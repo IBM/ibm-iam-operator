@@ -1,0 +1,1037 @@
+//
+// Copyright 2020 IBM Corporation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+package authentication
+
+import (
+	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"strconv"
+)
+
+
+
+func buildInitContainers(mongoDBImage string) []corev1.Container {
+	return []corev1.Container{
+		{
+			Name: "init-mongodb",
+			Image: mongoDBImage,
+			ImagePullPolicy: corev1.PullAlways,
+			Command: []string{
+				"bash",
+				"-c",
+				"until </dev/tcp/mongodb.kube-system/27017 ; do sleep 5; done;",
+			},
+			SecurityContext: &corev1.SecurityContext{
+				Privileged: &falseVar,
+				RunAsNonRoot: &trueVar,
+				ReadOnlyRootFilesystem: &trueVar,
+				AllowPrivilegeEscalation: &falseVar,
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL",},
+				},
+			},
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
+		},
+	}
+}
+
+func buildAuditContainer(auditImage string, journalPath string) corev1.Container {
+
+	return corev1.Container{
+		Name : "icp-audit-service",
+		Image : auditImage,
+		ImagePullPolicy : corev1.PullAlways,
+		Env : []corev1.EnvVar{
+			{
+				Name : "AUDIT_DIR",
+				Value : "/var/log/audit",
+			},
+		},
+		VolumeMounts : []corev1.VolumeMount {
+			{
+				Name : "shared",
+				MountPath : "/var/log/audit",
+			},
+			{
+				Name : "journal",
+				MountPath : journalPath,
+			},
+			{
+				Name : "logrotate",
+				MountPath : "/etc/logrotate.d/audit",
+				SubPath: "audit",
+			},
+			{
+				Name : "logrotate-conf",
+				MountPath : "/etc/logrotate.conf",
+				SubPath : "logrotate.conf",
+			},
+		},
+		SecurityContext: &corev1.SecurityContext{
+			Privileged: &falseVar,
+			RunAsNonRoot: &trueVar,
+			ReadOnlyRootFilesystem: &trueVar,
+			AllowPrivilegeEscalation: &falseVar,
+			RunAsUser : &user,
+			SELinuxOptions: &corev1.SELinuxOptions{
+				Type: "spc_t",
+			},
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL",},
+			},
+		},
+		Resources: corev1.ResourceRequirements{
+			Limits: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu100,
+				corev1.ResourceMemory: *memory128},
+			Requests: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu10,
+				corev1.ResourceMemory: *memory32},
+		},
+	}
+
+}
+
+func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication,authServiceImage string) corev1.Container {
+
+	envVars := []corev1.EnvVar {
+		{
+			Name : "MONGO_DB_NAME",
+			Value : "platform-db",
+		},
+		{
+			Name : "MONGO_COLLECTION",
+			Value : "iam",
+		},
+		{
+			Name : "MONGO_USERNAME",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "icp-mongodb-admin",
+					},
+					Key : "user",
+				},
+			},
+		},
+		{
+			Name : "MONGO_PASSWORD",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "icp-mongodb-admin",
+					},
+					Key : "password",
+				},
+			},
+		},
+		{
+			Name : "POD_NAME",
+			ValueFrom : &corev1.EnvVarSource{
+				FieldRef : &corev1.ObjectFieldSelector{
+					APIVersion : "v1",
+					FieldPath : "metadata.name",
+				},
+			}, 
+		},
+		{
+			Name : "POD_NAMESPACE",
+			ValueFrom : &corev1.EnvVarSource{
+				FieldRef : &corev1.ObjectFieldSelector{
+					APIVersion : "v1",
+					FieldPath : "metadata.namespace",
+				},
+			}, 
+		},
+		{
+			Name : "MONGO_HOST",
+			Value : "mongodb",
+		},
+		{
+			Name :"MONGO_PORT",
+			Value : "27017",
+		},
+		
+		{
+			Name : "MONGO_AUTHSOURCE",
+			Value : "admin",
+		},
+		{
+			Name : "WLP_CLIENT_ID",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-oidc-credentials",
+					},
+					Key : "WLP_CLIENT_ID",
+				},
+			},
+		},
+		{
+			Name : "WLP_CLIENT_SECRET",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-oidc-credentials",
+					},
+					Key : "WLP_CLIENT_SECRET",
+				},
+			},
+		},
+		{
+			Name : "WLP_SCOPE",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-oidc-credentials",
+					},
+					Key : "WLP_SCOPE",
+				},
+			},
+		},
+		{
+			Name : "OAUTH2_CLIENT_REGISTRATION_SECRET",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-oidc-credentials",
+					},
+					Key : "OAUTH2_CLIENT_REGISTRATION_SECRET",
+				},
+			},
+		},
+		{
+			Name : "IBMID_CLIENT_SECRET",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-oidc-credentials",
+					},
+					Key : "IBMID_CLIENT_SECRET",
+				},
+			},
+		},
+		{
+			Name : "DEFAULT_ADMIN_USER",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp-credentials",
+					},
+					Key : "admin_username",
+				},
+			},
+		},
+		{
+			Name : "DEFAULT_ADMIN_PASSWORD",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp-credentials",
+					},
+					Key : "admin_password",
+				},
+			},
+		},
+
+	}
+	
+	idpEnvVarList := []string{"NODE_ENV","MASTER_HOST","IDENTITY_PROVIDER_URL","HTTP_ONLY","SESSION_TIMEOUT","LDAP_ATTR_CACHE_SIZE","LDAP_ATTR_CACHE_TIMEOUT","LDAP_ATTR_CACHE_ENABLED","LDAP_ATTR_CACHE_SIZELIMIT",
+	"LDAP_SEARCH_CACHE_SIZE","LDAP_SEARCH_CACHE_TIMEOUT","IDENTITY_PROVIDER_URL","IDENTITY_MGMT_URL","LDAP_SEARCH_CACHE_ENABLED","LDAP_SEARCH_CACHE_SIZELIMIT","IDTOKEN_LIFETIME","IBMID_CLIENT_ID","IBMID_CLIENT_ISSUER",
+	"SAML_NAMEID_FORMAT","FIPS_ENABLED","LOGJAM_DHKEYSIZE_2048_BITS_ENABLED","LOG_LEVEL_AUTHSVC","LIBERTY_DEBUG_ENABLED","OIDC_ISSUER_URL",}
+	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
+
+	envVars = append(envVars,idpEnvVars...)
+
+	if instance.Spec.Config.EnableImpersonation == true {
+		impersonationVars := []corev1.EnvVar{
+			{
+				Name : "ENABLE_IMPERSONATION",
+				Value : "true",
+			},
+			{
+				Name : "KUBE_APISEVER_HOST",
+				Value : "icp-management-ingress",
+			},
+			{
+				Name : "KUBERNETES_SERVICE_HOST",
+				Value : "icp-management-ingress",
+			},
+		}
+
+		envVars = append(envVars,impersonationVars...)
+
+	}
+
+
+	return corev1.Container{
+		Name : "platform-auth-service",
+		Image : authServiceImage,
+		ImagePullPolicy : corev1.PullAlways,
+		SecurityContext: &corev1.SecurityContext{
+			Privileged: &falseVar,
+			RunAsNonRoot: &trueVar,
+			ReadOnlyRootFilesystem: &trueVar,
+			AllowPrivilegeEscalation: &falseVar,
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL",},
+			},
+		},
+		Resources: corev1.ResourceRequirements{
+			Limits: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu1000,
+				corev1.ResourceMemory: *memory1024},
+			Requests: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu100,
+				corev1.ResourceMemory: *memory350},
+		},
+		VolumeMounts : []corev1.VolumeMount{
+			{
+				Name : "auth-key",
+				MountPath : "/certs/platform-auth",
+			},
+			{
+				Name : "ibmid-jwk-cert",
+				MountPath : "/certs/ibmid/jwk",
+			},
+			{
+				Name : "ibmid-ssl-cert",
+				MountPath : "/certs/ibmid/ssl",
+			},
+			{
+				Name : "ldaps-ca-cert",
+				MountPath : "/opt/ibm/ldaps",
+			},
+			{
+				Name : "mongodb-ca-cert",
+				MountPath : "/certs/mongodb-ca",
+			},
+			{
+				Name : "mongodb-client-cert",
+				MountPath : "/certs/mongodb-client",
+			},
+			{
+				Name : "router-certs",
+				MountPath : "/certs/router-certs",
+			},
+		},
+		ReadinessProbe : &corev1.Probe {
+			Handler : corev1.Handler {
+				HTTPGet : &corev1.HTTPGetAction{
+					Path : "/iam/oidc/keys",
+					Port : intstr.IntOrString{
+						IntVal : authServicePort,
+					},
+					Scheme : "HTTPS",
+				},
+			},
+			InitialDelaySeconds : 60,
+			PeriodSeconds : 30,
+			FailureThreshold : 6,
+		},
+		LivenessProbe : &corev1.Probe {
+			Handler : corev1.Handler {
+				HTTPGet : &corev1.HTTPGetAction{
+					Path : "/iam/oidc/keys",
+					Port : intstr.IntOrString{
+						IntVal : authServicePort,
+					},
+					Scheme : "HTTPS",
+				},
+			},
+			InitialDelaySeconds : 180,
+			PeriodSeconds : 30,
+			FailureThreshold : 6,
+		},
+		Env : envVars,
+
+	}
+
+}
+
+func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication,identityProviderImage string) corev1.Container {
+
+	envVars := []corev1.EnvVar {
+		{
+			Name : "MONGO_DB_NAME",
+			Value : "platform-db",
+		},
+		{
+			Name : "SERVICE_NAME",
+			Value : "platform-identity-provider",
+		},
+		{
+			Name : "AUDIT_ENABLED",
+			ValueFrom : &corev1.EnvVarSource{
+				ConfigMapKeyRef : &corev1.ConfigMapKeySelector {
+					LocalObjectReference : corev1.LocalObjectReference{
+						Name : "platform-auth-idp",
+					},
+					Key : "AUDIT_ENABLED_IDPROVIDER",
+				},
+			},
+		},
+		{
+			Name : "POD_NAME",
+			ValueFrom : &corev1.EnvVarSource{
+				FieldRef : &corev1.ObjectFieldSelector{
+					APIVersion : "v1",
+					FieldPath : "metadata.name",
+				},
+			}, 
+		},
+		{
+			Name : "POD_NAMESPACE",
+			ValueFrom : &corev1.EnvVarSource{
+				FieldRef : &corev1.ObjectFieldSelector{
+					APIVersion : "v1",
+					FieldPath : "metadata.namespace",
+				},
+			}, 
+		},
+		{
+			Name : "ENCRYPTION_KEY",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp-encryption",
+					},
+					Key : "ENCRYPTION_KEY",
+				},
+			},
+		},
+		{
+			Name : "algorithm",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp-encryption",
+					},
+					Key : "algorithm",
+				},
+			},
+		},
+		{
+			Name : "inputEncoding",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp-encryption",
+					},
+					Key : "inputEncoding",
+				},
+			},
+		},
+		{
+			Name : "outputEncoding",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp-encryption",
+					},
+					Key : "outputEncoding",
+				},
+			},
+		},
+		{
+			Name : "MONGO_COLLECTION",
+			Value : "iam",
+		},
+		{
+			Name : "MONGO_USERNAME",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "icp-mongodb-admin",
+					},
+					Key : "user",
+				},
+			},
+		},
+		{
+			Name : "MONGO_PASSWORD",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "icp-mongodb-admin",
+					},
+					Key : "password",
+				},
+			},
+		},
+		
+		{
+			Name : "MONGO_HOST",
+			Value : "mongodb",
+		},
+		{
+			Name :"MONGO_PORT",
+			Value : "27017",
+		},
+		
+		{
+			Name : "MONGO_AUTHSOURCE",
+			Value : "admin",
+		},
+		{
+			Name  : "OPENSHIFT_URL",
+			Value : "https://kubernetes.default:443",
+		},
+		{
+			Name  : "IS_OPENSHIFT_ENV",
+			Value : strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv), 
+		},
+		{
+			Name : "roksClientId",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-oidc-credentials",
+					},
+					Key : "WLP_CLIENT_ID",
+				},
+			},
+		},
+		{
+			Name : "roksClientSecret",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-oidc-credentials",
+					},
+					Key : "WLP_CLIENT_SECRET",
+				},
+			},
+		},
+		{
+			Name : "wlpClientId",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-oidc-credentials",
+					},
+					Key : "WLP_CLIENT_ID",
+				},
+			},
+		},
+		{
+			Name : "wlpClientSecret",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-oidc-credentials",
+					},
+					Key : "WLP_CLIENT_SECRET",
+				},
+			},
+		},
+		{
+			Name  : "IDMGMT_KUBEDNS_NAME",
+			Value : "127.0.0.1",
+		},
+		{
+			Name : "OAUTH2_CLIENT_REGISTRATION_SECRET",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-oidc-credentials",
+					},
+					Key : "OAUTH2_CLIENT_REGISTRATION_SECRET",
+				},
+			},
+		},
+		{
+			Name : "DEFAULT_ADMIN_USER",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp-credentials",
+					},
+					Key : "admin_username",
+				},
+			},
+		},
+		{
+			Name : "DEFAULT_ADMIN_PASSWORD",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp-credentials",
+					},
+					Key : "admin_password",
+				},
+			},
+		},
+		{
+			Name  : "IAM_PAP_URL",
+			Value : "https://iam-pap:39001",
+		},
+
+	}
+	
+	idpEnvVarList := []string{"NODE_ENV","LOG_LEVEL_IDPROVIDER","LOG_LEVEL_MW","IDTOKEN_LIFETIME","ROKS_ENABLED","ROKS_URL","OS_TOKEN_LENGTH","LIBERTY_TOKEN_LENGTH",
+	"MASTER_HOST","IDENTITY_PROVIDER_URL","BASE_AUTH_URL","BASE_OIDC_URL","OIDC_ISSUER_URL","HTTP_ONLY",}
+	
+	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
+
+	envVars = append(envVars,idpEnvVars...)
+
+	if instance.Spec.Config.EnableImpersonation == true {
+		impersonationVars := []corev1.EnvVar{
+			{
+				Name : "ENABLE_IMPERSONATION",
+				Value : "true",
+			},
+			{
+				Name : "KUBE_APISEVER_HOST",
+				Value : "icp-management-ingress",
+			},
+			{
+				Name : "KUBERNETES_SERVICE_HOST",
+				Value : "icp-management-ingress",
+			},
+		}
+
+		envVars = append(envVars,impersonationVars...)
+
+	}
+
+
+	return corev1.Container{
+		Name : "platform-identity-provider",
+		Image : identityProviderImage,
+		ImagePullPolicy : corev1.PullAlways,
+		SecurityContext: &corev1.SecurityContext{
+			Privileged: &falseVar,
+			RunAsNonRoot: &trueVar,
+			ReadOnlyRootFilesystem: &trueVar,
+			AllowPrivilegeEscalation: &falseVar,
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL",},
+			},
+		},
+		Resources: corev1.ResourceRequirements{
+			Limits: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu1000,
+				corev1.ResourceMemory: *memory1024},
+			Requests: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu50,
+				corev1.ResourceMemory: *memory150},
+		},
+		VolumeMounts : []corev1.VolumeMount{
+			{
+				Name : "auth-key",
+				MountPath : "/opt/ibm/identity-provider/server/boot/auth-key",
+			},
+			{
+				Name : "shared",
+				MountPath : "/var/log/audit",
+			},
+			{
+				Name : "identity-provider-crt",
+				MountPath : "/opt/ibm/identity-provider/certs",
+			},
+			{
+				Name : "mongodb-ca-cert",
+				MountPath : "/certs/mongodb-ca",
+			},
+			{
+				Name : "mongodb-client-cert",
+				MountPath : "/certs/mongodb-client",
+			},
+		},
+		ReadinessProbe : &corev1.Probe {
+			Handler : corev1.Handler {
+				HTTPGet : &corev1.HTTPGetAction{
+					Path : "/",
+					Port : intstr.IntOrString{
+						IntVal : identityProviderPort,
+					},
+					Scheme : "HTTPS",
+				},
+			},
+		},
+		LivenessProbe : &corev1.Probe {
+			Handler : corev1.Handler {
+				HTTPGet : &corev1.HTTPGetAction{
+					Path : "/",
+					Port : intstr.IntOrString{
+						IntVal : identityProviderPort,
+					},
+					Scheme : "HTTPS",
+				},
+			},
+		},
+		Env : envVars,
+
+	}
+
+}
+
+
+func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication,identityManagerImage string) corev1.Container {
+
+	envVars := []corev1.EnvVar {
+		{
+			Name : "MONGO_DB_NAME",
+			Value : "platform-db",
+		},
+		{
+			Name : "SERVICE_NAME",
+			Value : "platform-identity-management",
+		},
+		{
+			Name : "AUDIT_ENABLED",
+			ValueFrom : &corev1.EnvVarSource{
+				ConfigMapKeyRef : &corev1.ConfigMapKeySelector {
+					LocalObjectReference : corev1.LocalObjectReference{
+						Name : "platform-auth-idp",
+					},
+					Key : "AUDIT_ENABLED_IDMGMT",
+				},
+			},
+		},
+		{
+			Name : "POD_NAME",
+			ValueFrom : &corev1.EnvVarSource{
+				FieldRef : &corev1.ObjectFieldSelector{
+					APIVersion : "v1",
+					FieldPath : "metadata.name",
+				},
+			}, 
+		},
+		{
+			Name : "POD_NAMESPACE",
+			ValueFrom : &corev1.EnvVarSource{
+				FieldRef : &corev1.ObjectFieldSelector{
+					APIVersion : "v1",
+					FieldPath : "metadata.namespace",
+				},
+			}, 
+		},
+		{
+			Name : "IBMID_PROFILE_CLIENT_SECRET",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-oidc-credentials",
+					},
+					Key : "IBMID_PROFILE_CLIENT_SECRET",
+				},
+			},
+		},
+		{
+			Name : "MONGO_COLLECTION",
+			Value : "iam",
+		},
+		{
+			Name : "MONGO_USERNAME",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "icp-mongodb-admin",
+					},
+					Key : "user",
+				},
+			},
+		},
+		{
+			Name : "MONGO_PASSWORD",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "icp-mongodb-admin",
+					},
+					Key : "password",
+				},
+			},
+		},
+		
+		{
+			Name : "MONGO_HOST",
+			Value : "mongodb",
+		},
+		{
+			Name :"MONGO_PORT",
+			Value : "27017",
+		},
+		
+		{
+			Name : "MONGO_AUTHSOURCE",
+			Value : "admin",
+		},
+		{
+			Name  : "OPENSHIFT_URL",
+			Value : "https://kubernetes.default:443",
+		},
+		{
+			Name  : "IS_OPENSHIFT_ENV",
+			Value : strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv), 
+		},
+		{
+			Name : "roksClientId",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-oidc-credentials",
+					},
+					Key : "WLP_CLIENT_ID",
+				},
+			},
+		},
+		{
+			Name : "roksClientSecret",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-oidc-credentials",
+					},
+					Key : "WLP_CLIENT_SECRET",
+				},
+			},
+		},
+		{
+			Name : "DEFAULT_ADMIN_USER",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp-credentials",
+					},
+					Key : "admin_username",
+				},
+			},
+		},
+		{
+			Name : "DEFAULT_ADMIN_PASSWORD",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp-credentials",
+					},
+					Key : "admin_password",
+				},
+			},
+		},
+		{
+			Name  : "IDPROVIDER_KUBEDNS_NAME",
+			Value : "127.0.0.1",
+		},
+		{
+			Name  : "MASTER_NODES_LIST",
+			Value : instance.Spec.IdentityManager.MasterNodesList,
+		},
+		{
+			Name : "LOCAL_NODE_IP",
+			ValueFrom : &corev1.EnvVarSource{
+				FieldRef : &corev1.ObjectFieldSelector{
+					APIVersion : "v1",
+					FieldPath : "status.hostIP",
+				},
+			}, 
+		},
+		{
+			Name : "LOCAL_POD_IP",
+			ValueFrom : &corev1.EnvVarSource{
+				FieldRef : &corev1.ObjectFieldSelector{
+					APIVersion : "v1",
+					FieldPath : "status.podIP",
+				},
+			}, 
+		},
+		{
+			Name : "WLP_CLIENT_ID",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-oidc-credentials",
+					},
+					Key : "WLP_CLIENT_ID",
+				},
+			},
+		},
+		{
+			Name : "WLP_CLIENT_SECRET",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-oidc-credentials",
+					},
+					Key : "WLP_CLIENT_SECRET",
+				},
+			},
+		},
+		{
+			Name : "WLP_SCOPE",
+			ValueFrom : &corev1.EnvVarSource{
+				SecretKeyRef : &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-oidc-credentials",
+					},
+					Key : "WLP_SCOPE",
+				},
+			},
+		},
+
+	}
+	
+	idpEnvVarList := []string{"NODE_ENV","LOG_LEVEL_IDMGMT","LOG_LEVEL_MW","IBMID_PROFILE_URL","IBMID_PROFILE_CLIENT_ID","IBMID_PROFILE_FIELDS","AUDIT_DETAIL",
+          "ROKS_ENABLED","ROKS_USER_PREFIX","IDENTITY_AUTH_DIRECTORY_URL","OIDC_ISSUER_URL","CLUSTER_NAME","HTTP_ONLY","LDAP_SEARCH_SIZE_LIMIT","LDAP_SEARCH_TIME_LIMIT",
+           "LDAP_SEARCH_CN_ATTR_ONLY","LDAP_SEARCH_ID_ATTR_ONLY","LDAP_SEARCH_EXCLUDE_WILDCARD_CHARS","IGNORE_LDAP_FILTERS_VALIDATION","MASTER_HOST",}
+	
+	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
+
+	envVars = append(envVars,idpEnvVars...)
+
+	if instance.Spec.Config.EnableImpersonation == true {
+		impersonationVars := []corev1.EnvVar{
+			{
+				Name : "ENABLE_IMPERSONATION",
+				Value : "true",
+			},
+			{
+				Name : "KUBE_APISEVER_HOST",
+				Value : "icp-management-ingress",
+			},
+			{
+				Name : "KUBERNETES_SERVICE_HOST",
+				Value : "icp-management-ingress",
+			},
+		}
+
+		envVars = append(envVars,impersonationVars...)
+
+	} else{
+		newVar := corev1.EnvVar{
+			Name : "KUBE_APISERVER_HOST",
+			Value : "kubernetes.default",
+		}
+		envVars = append(envVars,newVar)
+	}
+
+
+	return corev1.Container{
+		Name : "platform-identity-manager",
+		Image : identityManagerImage,
+		ImagePullPolicy : corev1.PullAlways,
+		SecurityContext: &corev1.SecurityContext{
+			Privileged: &falseVar,
+			RunAsNonRoot: &trueVar,
+			ReadOnlyRootFilesystem: &trueVar,
+			AllowPrivilegeEscalation: &falseVar,
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL",},
+			},
+		},
+		Resources: corev1.ResourceRequirements{
+			Limits: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu1000,
+				corev1.ResourceMemory: *memory1024},
+			Requests: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu50,
+				corev1.ResourceMemory: *memory150},
+		},
+		VolumeMounts : []corev1.VolumeMount{
+			{
+				Name : "cluster-ca",
+				MountPath : "/opt/ibm/identity-mgmt/certs",
+			},
+			{
+				Name : "platform-identity-management",
+				MountPath : "/opt/ibm/identity-mgmt/server/certs",
+			},
+			{
+				Name : "shared",
+				MountPath : "/var/log/audit",
+			},
+			{
+				Name : "mongodb-ca-cert",
+				MountPath : "/certs/mongodb-ca",
+			},
+			{
+				Name : "mongodb-client-cert",
+				MountPath : "/certs/mongodb-client",
+			},
+		},
+		ReadinessProbe : &corev1.Probe {
+			Handler : corev1.Handler {
+				HTTPGet : &corev1.HTTPGetAction{
+					Path : "/",
+					Port : intstr.IntOrString{
+						IntVal : identityManagerPort,
+					},
+					Scheme : "HTTPS",
+				},
+			},
+		},
+		LivenessProbe : &corev1.Probe {
+			Handler : corev1.Handler {
+				HTTPGet : &corev1.HTTPGetAction{
+					Path : "/",
+					Port : intstr.IntOrString{
+						IntVal : identityManagerPort,
+					},
+					Scheme : "HTTPS",
+				},
+			},
+		},
+		Env : envVars,
+
+	}
+
+}
+
+func buildContainers(instance *operatorv1alpha1.Authentication,auditImage string, authServiceImage string,identityProviderImage string,identityManagerImage string, journalPath string) []corev1.Container {
+	
+	auditContainer := buildAuditContainer(auditImage, journalPath)
+	authServiceContainer := buildAuthServiceContainer(instance,authServiceImage)
+	identityProviderContainer := buildIdentityProviderContainer(instance,identityProviderImage)
+	identityManagerContainer := buildIdentityManagerContainer(instance,identityManagerImage)
+
+	return []corev1.Container{auditContainer,authServiceContainer,identityProviderContainer,identityManagerContainer,}
+}
+
+
+
+func buildIdpEnvVars(envVarList []string) []corev1.EnvVar{
+	
+	envVars := []corev1.EnvVar{}
+	for _,varName := range envVarList{
+		envVar := corev1.EnvVar{
+			Name : varName,
+			ValueFrom : &corev1.EnvVarSource{
+				ConfigMapKeyRef : &corev1.ConfigMapKeySelector {
+					LocalObjectReference : corev1.LocalObjectReference{
+						Name : "platform-auth-idp",
+					},
+					Key : varName,
+				},
+			},
+		}
+		envVars = append(envVars,envVar)
+
+	}
+	return envVars
+}

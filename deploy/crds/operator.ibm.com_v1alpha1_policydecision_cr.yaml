@@ -1,0 +1,7 @@
+apiVersion: operator.ibm.com/v1alpha1
+kind: PolicyDecision
+metadata:
+  name: example-policydecision
+spec:
+  # Add fields here
+  size: 3

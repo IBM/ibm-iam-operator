@@ -1,0 +1,7 @@
+apiVersion: operator.ibm.com/v1alpha1
+kind: Authentication
+metadata:
+  name: example-authentication
+spec:
+  # Add fields here
+  size: 3

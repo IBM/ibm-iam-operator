@@ -1,7 +1,10 @@
+  
 apiVersion: operator.ibm.com/v1alpha1
 kind: OIDCClientWatcher
 metadata:
   name: example-oidcclientwatcher
 spec:
-  # Add fields here
-  size: 3
+  operatorVersion: "0.14.1"
+  imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64/icp-oidcclient-watcher"
+  imageTagPostFix: "3.3.0"
+  replicas: 1

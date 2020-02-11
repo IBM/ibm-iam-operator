@@ -1,0 +1,11 @@
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ibm-iam-operator
+subjects:
+- kind: ServiceAccount
+  name: ibm-iam-operator
+roleRef:
+  kind: Role
+  name: ibm-iam-operator
+  apiGroup: rbac.authorization.k8s.io

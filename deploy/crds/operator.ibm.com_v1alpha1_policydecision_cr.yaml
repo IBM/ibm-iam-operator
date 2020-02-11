@@ -1,0 +1,20 @@
+  
+apiVersion: operator.ibm.com/v1alpha1
+kind: PolicyDecision
+metadata:
+  name: example-policydecision
+spec:
+  auditService:
+    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageName: "icp-audit-service"
+    imageTag: "3.3.1"
+    journalPath: "/run/systemd/journal"
+  imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+  imageName: "icp-secret-watcher"
+  imageTag: "3.3.0"
+  initMongodb:
+    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageName: "icp-platform-auth"
+    imageTag: "3.3.0"
+  operatorVersion: "0.14.1"
+  replicas: 1

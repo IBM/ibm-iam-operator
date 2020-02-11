@@ -1,0 +1,56 @@
+apiVersion: operator.ibm.com/v1alpha1
+kind: Authentication
+metadata:
+  name: example-authentication
+spec:
+  operatorVersion: "0.14.1"
+  replicas: 1
+  auditService: 
+    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageName: "icp-audit-service"
+    imageTag: "3.3.1"
+    journalPath: "/run/systemd/journal"
+  authService:
+    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageName: "icp-platform-auth"
+    imageTag: "3.3.0"
+    ldapsCACert: "platform-auth-ldaps-ca-cert"
+    routerCertSecret: "icp-management-ingress-tls-secret"
+  clientRegistration:
+    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageName: "icp-platform-auth"
+    imageTag: "3.3.0"
+  identityManager:
+    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageName: "icp-identity-manager"
+    imageTag: "3.3.1"
+    masterNodesList : "10.0.0.1 10.0.0.2 10.0.0.3"
+  identityProvider:
+    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageName: "icp-identity-provider"
+    imageTag: "3.3.1"
+  initMongodb:
+    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageName: "icp-platform-auth"
+    imageTag: "3.3.0"
+  config:
+    oidcIssuerURL: "https://127.0.0.1:8443/idauth/oidc/endpoint/OP"
+    authUniqueHosts: "internal-ip1 internal-ip2 mycluster.icp"
+    clusterCADomain: "mycluster.icp"
+    clusterExternalAddress: "10.0.0.1"
+    clusterInternalAddress: "10.0.0.1"
+    clusterName: "mycluster"
+    defaultAdminPassword: "password"
+    defaultAdminUser: "admin"
+    enableImpersonation: true
+    fipsEnabled: true
+    icpPort: 8443
+    installType: "fresh"
+    isOpenshiftEnv: true
+    openshiftPort: 443
+    roksEnabled: true
+    roksURL : "https://roks.domain.name:443"
+    roksUserPrefix : "IAM#"
+    wlpClientID : "Awdfagsadf"
+    wlpClientRegistrationSecret: "Awdfagsadf"
+    wlpClientSecret: "Awdfagsadf"

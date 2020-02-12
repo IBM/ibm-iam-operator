@@ -1,7 +1,9 @@
 apiVersion: operator.ibm.com/v1alpha1
 kind: PolicyController
 metadata:
-  name: example-policycontroller
+  name: policycontroller-deployment
 spec:
-  # Add fields here
-  size: 3
+  operatorVersion: "0.14.1"
+  imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64/iam-policy-controller"
+  imageTagPostfix: "3.3.0"
+  replicas: 1

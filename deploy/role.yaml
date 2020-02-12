@@ -74,6 +74,7 @@ rules:
   - oidcclientwatchers
   - authentications
   - policycontrollers
+  - paps
   verbs:
   - create
   - delete

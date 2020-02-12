@@ -30,9 +30,66 @@ spec:
           type: object
         spec:
           description: PapSpec defines the desired state of Pap
+          properties:
+            auditService:
+              properties:
+                imageName:
+                  type: string
+                imageRegistry:
+                  type: string
+                imageTag:
+                  type: string
+                journalPath:
+                  type: string
+              required:
+              - imageName
+              - imageRegistry
+              - imageTag
+              - journalPath
+              type: object
+            operatorVersion:
+              description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+                Important: Run "operator-sdk generate k8s" to regenerate code after
+                modifying this file Add custom validation using kubebuilder tags:
+                https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html'
+              type: string
+            papService:
+              description: PapServiceSpec defined the desired state of PapService
+                Container
+              properties:
+                imageName:
+                  type: string
+                imageRegistry:
+                  type: string
+                imageTag:
+                  type: string
+              required:
+              - imageName
+              - imageRegistry
+              - imageTag
+              type: object
+            replicas:
+              format: int32
+              type: integer
+          required:
+          - auditService
+          - operatorVersion
+          - papService
+          - replicas
           type: object
         status:
           description: PapStatus defines the observed state of Pap
+          properties:
+            nodes:
+              description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
+                of cluster Important: Run "operator-sdk generate k8s" to regenerate
+                code after modifying this file Add custom validation using kubebuilder
+                tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html'
+              items:
+                type: string
+              type: array
+          required:
+          - nodes
           type: object
       type: object
   version: v1alpha1

@@ -42,13 +42,6 @@ type PapServiceSpec struct {
 	ImageTag      string `json:"imageTag"`
 }
 
-// AuditServiceSpec defined the desired state of AuditSidecar
-type AuditServiceSpec struct {
-	ImageRegistry string `json:"imageRegistry"`
-	ImageName     string `json:"imageName"`
-	ImageTag      string `json:"imageTag"`
-	JournalPath   string `json:"journalPath"`
-}
 
 // PapStatus defines the observed state of Pap
 type PapStatus struct {

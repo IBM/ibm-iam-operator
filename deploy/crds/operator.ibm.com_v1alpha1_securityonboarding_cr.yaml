@@ -1,0 +1,37 @@
+apiVersion: operator.ibm.com/v1alpha1
+kind: SecurityOnboarding
+metadata:
+  name: example-securityonboarding
+spec:
+  # Add fields here
+  operatorVersion: "0.14.1"
+  replicas: 1
+  imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+  imageName: "icp-iam-onboarding"
+  imageTag: "3.3.1"
+  iamOnboarding:
+    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageName: "icp-iam-onboarding"
+    imageTag: "3.3.1"
+  initAuthService:
+    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageName: "icp-platform-auth"
+    imageTag: "3.3.1"
+  initIdentityProvider:
+    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageName: "icp-platform-auth"
+    imageTag: "3.3.1"
+  initIdentityManager:
+    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageName: "icp-platform-auth"
+    imageTag: "3.3.1"
+  initTokenService:
+    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageName: "icp-platform-auth"
+    imageTag: "3.3.1"
+  initPAPSpec:
+    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageName: "icp-platform-auth"
+    imageTag: "3.3.1"
+  impersonation:
+    enableImpersonation: false

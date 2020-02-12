@@ -21,36 +21,35 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 var secretData map[string]map[string][]byte
 
-func generateSecretData(instance *operatorv1alpha1.Authentication){
+func generateSecretData(instance *operatorv1alpha1.Authentication) {
 	secretData = map[string]map[string][]byte{
-		"platform-auth-idp-credentials" : map[string][]byte{
-										  	"admin_username" : []byte(instance.Spec.Config.DefaultAdminUser),
-										  	"admin_password" : []byte(instance.Spec.Config.DefaultAdminPassword),
-										  },
-		"platform-auth-idp-encryption"  : map[string][]byte{
-										  	//@posriniv - get back
-										  	"ENCRYPTION_KEY"  : []byte("encryption_key"),
-										  	"algorithm"       : []byte("aes256"),
-										  	"inputEncoding"   : []byte("utf8"),
-										  	"outputEncoding"  : []byte("hex"),
-										  },
-		"platform-oidc-credentials"     : map[string][]byte{
-										  	"WLP_CLIENT_ID"     				  : []byte(instance.Spec.Config.WLPClientID),
-										  	"WLP_CLIENT_SECRET" 				  : []byte(instance.Spec.Config.WLPClientSecret),
-										  	"WLP_SCOPE"         				  : []byte("openid+profile+email"),
-										  	"OAUTH2_CLIENT_REGISTRATION_SECRET"   : []byte(instance.Spec.Config.WLPClientRegistrationSecret),
-										  
-										  },
-		"platform-auth-ibmid-jwk"       : map[string][]byte{
-										  	"cert" : []byte( `-----BEGIN CERTIFICATE-----
+		"platform-auth-idp-credentials": map[string][]byte{
+			"admin_username": []byte(instance.Spec.Config.DefaultAdminUser),
+			"admin_password": []byte(instance.Spec.Config.DefaultAdminPassword),
+		},
+		"platform-auth-idp-encryption": map[string][]byte{
+			//@posriniv - get back
+			"ENCRYPTION_KEY": []byte("encryption_key"),
+			"algorithm":      []byte("aes256"),
+			"inputEncoding":  []byte("utf8"),
+			"outputEncoding": []byte("hex"),
+		},
+		"platform-oidc-credentials": map[string][]byte{
+			"WLP_CLIENT_ID":                     []byte(instance.Spec.Config.WLPClientID),
+			"WLP_CLIENT_SECRET":                 []byte(instance.Spec.Config.WLPClientSecret),
+			"WLP_SCOPE":                         []byte("openid+profile+email"),
+			"OAUTH2_CLIENT_REGISTRATION_SECRET": []byte(instance.Spec.Config.WLPClientRegistrationSecret),
+		},
+		"platform-auth-ibmid-jwk": map[string][]byte{
+			"cert": []byte(`-----BEGIN CERTIFICATE-----
 										  			MIIG0DCCBbigAwIBAgIQDyDiN8JrsjRvvfSx1fvrzDANBgkqhkiG9w0BAQsFADBN
 										  			MQswCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMScwJQYDVQQDEx5E
 										  			aWdpQ2VydCBTSEEyIFNlY3VyZSBTZXJ2ZXIgQ0EwHhcNMTgwODMxMDAwMDAwWhcN
@@ -89,9 +88,9 @@ func generateSecretData(instance *operatorv1alpha1.Authentication){
 										  			41RMreIrVhJ93toFm60qvFTpTSW7HkNcM3ADOYFAFaOkZIaK4cfU2EG4UM+iSh2T
 										  			dkFT7dsc3V09lnpkGMSkqAs8VA0=
 										  			-----END CERTIFICATE-----`),
-										    },
-		"platform-auth-ibmid-sslchain"  : map[string][]byte{
-											"cert" : []byte(`-----BEGIN CERTIFICATE-----
+		},
+		"platform-auth-ibmid-sslchain": map[string][]byte{
+			"cert": []byte(`-----BEGIN CERTIFICATE-----
 													MIIDrzCCApegAwIBAgIQCDvgVpBCRrGhdWrJWZHHSjANBgkqhkiG9w0BAQUFADBh
 													MQswCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYDVQQLExB3
 													d3cuZGlnaWNlcnQuY29tMSAwHgYDVQQDExdEaWdpQ2VydCBHbG9iYWwgUm9vdCBD
@@ -140,52 +139,49 @@ func generateSecretData(instance *operatorv1alpha1.Authentication){
 													c+LJMto4JQtV05od8GiG7S5BNO98pVAdvzr508EIDObtHopYJeS4d60tbvVS3bR0
 													j6tJLp07kzQoH3jOlOrHvdPJbRzeXDLz
 													-----END CERTIFICATE-----`),
-										},
-
+		},
 	}
 }
 
-
-func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authentication, currentSecret *corev1.Secret, requeueResult *bool)(error){
+func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authentication, currentSecret *corev1.Secret, requeueResult *bool) error {
 
 	generateSecretData(instance)
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 
-	for secret,_ := range secretData {
+	for secret, _ := range secretData {
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: secret, Namespace: instance.Namespace}, currentSecret)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new Secret
-			newSecret := generateSecretObject(instance,r.scheme,secret)
+			newSecret := generateSecretObject(instance, r.scheme, secret)
 			reqLogger.Info("Creating a new Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
 			err = r.client.Create(context.TODO(), newSecret)
 			if err != nil {
 				reqLogger.Error(err, "Failed to create new Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
-				return  err
+				return err
 			}
 			// Secret created successfully - return and requeue
 			*requeueResult = true
 		} else if err != nil {
 			reqLogger.Error(err, "Failed to get Secret")
-			return  err
+			return err
 		}
 
 	}
-	
+
 	return nil
 
 }
 
-
-func generateSecretObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, secretName string) (*corev1.Secret){
+func generateSecretObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, secretName string) *corev1.Secret {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name, "Secret.Name", secretName)
 	newSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        secretName,
-			Namespace:   instance.Namespace,
+			Name:      secretName,
+			Namespace: instance.Namespace,
 		},
-		Type : corev1.SecretTypeOpaque,
+		Type: corev1.SecretTypeOpaque,
 		Data: secretData[secretName],
 	}
 
@@ -197,5 +193,3 @@ func generateSecretObject(instance *operatorv1alpha1.Authentication, scheme *run
 	}
 	return newSecret
 }
-
-

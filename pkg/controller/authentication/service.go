@@ -21,14 +21,13 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-
-func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authentication, currentService *corev1.Service, requeueResult *bool)(error){
+func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authentication, currentService *corev1.Service, requeueResult *bool) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "platform-auth-service", Namespace: instance.Namespace}, currentService)
@@ -39,13 +38,13 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 		err = r.client.Create(context.TODO(), platformAuthService)
 		if err != nil {
 			reqLogger.Error(err, "Failed to create new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-auth-service")
-			return  err
+			return err
 		}
 		// Service created successfully - return and requeue
 		*requeueResult = true
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Service")
-		return  err
+		return err
 	}
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "platform-identity-provider", Namespace: instance.Namespace}, currentService)
@@ -56,13 +55,13 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 		err = r.client.Create(context.TODO(), identityProviderService)
 		if err != nil {
 			reqLogger.Error(err, "Failed to create new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-identity-provider")
-			return  err
+			return err
 		}
 		// Service created successfully - return and requeue
 		*requeueResult = true
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Service")
-		return  err
+		return err
 	}
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "platform-identity-management", Namespace: instance.Namespace}, currentService)
@@ -73,13 +72,13 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 		err = r.client.Create(context.TODO(), identityManagementService)
 		if err != nil {
 			reqLogger.Error(err, "Failed to create new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-identity-management")
-			return  err
+			return err
 		}
 		// Service created successfully - return and requeue
 		*requeueResult = true
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Service")
-		return  err
+		return err
 	}
 
 	return nil
@@ -92,28 +91,28 @@ func (r *ReconcileAuthentication) platformAuthService(instance *operatorv1alpha1
 	var authPort int32 = 9443
 	var dirPort int32 = 3100
 	platformAuthService := &corev1.Service{
-				ObjectMeta : metav1.ObjectMeta{
-					Name:        "platform-auth-service",
-					Namespace:   instance.Namespace,
-					Labels:      map[string]string{"app": "auth-idp"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "platform-auth-service",
+			Namespace: instance.Namespace,
+			Labels:    map[string]string{"app": "auth-idp"},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name: "p9443",
+					Port: authPort,
 				},
-				Spec : corev1.ServiceSpec{
-					Ports : []corev1.ServicePort{
-						{
-							Name: "p9443",
-							Port: authPort,
-						},
-						{
-							Name: "p3100",
-							Port: dirPort,
-						},
-					},
-					Selector : map[string]string{
-								"k8s-app": "auth-idp",
-							  },
-					Type :     "ClusterIP",
-					SessionAffinity : corev1.ServiceAffinityClientIP,
+				{
+					Name: "p3100",
+					Port: dirPort,
 				},
+			},
+			Selector: map[string]string{
+				"k8s-app": "auth-idp",
+			},
+			Type:            "ClusterIP",
+			SessionAffinity: corev1.ServiceAffinityClientIP,
+		},
 	}
 
 	// Set Authentication instance as the owner and controller of the Service
@@ -132,32 +131,32 @@ func (r *ReconcileAuthentication) identityManagementService(instance *operatorv1
 	var idmgmtPort int32 = 4500
 	var redirectPort int32 = 443
 	identityManagementService := &corev1.Service{
-				ObjectMeta : metav1.ObjectMeta{
-					Name:        "platform-identity-management",
-					Namespace:   instance.Namespace,
-					Labels:      map[string]string{"app": "auth-idp"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "platform-identity-management",
+			Namespace: instance.Namespace,
+			Labels:    map[string]string{"app": "auth-idp"},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name: "p4500",
+					Port: idmgmtPort,
 				},
-				Spec : corev1.ServiceSpec{
-					Ports : []corev1.ServicePort{
-						{
-							Name : "p4500",
-							Port : idmgmtPort,
-						},
-						{
-							Name : "p443",
-							Port : redirectPort,
-							Protocol : corev1.ProtocolTCP,
-							TargetPort : intstr.IntOrString{
-								IntVal : idmgmtPort,
-							},
-						},
+				{
+					Name:     "p443",
+					Port:     redirectPort,
+					Protocol: corev1.ProtocolTCP,
+					TargetPort: intstr.IntOrString{
+						IntVal: idmgmtPort,
 					},
-					Selector : map[string]string{
-								"k8s-app": "auth-idp",
-							  },
-					Type :     "ClusterIP",
-					SessionAffinity : corev1.ServiceAffinityClientIP,
 				},
+			},
+			Selector: map[string]string{
+				"k8s-app": "auth-idp",
+			},
+			Type:            "ClusterIP",
+			SessionAffinity: corev1.ServiceAffinityClientIP,
+		},
 	}
 
 	// Set Authentication instance as the owner and controller of the Service
@@ -176,28 +175,28 @@ func (r *ReconcileAuthentication) identityProviderService(instance *operatorv1al
 	var idproviderPort int32 = 4300
 	var redirectPort int32 = 9443
 	identityProviderService := &corev1.Service{
-				ObjectMeta : metav1.ObjectMeta{
-					Name:        "platform-identity-provider",
-					Namespace:   instance.Namespace,
-					Labels:      map[string]string{"app": "auth-idp"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "platform-identity-provider",
+			Namespace: instance.Namespace,
+			Labels:    map[string]string{"app": "auth-idp"},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name: "p4300",
+					Port: idproviderPort,
 				},
-				Spec : corev1.ServiceSpec{
-					Ports : []corev1.ServicePort{
-						{
-							Name: "p4300",
-							Port: idproviderPort,
-						},
-						{
-							Name: "p9443",
-							Port: redirectPort,
-						},
-					},
-					Selector : map[string]string{
-								"k8s-app": "auth-idp",
-							  },
-					Type :     "ClusterIP",
-					SessionAffinity : corev1.ServiceAffinityClientIP,
+				{
+					Name: "p9443",
+					Port: redirectPort,
 				},
+			},
+			Selector: map[string]string{
+				"k8s-app": "auth-idp",
+			},
+			Type:            "ClusterIP",
+			SessionAffinity: corev1.ServiceAffinityClientIP,
+		},
 	}
 
 	// Set Authentication instance as the owner and controller of the Service

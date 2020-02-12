@@ -18,17 +18,17 @@ package policydecision
 
 import (
 	"context"
-	"reflect"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
-	appsv1 "k8s.io/api/apps/v1"
-	net "k8s.io/api/networking/v1beta1"
 	certmgr "github.ibm.com/IBMPrivateCloud/icp-cert-manager/pkg/apis/certmanager/v1alpha1"
-	"k8s.io/apimachinery/pkg/util/intstr"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	net "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -46,10 +46,6 @@ var defaultMode int32 = 420
 var seconds60 int64 = 60
 var user int64 = 21000
 var port int32 = 7998
-
-
-
-
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -130,7 +126,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -173,45 +169,44 @@ func (r *ReconcilePolicyDecision) Reconcile(request reconcile.Request) (reconcil
 	// Check if this Service already exists and create it if it doesn't
 	currentCertificate := &certmgr.Certificate{}
 	recResult, err := r.handleCertificate(instance, currentCertificate)
-	if err !=  nil{
+	if err != nil {
 		return recResult, err
 	}
 
 	// Check if this Service already exists and create it if it doesn't
 	currentService := &corev1.Service{}
 	recResult, err = r.handleService(instance, currentService)
-	if err !=  nil{
+	if err != nil {
 		return recResult, err
 	}
 
 	// Check if this ConfigMap already exists and create it if it doesn't
 	currentConfigMap := &corev1.ConfigMap{}
 	recResult, err = r.handleConfigMap(instance, currentConfigMap)
-	if err !=  nil{
+	if err != nil {
 		return recResult, err
 	}
 
 	// Check if this Ingress already exists and create it if it doesn't
 	currentIngress := &net.Ingress{}
 	recResult, err = r.handleIngress(instance, currentIngress)
-	if err !=  nil{
+	if err != nil {
 		return recResult, err
 	}
 
 	// Check if this Deployment already exists and create it if it doesn't
 	currentDeployment := &appsv1.Deployment{}
 	recResult, err = r.handleDeployment(instance, currentDeployment)
-	if err !=  nil{
+	if err != nil {
 		return recResult, err
 	}
 
-	return reconcile.Result{}, nil	
+	return reconcile.Result{}, nil
 
 }
 
+func (r *ReconcilePolicyDecision) handleCertificate(instance *operatorv1alpha1.PolicyDecision, currentCertificate *certmgr.Certificate) (reconcile.Result, error) {
 
-func (r *ReconcilePolicyDecision) handleCertificate(instance *operatorv1alpha1.PolicyDecision, currentCertificate *certmgr.Certificate) (reconcile.Result, error){
-	
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "auth-pdp-cert", Namespace: instance.Namespace}, currentCertificate)
 	if err != nil && errors.IsNotFound(err) {
@@ -234,7 +229,7 @@ func (r *ReconcilePolicyDecision) handleCertificate(instance *operatorv1alpha1.P
 
 }
 
-func (r *ReconcilePolicyDecision) handleConfigMap(instance *operatorv1alpha1.PolicyDecision, currentConfigMap *corev1.ConfigMap)(reconcile.Result, error){
+func (r *ReconcilePolicyDecision) handleConfigMap(instance *operatorv1alpha1.PolicyDecision, currentConfigMap *corev1.ConfigMap) (reconcile.Result, error) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "auth-pdp", Namespace: instance.Namespace}, currentConfigMap)
@@ -258,7 +253,7 @@ func (r *ReconcilePolicyDecision) handleConfigMap(instance *operatorv1alpha1.Pol
 
 }
 
-func (r *ReconcilePolicyDecision) handleIngress(instance *operatorv1alpha1.PolicyDecision, currentIngress *net.Ingress)(reconcile.Result, error){
+func (r *ReconcilePolicyDecision) handleIngress(instance *operatorv1alpha1.PolicyDecision, currentIngress *net.Ingress) (reconcile.Result, error) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "iam-pdp", Namespace: instance.Namespace}, currentIngress)
@@ -282,7 +277,7 @@ func (r *ReconcilePolicyDecision) handleIngress(instance *operatorv1alpha1.Polic
 
 }
 
-func (r *ReconcilePolicyDecision) handleService(instance *operatorv1alpha1.PolicyDecision, currentService *corev1.Service)(reconcile.Result, error){
+func (r *ReconcilePolicyDecision) handleService(instance *operatorv1alpha1.PolicyDecision, currentService *corev1.Service) (reconcile.Result, error) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "iam-pdp", Namespace: instance.Namespace}, currentService)
@@ -306,7 +301,7 @@ func (r *ReconcilePolicyDecision) handleService(instance *operatorv1alpha1.Polic
 
 }
 
-func (r *ReconcilePolicyDecision) handleDeployment(instance *operatorv1alpha1.PolicyDecision, currentDeployment *appsv1.Deployment)(reconcile.Result, error){
+func (r *ReconcilePolicyDecision) handleDeployment(instance *operatorv1alpha1.PolicyDecision, currentDeployment *appsv1.Deployment) (reconcile.Result, error) {
 
 	// Check if this Deployment already exists
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
@@ -327,7 +322,7 @@ func (r *ReconcilePolicyDecision) handleDeployment(instance *operatorv1alpha1.Po
 	podList := &corev1.PodList{}
 	listOpts := []client.ListOption{
 		client.InNamespace(instance.Namespace),
-		client.MatchingLabels(map[string]string{"k8s-app" : "auth-pdp"},),
+		client.MatchingLabels(map[string]string{"k8s-app": "auth-pdp"}),
 	}
 	if err = r.client.List(context.TODO(), podList, listOpts...); err != nil {
 		reqLogger.Error(err, "Failed to list pods", "PolicyDecision.Namespace", instance.Namespace, "PolicyDecision.Name", "auth-pdp")
@@ -362,23 +357,23 @@ func getPodNames(pods []corev1.Pod) []string {
 	return podNames
 }
 
-func (r *ReconcilePolicyDecision) certificateForPolicyDecision (instance *operatorv1alpha1.PolicyDecision) *certmgr.Certificate {
-	
+func (r *ReconcilePolicyDecision) certificateForPolicyDecision(instance *operatorv1alpha1.PolicyDecision) *certmgr.Certificate {
+
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	pdpCertificate := &certmgr.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "auth-pdp-cert",
-			Namespace:   instance.Namespace,
-			Labels:      map[string]string{"app": "auth-pdp"},
+			Name:      "auth-pdp-cert",
+			Namespace: instance.Namespace,
+			Labels:    map[string]string{"app": "auth-pdp"},
 		},
 		Spec: certmgr.CertificateSpec{
 			SecretName: "auth-pdp-secret",
-			IssuerRef: certmgr.ObjectReference {
+			IssuerRef: certmgr.ObjectReference{
 				Name: "icp-ca-issuer",
-				Kind: certmgr.ClusterIssuerKind, 
+				Kind: certmgr.ClusterIssuerKind,
 			},
 			CommonName: "iam-pdp",
-			DNSNames: []string{"iam-pdp"},
+			DNSNames:   []string{"iam-pdp"},
 		},
 	}
 
@@ -396,23 +391,23 @@ func (r *ReconcilePolicyDecision) serviceForPolicyDecision(instance *operatorv1a
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	pdpService := &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "iam-pdp",
-					Namespace:   instance.Namespace,
-					Labels:      map[string]string{"app": "auth-pdp"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "iam-pdp",
+			Namespace: instance.Namespace,
+			Labels:    map[string]string{"app": "auth-pdp"},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name: "p7998",
+					Port: port,
 				},
-				Spec: corev1.ServiceSpec{
-					Ports: []corev1.ServicePort{
-						{
-							Name: "p7998",
-							Port: port,
-						},
-					},
-					Selector: map[string]string{
-								"k8s-app": "auth-pdp",
-							  },
-					Type:     "ClusterIP",
-				},
+			},
+			Selector: map[string]string{
+				"k8s-app": "auth-pdp",
+			},
+			Type: "ClusterIP",
+		},
 	}
 
 	// Set PolicyDecision instance as the owner and controller of the Service
@@ -425,25 +420,25 @@ func (r *ReconcilePolicyDecision) serviceForPolicyDecision(instance *operatorv1a
 
 }
 
-func (r *ReconcilePolicyDecision) configMapForPolicyDecision (instance *operatorv1alpha1.PolicyDecision) *corev1.ConfigMap {
+func (r *ReconcilePolicyDecision) configMapForPolicyDecision(instance *operatorv1alpha1.PolicyDecision) *corev1.ConfigMap {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	pdpConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "auth-pdp",
-			Namespace:   instance.Namespace,
-			Labels:      map[string]string{"app": "auth-pdp"},
+			Name:      "auth-pdp",
+			Namespace: instance.Namespace,
+			Labels:    map[string]string{"app": "auth-pdp"},
 		},
 		Data: map[string]string{
-			"AUDIT_ENABLED"  : "false",
-			"AUDIT_LOG_PATH" : "/var/log/audit",
-			"JOURNAL_PATH"   : instance.Spec.AuditService.JournalPath,
-			"logrotate-conf" : `\n # rotate log files weekly\ndaily\n\n# use the syslog group by
+			"AUDIT_ENABLED":  "false",
+			"AUDIT_LOG_PATH": "/var/log/audit",
+			"JOURNAL_PATH":   instance.Spec.AuditService.JournalPath,
+			"logrotate-conf": `\n # rotate log files weekly\ndaily\n\n# use the syslog group by
 								default, since this is the owning group # of /var/log/syslog.\n#su root syslog\n\n#
 								keep 4 weeks worth of backlogs\nrotate 4\n\n# create new (empty) log files after
 								rotating old ones \ncreate\n\n# uncomment this if you want your log files compressed\n
 								#compress\n\n# packages drop log rotation information into this directory\n include
 								/etc/logrotate.d\n# no packages own wtmp, or btmp -- we'll rotate them here\n`,
-			"logrotate"      : "/var/log/audit/*.log {\n  copytruncate\n  rotate 24\n  hourly\n  missingok\n  notifempty\n}",
+			"logrotate": "/var/log/audit/*.log {\n  copytruncate\n  rotate 24\n  hourly\n  missingok\n  notifempty\n}",
 		},
 	}
 
@@ -456,41 +451,41 @@ func (r *ReconcilePolicyDecision) configMapForPolicyDecision (instance *operator
 	return pdpConfigMap
 }
 
-func (r *ReconcilePolicyDecision) ingressForPolicyDecision (instance *operatorv1alpha1.PolicyDecision) *net.Ingress {
+func (r *ReconcilePolicyDecision) ingressForPolicyDecision(instance *operatorv1alpha1.PolicyDecision) *net.Ingress {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	pdpIngress := &net.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "iam-pdp",
-					Namespace:   instance.Namespace,
-					Labels:      map[string]string { "app": "auth-pdp"},
-					Annotations: map[string]string { 
-									"kubernetes.io/ingress.class" : "ibm-icp-management",
-									"icp.management.ibm.com/secure-backends" : "true",
-									"icp.management.ibm.com/rewrite-target" : "/",
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "iam-pdp",
+			Namespace: instance.Namespace,
+			Labels:    map[string]string{"app": "auth-pdp"},
+			Annotations: map[string]string{
+				"kubernetes.io/ingress.class":            "ibm-icp-management",
+				"icp.management.ibm.com/secure-backends": "true",
+				"icp.management.ibm.com/rewrite-target":  "/",
+			},
+		},
+		Spec: net.IngressSpec{
+			Rules: []net.IngressRule{
+				{
+					IngressRuleValue: net.IngressRuleValue{
+						HTTP: &net.HTTPIngressRuleValue{
+							Paths: []net.HTTPIngressPath{
+								{
+									Path: "/iam-pdp/",
+									Backend: net.IngressBackend{
+										ServiceName: "iam-pdp",
+										ServicePort: intstr.IntOrString{
+											IntVal: port,
+										},
+									},
 								},
-				},
-				Spec: net.IngressSpec {
-					Rules: []net.IngressRule {
-						{
-							IngressRuleValue: net.IngressRuleValue {
-											HTTP: &net.HTTPIngressRuleValue {
-												Paths: []net.HTTPIngressPath {
-													{ 
-														Path: "/iam-pdp/",
-														Backend: net.IngressBackend {
-																ServiceName: "iam-pdp",
-																ServicePort: intstr.IntOrString{
-																	IntVal : port,
-																},
-														},
-													},
-												},
-											},
 							},
 						},
 					},
 				},
+			},
+		},
 	}
 
 	// Set PolicyDecision instance as the owner and controller of the Ingress
@@ -503,7 +498,7 @@ func (r *ReconcilePolicyDecision) ingressForPolicyDecision (instance *operatorv1
 
 }
 
-func (r *ReconcilePolicyDecision) deploymentForPolicyDecision (instance *operatorv1alpha1.PolicyDecision) *appsv1.Deployment {
+func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operatorv1alpha1.PolicyDecision) *appsv1.Deployment {
 
 	reqLogger := log.WithValues("deploymentForPolicyDecision", "Entry", "instance.Name", instance.Name)
 	pdpImage := instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + ":" + instance.Spec.ImageTag
@@ -511,7 +506,7 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision (instance *operato
 	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + ":" + instance.Spec.AuditService.ImageTag
 	replicas := instance.Spec.Replicas
 	journalPath := instance.Spec.AuditService.JournalPath
-	
+
 	pdpDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "auth-pdp",
@@ -522,31 +517,31 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision (instance *operato
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app"       : "auth-pdp",
-					"k8s-app"   : "auth-pdp",
-					"component" : "auth-pdp",
+					"app":       "auth-pdp",
+					"k8s-app":   "auth-pdp",
+					"component": "auth-pdp",
 				},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app"       : "auth-pdp",
-						"k8s-app"   : "auth-pdp",
-						"component" : "auth-pdp",
+						"app":       "auth-pdp",
+						"k8s-app":   "auth-pdp",
+						"component": "auth-pdp",
 					},
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
-						"productName": "IBM Cloud Platform Common Services",
-						"productID": "IBMCloudPlatformCommonServices_342_apache_0000",
+						"productName":    "IBM Cloud Platform Common Services",
+						"productID":      "IBMCloudPlatformCommonServices_342_apache_0000",
 						"productVersion": "3.4.2",
 						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},
 				},
 				Spec: corev1.PodSpec{
-					NodeSelector:                  map[string]string{"master" : "true"},
+					NodeSelector:                  map[string]string{"master": "true"},
 					TerminationGracePeriodSeconds: &seconds60,
-					HostIPC: falseVar,
-					HostPID: falseVar,
+					HostIPC:                       falseVar,
+					HostPID:                       falseVar,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
@@ -575,12 +570,12 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision (instance *operato
 							Operator: corev1.TolerationOpExists,
 						},
 					},
-					Volumes: buildPdpVolumes(journalPath),
-					Containers: buildContainers(auditImage,pdpImage,journalPath),
+					Volumes:        buildPdpVolumes(journalPath),
+					Containers:     buildContainers(auditImage, pdpImage, journalPath),
 					InitContainers: buildInitContainers(mongoDBImage),
 					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser : &user,
-						FSGroup : &user,
+						RunAsUser: &user,
+						FSGroup:   &user,
 					},
 				},
 			},
@@ -596,7 +591,7 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision (instance *operato
 
 }
 
-func buildPdpVolumes(journalPath string) []corev1.Volume{
+func buildPdpVolumes(journalPath string) []corev1.Volume {
 	return []corev1.Volume{
 		{
 			Name: "mongodb-ca-cert",
@@ -611,13 +606,13 @@ func buildPdpVolumes(journalPath string) []corev1.Volume{
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "cluster-ca-cert",
-					Items : []corev1.KeyToPath{
+					Items: []corev1.KeyToPath{
 						{
-							Key: "tls.key",
+							Key:  "tls.key",
 							Path: "ca.key",
 						},
 						{
-							Key: "tls.crt",
+							Key:  "tls.crt",
 							Path: "ca.crt",
 						},
 					},
@@ -629,18 +624,17 @@ func buildPdpVolumes(journalPath string) []corev1.Volume{
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "auth-pdp-secret",
-					Items : []corev1.KeyToPath{
+					Items: []corev1.KeyToPath{
 						{
-							Key: "tls.key",
+							Key:  "tls.key",
 							Path: "tls.key",
 						},
 						{
-							Key: "tls.crt",
+							Key:  "tls.crt",
 							Path: "tls.crt",
 						},
 					},
 				},
-				
 			},
 		},
 		{
@@ -654,7 +648,7 @@ func buildPdpVolumes(journalPath string) []corev1.Volume{
 		{
 			Name: "journal",
 			VolumeSource: corev1.VolumeSource{
-				HostPath : &corev1.HostPathVolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
 					Path: journalPath,
 				},
 			},
@@ -666,36 +660,34 @@ func buildPdpVolumes(journalPath string) []corev1.Volume{
 			},
 		},
 		{
-			Name : "logrotate",
-			VolumeSource : corev1.VolumeSource{
+			Name: "logrotate",
+			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference : corev1.LocalObjectReference{
-						Name : "auth-pdp",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "auth-pdp",
 					},
-					Items : []corev1.KeyToPath{
+					Items: []corev1.KeyToPath{
 						{
-							Key: "logrotate",
+							Key:  "logrotate",
 							Path: "audit",
 						},
 					},
-	
 				},
 			},
 		},
 		{
-			Name : "logrotate-conf",
-			VolumeSource : corev1.VolumeSource{
+			Name: "logrotate-conf",
+			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference : corev1.LocalObjectReference{
-						Name : "auth-pdp",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "auth-pdp",
 					},
-					Items : []corev1.KeyToPath{
+					Items: []corev1.KeyToPath{
 						{
-							Key: "logrotate-conf",
+							Key:  "logrotate-conf",
 							Path: "logrotate.conf",
 						},
 					},
-	
 				},
 			},
 		},

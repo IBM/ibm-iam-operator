@@ -33,9 +33,9 @@ var (
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: SchemeGroupVersion}
 
-    CertificateSchemeGroupVersion = schema.GroupVersion{Group: "certmanager.k8s.io", Version: "v1alpha1"}
-	CertificateSchemeBuilder = &scheme.Builder{GroupVersion: CertificateSchemeGroupVersion}
+	CertificateSchemeGroupVersion = schema.GroupVersion{Group: "certmanager.k8s.io", Version: "v1alpha1"}
+	CertificateSchemeBuilder      = &scheme.Builder{GroupVersion: CertificateSchemeGroupVersion}
 
-    CRDSchemeGroupVersion = schema.GroupVersion{Group: "apiextensions.k8s.io", Version: "v1beta1"}
-    CRDSchemeBuilder = &scheme.Builder{GroupVersion: CRDSchemeGroupVersion}
+	CRDSchemeGroupVersion = schema.GroupVersion{Group: "apiextensions.k8s.io", Version: "v1beta1"}
+	CRDSchemeBuilder      = &scheme.Builder{GroupVersion: CRDSchemeGroupVersion}
 )

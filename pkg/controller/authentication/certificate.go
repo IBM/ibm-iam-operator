@@ -27,81 +27,79 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-
 var certificateData map[string]map[string]string
 
-func generateCertificateData(instance *operatorv1alpha1.Authentication){
+func generateCertificateData(instance *operatorv1alpha1.Authentication) {
 	certificateData = map[string]map[string]string{
-		"platform-auth-cert" : map[string]string{
-			"secretName" : "platform-auth-secret",
-			"cn" : "platform-auth-service",
+		"platform-auth-cert": map[string]string{
+			"secretName": "platform-auth-secret",
+			"cn":         "platform-auth-service",
 		},
-		"identity-provider-cert" : map[string]string{
-			"secretName" : "identity-provider-secret",
-			"cn" : "platform-identity-provider",
+		"identity-provider-cert": map[string]string{
+			"secretName": "identity-provider-secret",
+			"cn":         "platform-identity-provider",
 		},
-		"platform-identity-management" : map[string]string{
-			"secretName" : "platform-identity-management",
-			"cn" : "platform-identity-management",
-			"completeName" : "platform-identity-management.kube-system.svc",
+		"platform-identity-management": map[string]string{
+			"secretName":   "platform-identity-management",
+			"cn":           "platform-identity-management",
+			"completeName": "platform-identity-management.kube-system.svc",
 		},
 	}
 }
 
-func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.Authentication, currentCertificate *certmgr.Certificate, requeueResult *bool) (error){
-	
+func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.Authentication, currentCertificate *certmgr.Certificate, requeueResult *bool) error {
+
 	generateCertificateData(instance)
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 
-	for certificate,_ := range certificateData {
+	for certificate, _ := range certificateData {
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: certificate, Namespace: instance.Namespace}, currentCertificate)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new Certificate
-			newCertificate := generateCertificateObject(instance,r.scheme,certificate)
+			newCertificate := generateCertificateObject(instance, r.scheme, certificate)
 			reqLogger.Info("Creating a new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", certificate)
 			err = r.client.Create(context.TODO(), newCertificate)
 			if err != nil {
 				reqLogger.Error(err, "Failed to create new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", certificate)
-				return  err
+				return err
 			}
 			// Certificate created successfully - return and requeue
 			*requeueResult = true
 		} else if err != nil {
 			reqLogger.Error(err, "Failed to get Certificate")
-			return  err
+			return err
 		}
 
 	}
-	
+
 	return nil
 
 }
 
-
-func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, certificateName string) *certmgr.Certificate{
+func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, certificateName string) *certmgr.Certificate {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	certSpec := certmgr.CertificateSpec{
 		SecretName: certificateData[certificateName]["secretName"],
-		IssuerRef: certmgr.ObjectReference {
+		IssuerRef: certmgr.ObjectReference{
 			Name: "icp-ca-issuer",
-			Kind: certmgr.ClusterIssuerKind, 
+			Kind: certmgr.ClusterIssuerKind,
 		},
 		CommonName: certificateData[certificateName]["cn"],
-		DNSNames: []string{certificateData[certificateName]["cn"]},
+		DNSNames:   []string{certificateData[certificateName]["cn"]},
 	}
 	if certificateName == "platform-identity-management" {
-		certSpec.DNSNames = append(certSpec.DNSNames,certificateData[certificateName]["completeName"])
+		certSpec.DNSNames = append(certSpec.DNSNames, certificateData[certificateName]["completeName"])
 	}
-	if certificateName == "platform-auth-service"{
-		certSpec.IPAddresses = []string{"127.0.0.1","::1",}
+	if certificateName == "platform-auth-service" {
+		certSpec.IPAddresses = []string{"127.0.0.1", "::1"}
 	}
 	newCertificate := &certmgr.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        certificateName,
-			Namespace:   instance.Namespace,
-			Labels:      map[string]string{"app": "auth-idp"},
+			Name:      certificateName,
+			Namespace: instance.Namespace,
+			Labels:    map[string]string{"app": "auth-idp"},
 		},
 		Spec: certSpec,
 	}
@@ -114,4 +112,3 @@ func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme
 	}
 	return newCertificate
 }
-

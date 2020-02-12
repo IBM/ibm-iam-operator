@@ -18,22 +18,19 @@ package authentication
 
 import (
 	"context"
-	"reflect"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-
-
-
-func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Authentication, currentDeployment *appsv1.Deployment, requeueResult *bool)(error){
+func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Authentication, currentDeployment *appsv1.Deployment, requeueResult *bool) error {
 
 	// Check if this Deployment already exists
 	deployment := "auth-idp"
@@ -41,7 +38,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: deployment, Namespace: instance.Namespace}, currentDeployment)
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", deployment)
-		newDeployment := generateDeploymentObject(instance,r.scheme, deployment)
+		newDeployment := generateDeploymentObject(instance, r.scheme, deployment)
 		err = r.client.Create(context.TODO(), newDeployment)
 		if err != nil {
 			return err
@@ -49,13 +46,13 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 		// Deployment created successfully - return and requeue
 		*requeueResult = true
 	} else if err != nil {
-		return  err
+		return err
 	}
 
 	podList := &corev1.PodList{}
 	listOpts := []client.ListOption{
 		client.InNamespace(instance.Namespace),
-		client.MatchingLabels(map[string]string{"k8s-app" : deployment},),
+		client.MatchingLabels(map[string]string{"k8s-app": deployment}),
 	}
 	if err = r.client.List(context.TODO(), podList, listOpts...); err != nil {
 		reqLogger.Error(err, "Failed to list pods", "Authentication.Namespace", instance.Namespace, "Authentication.Name", deployment)
@@ -90,7 +87,7 @@ func getPodNames(pods []corev1.Pod) []string {
 	return podNames
 }
 
-func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string) *appsv1.Deployment{
+func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string) *appsv1.Deployment {
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	authServiceImage := instance.Spec.AuthService.ImageRegistry + "/" + instance.Spec.AuthService.ImageName + ":" + instance.Spec.AuthService.ImageTag
 	identityProviderImage := instance.Spec.IdentityProvider.ImageRegistry + "/" + instance.Spec.IdentityProvider.ImageName + ":" + instance.Spec.IdentityProvider.ImageTag
@@ -102,7 +99,6 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
 
-	
 	idpDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      deployment,
@@ -113,31 +109,31 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app"       : deployment,
-					"k8s-app"   : deployment,
-					"component" : deployment,
+					"app":       deployment,
+					"k8s-app":   deployment,
+					"component": deployment,
 				},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app"       : deployment,
-						"k8s-app"   : deployment,
-						"component" : deployment,
+						"app":       deployment,
+						"k8s-app":   deployment,
+						"component": deployment,
 					},
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
-						"productName": "IBM Cloud Platform Common Services",
-						"productID": "IBMCloudPlatformCommonServices_350_apache_0000",
+						"productName":    "IBM Cloud Platform Common Services",
+						"productID":      "IBMCloudPlatformCommonServices_350_apache_0000",
 						"productVersion": "3.5.0",
 						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},
 				},
 				Spec: corev1.PodSpec{
-					NodeSelector:                  map[string]string{"master" : "true"},
+					NodeSelector:                  map[string]string{"master": "true"},
 					TerminationGracePeriodSeconds: &seconds60,
-					HostIPC: falseVar,
-					HostPID: falseVar,
+					HostIPC:                       falseVar,
+					HostPID:                       falseVar,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
@@ -166,12 +162,12 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 							Operator: corev1.TolerationOpExists,
 						},
 					},
-					Volumes: buildIdpVolumes(journalPath,ldapCACert,routerCertSecret),
-					Containers: buildContainers(instance,auditImage,authServiceImage,identityProviderImage,identityManagerImage,journalPath),
+					Volumes:        buildIdpVolumes(journalPath, ldapCACert, routerCertSecret),
+					Containers:     buildContainers(instance, auditImage, authServiceImage, identityProviderImage, identityManagerImage, journalPath),
 					InitContainers: buildInitContainers(mongoDBImage),
 					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser : &user,
-						FSGroup : &user,
+						RunAsUser: &user,
+						FSGroup:   &user,
 					},
 				},
 			},
@@ -186,12 +182,12 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 	return idpDeployment
 }
 
-func buildIdpVolumes(journalPath string,ldapCACert string, routerCertSecret string) []corev1.Volume{
+func buildIdpVolumes(journalPath string, ldapCACert string, routerCertSecret string) []corev1.Volume {
 	return []corev1.Volume{
 		{
 			Name: "journal",
 			VolumeSource: corev1.VolumeSource{
-				HostPath : &corev1.HostPathVolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
 					Path: journalPath,
 				},
 			},
@@ -201,18 +197,17 @@ func buildIdpVolumes(journalPath string,ldapCACert string, routerCertSecret stri
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "platform-identity-management",
-					Items : []corev1.KeyToPath{
+					Items: []corev1.KeyToPath{
 						{
-							Key: "tls.key",
+							Key:  "tls.key",
 							Path: "tls.key",
 						},
 						{
-							Key: "tls.crt",
+							Key:  "tls.crt",
 							Path: "tls.crt",
 						},
 					},
 				},
-				
 			},
 		},
 		{
@@ -222,15 +217,15 @@ func buildIdpVolumes(journalPath string,ldapCACert string, routerCertSecret stri
 			},
 		},
 		{
-			Name : "logrotate",
-			VolumeSource : corev1.VolumeSource{
+			Name: "logrotate",
+			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference : corev1.LocalObjectReference{
-						Name : "platform-auth-idp",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp",
 					},
-					Items : []corev1.KeyToPath{
+					Items: []corev1.KeyToPath{
 						{
-							Key: "logrotate",
+							Key:  "logrotate",
 							Path: "audit",
 						},
 					},
@@ -239,15 +234,15 @@ func buildIdpVolumes(journalPath string,ldapCACert string, routerCertSecret stri
 			},
 		},
 		{
-			Name : "logrotate-conf",
-			VolumeSource : corev1.VolumeSource{
+			Name: "logrotate-conf",
+			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference : corev1.LocalObjectReference{
-						Name : "platform-auth-idp",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp",
 					},
-					Items : []corev1.KeyToPath{
+					Items: []corev1.KeyToPath{
 						{
-							Key: "logrotate-conf",
+							Key:  "logrotate-conf",
 							Path: "logrotate.conf",
 						},
 					},
@@ -260,18 +255,17 @@ func buildIdpVolumes(journalPath string,ldapCACert string, routerCertSecret stri
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "platform-auth-cert",
-					Items : []corev1.KeyToPath{
+					Items: []corev1.KeyToPath{
 						{
-							Key: "tls.key",
+							Key:  "tls.key",
 							Path: "platformauth-key.crt",
 						},
 						{
-							Key: "tls.crt",
+							Key:  "tls.crt",
 							Path: "platformauth.crt",
 						},
 					},
 				},
-				
 			},
 		},
 		{
@@ -279,18 +273,17 @@ func buildIdpVolumes(journalPath string,ldapCACert string, routerCertSecret stri
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "identity-provider-cert",
-					Items : []corev1.KeyToPath{
+					Items: []corev1.KeyToPath{
 						{
-							Key: "tls.key",
+							Key:  "tls.key",
 							Path: "tls.key",
 						},
 						{
-							Key: "tls.crt",
+							Key:  "tls.crt",
 							Path: "tls.crt",
 						},
 					},
 				},
-				
 			},
 		},
 		{
@@ -298,9 +291,9 @@ func buildIdpVolumes(journalPath string,ldapCACert string, routerCertSecret stri
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: ldapCACert,
-					Items : []corev1.KeyToPath{
+					Items: []corev1.KeyToPath{
 						{
-							Key: "certificate",
+							Key:  "certificate",
 							Path: "ldaps-ca.crt",
 						},
 					},
@@ -312,9 +305,9 @@ func buildIdpVolumes(journalPath string,ldapCACert string, routerCertSecret stri
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "platform-auth-ibmid-jwk",
-					Items : []corev1.KeyToPath{
+					Items: []corev1.KeyToPath{
 						{
-							Key: "cert",
+							Key:  "cert",
 							Path: "ibmid-jwk.crt",
 						},
 					},
@@ -326,9 +319,9 @@ func buildIdpVolumes(journalPath string,ldapCACert string, routerCertSecret stri
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "platform-auth-ibmid-ssl-chain",
-					Items : []corev1.KeyToPath{
+					Items: []corev1.KeyToPath{
 						{
-							Key: "cert",
+							Key:  "cert",
 							Path: "ibmid-ssl.crt",
 						},
 					},
@@ -340,13 +333,13 @@ func buildIdpVolumes(journalPath string,ldapCACert string, routerCertSecret stri
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: routerCertSecret,
-					Items : []corev1.KeyToPath{
+					Items: []corev1.KeyToPath{
 						{
-							Key: "tls.crt",
+							Key:  "tls.crt",
 							Path: "icp-router.crt",
 						},
 						{
-							Key: "tls.key",
+							Key:  "tls.key",
 							Path: "icp-router.key",
 						},
 					},
@@ -358,13 +351,13 @@ func buildIdpVolumes(journalPath string,ldapCACert string, routerCertSecret stri
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "cluster-ca-cert",
-					Items : []corev1.KeyToPath{
+					Items: []corev1.KeyToPath{
 						{
-							Key: "tls.key",
+							Key:  "tls.key",
 							Path: "ca.key",
 						},
 						{
-							Key: "tls.crt",
+							Key:  "tls.crt",
 							Path: "ca.crt",
 						},
 					},

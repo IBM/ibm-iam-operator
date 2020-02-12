@@ -37,8 +37,8 @@ var memory2560 = resource.NewQuantity(2560*1024*1024, resource.BinarySI) // 2560
 func buildInitContainers(mongoDBImage string) []corev1.Container {
 	return []corev1.Container{
 		{
-			Name: "init-mongodb",
-			Image: mongoDBImage,
+			Name:            "init-mongodb",
+			Image:           mongoDBImage,
 			ImagePullPolicy: corev1.PullAlways,
 			Command: []string{
 				"bash",
@@ -46,12 +46,12 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 				"until </dev/tcp/mongodb.kube-system/27017 ; do sleep 5; done;",
 			},
 			SecurityContext: &corev1.SecurityContext{
-				Privileged: &falseVar,
-				RunAsNonRoot: &trueVar,
-				ReadOnlyRootFilesystem: &trueVar,
+				Privileged:               &falseVar,
+				RunAsNonRoot:             &trueVar,
+				ReadOnlyRootFilesystem:   &trueVar,
 				AllowPrivilegeEscalation: &falseVar,
 				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"ALL",},
+					Drop: []corev1.Capability{"ALL"},
 				},
 			},
 			Resources: corev1.ResourceRequirements{
@@ -69,46 +69,46 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 func buildAuditContainer(auditImage string, journalPath string) corev1.Container {
 
 	return corev1.Container{
-		Name : "icp-audit-service",
-		Image : auditImage,
-		ImagePullPolicy : corev1.PullAlways,
-		Env : []corev1.EnvVar{
+		Name:            "icp-audit-service",
+		Image:           auditImage,
+		ImagePullPolicy: corev1.PullAlways,
+		Env: []corev1.EnvVar{
 			{
-				Name : "AUDIT_DIR",
-				Value : "/var/log/audit",
+				Name:  "AUDIT_DIR",
+				Value: "/var/log/audit",
 			},
 		},
-		VolumeMounts : []corev1.VolumeMount {
+		VolumeMounts: []corev1.VolumeMount{
 			{
-				Name : "shared",
-				MountPath : "/var/log/audit",
+				Name:      "shared",
+				MountPath: "/var/log/audit",
 			},
 			{
-				Name : "journal",
-				MountPath : journalPath,
+				Name:      "journal",
+				MountPath: journalPath,
 			},
 			{
-				Name : "logrotate",
-				MountPath : "/etc/logrotate.d/audit",
-				SubPath: "audit",
+				Name:      "logrotate",
+				MountPath: "/etc/logrotate.d/audit",
+				SubPath:   "audit",
 			},
 			{
-				Name : "logrotate-conf",
-				MountPath : "/etc/logrotate.conf",
-				SubPath : "logrotate.conf",
+				Name:      "logrotate-conf",
+				MountPath: "/etc/logrotate.conf",
+				SubPath:   "logrotate.conf",
 			},
 		},
 		SecurityContext: &corev1.SecurityContext{
-			Privileged: &falseVar,
-			RunAsNonRoot: &trueVar,
-			ReadOnlyRootFilesystem: &trueVar,
+			Privileged:               &falseVar,
+			RunAsNonRoot:             &trueVar,
+			ReadOnlyRootFilesystem:   &trueVar,
 			AllowPrivilegeEscalation: &falseVar,
-			RunAsUser : &user,
+			RunAsUser:                &user,
 			SELinuxOptions: &corev1.SELinuxOptions{
 				Type: "spc_t",
 			},
 			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL",},
+				Drop: []corev1.Capability{"ALL"},
 			},
 		},
 		Resources: corev1.ResourceRequirements{
@@ -126,16 +126,16 @@ func buildAuditContainer(auditImage string, journalPath string) corev1.Container
 func buildPdpContainer(pdpImage string) corev1.Container {
 
 	return corev1.Container{
-		Name : "auth-pdp",
-		Image : pdpImage,
-		ImagePullPolicy : corev1.PullAlways,
+		Name:            "auth-pdp",
+		Image:           pdpImage,
+		ImagePullPolicy: corev1.PullAlways,
 		SecurityContext: &corev1.SecurityContext{
-			Privileged: &falseVar,
-			RunAsNonRoot: &trueVar,
-			ReadOnlyRootFilesystem: &trueVar,
+			Privileged:               &falseVar,
+			RunAsNonRoot:             &trueVar,
+			ReadOnlyRootFilesystem:   &trueVar,
 			AllowPrivilegeEscalation: &falseVar,
 			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL",},
+				Drop: []corev1.Capability{"ALL"},
 			},
 		},
 		Resources: corev1.ResourceRequirements{
@@ -146,178 +146,177 @@ func buildPdpContainer(pdpImage string) corev1.Container {
 				corev1.ResourceCPU:    *cpu20,
 				corev1.ResourceMemory: *memory32},
 		},
-		VolumeMounts : []corev1.VolumeMount{
+		VolumeMounts: []corev1.VolumeMount{
 			{
-				Name : "mongodb-ca-cert",
-				MountPath : "/certs/mongodb-ca",
+				Name:      "mongodb-ca-cert",
+				MountPath: "/certs/mongodb-ca",
 			},
 			{
-				Name : "auth-pdp-secret",
-				MountPath : "/certs/auth-pdp",
+				Name:      "auth-pdp-secret",
+				MountPath: "/certs/auth-pdp",
 			},
 			{
-				Name : "cluster-ca",
-				MountPath : "/certs",
+				Name:      "cluster-ca",
+				MountPath: "/certs",
 			},
 			{
-				Name : "shared",
-				MountPath : "/var/log/audit",
+				Name:      "shared",
+				MountPath: "/var/log/audit",
 			},
 			{
-				Name : "mongodb-client-cert",
-				MountPath : "/certs/mongodb-client",
+				Name:      "mongodb-client-cert",
+				MountPath: "/certs/mongodb-client",
 			},
 		},
-		ReadinessProbe : &corev1.Probe {
-			Handler : corev1.Handler {
-				HTTPGet : &corev1.HTTPGetAction{
-					Path : "/v1/health",
-					Port : intstr.IntOrString{
-						IntVal : port,
+		ReadinessProbe: &corev1.Probe{
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/v1/health",
+					Port: intstr.IntOrString{
+						IntVal: port,
 					},
-					Scheme : "HTTPS",
+					Scheme: "HTTPS",
 				},
 			},
-			InitialDelaySeconds : 30,
+			InitialDelaySeconds: 30,
 		},
-		LivenessProbe : &corev1.Probe {
-			Handler : corev1.Handler {
-				HTTPGet : &corev1.HTTPGetAction{
-					Path : "/v1/health",
-					Port : intstr.IntOrString{
-						IntVal : port,
+		LivenessProbe: &corev1.Probe{
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/v1/health",
+					Port: intstr.IntOrString{
+						IntVal: port,
 					},
-					Scheme : "HTTPS",
+					Scheme: "HTTPS",
 				},
 			},
-			InitialDelaySeconds : 60,
+			InitialDelaySeconds: 60,
 		},
-		Env : []corev1.EnvVar {
+		Env: []corev1.EnvVar{
 			{
-				Name : "MONGO_HOST",
-				Value : "mongodb",
+				Name:  "MONGO_HOST",
+				Value: "mongodb",
 			},
 			{
-				Name :"MONGO_PORT",
-				Value : "27017",
+				Name:  "MONGO_PORT",
+				Value: "27017",
 			},
 			{
-				Name : "MONGO_USERNAME",
-				ValueFrom : &corev1.EnvVarSource{
-					SecretKeyRef : &corev1.SecretKeySelector{
+				Name: "MONGO_USERNAME",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{
 							Name: "icp-mongodb-admin",
 						},
-						Key : "user",
+						Key: "user",
 					},
 				},
 			},
 			{
-				Name : "MONGO_PASSWORD",
-				ValueFrom : &corev1.EnvVarSource{
-					SecretKeyRef : &corev1.SecretKeySelector{
+				Name: "MONGO_PASSWORD",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{
 							Name: "icp-mongodb-admin",
 						},
-						Key : "password",
+						Key: "password",
 					},
 				},
 			},
 			{
-				Name : "DB_NAME",
-				Value : "platform-db",
+				Name:  "DB_NAME",
+				Value: "platform-db",
 			},
 			{
-				Name : "MONGO_AUTHSOURCE",
-				Value : "admin",
+				Name:  "MONGO_AUTHSOURCE",
+				Value: "admin",
 			},
 			{
-				Name : "POD_NAME",
-				ValueFrom : &corev1.EnvVarSource{
-					FieldRef : &corev1.ObjectFieldSelector{
-						APIVersion : "v1",
-						FieldPath : "metadata.name",
+				Name: "POD_NAME",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "metadata.name",
 					},
-				}, 
+				},
 			},
 			{
-				Name : "POD_NAMESPACE",
-				ValueFrom : &corev1.EnvVarSource{
-					FieldRef : &corev1.ObjectFieldSelector{
-						APIVersion : "v1",
-						FieldPath : "metadata.namespace",
+				Name: "POD_NAMESPACE",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "metadata.namespace",
 					},
-				}, 
+				},
 			},
 			{
-				Name : "CLUSTER_NAME",
-				ValueFrom : &corev1.EnvVarSource{
-					ConfigMapKeyRef : &corev1.ConfigMapKeySelector {
-						LocalObjectReference : corev1.LocalObjectReference{
-							Name : "platform-auth-idp",
+				Name: "CLUSTER_NAME",
+				ValueFrom: &corev1.EnvVarSource{
+					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "platform-auth-idp",
 						},
-						Key : "CLUSTER_NAME",
+						Key: "CLUSTER_NAME",
 					},
 				},
 			},
 			{
-				Name : "DEFAULT_ADMIN_USER",
-				ValueFrom : &corev1.EnvVarSource{
-					SecretKeyRef : &corev1.SecretKeySelector{
+				Name: "DEFAULT_ADMIN_USER",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{
 							Name: "platform-auth-idp-credentials",
 						},
-						Key : "admin_username",
+						Key: "admin_username",
 					},
 				},
 			},
 			{
-				Name : "ROKS_ENABLED",
-				ValueFrom : &corev1.EnvVarSource{
-					ConfigMapKeyRef : &corev1.ConfigMapKeySelector {
-						LocalObjectReference : corev1.LocalObjectReference{
-							Name : "platform-auth-idp",
+				Name: "ROKS_ENABLED",
+				ValueFrom: &corev1.EnvVarSource{
+					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "platform-auth-idp",
 						},
-						Key : "ROKS_ENABLED",
+						Key: "ROKS_ENABLED",
 					},
 				},
 			},
 			{
-				Name : "AUDIT_LOG_PATH",
-				ValueFrom : &corev1.EnvVarSource{
-					ConfigMapKeyRef : &corev1.ConfigMapKeySelector {
-						LocalObjectReference : corev1.LocalObjectReference{
-							Name : "auth-pdp",
+				Name: "AUDIT_LOG_PATH",
+				ValueFrom: &corev1.EnvVarSource{
+					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "auth-pdp",
 						},
-						Key : "AUDIT_LOG_PATH",
+						Key: "AUDIT_LOG_PATH",
 					},
 				},
 			},
 			{
-				Name : "AUDIT_ENABLED",
-				ValueFrom : &corev1.EnvVarSource{
-					ConfigMapKeyRef : &corev1.ConfigMapKeySelector {
-						LocalObjectReference : corev1.LocalObjectReference{
-							Name : "auth-pdp",
+				Name: "AUDIT_ENABLED",
+				ValueFrom: &corev1.EnvVarSource{
+					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "auth-pdp",
 						},
-						Key : "AUDIT_ENABLED",
+						Key: "AUDIT_ENABLED",
 					},
 				},
 			},
 			{
-				Name : "IDENTITY_PROVIDER_URL",
-				Value : "https://platform-identity-provider:4300",
+				Name:  "IDENTITY_PROVIDER_URL",
+				Value: "https://platform-identity-provider:4300",
 			},
 		},
-
 	}
 
 }
 
 func buildContainers(auditImage string, pdpImage string, journalPath string) []corev1.Container {
-	
+
 	auditContainer := buildAuditContainer(auditImage, journalPath)
 	pdpContainer := buildPdpContainer(pdpImage)
 
-	return []corev1.Container{auditContainer,pdpContainer,}
+	return []corev1.Container{auditContainer, pdpContainer}
 }

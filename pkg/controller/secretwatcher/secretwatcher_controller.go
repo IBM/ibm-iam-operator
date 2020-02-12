@@ -210,10 +210,10 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels3,
-					Annotations: map[string] string{
+					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
-						"productName": "IBM Cloud Platform Common Services",
-						"productID": "IBMCloudPlatformCommonServices_342_apache_0000",
+						"productName":    "IBM Cloud Platform Common Services",
+						"productID":      "IBMCloudPlatformCommonServices_342_apache_0000",
 						"productVersion": "3.4.2",
 						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},
@@ -222,9 +222,9 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 					NodeSelector:                  nodeSelector,
 					PriorityClassName:             "system-cluster-critical",
 					TerminationGracePeriodSeconds: &seconds60,
-					SecurityContext: &corev1.PodSecurityContext {
-						RunAsUser : &runAsUser,
-						FSGroup : &fsGroup,
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsUser: &runAsUser,
+						FSGroup:   &fsGroup,
 					},
 					HostIPC: false,
 					HostPID: false,
@@ -332,28 +332,28 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 							LivenessProbe: &corev1.Probe{
 								Handler: corev1.Handler{
 									Exec: &corev1.ExecAction{
-										Command : []string{"ls"},
+										Command: []string{"ls"},
 									},
 								},
 								InitialDelaySeconds: 30,
-								PeriodSeconds : 15,
+								PeriodSeconds:       15,
 							},
 							ReadinessProbe: &corev1.Probe{
 								Handler: corev1.Handler{
 									Exec: &corev1.ExecAction{
-										Command : []string{"ls"},
+										Command: []string{"ls"},
 									},
 								},
 								InitialDelaySeconds: 15,
-								PeriodSeconds : 15,
+								PeriodSeconds:       15,
 							},
 							SecurityContext: &corev1.SecurityContext{
-								Privileged: &falseVar,
-								RunAsNonRoot: &trueVar,
-								ReadOnlyRootFilesystem: &trueVar,
+								Privileged:               &falseVar,
+								RunAsNonRoot:             &trueVar,
+								ReadOnlyRootFilesystem:   &trueVar,
 								AllowPrivilegeEscalation: &falseVar,
 								Capabilities: &corev1.Capabilities{
-									Drop: []corev1.Capability{"ALL",},
+									Drop: []corev1.Capability{"ALL"},
 								},
 							},
 						},

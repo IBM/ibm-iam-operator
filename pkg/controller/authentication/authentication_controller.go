@@ -256,6 +256,7 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, err
 	}
 
+
 	// Check if this ClusterRole already exists and create it if it doesn't
 	currentClusterRole := &rbacv1.ClusterRole{}
 	err = r.handleClusterRole(instance, currentClusterRole, &requeueResult)

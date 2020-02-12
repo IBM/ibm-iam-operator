@@ -22,6 +22,7 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	net "k8s.io/api/networking/v1beta1"
 	certmgr "github.ibm.com/IBMPrivateCloud/icp-cert-manager/pkg/apis/certmanager/v1alpha1"
 	//"k8s.io/apimachinery/pkg/util/intstr"
@@ -251,6 +252,20 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 	// Check if this Ingress already exists and create it if it doesn't
 	currentIngress := &net.Ingress{}
 	err = r.handleIngress(instance, currentIngress, &requeueResult)
+	if err !=  nil{
+		return reconcile.Result{}, err
+	}
+
+	// Check if this ClusterRole already exists and create it if it doesn't
+	currentClusterRole := &rbacv1.ClusterRole{}
+	err = r.handleClusterRole(instance, currentClusterRole, &requeueResult)
+	if err !=  nil{
+		return reconcile.Result{}, err
+	}
+
+	// Check if this ClusterRole already exists and create it if it doesn't
+	currentClusterRoleBinding := &rbacv1.ClusterRoleBinding{}
+	err = r.handleClusterRoleBinding(instance, currentClusterRoleBinding, &requeueResult)
 	if err !=  nil{
 		return reconcile.Result{}, err
 	}

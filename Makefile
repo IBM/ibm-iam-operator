@@ -84,9 +84,9 @@ $(eval DOCKER_BUILD_OPTS := --build-arg "IMAGE_NAME=$(IMAGE_NAME)" --build-arg "
 
 all: fmt check test coverage build images
 
-ifneq ("$(realpath $(DEST))", "$(realpath $(PWD))")
-    $(error Please run 'make' from $(DEST). Current directory is $(PWD))
-endif
+#ifneq ("$(realpath $(DEST))", "$(realpath $(PWD))")
+#    $(error Please run 'make' from $(DEST). Current directory is $(PWD))
+#endif
 
 include common/Makefile.common.mk
 

@@ -1,20 +1,20 @@
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: policydecisions.operator.ibm.com
+  name: securityonboardings.operator.ibm.com
 spec:
   group: operator.ibm.com
   names:
-    kind: PolicyDecision
-    listKind: PolicyDecisionList
-    plural: policydecisions
-    singular: policydecision
+    kind: SecurityOnboarding
+    listKind: SecurityOnboardingList
+    plural: securityonboardings
+    singular: securityonboarding
   scope: Namespaced
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
-      description: PolicyDecision is the Schema for the policydecisions API
+      description: SecurityOnboarding is the Schema for the securityonboardings API
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -29,9 +29,9 @@ spec:
         metadata:
           type: object
         spec:
-          description: PolicyDecisionSpec defines the desired state of PolicyDecision
+          description: SecurityOnboardingSpec defines the desired state of SecurityOnboarding
           properties:
-            auditService:
+            iamOnboarding:
               properties:
                 imageName:
                   type: string
@@ -39,13 +39,10 @@ spec:
                   type: string
                 imageTag:
                   type: string
-                journalPath:
-                  type: string
               required:
               - imageName
               - imageRegistry
               - imageTag
-              - journalPath
               type: object
             imageName:
               type: string
@@ -53,7 +50,66 @@ spec:
               type: string
             imageTag:
               type: string
-            initMongodb:
+            impersonation:
+              properties:
+                enableImpersonation:
+                  type: boolean
+              required:
+              - enableImpersonation
+              type: object
+            initAuthService:
+              properties:
+                imageName:
+                  type: string
+                imageRegistry:
+                  type: string
+                imageTag:
+                  type: string
+              required:
+              - imageName
+              - imageRegistry
+              - imageTag
+              type: object
+            initIdentityManager:
+              properties:
+                imageName:
+                  type: string
+                imageRegistry:
+                  type: string
+                imageTag:
+                  type: string
+              required:
+              - imageName
+              - imageRegistry
+              - imageTag
+              type: object
+            initIdentityProvider:
+              properties:
+                imageName:
+                  type: string
+                imageRegistry:
+                  type: string
+                imageTag:
+                  type: string
+              required:
+              - imageName
+              - imageRegistry
+              - imageTag
+              type: object
+            initPAPSpec:
+              properties:
+                imageName:
+                  type: string
+                imageRegistry:
+                  type: string
+                imageTag:
+                  type: string
+              required:
+              - imageName
+              - imageRegistry
+              - imageTag
+              type: object
+            initTokenService:
               properties:
                 imageName:
                   type: string
@@ -76,18 +132,23 @@ spec:
               format: int32
               type: integer
           required:
-          - auditService
+          - iamOnboarding
           - imageName
           - imageRegistry
           - imageTag
-          - initMongodb
+          - impersonation
+          - initAuthService
+          - initIdentityManager
+          - initIdentityProvider
+          - initPAPSpec
+          - initTokenService
           - operatorVersion
           - replicas
           type: object
         status:
-          description: PolicyDecisionStatus defines the observed state of PolicyDecision
+          description: SecurityOnboardingStatus defines the observed state of SecurityOnboarding
           properties:
-            nodes:
+            podNames:
               description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
                 of cluster Important: Run "operator-sdk generate k8s" to regenerate
                 code after modifying this file Add custom validation using kubebuilder
@@ -96,7 +157,7 @@ spec:
                 type: string
               type: array
           required:
-          - nodes
+          - podNames
           type: object
       type: object
   version: v1alpha1

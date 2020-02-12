@@ -24,22 +24,27 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// PolicyDecisionSpec defines the desired state of PolicyDecision
-type PolicyDecisionSpec struct {
+// PapSpec defines the desired state of Pap
+type PapSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
 	OperatorVersion string           `json:"operatorVersion"`
 	Replicas        int32            `json:"replicas"`
-	ImageRegistry   string           `json:"imageRegistry"`
-	ImageName       string           `json:"imageName"`
-	ImageTag        string           `json:"imageTag"`
+	PapService      PapServiceSpec   `json:"papService"`
 	AuditService    AuditServiceSpec `json:"auditService"`
-	InitMongodb     InitMongodbSpec  `json:"initMongodb"`
 }
 
-// PolicyDecisionStatus defines the observed state of PolicyDecision
-type PolicyDecisionStatus struct {
+// PapServiceSpec defined the desired state of PapService Container
+type PapServiceSpec struct {
+	ImageRegistry string `json:"imageRegistry"`
+	ImageName     string `json:"imageName"`
+	ImageTag      string `json:"imageTag"`
+}
+
+
+// PapStatus defines the observed state of Pap
+type PapStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
@@ -48,27 +53,27 @@ type PolicyDecisionStatus struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// PolicyDecision is the Schema for the policydecisions API
+// Pap is the Schema for the paps API
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:path=policydecisions,scope=Namespaced
-type PolicyDecision struct {
+// +kubebuilder:resource:path=paps,scope=Namespaced
+type Pap struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   PolicyDecisionSpec   `json:"spec,omitempty"`
-	Status PolicyDecisionStatus `json:"status,omitempty"`
+	Spec   PapSpec   `json:"spec,omitempty"`
+	Status PapStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// PolicyDecisionList contains a list of PolicyDecision
-type PolicyDecisionList struct {
+// PapList contains a list of Pap
+type PapList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []PolicyDecision `json:"items"`
+	Items           []Pap `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&PolicyDecision{}, &PolicyDecisionList{})
+	SchemeBuilder.Register(&Pap{}, &PapList{})
 	CertificateSchemeBuilder.Register(&certmgr.Certificate{}, &certmgr.CertificateList{})
 }

@@ -32,7 +32,6 @@ spec:
           description: AuthenticationSpec defines the desired state of Authentication
           properties:
             auditService:
-              description: AuditServiceSpec defined the desired state of AuditSidecar
               properties:
                 imageName:
                   type: string
@@ -176,8 +175,6 @@ spec:
               - imageTag
               type: object
             initMongodb:
-              description: InitMongodbSpec defines the desired state of InitMongodb
-                Container
               properties:
                 imageName:
                   type: string

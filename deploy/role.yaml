@@ -73,6 +73,9 @@ rules:
   - policydecisions
   - oidcclientwatchers
   - authentications
+  - policycontrollers
+  - paps
+  - securityonboardings
   verbs:
   - create
   - delete

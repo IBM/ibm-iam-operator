@@ -17,29 +17,26 @@
 package v1alpha1
 
 import (
-	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
+	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// PolicyDecisionSpec defines the desired state of PolicyDecision
-type PolicyDecisionSpec struct {
+// PolicyControllerSpec defines the desired state of PolicyController
+type PolicyControllerSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
-	OperatorVersion string           `json:"operatorVersion"`
-	Replicas        int32            `json:"replicas"`
-	ImageRegistry   string           `json:"imageRegistry"`
-	ImageName       string           `json:"imageName"`
-	ImageTag        string           `json:"imageTag"`
-	AuditService    AuditServiceSpec `json:"auditService"`
-	InitMongodb     InitMongodbSpec  `json:"initMongodb"`
+	OperatorVersion string `json:"operatorVersion,omitempty"`
+	Replicas        int32  `json:"replicas"`
+	ImageRegistry   string `json:"imageRegistry,omitempty"`
+	ImageTagPostfix string `json:"imageTagPostfix,omitempty"`
 }
 
-// PolicyDecisionStatus defines the observed state of PolicyDecision
-type PolicyDecisionStatus struct {
+// PolicyControllerStatus defines the observed state of PolicyController
+type PolicyControllerStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
@@ -48,27 +45,27 @@ type PolicyDecisionStatus struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// PolicyDecision is the Schema for the policydecisions API
+// PolicyController is the Schema for the policycontrollers API
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:path=policydecisions,scope=Namespaced
-type PolicyDecision struct {
+// +kubebuilder:resource:path=policycontrollers,scope=Namespaced
+type PolicyController struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   PolicyDecisionSpec   `json:"spec,omitempty"`
-	Status PolicyDecisionStatus `json:"status,omitempty"`
+	Spec   PolicyControllerSpec   `json:"spec,omitempty"`
+	Status PolicyControllerStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// PolicyDecisionList contains a list of PolicyDecision
-type PolicyDecisionList struct {
+// PolicyControllerList contains a list of PolicyController
+type PolicyControllerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []PolicyDecision `json:"items"`
+	Items           []PolicyController `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&PolicyDecision{}, &PolicyDecisionList{})
-	CertificateSchemeBuilder.Register(&certmgr.Certificate{}, &certmgr.CertificateList{})
+	SchemeBuilder.Register(&PolicyController{}, &PolicyControllerList{})
+	CRDSchemeBuilder.Register(&extv1.CustomResourceDefinition{}, &extv1.CustomResourceDefinitionList{})
 }

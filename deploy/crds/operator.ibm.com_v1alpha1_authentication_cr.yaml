@@ -24,7 +24,7 @@ spec:
     imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
     imageName: "icp-identity-manager"
     imageTag: "3.3.1"
-    masterNodesList : "10.0.0.1 10.0.0.2 10.0.0.3"
+    masterNodesList: "10.0.0.1 10.0.0.2 10.0.0.3"
   identityProvider:
     imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
     imageName: "icp-identity-provider"
@@ -49,8 +49,8 @@ spec:
     isOpenshiftEnv: true
     openshiftPort: 443
     roksEnabled: true
-    roksURL : "https://roks.domain.name:443"
-    roksUserPrefix : "IAM#"
-    wlpClientID : "Awdfagsadf"
+    roksURL: "https://roks.domain.name:443"
+    roksUserPrefix: "IAM#"
+    wlpClientID: "Awdfagsadf"
     wlpClientRegistrationSecret: "Awdfagsadf"
     wlpClientSecret: "Awdfagsadf"

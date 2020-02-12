@@ -42,7 +42,6 @@ type PapServiceSpec struct {
 	ImageTag      string `json:"imageTag"`
 }
 
-
 // PapStatus defines the observed state of Pap
 type PapStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster

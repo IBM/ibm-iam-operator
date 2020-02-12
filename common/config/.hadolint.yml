@@ -1,0 +1,9 @@
+ignored:
+  - FAKE_DL3003
+  - DL3006
+  
+trustedRegistries:
+  - gcr.io
+  - docker.io
+  - quay.io
+  - registry.access.redhat.com

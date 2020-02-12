@@ -20,7 +20,7 @@ import (
 	"context"
 	//"reflect"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
-	certmgr "github.ibm.com/IBMPrivateCloud/icp-cert-manager/pkg/apis/certmanager/v1alpha1"
+	certmgr "github.com/ibm/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1beta1"

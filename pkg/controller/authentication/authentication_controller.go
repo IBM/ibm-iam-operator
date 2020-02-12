@@ -20,11 +20,11 @@ import (
 	"context"
 	//"reflect"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
-	appsv1 "k8s.io/api/apps/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	net "k8s.io/api/networking/v1beta1"
 	certmgr "github.ibm.com/IBMPrivateCloud/icp-cert-manager/pkg/apis/certmanager/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	net "k8s.io/api/networking/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	//"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/api/errors"
 	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,12 +34,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	//"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 var log = logf.Log.WithName("controller_authentication")
@@ -52,10 +52,6 @@ var partialAccess int32 = 420
 var authServicePort int32 = 9443
 var identityProviderPort int32 = 4300
 var identityManagerPort int32 = 4500
-
-
-
-
 
 var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)            // 10m
 var cpu20 = resource.NewMilliQuantity(20, resource.DecimalSI)            // 20m
@@ -173,7 +169,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-
 	return nil
 }
 
@@ -217,74 +212,69 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 	// Check if this Certificate already exists and create it if it doesn't
 	currentCertificate := &certmgr.Certificate{}
 	err = r.handleCertificate(instance, currentCertificate, &requeueResult)
-	if err !=  nil{
+	if err != nil {
 		return reconcile.Result{}, err
 	}
 
 	// Check if this Service already exists and create it if it doesn't
 	currentService := &corev1.Service{}
 	err = r.handleService(instance, currentService, &requeueResult)
-	if err !=  nil{
+	if err != nil {
 		return reconcile.Result{}, err
 	}
 
 	// Check if this Secret already exists and create it if it doesn't
 	currentSecret := &corev1.Secret{}
 	err = r.handleSecret(instance, currentSecret, &requeueResult)
-	if err !=  nil{
+	if err != nil {
 		return reconcile.Result{}, err
 	}
 
 	// Check if this Job already exists and create it if it doesn't
 	currentJob := &batchv1.Job{}
 	err = r.handleJob(instance, currentJob, &requeueResult)
-	if err !=  nil{
+	if err != nil {
 		return reconcile.Result{}, err
 	}
 
 	//Check if this ConfigMap already exists and create it if it doesn't
 	currentConfigMap := &corev1.ConfigMap{}
 	err = r.handleConfigMap(instance, currentConfigMap, &requeueResult)
-	if err !=  nil{
+	if err != nil {
 		return reconcile.Result{}, err
 	}
 
 	// Check if this Ingress already exists and create it if it doesn't
 	currentIngress := &net.Ingress{}
 	err = r.handleIngress(instance, currentIngress, &requeueResult)
-	if err !=  nil{
+	if err != nil {
 		return reconcile.Result{}, err
 	}
-
 
 	// Check if this ClusterRole already exists and create it if it doesn't
 	currentClusterRole := &rbacv1.ClusterRole{}
 	err = r.handleClusterRole(instance, currentClusterRole, &requeueResult)
-	if err !=  nil{
+	if err != nil {
 		return reconcile.Result{}, err
 	}
 
 	// Check if this ClusterRole already exists and create it if it doesn't
 	currentClusterRoleBinding := &rbacv1.ClusterRoleBinding{}
 	err = r.handleClusterRoleBinding(instance, currentClusterRoleBinding, &requeueResult)
-	if err !=  nil{
+	if err != nil {
 		return reconcile.Result{}, err
 	}
 
 	// Check if this Deployment already exists and create it if it doesn't
 	currentDeployment := &appsv1.Deployment{}
 	err = r.handleDeployment(instance, currentDeployment, &requeueResult)
-	if err !=  nil{
+	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	if(requeueResult){
+	if requeueResult {
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	return reconcile.Result{}, nil	
+	return reconcile.Result{}, nil
 }
-
-
-
-

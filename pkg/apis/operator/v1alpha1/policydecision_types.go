@@ -17,8 +17,8 @@
 package v1alpha1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	certmgr "github.ibm.com/IBMPrivateCloud/icp-cert-manager/pkg/apis/certmanager/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -29,15 +29,14 @@ type PolicyDecisionSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
-	OperatorVersion string          `json:"operatorVersion"`
-	Replicas int32                  `json:"replicas"`
-	ImageRegistry string            `json:"imageRegistry"`
-	ImageName string                `json:"imageName"`
-	ImageTag string                 `json:"imageTag"`
-	AuditService AuditServiceSpec   `json:"auditService"`
-	InitMongodb InitMongodbSpec     `json:"initMongodb"`
+	OperatorVersion string           `json:"operatorVersion"`
+	Replicas        int32            `json:"replicas"`
+	ImageRegistry   string           `json:"imageRegistry"`
+	ImageName       string           `json:"imageName"`
+	ImageTag        string           `json:"imageTag"`
+	AuditService    AuditServiceSpec `json:"auditService"`
+	InitMongodb     InitMongodbSpec  `json:"initMongodb"`
 }
-
 
 // PolicyDecisionStatus defines the observed state of PolicyDecision
 type PolicyDecisionStatus struct {

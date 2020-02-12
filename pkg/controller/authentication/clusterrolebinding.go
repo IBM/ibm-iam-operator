@@ -25,111 +25,106 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-
-
 type SubjectData struct {
 	Name string
 	Kind string
 }
 
 type CRBData struct {
-	Subject []SubjectData
+	Subject  []SubjectData
 	RoleName string
 }
 
-
-func generateCRBData(defaultAdminUser string, oidcIssuerURL string) map[string]CRBData{
+func generateCRBData(defaultAdminUser string, oidcIssuerURL string) map[string]CRBData {
 
 	return map[string]CRBData{
-		"icp:default:accountadmin" : CRBData{
-			Subject : []SubjectData {
+		"icp:default:accountadmin": CRBData{
+			Subject: []SubjectData{
 				{
-					Name : "icp:default:accountadmin",
-					Kind : "Group",
-
+					Name: "icp:default:accountadmin",
+					Kind: "Group",
 				},
 			},
-			RoleName : "icp:accountadmin",
+			RoleName: "icp:accountadmin",
 		},
-		"icp:default:member" : CRBData{
-			Subject : []SubjectData {
+		"icp:default:member": CRBData{
+			Subject: []SubjectData{
 				{
-					Name : "icp:default:member",
-					Kind : "Group",
+					Name: "icp:default:member",
+					Kind: "Group",
 				},
 			},
-			RoleName : "extension",
+			RoleName: "extension",
 		},
-		"icp:default:teamadmin" : CRBData{
-			Subject : []SubjectData {
+		"icp:default:teamadmin": CRBData{
+			Subject: []SubjectData{
 				{
-					Name : "icp:default:teamadmin",
-					Kind : "Group",
+					Name: "icp:default:teamadmin",
+					Kind: "Group",
 				},
 			},
-			RoleName : "icp:teamadmin",
+			RoleName: "icp:teamadmin",
 		},
-		"icp::editors" : CRBData{
-			Subject : []SubjectData {
+		"icp::editors": CRBData{
+			Subject: []SubjectData{
 				{
-					Name : "icp::editor",
-					Kind : "Group",
+					Name: "icp::editor",
+					Kind: "Group",
 				},
 			},
-			RoleName : "icp-clusterservicestatus-reader",
+			RoleName: "icp-clusterservicestatus-reader",
 		},
-		"icp::operators" : CRBData{
-			Subject : []SubjectData {
+		"icp::operators": CRBData{
+			Subject: []SubjectData{
 				{
-					Name : "icp::operator",
-					Kind : "Group",
+					Name: "icp::operator",
+					Kind: "Group",
 				},
 			},
-			RoleName : "icp-clusterservicestatus-reader",
+			RoleName: "icp-clusterservicestatus-reader",
 		},
-		"oidc-admin-binding" : CRBData{
-			Subject : []SubjectData {
+		"oidc-admin-binding": CRBData{
+			Subject: []SubjectData{
 				{
-					Name : oidcIssuerURL+"#"+defaultAdminUser,
-					Kind : "User",
+					Name: oidcIssuerURL + "#" + defaultAdminUser,
+					Kind: "User",
 				},
 				{
-					Name : defaultAdminUser,
-					Kind : "User",
+					Name: defaultAdminUser,
+					Kind: "User",
 				},
 			},
-			RoleName : "cluster-admin",
+			RoleName: "cluster-admin",
 		},
 	}
-	
+
 }
 
-
-func (r *ReconcileAuthentication) handleClusterRoleBinding(instance *operatorv1alpha1.Authentication, currentClusterRoleBinding *rbacv1.ClusterRoleBinding, requeueResult *bool)(error){
+func (r *ReconcileAuthentication) handleClusterRoleBinding(instance *operatorv1alpha1.Authentication, currentClusterRoleBinding *rbacv1.ClusterRoleBinding, requeueResult *bool) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 	defaultAdminUser := instance.Spec.Config.DefaultAdminUser
 	oidcIssuerURL := instance.Spec.Config.OIDCIssuerURL
 
-	crbData := generateCRBData(defaultAdminUser,oidcIssuerURL)
+	crbData := generateCRBData(defaultAdminUser, oidcIssuerURL)
 
-	for clusterRoleBinding,crbValue := range crbData {
+	for clusterRoleBinding, crbValue := range crbData {
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: clusterRoleBinding, Namespace: instance.Namespace}, currentClusterRoleBinding)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new clusterRoleBinding
 			newClusterRoleBinding := createClusterRoleBinding(clusterRoleBinding, crbValue)
-			reqLogger.Info("Creating a new clusterRoleBinding",  "clusterRoleBinding.Name", clusterRoleBinding)
+			reqLogger.Info("Creating a new clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
 			err = r.client.Create(context.TODO(), newClusterRoleBinding)
 			if err != nil {
 				reqLogger.Error(err, "Failed to create new clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
-				return  err
+				return err
 			}
 			// clusterRoleBinding created successfully - return and requeue
 			*requeueResult = true
 		} else if err != nil {
 			reqLogger.Error(err, "Failed to get clusterRoleBinding")
-			return  err
+			return err
 		}
 
 	}
@@ -137,40 +132,37 @@ func (r *ReconcileAuthentication) handleClusterRoleBinding(instance *operatorv1a
 	return nil
 }
 
-func createClusterRoleBinding(clusterRoleBinding string, data CRBData) *rbacv1.ClusterRoleBinding{
+func createClusterRoleBinding(clusterRoleBinding string, data CRBData) *rbacv1.ClusterRoleBinding {
 	newClusterRoleBinding := &rbacv1.ClusterRoleBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        clusterRoleBinding,
-					Labels : map[string]string{
-						"app" : "auth-idp",
-					},	
-				},
-				Subjects : getSubjects(data.Subject),
-				RoleRef : rbacv1.RoleRef{
-					APIGroup : "rbac.authorization.k8s.io",
-					Kind : "ClusterRole",
-					Name : data.RoleName,
-				},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: clusterRoleBinding,
+			Labels: map[string]string{
+				"app": "auth-idp",
+			},
+		},
+		Subjects: getSubjects(data.Subject),
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     data.RoleName,
+		},
 	}
-	
 
 	return newClusterRoleBinding
 }
 
+func getSubjects(subjectDataList []SubjectData) []rbacv1.Subject {
 
-func getSubjects(subjectDataList []SubjectData) []rbacv1.Subject{
-	
 	var subjects []rbacv1.Subject
 	var newSubject rbacv1.Subject
-	for _,subjectData := range subjectDataList{
+	for _, subjectData := range subjectDataList {
 
 		newSubject = rbacv1.Subject{
-			APIGroup : "rbac.authorization.k8s.io",
-			Kind : subjectData.Kind,
-			Name : subjectData.Name,
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     subjectData.Kind,
+			Name:     subjectData.Name,
 		}
-		subjects = append(subjects,newSubject)
+		subjects = append(subjects, newSubject)
 	}
 	return subjects
 }
-

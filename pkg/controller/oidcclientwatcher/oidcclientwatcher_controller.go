@@ -24,6 +24,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const oidcClientWatcherDeploymentName = "oidcclient-watcher"
@@ -48,10 +48,10 @@ var seconds60 int64 = 60
 var runAsUser int64 = 21000
 var fsGroup int64 = 21000
 var nodeSelector = map[string]string{"master": "true"}
-var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)            // 10m
-var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)          // 200m
-var memory16 = resource.NewQuantity(100*1024*1024, resource.BinarySI)    // 16Mi
-var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI)   // 128Mi
+var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)          // 10m
+var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
+var memory16 = resource.NewQuantity(100*1024*1024, resource.BinarySI)  // 16Mi
+var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI) // 128Mi
 
 var log = logf.Log.WithName("controller_oidcclientwatcher")
 
@@ -94,8 +94,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
-
-	
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Pods and requeue the owner OIDCClientWatcher
@@ -148,32 +146,29 @@ func (r *ReconcileOIDCClientWatcher) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
-	
 	// Check if this Deployment already exists and create it if it doesn't
 	currentDeployment := &appsv1.Deployment{}
 	recResult, err := r.handleDeployment(instance, currentDeployment)
-	if err !=  nil{
+	if err != nil {
 		return recResult, err
 	}
 
 	currentClusterRole := &rbacv1.ClusterRole{}
 	recResult, err = r.handleClusterRole(instance, currentClusterRole)
-	if err !=  nil{
+	if err != nil {
 		return recResult, err
 	}
 
 	currentCRD := &extv1.CustomResourceDefinition{}
 	recResult, err = r.handleCRD(instance, currentCRD)
-	if err !=  nil{
+	if err != nil {
 		return recResult, err
 	}
 
-	
 	return reconcile.Result{}, nil
 }
 
-
-func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha1.OIDCClientWatcher, currentClusterRole *rbacv1.ClusterRole)(reconcile.Result, error){
+func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha1.OIDCClientWatcher, currentClusterRole *rbacv1.ClusterRole) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "icp-oidc-client-admin-aggregate", Namespace: ""}, currentClusterRole)
 	if err != nil && errors.IsNotFound(err) {
@@ -205,11 +200,11 @@ func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha
 		reqLogger.Error(err, "Failed to get ClusterRole")
 		return reconcile.Result{}, err
 	}
-    //admin roles created successfully
+	//admin roles created successfully
 	return reconcile.Result{Requeue: true}, nil
 }
 
-func (r *ReconcileOIDCClientWatcher) handleCRD(instance *operatorv1alpha1.OIDCClientWatcher, currentCRD *extv1.CustomResourceDefinition)(reconcile.Result, error){
+func (r *ReconcileOIDCClientWatcher) handleCRD(instance *operatorv1alpha1.OIDCClientWatcher, currentCRD *extv1.CustomResourceDefinition) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "clients.oidc.security.ibm.com", Namespace: ""}, currentCRD)
 	if err != nil && errors.IsNotFound(err) {
@@ -230,8 +225,7 @@ func (r *ReconcileOIDCClientWatcher) handleCRD(instance *operatorv1alpha1.OIDCCl
 	return reconcile.Result{}, nil
 }
 
-
-func (r *ReconcileOIDCClientWatcher) handleDeployment(instance *operatorv1alpha1.OIDCClientWatcher, currentDeployment *appsv1.Deployment)(reconcile.Result, error){
+func (r *ReconcileOIDCClientWatcher) handleDeployment(instance *operatorv1alpha1.OIDCClientWatcher, currentDeployment *appsv1.Deployment) (reconcile.Result, error) {
 
 	// Check if this Deployment already exists
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
@@ -270,7 +264,7 @@ func (r *ReconcileOIDCClientWatcher) handleDeployment(instance *operatorv1alpha1
 	podList := &corev1.PodList{}
 	listOpts := []client.ListOption{
 		client.InNamespace(instance.Namespace),
-		client.MatchingLabels(map[string]string{"app":"oidcclient-watcher",}),
+		client.MatchingLabels(map[string]string{"app": "oidcclient-watcher"}),
 	}
 	if err = r.client.List(context.TODO(), podList, listOpts...); err != nil {
 		reqLogger.Error(err, "Failed to list pods", "OIDCClientWatcher.Namespace", instance.Namespace, "OIDCClientWatcher.Name", instance.Name)
@@ -295,21 +289,21 @@ func (r *ReconcileOIDCClientWatcher) handleDeployment(instance *operatorv1alpha1
 func (r *ReconcileOIDCClientWatcher) adminClusterRoleForOIDCClientWatcher(instance *operatorv1alpha1.OIDCClientWatcher) *rbacv1.ClusterRole {
 	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	adminClusterRole := &rbacv1.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "icp-oidc-client-admin-aggregate",
-					Labels:      map[string]string{
-						"kubernetes.io/bootstrapping": "rbac-defaults",
-						"rbac.icp.com/aggregate-to-icp-admin" : "true",
-						"rbac.authorization.k8s.io/aggregate-to-admin" : "true",
-					},
-				},
-				Rules : []rbacv1.PolicyRule{
-					{
-						APIGroups : []string{"oidc.security.ibm.com"},
-						Resources : []string{"clients"},
-						Verbs : []string{"create","get","list","patch","update","watch","delete",},
-					},
-				},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "icp-oidc-client-admin-aggregate",
+			Labels: map[string]string{
+				"kubernetes.io/bootstrapping":                  "rbac-defaults",
+				"rbac.icp.com/aggregate-to-icp-admin":          "true",
+				"rbac.authorization.k8s.io/aggregate-to-admin": "true",
+			},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"oidc.security.ibm.com"},
+				Resources: []string{"clients"},
+				Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
+			},
+		},
 	}
 
 	// Set OIDCClientWatcher instance as the owner and controller of the admin cluster role
@@ -324,21 +318,21 @@ func (r *ReconcileOIDCClientWatcher) adminClusterRoleForOIDCClientWatcher(instan
 func (r *ReconcileOIDCClientWatcher) operatorClusterRoleForOIDCClientWatcher(instance *operatorv1alpha1.OIDCClientWatcher) *rbacv1.ClusterRole {
 	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	operatorClusterRole := &rbacv1.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "icp-oidc-client-operate-aggregate",
-					Labels:      map[string]string{
-						"kubernetes.io/bootstrapping": "rbac-defaults",
-						"rbac.icp.com/aggregate-to-icp-operate" : "true",
-						"rbac.authorization.k8s.io/aggregate-to-edit" : "true",
-					},
-				},
-				Rules : []rbacv1.PolicyRule{
-					{
-						APIGroups : []string{"oidc.security.ibm.com"},
-						Resources : []string{"clients"},
-						Verbs : []string{"create","get","list","patch","update","watch","delete",},
-					},
-				},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "icp-oidc-client-operate-aggregate",
+			Labels: map[string]string{
+				"kubernetes.io/bootstrapping":                 "rbac-defaults",
+				"rbac.icp.com/aggregate-to-icp-operate":       "true",
+				"rbac.authorization.k8s.io/aggregate-to-edit": "true",
+			},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"oidc.security.ibm.com"},
+				Resources: []string{"clients"},
+				Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
+			},
+		},
 	}
 
 	// Set OIDCClientWatcher instance as the owner and controller of the cluster role
@@ -353,83 +347,81 @@ func (r *ReconcileOIDCClientWatcher) operatorClusterRoleForOIDCClientWatcher(ins
 func (r *ReconcileOIDCClientWatcher) crdForOIDCClientWatcher(instance *operatorv1alpha1.OIDCClientWatcher) *extv1.CustomResourceDefinition {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newCRD := &extv1.CustomResourceDefinition{
-		TypeMeta: metav1.TypeMeta {
-			Kind : "CustomResourceDefinition",
-			APIVersion : "apiextensions.k8s.io/v1beta1",
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "CustomResourceDefinition",
+			APIVersion: "apiextensions.k8s.io/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "clients.oidc.security.ibm.com",
-			Labels:      map[string]string{
-				"app" : "oidcclient-watcher",
+			Name: "clients.oidc.security.ibm.com",
+			Labels: map[string]string{
+				"app": "oidcclient-watcher",
 			},
-			Namespace : "kube-system",
+			Namespace: "kube-system",
 		},
 		Spec: extv1.CustomResourceDefinitionSpec{
-			Scope: "Namespaced",
-			Group: "oidc.security.ibm.com",
+			Scope:   "Namespaced",
+			Group:   "oidc.security.ibm.com",
 			Version: "v1",
 			Names: extv1.CustomResourceDefinitionNames{
-				Kind: "Client",
-				Singular: "client",
-				Plural: "clients",
-				ShortNames: []string{"or"},					
+				Kind:       "Client",
+				Singular:   "client",
+				Plural:     "clients",
+				ShortNames: []string{"or"},
 			},
 			Validation: &extv1.CustomResourceValidation{
-				OpenAPIV3Schema : &extv1.JSONSchemaProps{
-					Properties : map[string]extv1.JSONSchemaProps{
-						"apiVersion" : extv1.JSONSchemaProps{
-							Description : `APIVersion defines the versioned schema of this representation
+				OpenAPIV3Schema: &extv1.JSONSchemaProps{
+					Properties: map[string]extv1.JSONSchemaProps{
+						"apiVersion": extv1.JSONSchemaProps{
+							Description: `APIVersion defines the versioned schema of this representation
 							of an object. Servers should convert recognized schemas to the latest
 							internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources`,
-							Type : "string",
+							Type: "string",
 						},
-						"kind" : extv1.JSONSchemaProps{
-							Description : `Kind is a string value representing the REST resource this
+						"kind": extv1.JSONSchemaProps{
+							Description: `Kind is a string value representing the REST resource this
 							object represents. Servers may infer this from the endpoint the client
 							submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds`,
-							Type : "string",
+							Type: "string",
 						},
-						"metadata" : extv1.JSONSchemaProps{
-							Type : "object",
+						"metadata": extv1.JSONSchemaProps{
+							Type: "object",
 						},
-						"spec" : extv1.JSONSchemaProps{
-							Type : "object",
+						"spec": extv1.JSONSchemaProps{
+							Type: "object",
 						},
-						"status" : extv1.JSONSchemaProps{
-							Type : "object",
+						"status": extv1.JSONSchemaProps{
+							Type: "object",
 						},
 					},
 				},
 			},
-			AdditionalPrinterColumns : []extv1.CustomResourceColumnDefinition{
+			AdditionalPrinterColumns: []extv1.CustomResourceColumnDefinition{
 				{
-					Name : "Secret",
-					Type : "string",
-					JSONPath : ".spec.secret",
+					Name:     "Secret",
+					Type:     "string",
+					JSONPath: ".spec.secret",
 				},
 				{
-					Name : "Ready",
-					Type : "string",
+					Name:     "Ready",
+					Type:     "string",
 					JSONPath: `.status.conditions[?(@.type=="Ready")].status`,
 				},
 				{
-					Name : "Status",
-					Type : "string",
-					JSONPath : `.status.conditions[?(@.type=="Ready")].message`,
-					Priority: 1, 
+					Name:     "Status",
+					Type:     "string",
+					JSONPath: `.status.conditions[?(@.type=="Ready")].message`,
+					Priority: 1,
 				},
 				{
-					Name : "Age",
-					Type : "date",
-					JSONPath : ".metadata.creationTimestamp",
-					Description : `CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.
+					Name:     "Age",
+					Type:     "date",
+					JSONPath: ".metadata.creationTimestamp",
+					Description: `CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.
 					\nPopulated by the system. Read-only. Null for lists. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata`,
 				},
 			},
 		},
 	}
-
-	
 
 	// Set OIDCClientWatcher instance as the owner and controller of the CustomResourceDefinition
 	err := controllerutil.SetControllerReference(instance, newCRD, r.scheme)
@@ -439,7 +431,6 @@ func (r *ReconcileOIDCClientWatcher) crdForOIDCClientWatcher(instance *operatorv
 	}
 	return newCRD
 }
-
 
 // deploymentForOIDCClientWatcher returns a OIDCClientWatcher Deployment object
 func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *operatorv1alpha1.OIDCClientWatcher) *appsv1.Deployment {
@@ -451,26 +442,26 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      oidcClientWatcherDeploymentName,
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{
-				"app" : "oidcclient-watcher",
+			Labels: map[string]string{
+				"app": "oidcclient-watcher",
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app" : "oidcclient-watcher",
+					"app": "oidcclient-watcher",
 				},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app" : "oidcclient-watcher",
+						"app": "oidcclient-watcher",
 					},
-					Annotations: map[string] string{
+					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
-						"productName": "IBM Cloud Platform Common Services",
-						"productID": "IBMCloudPlatformCommonServices_342_apache_0000",
+						"productName":    "IBM Cloud Platform Common Services",
+						"productID":      "IBMCloudPlatformCommonServices_342_apache_0000",
 						"productVersion": "3.4.2",
 						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},
@@ -479,9 +470,9 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 					NodeSelector:                  nodeSelector,
 					PriorityClassName:             "system-cluster-critical",
 					TerminationGracePeriodSeconds: &seconds60,
-					SecurityContext: &corev1.PodSecurityContext {
-						RunAsUser : &runAsUser,
-						FSGroup : &fsGroup,
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsUser: &runAsUser,
+						FSGroup:   &fsGroup,
 					},
 					HostIPC: false,
 					HostPID: false,
@@ -529,10 +520,10 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 							Resources: corev1.ResourceRequirements{
 								Limits: map[corev1.ResourceName]resource.Quantity{
 									corev1.ResourceCPU:    *cpu200,
-									corev1.ResourceMemory: *memory128,},
+									corev1.ResourceMemory: *memory128},
 								Requests: map[corev1.ResourceName]resource.Quantity{
 									corev1.ResourceCPU:    *cpu10,
-									corev1.ResourceMemory: *memory16,},
+									corev1.ResourceMemory: *memory16},
 							},
 							Env: []corev1.EnvVar{
 								{
@@ -603,12 +594,12 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 									Value: "https://platform-identity-management:4500",
 								},
 								{
-									Name : "OPERATOR_NAME",
-									Value : "icp-oidcclient-watcher",
+									Name:  "OPERATOR_NAME",
+									Value: "icp-oidcclient-watcher",
 								},
 								{
-									Name : "OAUTH_ADMIN",
-									Value : "oauthadmin",
+									Name:  "OAUTH_ADMIN",
+									Value: "oauthadmin",
 								},
 								{
 									Name: "OAUTH2_CLIENT_REGISTRATION_SECRET",
@@ -622,11 +613,11 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 									},
 								},
 								{
-									Name : "POD_NAME",
-									ValueFrom : &corev1.EnvVarSource{
-										FieldRef : &corev1.ObjectFieldSelector{
-											APIVersion : "v1",
-											FieldPath : "metadata.name",
+									Name: "POD_NAME",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											APIVersion: "v1",
+											FieldPath:  "metadata.name",
 										},
 									},
 								},
@@ -640,28 +631,28 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 							LivenessProbe: &corev1.Probe{
 								Handler: corev1.Handler{
 									Exec: &corev1.ExecAction{
-										Command : []string{"ls"},
+										Command: []string{"ls"},
 									},
 								},
 								InitialDelaySeconds: 30,
-								PeriodSeconds : 15,
+								PeriodSeconds:       15,
 							},
 							ReadinessProbe: &corev1.Probe{
 								Handler: corev1.Handler{
 									Exec: &corev1.ExecAction{
-										Command : []string{"ls"},
+										Command: []string{"ls"},
 									},
 								},
 								InitialDelaySeconds: 15,
-								PeriodSeconds : 15,
+								PeriodSeconds:       15,
 							},
 							SecurityContext: &corev1.SecurityContext{
-								Privileged: &falseVar,
-								RunAsNonRoot: &trueVar,
-								ReadOnlyRootFilesystem: &trueVar,
+								Privileged:               &falseVar,
+								RunAsNonRoot:             &trueVar,
+								ReadOnlyRootFilesystem:   &trueVar,
 								AllowPrivilegeEscalation: &falseVar,
 								Capabilities: &corev1.Capabilities{
-									Drop: []corev1.Capability{"ALL",},
+									Drop: []corev1.Capability{"ALL"},
 								},
 							},
 						},
@@ -678,8 +669,6 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 	}
 	return ocwDep
 }
-
-
 
 // getPodNames returns the pod names of the array of pods passed in
 func getPodNames(pods []corev1.Pod) []string {

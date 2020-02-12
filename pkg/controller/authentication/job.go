@@ -22,16 +22,14 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-
-
-func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentication, currentJob *batchv1.Job, requeueResult *bool) (error){
+func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentication, currentJob *batchv1.Job, requeueResult *bool) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
@@ -40,52 +38,49 @@ func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentic
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: job, Namespace: instance.Namespace}, currentJob)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new Job
-		newJob := generateJobObject(instance,r.scheme,job)
+		newJob := generateJobObject(instance, r.scheme, job)
 		reqLogger.Info("Creating a new Job", "Job.Namespace", instance.Namespace, "Job.Name", job)
 		err = r.client.Create(context.TODO(), newJob)
 		if err != nil {
 			reqLogger.Error(err, "Failed to create new Job", "Job.Namespace", instance.Namespace, "Job.Name", job)
-			return  err
+			return err
 		}
 		// Job created successfully - return and requeue
 		*requeueResult = true
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Job")
-		return  err
+		return err
 	}
 
-	
-	
 	return nil
 
 }
 
-
-func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme,jobName string) *batchv1.Job{
+func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, jobName string) *batchv1.Job {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	image := instance.Spec.ClientRegistration.ImageRegistry + "/" + instance.Spec.ClientRegistration.ImageName + ":" + instance.Spec.ClientRegistration.ImageTag
-	
+
 	newJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        jobName,
-			Namespace:   instance.Namespace,
-			Labels:      map[string]string{"app": jobName},
+			Name:      jobName,
+			Namespace: instance.Namespace,
+			Labels:    map[string]string{"app": jobName},
 		},
 		Spec: batchv1.JobSpec{
-			Template : corev1.PodTemplateSpec{
-				ObjectMeta : metav1.ObjectMeta{
-					Name:        jobName,
-					Labels:      map[string]string{"app": jobName},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   jobName,
+					Labels: map[string]string{"app": jobName},
 					Annotations: map[string]string{
-						"scheduler.alpha.kubernetes.io/critical-pod" : "",
-						"seccomp.security.alpha.kubernetes.io/pod" : "docker/default",
+						"scheduler.alpha.kubernetes.io/critical-pod": "",
+						"seccomp.security.alpha.kubernetes.io/pod":   "docker/default",
 					},
 				},
-				Spec : corev1.PodSpec {
-					HostIPC : false,
-					HostPID : false,
-					PriorityClassName : "system-cluster-critical",
-					RestartPolicy : corev1.RestartPolicyOnFailure,
+				Spec: corev1.PodSpec{
+					HostIPC:           false,
+					HostPID:           false,
+					PriorityClassName: "system-cluster-critical",
+					RestartPolicy:     corev1.RestartPolicyOnFailure,
 					Tolerations: []corev1.Toleration{
 						{
 							Key:      "dedicated",
@@ -97,16 +92,14 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 							Operator: corev1.TolerationOpExists,
 						},
 					},
-					Volumes: buildVolumes(),
+					Volumes:    buildVolumes(),
 					Containers: buildContainer(jobName, image),
 					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser : &user,
-						FSGroup : &user,
+						RunAsUser: &user,
+						FSGroup:   &user,
 					},
-					NodeSelector: map[string]string{"master" : "true"},
+					NodeSelector: map[string]string{"master": "true"},
 				},
-
-
 			},
 		},
 	}
@@ -120,48 +113,47 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 	return newJob
 }
 
-func buildVolumes()[]corev1.Volume{
+func buildVolumes() []corev1.Volume {
 	return []corev1.Volume{
-		
+
 		{
-			Name : "registration-script",
-			VolumeSource : corev1.VolumeSource{
+			Name: "registration-script",
+			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference : corev1.LocalObjectReference{
-						Name : "registration-script",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "registration-script",
 					},
 					DefaultMode: &fullAccess,
 				},
 			},
 		},
 		{
-			Name : "registration-json",
-			VolumeSource : corev1.VolumeSource{
+			Name: "registration-json",
+			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference : corev1.LocalObjectReference{
-						Name : "registration-json",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "registration-json",
 					},
-					DefaultMode : &fullAccess,
+					DefaultMode: &fullAccess,
 				},
 			},
 		},
-		
 	}
 }
 
 func buildContainer(jobName string, image string) []corev1.Container {
 	return []corev1.Container{
 		{
-			Name : jobName,
-			Image : image,
-			ImagePullPolicy : corev1.PullAlways,
+			Name:            jobName,
+			Image:           image,
+			ImagePullPolicy: corev1.PullAlways,
 			SecurityContext: &corev1.SecurityContext{
-				Privileged: &falseVar,
-				RunAsNonRoot: &trueVar,
-				ReadOnlyRootFilesystem: &falseVar,
+				Privileged:               &falseVar,
+				RunAsNonRoot:             &trueVar,
+				ReadOnlyRootFilesystem:   &falseVar,
 				AllowPrivilegeEscalation: &falseVar,
 				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"ALL",},
+					Drop: []corev1.Capability{"ALL"},
 				},
 			},
 			Resources: corev1.ResourceRequirements{
@@ -172,43 +164,42 @@ func buildContainer(jobName string, image string) []corev1.Container {
 					corev1.ResourceCPU:    *cpu100,
 					corev1.ResourceMemory: *memory128},
 			},
-			VolumeMounts : []corev1.VolumeMount{
+			VolumeMounts: []corev1.VolumeMount{
 				{
-					Name : "registration-script",
-					MountPath : "/scripts",
+					Name:      "registration-script",
+					MountPath: "/scripts",
 				},
 				{
-					Name : "registration-json",
-					MountPath : "/jsons",
+					Name:      "registration-json",
+					MountPath: "/jsons",
 				},
 			},
-			Command : []string{"/scripts/register-client.sh"},
-			Env : []corev1.EnvVar {
+			Command: []string{"/scripts/register-client.sh"},
+			Env: []corev1.EnvVar{
 				{
-					Name : "WLP_CLIENT_REGISTRATION_SECRET",
-					ValueFrom : &corev1.EnvVarSource{
-						SecretKeyRef : &corev1.SecretKeySelector{
+					Name: "WLP_CLIENT_REGISTRATION_SECRET",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
 								Name: "platform-oidc-credentials",
 							},
-							Key : "OAUTH2_CLIENT_REGISTRATION_SECRET",
+							Key: "OAUTH2_CLIENT_REGISTRATION_SECRET",
 						},
 					},
 				},
 				{
-					Name : "WLP_CLIENT_ID",
-					ValueFrom : &corev1.EnvVarSource{
-						SecretKeyRef : &corev1.SecretKeySelector{
+					Name: "WLP_CLIENT_ID",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
 								Name: "platform-oidc-credentials",
 							},
-							Key : "WLP_CLIENT_ID",
+							Key: "WLP_CLIENT_ID",
 						},
 					},
 				},
 			},
-	    },
-
+		},
 	}
-		
+
 }

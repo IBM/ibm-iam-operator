@@ -16,7 +16,7 @@ spec:
       containers:
         - name: ibm-iam-operator
           # Replace this with the built image name
-          image: REPLACE_IMAGE
+          image: quay.io/opencloudio/ibm-iam-operator-amd64:76276304
           command:
           - ibm-iam-operator
           imagePullPolicy: Always

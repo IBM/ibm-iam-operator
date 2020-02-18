@@ -644,7 +644,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 				MountPath: "/var/log/audit",
 			},
 			{
-				Name:      "identity-provider-crt",
+				Name:      "identity-provider-cert",
 				MountPath: "/opt/ibm/identity-provider/certs",
 			},
 			{

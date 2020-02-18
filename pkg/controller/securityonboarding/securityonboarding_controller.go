@@ -217,7 +217,7 @@ func createConfigMap(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcile
 	currentConfigMap := &corev1.ConfigMap{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: val0, Namespace: instance.Namespace}, currentConfigMap)
 	if err == nil {
-		return currentConfigMap, fmt.Errorf("Config Map %g already exists.", val0)
+		return currentConfigMap, fmt.Errorf("Config Map %v already exists.", val0)
 	}
 
 	configMap := &corev1.ConfigMap{
@@ -424,7 +424,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 	currentJob := &batchv1.Job{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "security-onboarding", Namespace: instance.Namespace}, currentJob)
 	if err == nil {
-		return currentJob, fmt.Errorf("Job %g already exists.", "security-onboarding")
+		return currentJob, fmt.Errorf("Job %v already exists.", "security-onboarding")
 	}
 
 	job := &batchv1.Job{
@@ -796,7 +796,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 	currentJob := &batchv1.Job{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "iam-onboarding", Namespace: instance.Namespace}, currentJob)
 	if err == nil {
-		return currentJob, fmt.Errorf("Job %g already exists.", "iam-onboarding")
+		return currentJob, fmt.Errorf("Job %v already exists.", "iam-onboarding")
 	}
 
 	job := &batchv1.Job{

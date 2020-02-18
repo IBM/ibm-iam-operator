@@ -18,22 +18,17 @@ package authentication
 
 import (
 	"context"
-	//"reflect"
-	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
+	//certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1beta1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	//"k8s.io/apimachinery/pkg/util/intstr"
+	//rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	//"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	//"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -101,13 +96,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Certificate and requeue the owner Authentication
-	err = c.Watch(&source.Kind{Type: &certmgr.Certificate{}}, &handler.EnqueueRequestForOwner{
+	/*err = c.Watch(&source.Kind{Type: &certmgr.Certificate{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &operatorv1alpha1.Authentication{},
 	})
 	if err != nil {
 		return err
-	}
+	}*/
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Certificate and requeue the owner Authentication
@@ -210,11 +205,11 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 	}
 
 	// Check if this Certificate already exists and create it if it doesn't
-	currentCertificate := &certmgr.Certificate{}
+	/*currentCertificate := &certmgr.Certificate{}
 	err = r.handleCertificate(instance, currentCertificate, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
-	}
+	}*/
 
 	// Check if this Service already exists and create it if it doesn't
 	currentService := &corev1.Service{}
@@ -226,6 +221,12 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 	// Check if this Secret already exists and create it if it doesn't
 	currentSecret := &corev1.Secret{}
 	err = r.handleSecret(instance, currentSecret, &requeueResult)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	// Check if this Secret already exists and create it if it doesn't
+	mongoSecret := &corev1.Secret{}
+	err = r.handleMongoSecrets(instance, mongoSecret, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -252,7 +253,7 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 	}
 
 	// Check if this ClusterRole already exists and create it if it doesn't
-	currentClusterRole := &rbacv1.ClusterRole{}
+	/*currentClusterRole := &rbacv1.ClusterRole{}
 	err = r.handleClusterRole(instance, currentClusterRole, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -263,7 +264,7 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 	err = r.handleClusterRoleBinding(instance, currentClusterRoleBinding, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
-	}
+	}*/
 
 	// Check if this Deployment already exists and create it if it doesn't
 	currentDeployment := &appsv1.Deployment{}

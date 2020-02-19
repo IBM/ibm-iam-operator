@@ -75,8 +75,8 @@ install: ## Install all resources (CR/CRD's, RBCA and Operator)
 	- kubectl apply -f deploy/crds/operator.ibm.com_securityonboardings_crd.yaml
 	@echo ....... Applying RBAC .......
 	- kubectl apply -f deploy/service_account.yaml -n ${NAMESPACE}
-	- kubectl apply -f deploy/role.yaml
-	- kubectl apply -f deploy/role_binding.yaml
+	- kubectl apply -f deploy/role.yaml -n ${NAMESPACE}
+	- kubectl apply -f deploy/role_binding.yaml -n ${NAMESPACE}
 	- kubectl apply -f deploy/cluster_role.yaml
 	- kubectl apply -f deploy/cluster_role_binding.yaml
 	@echo ....... Applying Operator .......
@@ -111,9 +111,9 @@ uninstall: ## Uninstall all that all performed in the $ make install
 	- kubectl delete -f deploy/crds/operator.ibm.com_secretwatchers_crd.yaml
 	- kubectl delete -f deploy/crds/operator.ibm.com_securityonboardings_crd.yaml
 	@echo ....... Deleting Rules and Service Account .......
-	- kubectl delete -f deploy/role_binding.yaml
+	- kubectl delete -f deploy/role_binding.yaml -n ${NAMESPACE}
 	- kubectl delete -f deploy/service_account.yaml -n ${NAMESPACE}
-	- kubectl delete -f deploy/role.yaml
+	- kubectl delete -f deploy/role.yaml -n ${NAMESPACE}
 	- kubectl delete -f deploy/cluster_role.yaml
 	- kubectl delete -f deploy/cluster_role_binding.yaml
 	@echo ....... Deleting namespace ${NAMESPACE}.......

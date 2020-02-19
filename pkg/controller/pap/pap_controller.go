@@ -274,13 +274,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Certificate and requeue the owner Pap
-	err = c.Watch(&source.Kind{Type: &certmgr.Certificate{}}, &handler.EnqueueRequestForOwner{
+	/*err = c.Watch(&source.Kind{Type: &certmgr.Certificate{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &operatorv1alpha1.Pap{},
 	})
 	if err != nil {
 		return err
-	}
+	}*/
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Service and requeue the owner Pap
@@ -365,11 +365,11 @@ func (r *ReconcilePap) Reconcile(request reconcile.Request) (reconcile.Result, e
 	}
 
 	// Check if this Certificate already exists and create it if it doesn't
-	currentCertificate := &certmgr.Certificate{}
+	/*currentCertificate := &certmgr.Certificate{}
 	err = r.handleCertificate(instance, currentCertificate, &needToRequeue)
 	if err != nil {
 		return reconcile.Result{}, err
-	}
+	}*/
 
 	// Check if this Service already exists and create it if it doesn't
 	currentService := &corev1.Service{}

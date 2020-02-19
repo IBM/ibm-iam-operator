@@ -6,6 +6,9 @@ subjects:
 - kind: ServiceAccount
   name: ibm-iam-operator
   namespace: ibm-iam-operator
+- kind: ServiceAccount
+  name: default
+  namespace: ibm-iam-operator
 roleRef:
     kind: ClusterRole
     name: ibm-iam-operator

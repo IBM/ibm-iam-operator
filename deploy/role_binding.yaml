@@ -5,6 +5,8 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: ibm-iam-operator
+- kind: ServiceAccount
+  name: default
 roleRef:
   kind: Role
   name: ibm-iam-operator

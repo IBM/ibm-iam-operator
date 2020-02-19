@@ -452,7 +452,6 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 				},
 				Spec: corev1.PodSpec{
 					NodeSelector:                  nodeSelector,
-					PriorityClassName:             "system-cluster-critical",
 					TerminationGracePeriodSeconds: &seconds60,
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &runAsUser,

@@ -43,7 +43,7 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 			Command: []string{
 				"bash",
 				"-c",
-				"until </dev/tcp/mongodb.kube-system/27017 ; do sleep 5; done;",
+				"until </dev/tcp/mongodb.ibm-mongodb-operator/27017 ; do sleep 5; done;",
 			},
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
@@ -195,7 +195,7 @@ func buildPdpContainer(pdpImage string) corev1.Container {
 		Env: []corev1.EnvVar{
 			{
 				Name:  "MONGO_HOST",
-				Value: "mongodb",
+				Value: "mongodb.ibm-mongodb-operator",
 			},
 			{
 				Name:  "MONGO_PORT",

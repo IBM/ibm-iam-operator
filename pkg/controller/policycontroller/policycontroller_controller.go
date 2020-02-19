@@ -96,15 +96,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create that are owned by the primary resource
-	// Watch for changes to secondary resource Pods and requeue the owner PolicyController
-	err = c.Watch(&source.Kind{Type: &extv1.CustomResourceDefinition{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &operatorv1alpha1.PolicyController{},
-	})
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -360,7 +351,7 @@ func (r *ReconcilePolicyController) clusterRoleBindingForPolicyController(instan
 }
 
 func (r *ReconcilePolicyController) custResourceDefinitionForPolicyController(instance *operatorv1alpha1.PolicyController) *extv1.CustomResourceDefinition {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newCRD := &extv1.CustomResourceDefinition{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "CustomResourceDefinition",
@@ -432,12 +423,6 @@ func (r *ReconcilePolicyController) custResourceDefinitionForPolicyController(in
 		},
 	}
 
-	// Set PolicyController instance as the owner and controller of the CustomResourceDefinition
-	err := controllerutil.SetControllerReference(instance, newCRD, r.scheme)
-	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Cluster Role")
-		return nil
-	}
 	return newCRD
 }
 

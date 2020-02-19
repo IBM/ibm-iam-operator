@@ -23,7 +23,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1beta1"
-	//rbacv1 "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -253,7 +253,7 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 	}
 
 	// Check if this ClusterRole already exists and create it if it doesn't
-	/*currentClusterRole := &rbacv1.ClusterRole{}
+	currentClusterRole := &rbacv1.ClusterRole{}
 	err = r.handleClusterRole(instance, currentClusterRole, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -264,7 +264,7 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 	err = r.handleClusterRoleBinding(instance, currentClusterRoleBinding, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
-	}*/
+	}
 
 	// Check if this Deployment already exists and create it if it doesn't
 	currentDeployment := &appsv1.Deployment{}

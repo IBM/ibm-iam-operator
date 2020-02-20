@@ -276,7 +276,7 @@ func (r *ReconcileAuthentication) handleClusterRole(instance *operatorv1alpha1.A
 	crData := generateCRData()
 
 	for clusterRole, _ := range crData {
-		err = r.client.Get(context.TODO(), types.NamespacedName{Name: clusterRole, Namespace: instance.Namespace}, currentClusterRole)
+		err = r.client.Get(context.Background(), types.NamespacedName{Name: clusterRole, Namespace: ""}, currentClusterRole)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new ClusterRole
 			newClusterRole := createClusterRole(clusterRole, crData[clusterRole])

@@ -110,7 +110,7 @@ func (r *ReconcileAuthentication) handleClusterRoleBinding(instance *operatorv1a
 	crbData := generateCRBData(defaultAdminUser, oidcIssuerURL)
 
 	for clusterRoleBinding, crbValue := range crbData {
-		err = r.client.Get(context.TODO(), types.NamespacedName{Name: clusterRoleBinding, Namespace: instance.Namespace}, currentClusterRoleBinding)
+		err = r.client.Get(context.Background(), types.NamespacedName{Name: clusterRoleBinding, Namespace: ""}, currentClusterRoleBinding)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new clusterRoleBinding
 			newClusterRoleBinding := createClusterRoleBinding(clusterRoleBinding, crbValue)

@@ -130,7 +130,6 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 					},
 				},
 				Spec: corev1.PodSpec{
-					NodeSelector:                  map[string]string{"master": "true"},
 					TerminationGracePeriodSeconds: &seconds60,
 					HostIPC:                       falseVar,
 					HostPID:                       falseVar,

@@ -5,12 +5,12 @@ metadata:
 spec:
   # Add fields here
   auditService:
-    imageRegistry: "hyc-cloud-private-release-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
     imageName: "icp-audit-service"
     imageTag: "3.3.0"
     journalPath: "/run/systemd/journal"
   papService:
-    imageRegistry: "hyc-cloud-private-release-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
     imageName: "iam-policy-administration"
     imageTag: "3.3.0"
   operatorVersion: "3.5.0"

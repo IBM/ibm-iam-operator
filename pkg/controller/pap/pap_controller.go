@@ -741,7 +741,6 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 					},
 				},
 				Spec: corev1.PodSpec{
-					NodeSelector:                  map[string]string{"master": "true"},
 					TerminationGracePeriodSeconds: &seconds60,
 					HostIPC:                       falseVar,
 					HostPID:                       falseVar,

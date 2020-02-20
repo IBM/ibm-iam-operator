@@ -47,7 +47,6 @@ var defaultMode int32 = 420
 var seconds60 int64 = 60
 var runAsUser int64 = 21000
 var fsGroup int64 = 21000
-var nodeSelector = map[string]string{"master": "true"}
 var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)          // 10m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
 var memory16 = resource.NewQuantity(100*1024*1024, resource.BinarySI)  // 16Mi
@@ -412,7 +411,7 @@ func (r *ReconcileOIDCClientWatcher) crdForOIDCClientWatcher(instance *operatorv
 			},
 		},
 	}
-	
+
 	return newCRD
 }
 
@@ -451,7 +450,6 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 					},
 				},
 				Spec: corev1.PodSpec{
-					NodeSelector:                  nodeSelector,
 					TerminationGracePeriodSeconds: &seconds60,
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &runAsUser,

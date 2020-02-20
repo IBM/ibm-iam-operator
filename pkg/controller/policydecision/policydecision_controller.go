@@ -538,7 +538,6 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 					},
 				},
 				Spec: corev1.PodSpec{
-					NodeSelector:                  map[string]string{"master": "true"},
 					TerminationGracePeriodSeconds: &seconds60,
 					HostIPC:                       falseVar,
 					HostPID:                       falseVar,

@@ -290,7 +290,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 		SecurityContext: &corev1.SecurityContext{
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
-			ReadOnlyRootFilesystem:   &trueVar,
+			ReadOnlyRootFilesystem:   &falseVar,
 			AllowPrivilegeEscalation: &falseVar,
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
@@ -928,7 +928,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		SecurityContext: &corev1.SecurityContext{
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
-			ReadOnlyRootFilesystem:   &trueVar,
+			ReadOnlyRootFilesystem:   &falseVar,
 			AllowPrivilegeEscalation: &falseVar,
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},

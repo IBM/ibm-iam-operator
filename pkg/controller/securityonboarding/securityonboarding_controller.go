@@ -144,12 +144,12 @@ func (r *ReconcileSecurityOnboarding) Reconcile(request reconcile.Request) (reco
 
 	reqLogger.Info("Complete - handleConfigMap")
 
-	recResult, err = r.handleJob(instance)
+	/*recResult, err = r.handleJob(instance)
 	if err != nil {
 		return recResult, err
 	}
 
-	reqLogger.Info("Complete - handleConfigMap")
+	reqLogger.Info("Complete - handleConfigMap")*/
 
 	return reconcile.Result{}, nil
 }
@@ -491,7 +491,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		},
 		{
 			Name:            "init-token-service",
-			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://iam-token-service:10443/oidc/keys | grep '200 OK'; do sleep 3; done;"},
+			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-auth-service:9443/iam/oidc/keys | grep '200 OK'; do sleep 3; done;"},
 			Image:           instance.Spec.InitTokenService.ImageRegistry + "/" + instance.Spec.InitTokenService.ImageName + ":" + instance.Spec.InitTokenService.ImageTag,
 			ImagePullPolicy: corev1.PullPolicy("Always"),
 		},
@@ -691,7 +691,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		},
 		{
 			Name:  "MONGO_HOST",
-			Value: "mongodb",
+			Value: "mongodb.ibm-mongodb-operator",
 		},
 		{
 			Name:  "MONGO_PORT",
@@ -715,7 +715,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		},
 		{
 			Name:  "IAM_TOKEN_SERVICE_URL",
-			Value: "https://iam-token-service:10443",
+			Value: "https://platform-auth-service:9443/iam",
 		},
 		{
 			Name:  "IDENTITY_PROVIDER_URL",

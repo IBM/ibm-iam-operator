@@ -44,7 +44,6 @@ var defaultMode int32 = 420
 var seconds60 int64 = 60
 var runAsUser int64 = 21000
 var fsGroup int64 = 21000
-var nodeSelector = map[string]string{"master": "true"}
 
 var log = logf.Log.WithName("controller_secretwatcher")
 
@@ -219,8 +218,6 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 					},
 				},
 				Spec: corev1.PodSpec{
-					NodeSelector:                  nodeSelector,
-					PriorityClassName:             "system-cluster-critical",
 					TerminationGracePeriodSeconds: &seconds60,
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &runAsUser,

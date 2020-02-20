@@ -130,7 +130,6 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 					},
 				},
 				Spec: corev1.PodSpec{
-					NodeSelector:                  map[string]string{"master": "true"},
 					TerminationGracePeriodSeconds: &seconds60,
 					HostIPC:                       falseVar,
 					HostPID:                       falseVar,
@@ -254,7 +253,7 @@ func buildIdpVolumes(journalPath string, ldapCACert string, routerCertSecret str
 			Name: "auth-key",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: "platform-auth-cert",
+					SecretName: "platform-auth-secret",
 					Items: []corev1.KeyToPath{
 						{
 							Key:  "tls.key",
@@ -272,7 +271,7 @@ func buildIdpVolumes(journalPath string, ldapCACert string, routerCertSecret str
 			Name: "identity-provider-cert",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: "identity-provider-cert",
+					SecretName: "identity-provider-secret",
 					Items: []corev1.KeyToPath{
 						{
 							Key:  "tls.key",

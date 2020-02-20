@@ -77,10 +77,9 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 					},
 				},
 				Spec: corev1.PodSpec{
-					HostIPC:           false,
-					HostPID:           false,
-					PriorityClassName: "system-cluster-critical",
-					RestartPolicy:     corev1.RestartPolicyOnFailure,
+					HostIPC:       false,
+					HostPID:       false,
+					RestartPolicy: corev1.RestartPolicyOnFailure,
 					Tolerations: []corev1.Toleration{
 						{
 							Key:      "dedicated",
@@ -98,7 +97,6 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 						RunAsUser: &user,
 						FSGroup:   &user,
 					},
-					NodeSelector: map[string]string{"master": "true"},
 				},
 			},
 		},

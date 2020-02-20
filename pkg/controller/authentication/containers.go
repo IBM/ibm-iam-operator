@@ -33,7 +33,7 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 			Command: []string{
 				"bash",
 				"-c",
-				"until </dev/tcp/mongodb.kube-system/27017 ; do sleep 5; done;",
+				"until </dev/tcp/mongodb.ibm-mongodb-operator/27017 ; do sleep 5; done;",
 			},
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
@@ -166,7 +166,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 		},
 		{
 			Name:  "MONGO_HOST",
-			Value: "mongodb",
+			Value: "mongodb.ibm-mongodb-operator",
 		},
 		{
 			Name:  "MONGO_PORT",
@@ -290,7 +290,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 		SecurityContext: &corev1.SecurityContext{
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
-			ReadOnlyRootFilesystem:   &trueVar,
+			ReadOnlyRootFilesystem:   &falseVar,
 			AllowPrivilegeEscalation: &falseVar,
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
@@ -763,7 +763,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 
 		{
 			Name:  "MONGO_HOST",
-			Value: "mongodb",
+			Value: "mongodb.ibm-mongodb-operator",
 		},
 		{
 			Name:  "MONGO_PORT",
@@ -928,7 +928,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		SecurityContext: &corev1.SecurityContext{
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
-			ReadOnlyRootFilesystem:   &trueVar,
+			ReadOnlyRootFilesystem:   &falseVar,
 			AllowPrivilegeEscalation: &falseVar,
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},

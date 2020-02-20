@@ -263,7 +263,7 @@ func buildPapContainer(papImage string) corev1.Container {
 			},
 			{
 				Name:  "MONGO_HOST",
-				Value: "mongodb",
+				Value: "mongodb.ibm-mongodb-operator",
 			},
 			{
 				Name:  "MONGO_PORT",

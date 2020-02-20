@@ -29,7 +29,7 @@ NAMESPACE=ibm-iam-operator
 # Use your own docker registry and image name for dev/test by overridding the IMG and REGISTRY environment variable.
 IMG ?= ibm-iam-operator
 REGISTRY ?= quay.io/opencloudio
-CSV_VERSION ?= 0.0.1
+CSV_VERSION ?= 3.5.0
 
 QUAY_USERNAME ?=
 QUAY_PASSWORD ?=

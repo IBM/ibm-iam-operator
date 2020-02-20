@@ -17,8 +17,8 @@
 
 set -e
 QUAY_NAMESPACE=${QUAY_NAMESPACE:-opencloudio}
-QUAY_REPOSITORY=${QUAY_REPOSITORY:-ibm-metering-operator-app}
-BUNDLE_DIR=${BUNDLE_DIR:-deploy/olm-catalog/ibm-metering-operator}
+QUAY_REPOSITORY=${QUAY_REPOSITORY:-ibm-iam-operator-app}
+BUNDLE_DIR=${BUNDLE_DIR:-deploy/olm-catalog/ibm-iam-operator}
 
 [[ "X$QUAY_USERNAME" == "X" ]] && read -rp "Enter username quay.io: " QUAY_USERNAME
 [[ "X$QUAY_PASSWORD" == "X" ]] && read -rsp "Enter password quay.io: " QUAY_PASSWORD && echo
@@ -56,4 +56,3 @@ curl -H "Content-Type: application/json" \
     "release": "'"${RELEASE}"'",
     "media_type": "helm"
 }'
-

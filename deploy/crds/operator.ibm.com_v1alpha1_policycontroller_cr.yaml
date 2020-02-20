@@ -4,6 +4,6 @@ metadata:
   name: policycontroller-deployment
 spec:
   operatorVersion: "0.14.1"
-  imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64/iam-policy-controller"
+  imageRegistry: "quay.io/opencloudio/iam-policy-controller"
   imageTagPostfix: "3.3.0"
   replicas: 1

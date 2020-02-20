@@ -6,31 +6,31 @@ spec:
   # Add fields here
   operatorVersion: "0.14.1"
   replicas: 1
-  imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+  imageRegistry: "quay.io/opencloudio"
   imageName: "icp-iam-onboarding"
   imageTag: "3.3.1"
   iamOnboarding:
-    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageRegistry: "quay.io/opencloudio"
     imageName: "icp-iam-onboarding"
     imageTag: "3.3.1"
   initAuthService:
-    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
     imageTag: "3.3.1"
   initIdentityProvider:
-    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
     imageTag: "3.3.1"
   initIdentityManager:
-    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
     imageTag: "3.3.1"
   initTokenService:
-    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
     imageTag: "3.3.1"
   initPAPSpec:
-    imageRegistry: "hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/ibmcom-amd64"
+    imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
     imageTag: "3.3.1"
   impersonation:

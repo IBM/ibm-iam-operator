@@ -25,15 +25,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"time"
 )
 
 
 
 func generateSecretData(instance *operatorv1alpha1.Authentication) map[string]map[string][]byte {
+
+	md5Hash := md5.Sum([]byte(instance.Spec.Config.ClusterName+"encryption_key"))
+	encryptionKey := string(md5Hash[:])
 	secretData := map[string]map[string][]byte{
 		"platform-auth-ldaps-ca-cert": map[string][]byte{
 			"certificate": []byte(""),
@@ -43,7 +43,7 @@ func generateSecretData(instance *operatorv1alpha1.Authentication) map[string]ma
 			"admin_password": []byte(instance.Spec.Config.DefaultAdminPassword),
 		},
 		"platform-auth-idp-encryption": map[string][]byte{
-			"ENCRYPTION_KEY": md5.Sum([]byte(instance.Authentication.Config.ClusterName+"encryption_key")),
+			"ENCRYPTION_KEY": []byte(encryptionKey),
 			"algorithm":      []byte("aes256"),
 			"inputEncoding":  []byte("utf8"),
 			"outputEncoding": []byte("hex"),

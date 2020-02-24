@@ -339,6 +339,17 @@ spec:
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1
+    required:
+    - description: CertManager is the Schema for the certmanagers API
+      kind: CertManager
+      name: certmanagers.operator.ibm.com
+      version: v1alpha1
+      displayName: CertManager
+    - description: MongoDB is the Schema for the mongodbs API
+      displayName: MongoDB
+      kind: MongoDB
+      version: v1alpha1
+      name: mongodbs.operator.ibm.com
   description: The IAM Operator provides a Kubernetes CRD-Based API to deploy and
     upgrade IAM services.
   displayName: IBM IAM Operator

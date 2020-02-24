@@ -691,7 +691,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		},
 		{
 			Name:  "MONGO_HOST",
-			Value: "mongodb.ibm-mongodb-operator",
+			Value: "mongodb",
 		},
 		{
 			Name:  "MONGO_PORT",

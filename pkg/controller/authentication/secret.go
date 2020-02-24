@@ -21,6 +21,7 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"crypto/md5"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,8 +43,7 @@ func generateSecretData(instance *operatorv1alpha1.Authentication) map[string]ma
 			"admin_password": []byte(instance.Spec.Config.DefaultAdminPassword),
 		},
 		"platform-auth-idp-encryption": map[string][]byte{
-			//@posriniv - get back
-			"ENCRYPTION_KEY": []byte("encryption_key"),
+			"ENCRYPTION_KEY": md5.Sum([]byte(instance.Authentication.Config.ClusterName+"encryption_key")),
 			"algorithm":      []byte("aes256"),
 			"inputEncoding":  []byte("utf8"),
 			"outputEncoding": []byte("hex"),

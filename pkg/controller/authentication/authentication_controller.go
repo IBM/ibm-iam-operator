@@ -226,11 +226,11 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 	}
 
 	// Check if this Job already exists and create it if it doesn't
-	/*currentJob := &batchv1.Job{}
+	currentJob := &batchv1.Job{}
 	err = r.handleJob(instance, currentJob, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
-	}*/
+	}
 
 	//Check if this ConfigMap already exists and create it if it doesn't
 	currentConfigMap := &corev1.ConfigMap{}

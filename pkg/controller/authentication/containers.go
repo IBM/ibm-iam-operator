@@ -33,7 +33,7 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 			Command: []string{
 				"bash",
 				"-c",
-				"until </dev/tcp/mongodb.ibm-mongodb-operator/27017 ; do sleep 5; done;",
+				"until </dev/tcp/mongodb/27017 ; do sleep 5; done;",
 			},
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
@@ -166,7 +166,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 		},
 		{
 			Name:  "MONGO_HOST",
-			Value: "mongodb.ibm-mongodb-operator",
+			Value: "mongodb",
 		},
 		{
 			Name:  "MONGO_PORT",
@@ -763,7 +763,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 
 		{
 			Name:  "MONGO_HOST",
-			Value: "mongodb.ibm-mongodb-operator",
+			Value: "mongodb",
 		},
 		{
 			Name:  "MONGO_PORT",

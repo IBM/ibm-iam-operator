@@ -224,12 +224,6 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	// Check if this Secret already exists and create it if it doesn't
-	mongoSecret := &corev1.Secret{}
-	err = r.handleMongoSecrets(instance, mongoSecret, &requeueResult)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
 
 	// Check if this Job already exists and create it if it doesn't
 	/*currentJob := &batchv1.Job{}

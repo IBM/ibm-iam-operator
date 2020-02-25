@@ -347,6 +347,74 @@ spec:
     mediatype: image/png
   install:
     spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          - services
+          - services/finalizers
+          - endpoints
+          - persistentvolumeclaims
+          - events
+          - configmaps
+          - secrets
+          - namespaces
+          verbs:
+          - '*'
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - daemonsets
+          - replicasets
+          - statefulsets
+          verbs:
+          - '*'
+        - apiGroups:
+          - apps
+          resourcesNames:
+          - meta-operator
+          resources:
+          - deployments/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - get
+          - list
+        - apiGroups:
+          - apps
+          resources:
+          - replicasets
+          - deployments
+          verbs:
+          - get
+        - apiGroups:
+          - operator.ibm.com
+          - operators.coreos.com
+          resources:
+          - '*'
+          - metaoperatorcatalogs
+          - metaoperatorconfigs
+          - metaoperatorsets
+          verbs:
+          - '*'
+        - apiGroups
+          - '*'
+          resources:
+          - '*'
+          verbs:
+          - '*'
+        - nonResourceURLs:
+          - '*'
+          verbs:
+          - '*'                                   
+        serviceAccountName: ibm-iam-operator
       deployments:
       - name: ibm-iam-operator
         spec:

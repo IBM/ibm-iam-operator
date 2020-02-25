@@ -82,6 +82,7 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"AUDIT_ENABLED_IDPROVIDER":    "false",
 			"AUDIT_ENABLED_IDMGMT":        "false",
 			"AUDIT_DETAIL":                "false",
+			"NONCE_ENABLED":               "false",
 			"LOG_LEVEL_IDPROVIDER":        "info",
 			"LOG_LEVEL_AUTHSVC":           "info",
 			"LOG_LEVEL_IDMGMT":            "info",
@@ -147,8 +148,7 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, scheme
 			Labels:    map[string]string{"app": "auth-idp"},
 		},
 		Data: map[string]string{
-			//@posriniv - get back
-			"platform-oidc-registration.json": "",
+			"platform-oidc-registration.json": registrationJson,
 		},
 	}
 
@@ -171,8 +171,7 @@ func registrationScriptConfigMap(instance *operatorv1alpha1.Authentication, sche
 			Labels:    map[string]string{"app": "auth-idp"},
 		},
 		Data: map[string]string{
-			//@posriniv - get back
-			"register-client.sh": "",
+			"register-client.sh": registerClientScript,
 		},
 	}
 

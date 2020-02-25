@@ -21,18 +21,19 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"crypto/md5"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"time"
 )
 
 
 
 func generateSecretData(instance *operatorv1alpha1.Authentication) map[string]map[string][]byte {
+
+	md5Hash := md5.Sum([]byte(instance.Spec.Config.ClusterName+"encryption_key"))
+	encryptionKey := string(md5Hash[:])
 	secretData := map[string]map[string][]byte{
 		"platform-auth-ldaps-ca-cert": map[string][]byte{
 			"certificate": []byte(""),
@@ -42,8 +43,7 @@ func generateSecretData(instance *operatorv1alpha1.Authentication) map[string]ma
 			"admin_password": []byte(instance.Spec.Config.DefaultAdminPassword),
 		},
 		"platform-auth-idp-encryption": map[string][]byte{
-			//@posriniv - get back
-			"ENCRYPTION_KEY": []byte("encryption_key"),
+			"ENCRYPTION_KEY": []byte(encryptionKey),
 			"algorithm":      []byte("aes256"),
 			"inputEncoding":  []byte("utf8"),
 			"outputEncoding": []byte("hex"),
@@ -393,74 +393,6 @@ func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authen
 	}
 
 	return nil
-
-}
-
-func (r *ReconcileAuthentication) handleMongoSecrets(instance *operatorv1alpha1.Authentication, mongoSecret *corev1.Secret, requeueResult *bool) error {
-
-	mongoSecretNames := []string{"icp-mongodb-admin", "icp-mongodb-client-cert"}
-	mongoSecretData := r.generateMongoData(mongoSecretNames)
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	var err error
-
-	for _, secret := range mongoSecretNames {
-		err = r.client.Get(context.TODO(), types.NamespacedName{Name: secret, Namespace: instance.Namespace}, mongoSecret)
-		if err != nil && errors.IsNotFound(err) {
-			// Define a new Secret
-			newSecret := generateSecretObject(instance, r.scheme, secret, mongoSecretData[secret])
-			reqLogger.Info("Creating a new Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
-			err = r.client.Create(context.TODO(), newSecret)
-			if err != nil {
-				reqLogger.Error(err, "Failed to create new Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
-				return err
-			}
-			// Secret created successfully - return and requeue
-			*requeueResult = true
-		} else if err != nil {
-			reqLogger.Error(err, "Failed to get Secret")
-			return err
-		}
-
-	}
-
-	return nil
-
-}
-
-func (r *ReconcileAuthentication) generateMongoData(mongoSecretNames []string) map[string]map[string][]byte {
-	reqLogger := log.WithValues("Generating Secrets", mongoSecretNames)
-	mongoSecretData := map[string]map[string][]byte{}
-	mongodbNamespace := "ibm-mongodb-operator"
-	var mongoSecret *corev1.Secret
-
-	// creates the in-cluster config
-	config, err := config.GetConfig()
-	if err != nil {
-		panic(err.Error())
-	}
-	// creates the clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	for _, secret := range mongoSecretNames {
-
-		for {
-			mongoSecret, err = clientset.CoreV1().Secrets(mongodbNamespace).Get(secret, metav1.GetOptions{})
-
-			if err == nil {
-				break
-			}
-			reqLogger.Error(err, "Failed to get mongodb secret in the", mongodbNamespace, "namespace, retry after some time")
-			time.Sleep(2 * time.Second)
-		}
-
-		mongoSecretData[secret] = mongoSecret.Data
-
-	}
-
-	return mongoSecretData
 
 }
 

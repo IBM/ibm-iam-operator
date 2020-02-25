@@ -196,6 +196,28 @@ func buildContainer(jobName string, image string) []corev1.Container {
 						},
 					},
 				},
+				{
+					Name: "WLP_CLIENT_SECRET",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "platform-oidc-credentials",
+							},
+							Key: "WLP_CLIENT_SECRET",
+						},
+					},
+				},
+				{
+					Name: "OIDC_ISSUER_URL",
+					ValueFrom: &corev1.EnvVarSource{
+						ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "platform-auth-idp",
+							},
+							Key: "OIDC_ISSUER_URL",
+						},
+					},
+				},
 			},
 		},
 	}

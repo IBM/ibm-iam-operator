@@ -5,10 +5,10 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: ibm-iam-operator
-  namespace: ibm-iam-operator
+  namespace: ibm-common-services
 - kind: ServiceAccount
   name: default
-  namespace: ibm-iam-operator
+  namespace: ibm-common-services
 roleRef:
     kind: ClusterRole
     name: ibm-iam-operator

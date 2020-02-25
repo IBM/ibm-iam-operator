@@ -351,8 +351,7 @@ YzpJKXZQwcQ+SQ6m9YebyOVZ1gkQIGdSjz5gGdgS63MG8nweiS4D
 -----END RSA PRIVATE KEY-----
 `
 
-const registerClientScript =`
-#!/bin/sh
+const registerClientScript =`#!/bin/sh
 HTTP_CODE=""
 while true
 do
@@ -384,31 +383,30 @@ fi
 `
 
 
-const registrationJson = `
-{
-    "token_endpoint_auth_method":"client_secret_basic",
-    "client_id": "WLP_CLIENT_ID",
-    "client_secret": "WLP_CLIENT_SECRET",
-    "scope":"openid profile email",
-    "grant_types":[
-       "authorization_code",
-       "client_credentials",
-       "password",
-       "implicit",
-       "refresh_token",
-       "urn:ietf:params:oauth:grant-type:jwt-bearer"
-    ],
-    "response_types":[
-       "code",
-       "token",
-       "id_token token"
-    ],
-    "application_type":"web",
-    "subject_type":"public",
-    "post_logout_redirect_uris":["OIDC_ISSUER_URL/console/logout"],
-    "preauthorized_scope":"openid profile email general",
-    "introspect_tokens":true,
-    "trusted_uri_prefixes":["OIDC_ISSUER_URL"],
-    "redirect_uris":["OIDC_ISSUER_URL/auth/liberty/callback","https://127.0.0.1:443/idauth/oidc/endpoint/OP"]
+const registrationJson = `{
+   "token_endpoint_auth_method":"client_secret_basic",
+   "client_id": "WLP_CLIENT_ID",
+   "client_secret": "WLP_CLIENT_SECRET",
+   "scope":"openid profile email",
+   "grant_types":[
+      "authorization_code",
+      "client_credentials",
+      "password",
+      "implicit",
+      "refresh_token",
+      "urn:ietf:params:oauth:grant-type:jwt-bearer"
+   ],
+   "response_types":[
+      "code",
+      "token",
+      "id_token token"
+   ],
+   "application_type":"web",
+   "subject_type":"public",
+   "post_logout_redirect_uris":["OIDC_ISSUER_URL/console/logout"],
+   "preauthorized_scope":"openid profile email general",
+   "introspect_tokens":true,
+   "trusted_uri_prefixes":["OIDC_ISSUER_URL"],
+   "redirect_uris":["OIDC_ISSUER_URL/auth/liberty/callback","https://127.0.0.1:443/idauth/oidc/endpoint/OP"]
 }
 `

@@ -144,12 +144,12 @@ func (r *ReconcileSecurityOnboarding) Reconcile(request reconcile.Request) (reco
 
 	reqLogger.Info("Complete - handleConfigMap")
 
-	/*recResult, err = r.handleJob(instance)
+	recResult, err = r.handleJob(instance)
 	if err != nil {
 		return recResult, err
 	}
 
-	reqLogger.Info("Complete - handleConfigMap")*/
+	reqLogger.Info("Complete - handleConfigMap")
 
 	return reconcile.Result{}, nil
 }

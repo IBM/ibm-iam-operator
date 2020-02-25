@@ -351,6 +351,7 @@ YzpJKXZQwcQ+SQ6m9YebyOVZ1gkQIGdSjz5gGdgS63MG8nweiS4D
 -----END RSA PRIVATE KEY-----
 `
 
+
 const registerClientScript =`#!/bin/sh
 HTTP_CODE=""
 while true
@@ -381,7 +382,6 @@ else
    https://platform-auth-service:9443/oidc/endpoint/OP/registration/$WLP_CLIENT_ID | grep '200 OK'; do sleep 1; done;
 fi
 `
-
 
 const registrationJson = `{
    "token_endpoint_auth_method":"client_secret_basic",

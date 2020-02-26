@@ -209,8 +209,8 @@ metadata:
     categories: Security
     certified: "false"
     containerImage: quay.io/opencloudio/ibm-iam-operator:latest
-    description: The IAM operator provides a simple Kubernetes CRD-Based API to
-      manage the lifecycle of IAM services. With this operator, you can simply deploy and
+    description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
+      the lifecycle of IAM services. With this operator, you can simply deploy and
       upgrade the IAM services
     repository: https://github.com/IBM/ibm-iam-operator
     support: IBM
@@ -221,9 +221,9 @@ spec:
   customresourcedefinitions:
     owned:
     - description: Authentication is the Schema for the authentications API
-      displayName: Authentication
       kind: Authentication
       name: authentications.operator.ibm.com
+      displayName: Authentication
       specDescriptors:
       - description: A list defines the catalog information for operators.
         displayName: Operators
@@ -239,8 +239,8 @@ spec:
       version: v1alpha1
     - description: OIDCClientWatcher is the Schema for the oidcclientwatchers API
       kind: OIDCClientWatcher
-      displayName: OIDCClientWatcher
       name: oidcclientwatchers.operator.ibm.com
+      displayName: OIDCClientWatcher
       specDescriptors:
       - description: A list defines the catalog information for operators.
         displayName: Operators
@@ -256,8 +256,8 @@ spec:
       version: v1alpha1
     - description: Pap is the Schema for the paps API
       kind: Pap
-      displayName: Pap
       name: paps.operator.ibm.com
+      displayName: Pap
       specDescriptors:
       - description: A list defines the catalog information for operators.
         displayName: Operators
@@ -273,8 +273,8 @@ spec:
       version: v1alpha1
     - description: PolicyController is the Schema for the policycontrollers API
       kind: PolicyController
-      displayName: PolicyController
       name: policycontrollers.operator.ibm.com
+      displayName: PolicyController
       specDescriptors:
       - description: A list defines the catalog information for operators.
         displayName: Operators
@@ -290,8 +290,8 @@ spec:
       version: v1alpha1
     - description: PolicyDecision is the Schema for the policydecisions API
       kind: PolicyDecision
-      displayName: PolicyDecision
       name: policydecisions.operator.ibm.com
+      displayName: PolicyDecision
       specDescriptors:
       - description: A list defines the catalog information for operators.
         displayName: Operators
@@ -307,8 +307,8 @@ spec:
       version: v1alpha1
     - description: SecretWatcher is the Schema for the secretwatchers API
       kind: SecretWatcher
-      displayName: SecretWatcher
       name: secretwatchers.operator.ibm.com
+      displayName: SecretWatcher
       specDescriptors:
       - description: A list defines the catalog information for operators.
         displayName: Operators
@@ -324,8 +324,8 @@ spec:
       version: v1alpha1
     - description: SecurityOnboarding is the Schema for the securityonboardings API
       kind: SecurityOnboarding
-      displayName: SecurityOnboarding
       name: securityonboardings.operator.ibm.com
+      displayName: SecurityOnboarding
       specDescriptors:
       - description: A list defines the catalog information for operators.
         displayName: Operators
@@ -341,15 +341,15 @@ spec:
       version: v1alpha1
     required:
     - description: CertManager is the Schema for the certmanagers API
+      displayName: CertManager
       kind: CertManager
       name: certmanagers.operator.ibm.com
       version: v1alpha1
-      displayName: CertManager
     - description: MongoDB is the Schema for the mongodbs API
       displayName: MongoDB
       kind: MongoDB
-      version: v1alpha1
       name: mongodbs.operator.ibm.com
+      version: v1alpha1
   description: The IAM Operator provides a Kubernetes CRD-Based API to deploy and
     upgrade IAM services.
   displayName: IBM IAM Operator
@@ -390,7 +390,7 @@ spec:
           resources:
           - '*'
           verbs:
-          - '*'                                   
+          - '*'
         serviceAccountName: ibm-iam-operator
       deployments:
       - name: ibm-iam-operator
@@ -559,9 +559,9 @@ spec:
   - IBM
   - Cloud
   maintainers:
-  - email: supports@ibm.com
+  - email: support@ibm.com
     name: IBM Support
   maturity: alpha
-  provider: 
+  provider:
     name: IBM
   version: 3.5.0

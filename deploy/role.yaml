@@ -122,3 +122,43 @@ rules:
   - patch
   - update
   - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ibm-iam-operator
+rules:
+- apiGroups:
+  - apiextensions.k8s.io
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io/v1
+  resources:
+  - clusterrolebindings
+  - clusterroles
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+#Permissions are needed to create clusterroles and clusterrolebindings to support team RBAC,
+# giving specific access doesn't seem to work. So, relaxing the permissions for now, should
+# make this more restricted - @posriniv - get back
+- apiGroups:
+  - '*'
+  resources:
+  - '*'
+  verbs:
+  - '*'

@@ -467,9 +467,9 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 						FSGroup:   &fsGroup,
 					},
 					ServiceAccountName: serviceAccountName,
-					HostNetwork: false,
-					HostIPC:     false,
-					HostPID:     false,
+					HostNetwork:        false,
+					HostIPC:            false,
+					HostPID:            false,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{

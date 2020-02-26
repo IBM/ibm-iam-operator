@@ -542,7 +542,7 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 					TerminationGracePeriodSeconds: &seconds60,
 					HostIPC:                       falseVar,
 					HostPID:                       falseVar,
-					ServiceAccountName: serviceAccountName,
+					ServiceAccountName:            serviceAccountName,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{

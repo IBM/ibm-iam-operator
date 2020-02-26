@@ -452,7 +452,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 				},
 				Spec: corev1.PodSpec{
 					TerminationGracePeriodSeconds: &seconds60,
-					ServiceAccountName: serviceAccountName,
+					ServiceAccountName:            serviceAccountName,
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &runAsUser,
 						FSGroup:   &fsGroup,

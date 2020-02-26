@@ -224,8 +224,8 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 						RunAsUser: &runAsUser,
 						FSGroup:   &fsGroup,
 					},
-					HostIPC: false,
-					HostPID: false,
+					HostIPC:            false,
+					HostPID:            false,
 					ServiceAccountName: serviceAccountName,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{

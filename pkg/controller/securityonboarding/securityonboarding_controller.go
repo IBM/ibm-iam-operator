@@ -388,7 +388,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 	}
 
 	podSpec := corev1.PodSpec{
-		RestartPolicy: "OnFailure",
+		RestartPolicy:      "OnFailure",
 		ServiceAccountName: serviceAccountName,
 		Containers: []corev1.Container{
 			{
@@ -758,9 +758,9 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 	}
 
 	podSpec := corev1.PodSpec{
-		RestartPolicy:  "OnFailure",
-		InitContainers: tmpInitContainers,
-		Volumes:        tmpVolumes,
+		RestartPolicy:      "OnFailure",
+		InitContainers:     tmpInitContainers,
+		Volumes:            tmpVolumes,
 		ServiceAccountName: serviceAccountName,
 		Containers: []corev1.Container{
 			{

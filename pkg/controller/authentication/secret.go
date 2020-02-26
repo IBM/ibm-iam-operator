@@ -18,21 +18,19 @@ package authentication
 
 import (
 	"context"
+	"crypto/md5"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"crypto/md5"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-
-
 func generateSecretData(instance *operatorv1alpha1.Authentication) map[string]map[string][]byte {
 
-	md5Hash := md5.Sum([]byte(instance.Spec.Config.ClusterName+"encryption_key"))
+	md5Hash := md5.Sum([]byte(instance.Spec.Config.ClusterName + "encryption_key"))
 	encryptionKey := string(md5Hash[:])
 	secretData := map[string]map[string][]byte{
 		"platform-auth-ldaps-ca-cert": map[string][]byte{
@@ -337,27 +335,27 @@ func generateSecretData(instance *operatorv1alpha1.Authentication) map[string]ma
 			-----END RSA PRIVATE KEY-----`),
 		},
 		"auth-pdp-secret": map[string][]byte{
-			"ca.crt": []byte(commonCaCert),
+			"ca.crt":  []byte(commonCaCert),
 			"tls.crt": []byte(pdpCert),
 			"tls.key": []byte(pdpKey),
 		},
 		"iam-pap-secret": map[string][]byte{
-			"ca.crt": []byte(commonCaCert),
+			"ca.crt":  []byte(commonCaCert),
 			"tls.crt": []byte(papCert),
 			"tls.key": []byte(papKey),
 		},
 		"identity-provider-secret": map[string][]byte{
-			"ca.crt": []byte(commonCaCert),
+			"ca.crt":  []byte(commonCaCert),
 			"tls.crt": []byte(providerCert),
 			"tls.key": []byte(providerKey),
 		},
 		"platform-auth-secret": map[string][]byte{
-			"ca.crt": []byte(commonCaCert),
+			"ca.crt":  []byte(commonCaCert),
 			"tls.crt": []byte(authCert),
 			"tls.key": []byte(authKey),
 		},
 		"platform-identity-management": map[string][]byte{
-			"ca.crt": []byte(commonCaCert),
+			"ca.crt":  []byte(commonCaCert),
 			"tls.crt": []byte(mgmtCert),
 			"tls.key": []byte(mgmtKey),
 		},

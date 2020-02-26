@@ -44,6 +44,7 @@ var defaultMode int32 = 420
 var seconds60 int64 = 60
 var runAsUser int64 = 21000
 var fsGroup int64 = 21000
+var serviceAccountName string = "ibm-iam-operator"
 
 var log = logf.Log.WithName("controller_secretwatcher")
 
@@ -223,8 +224,9 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 						RunAsUser: &runAsUser,
 						FSGroup:   &fsGroup,
 					},
-					HostIPC: false,
-					HostPID: false,
+					HostIPC:            false,
+					HostPID:            false,
+					ServiceAccountName: serviceAccountName,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{

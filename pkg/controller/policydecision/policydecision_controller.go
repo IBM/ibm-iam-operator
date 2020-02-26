@@ -46,6 +46,7 @@ var defaultMode int32 = 420
 var seconds60 int64 = 60
 var user int64 = 21000
 var port int32 = 7998
+var serviceAccountName string = "ibm-iam-operator"
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -541,6 +542,7 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 					TerminationGracePeriodSeconds: &seconds60,
 					HostIPC:                       falseVar,
 					HostPID:                       falseVar,
+					ServiceAccountName:            serviceAccountName,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{

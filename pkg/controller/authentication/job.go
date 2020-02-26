@@ -77,9 +77,10 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 					},
 				},
 				Spec: corev1.PodSpec{
-					HostIPC:       false,
-					HostPID:       false,
-					RestartPolicy: corev1.RestartPolicyOnFailure,
+					HostIPC:            false,
+					HostPID:            false,
+					ServiceAccountName: serviceAccountName,
+					RestartPolicy:      corev1.RestartPolicyOnFailure,
 					Tolerations: []corev1.Toleration{
 						{
 							Key:      "dedicated",

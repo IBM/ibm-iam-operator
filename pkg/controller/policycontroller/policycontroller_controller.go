@@ -52,6 +52,7 @@ var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)        // 100m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
 var memory16 = resource.NewQuantity(100*1024*1024, resource.BinarySI)  // 16Mi
 var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI) // 128Mi
+var serviceAccountName string = "ibm-iam-operator"
 
 var log = logf.Log.WithName("controller_policycontroller")
 
@@ -465,6 +466,7 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 						RunAsUser: &runAsUser,
 						FSGroup:   &fsGroup,
 					},
+					ServiceAccountName: serviceAccountName,
 					HostNetwork: false,
 					HostIPC:     false,
 					HostPID:     false,

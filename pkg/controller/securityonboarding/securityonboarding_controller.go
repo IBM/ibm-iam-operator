@@ -39,6 +39,7 @@ import (
 )
 
 var log = logf.Log.WithName("controller_securityonboarding")
+var serviceAccountName string = "ibm-iam-operator"
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -388,6 +389,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 
 	podSpec := corev1.PodSpec{
 		RestartPolicy: "OnFailure",
+		ServiceAccountName: serviceAccountName,
 		Containers: []corev1.Container{
 			{
 				Name:            "security-onboarding",
@@ -759,6 +761,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		RestartPolicy:  "OnFailure",
 		InitContainers: tmpInitContainers,
 		Volumes:        tmpVolumes,
+		ServiceAccountName: serviceAccountName,
 		Containers: []corev1.Container{
 			{
 				Name:            "iam-onboarding",

@@ -131,6 +131,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 				},
 				Spec: corev1.PodSpec{
 					TerminationGracePeriodSeconds: &seconds60,
+					ServiceAccountName: serviceAccountName,
 					HostIPC:                       falseVar,
 					HostPID:                       falseVar,
 					Affinity: &corev1.Affinity{

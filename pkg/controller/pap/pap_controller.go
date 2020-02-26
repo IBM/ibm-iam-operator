@@ -146,6 +146,7 @@ var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
 var user int64 = 21000
+var serviceAccountName string = "ibm-iam-operator"
 
 //var port int32 = 39001
 var iamPapServiceValues = IamPapServiceValues{
@@ -744,6 +745,7 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 					TerminationGracePeriodSeconds: &seconds60,
 					HostIPC:                       falseVar,
 					HostPID:                       falseVar,
+					ServiceAccountName: serviceAccountName,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{

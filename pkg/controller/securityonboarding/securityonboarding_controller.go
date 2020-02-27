@@ -326,6 +326,14 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 	//Create all the Volumes
 	strVolName := []string{"onboard-script", "elasticsearch-json", "monitoring-json", "helmapi-json", "helmrepo-json", "mgmtrepo-json",
 		"tillerservice-json", "tiller-serviceid-policies", "kms-json"}
+	tmpInitContainers := []corev1.Container{
+		{
+			Name:            "init-auth-service",
+			Command:         []string{"sh", "-c", "sleep 75; until curl -k -i -fsS https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration | grep '200 OK'; do sleep 3; done;"},
+			Image:           instance.Spec.InitAuthService.ImageRegistry + "/" + instance.Spec.InitAuthService.ImageName + ":" + instance.Spec.InitAuthService.ImageTag,
+			ImagePullPolicy: corev1.PullPolicy("Always"),
+		},
+	}
 	tmpVolumes := []corev1.Volume{}
 	for _, ele := range strVolName {
 		var mode int32 = 0744
@@ -390,6 +398,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 	podSpec := corev1.PodSpec{
 		RestartPolicy:      "OnFailure",
 		ServiceAccountName: serviceAccountName,
+		InitContainers:     tmpInitContainers,
 		Containers: []corev1.Container{
 			{
 				Name:            "security-onboarding",

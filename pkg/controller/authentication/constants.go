@@ -366,7 +366,7 @@ then
   cp /jsons/platform-oidc-registration.json platform-oidc-registration.json
   sed -i "s/WLP_CLIENT_ID/$WLP_CLIENT_ID/g" platform-oidc-registration.json
   sed -i "s/WLP_CLIENT_SECRET/$WLP_CLIENT_SECRET/g" platform-oidc-registration.json
-  sed -i "s/OIDC_ISSUER_URL/$OIDC_ISSUER_URL/g" platform-oidc-registration.json
+  sed -i "s/ICP_CONSOLE_URL/$ICP_CONSOLE_URL/g" platform-oidc-registration.json
   until curl -i -k -X POST -u oauthadmin:$WLP_CLIENT_REGISTRATION_SECRET \
    -H "Content-Type: application/json" \
    --data @platform-oidc-registration.json \

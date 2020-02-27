@@ -481,7 +481,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		},
 		{
 			Name:            "init-identity-manager",
-			Command:         []string{"sh", "-c", "until curl -k-i -fsS https://platform-identity-management:4500 | grep '200 OK'; do sleep 3; done;"},
+			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-management:4500 | grep '200 OK'; do sleep 3; done;"},
 			Image:           instance.Spec.InitIdentityManager.ImageRegistry + "/" + instance.Spec.InitIdentityManager.ImageName + ":" + instance.Spec.InitIdentityManager.ImageTag,
 			ImagePullPolicy: corev1.PullPolicy("Always"),
 			VolumeMounts: []corev1.VolumeMount{

@@ -1104,7 +1104,7 @@ def mapActionRoles(iam_service_name, filepath, accessToken):
                 time.sleep(2)
 def getServiceId(serviceName, accessToken):
     cluster_name = os.environ.get('CLUSTER_NAME')
-    url = 'https://iam-token-service:10443/serviceids/?boundTo=crn%3Av1%3Aicp%3Aprivate%3Aiam%3A' + cluster_name + '%3An/kube-system%3Acore%3Aservice%3A' + serviceName
+    url = 'https://platform-auth-service:9443/iam/serviceids/?boundTo=crn%3Av1%3Aicp%3Aprivate%3Aiam%3A' + cluster_name + '%3An/kube-system%3Acore%3Aservice%3A' + serviceName
     headersDef = {'Authorization': accessToken, 'Content-Type': 'application/json', 'Accept': 'application/json'}
     while True:
         r = requests.get(url, headers=headersDef, verify=False)
@@ -1132,7 +1132,7 @@ def mapServiceIdPolicies(serviceName, filepath, accessToken):
             else:
                 time.sleep(2)
 def getApiKeyToken():
-    url = 'https://iam-token-service:10443/oidc/token'
+    url = 'https://platform-auth-service:9443/iam/oidc/token'
     apikey = os.environ.get('ICP_API_KEY')
     payload = 'grant_type=urn%3Aibm%3Aparams%3Aoauth%3Agrant-type%3Aapikey&apikey=' + apikey + '&response_type=cloud_iam'
     headersDef = {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'}

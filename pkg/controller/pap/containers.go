@@ -321,7 +321,7 @@ func buildPapContainer(papImage string) corev1.Container {
 			},
 			{
 				Name:  "IAM_TOKEN_SERVICE_URL",
-				Value: "https://iam-token-service:10443",
+				Value: "https://platform-auth-service:9443/iam",
 			},
 		},
 	}

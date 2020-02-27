@@ -368,7 +368,7 @@ func buildIdpVolumes(journalPath string, ldapCACert string, routerCertSecret str
 			Name: "mongodb-ca-cert",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: "cluster-ca-cert",
+					SecretName: "mongodb-root-ca-cert",
 				},
 			},
 		},

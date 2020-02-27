@@ -209,13 +209,13 @@ func buildContainer(jobName string, image string) []corev1.Container {
 					},
 				},
 				{
-					Name: "OIDC_ISSUER_URL",
+					Name: "ICP_CONSOLE_URL",
 					ValueFrom: &corev1.EnvVarSource{
 						ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "platform-auth-idp",
+								Name: "management-ingress-info",
 							},
-							Key: "OIDC_ISSUER_URL",
+							Key: "MANAGEMENT_INGRESS_ROUTE_HOST",
 						},
 					},
 				},

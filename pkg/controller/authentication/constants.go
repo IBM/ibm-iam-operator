@@ -363,18 +363,18 @@ done
 if [ $HTTP_CODE = "404" ]
 then
   echo "Running new client id registration"
-  sed "s/WLP_CLIENT_ID/$WLP_CLIENT_ID/g" /jsons/platform-oidc-registration.json
-  sed "s/WLP_CLIENT_SECRET/$WLP_CLIENT_SECRET/g" /jsons/platform-oidc-registration.json
-  sed "s/OIDC_ISSUER_URL/$OIDC_ISSUER_URL/g" /jsons/platform-oidc-registration.json
+  sed -i "s/WLP_CLIENT_ID/$WLP_CLIENT_ID/g" /jsons/platform-oidc-registration.json
+  sed -i "s/WLP_CLIENT_SECRET/$WLP_CLIENT_SECRET/g" /jsons/platform-oidc-registration.json
+  sed -i "s/OIDC_ISSUER_URL/$OIDC_ISSUER_URL/g" /jsons/platform-oidc-registration.json
   until curl -i -k -X POST -u oauthadmin:$WLP_CLIENT_REGISTRATION_SECRET \
    -H "Content-Type: application/json" \
    --data @/jsons/platform-oidc-registration.json \
    https://platform-auth-service:9443/oidc/endpoint/OP/registration | grep '201 Created'; do sleep 1; done;
 else
   echo "Running update client id registration."
-  sed "s/WLP_CLIENT_ID/$WLP_CLIENT_ID/g" /jsons/platform-oidc-registration.json
-  sed "s/WLP_CLIENT_SECRET/$WLP_CLIENT_SECRET/g" /jsons/platform-oidc-registration.json
-  sed "s/OIDC_ISSUER_URL/$OIDC_ISSUER_URL/g" /jsons/platform-oidc-registration.json
+  sed -i "s/WLP_CLIENT_ID/$WLP_CLIENT_ID/g" /jsons/platform-oidc-registration.json
+  sed -i "s/WLP_CLIENT_SECRET/$WLP_CLIENT_SECRET/g" /jsons/platform-oidc-registration.json
+  sed -i "s/ICP_CONSOLE_URL/$ICP_CONSOLE_URL/g" /jsons/platform-oidc-registration.json
   until curl -i -k -X PUT -u oauthadmin:$WLP_CLIENT_REGISTRATION_SECRET \
    -H "Content-Type: application/json" \
    --data @/jsons/platform-oidc-registration.json \
@@ -402,10 +402,10 @@ const registrationJson = `{
    ],
    "application_type":"web",
    "subject_type":"public",
-   "post_logout_redirect_uris":["OIDC_ISSUER_URL/console/logout"],
+   "post_logout_redirect_uris":["ICP_CONSOLE_URL/console/logout"],
    "preauthorized_scope":"openid profile email general",
    "introspect_tokens":true,
-   "trusted_uri_prefixes":["OIDC_ISSUER_URL"],
-   "redirect_uris":["OIDC_ISSUER_URL/auth/liberty/callback","https://127.0.0.1:443/idauth/oidc/endpoint/OP"]
+   "trusted_uri_prefixes":["ICP_CONSOLE_URL"],
+   "redirect_uris":["ICP_CONSOLE_URL/auth/liberty/callback","https://127.0.0.1:443/idauth/oidc/endpoint/OP"]
 }
 `

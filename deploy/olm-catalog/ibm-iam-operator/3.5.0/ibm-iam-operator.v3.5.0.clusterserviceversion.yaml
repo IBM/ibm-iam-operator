@@ -60,7 +60,7 @@ metadata:
               "imageRegistry": "quay.io/opencloudio",
               "imageTag": "3.3.0",
               "ldapsCACert": "platform-auth-ldaps-ca-cert",
-              "routerCertSecret": "icp-management-ingress-tls-secret"
+              "routerCertSecret": "route-tls-secret"
             },
             "clientRegistration": {
               "imageName": "icp-platform-auth",

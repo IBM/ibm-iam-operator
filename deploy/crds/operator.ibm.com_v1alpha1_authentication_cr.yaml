@@ -42,7 +42,7 @@ spec:
     clusterName: "mycluster"
     defaultAdminPassword: "password"
     defaultAdminUser: "admin"
-    enableImpersonation: true
+    enableImpersonation: false
     fipsEnabled: true
     icpPort: 8443
     installType: "fresh"
@@ -51,6 +51,6 @@ spec:
     roksEnabled: true
     roksURL: "https://roks.domain.name:443"
     roksUserPrefix: "IAM#"
-    wlpClientID: "8893ee185ce05b46f48e297810037313"
+    wlpClientID: "4444be3a738841016ab76d71b650e836"
     wlpClientRegistrationSecret: "f1362ca4d20b8389af2d1ea68042c9af"
     wlpClientSecret: "aa73bf39752053bf723d1143fb4cf8a2"

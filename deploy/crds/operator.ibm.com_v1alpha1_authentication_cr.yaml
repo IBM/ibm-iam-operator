@@ -15,7 +15,7 @@ spec:
     imageName: "icp-platform-auth"
     imageTag: "3.3.0"
     ldapsCACert: "platform-auth-ldaps-ca-cert"
-    routerCertSecret: "icp-management-ingress-tls-secret"
+    routerCertSecret: "route-tls-secret"
   clientRegistration:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"

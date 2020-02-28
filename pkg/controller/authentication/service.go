@@ -257,7 +257,7 @@ func (r *ReconcileAuthentication) iamTokenService(instance *operatorv1alpha1.Aut
 	}
 
 	// Set Authentication instance as the owner and controller of the Service
-	err := controllerutil.SetControllerReference(instance, identityManagementService, r.scheme)
+	err := controllerutil.SetControllerReference(instance, iamTokenService, r.scheme)
 	if err != nil {
 		reqLogger.Error(err, "Failed to set owner for Service")
 		return nil

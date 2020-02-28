@@ -828,7 +828,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		},
 		{
 			Name:  "IDPROVIDER_KUBEDNS_NAME",
-			Value: "127.0.0.1",
+			Value: "https://127.0.0.1",
 		},
 		{
 			Name:  "MASTER_NODES_LIST",

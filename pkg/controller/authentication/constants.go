@@ -404,10 +404,10 @@ const registrationJson = `{
    ],
    "application_type":"web",
    "subject_type":"public",
-   "post_logout_redirect_uris":["ICP_CONSOLE_URL/console/logout"],
+   "post_logout_redirect_uris":["https://ICP_CONSOLE_URL/console/logout"],
    "preauthorized_scope":"openid profile email general",
    "introspect_tokens":true,
-   "trusted_uri_prefixes":["ICP_CONSOLE_URL"],
-   "redirect_uris":["ICP_CONSOLE_URL/auth/liberty/callback","https://127.0.0.1:443/idauth/oidc/endpoint/OP"]
+   "trusted_uri_prefixes":["https://ICP_CONSOLE_URL"],
+   "redirect_uris":["https://ICP_CONSOLE_URL/auth/liberty/callback","https://127.0.0.1:443/idauth/oidc/endpoint/OP"]
 }
 `

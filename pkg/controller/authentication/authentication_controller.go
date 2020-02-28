@@ -23,6 +23,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	userv1 "github.com/openshift/api/user/v1"
 	net "k8s.io/api/networking/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -165,6 +166,16 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// TODO(user): Modify this to be the types you create that are owned by the primary resource
+	// Watch for changes to secondary resource Deployment and requeue the owner Authentication
+	err = c.Watch(&source.Kind{Type: &userv1.User{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &operatorv1alpha1.Authentication{},
+	})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -264,6 +275,13 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 	// Check if this Deployment already exists and create it if it doesn't
 	currentDeployment := &appsv1.Deployment{}
 	err = r.handleDeployment(instance, currentDeployment, &requeueResult)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// Check if this User already exists and create it if it doesn't
+	currentUser := &userv1.User{}
+	err = r.handleUser(instance, currentUser, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
 	}

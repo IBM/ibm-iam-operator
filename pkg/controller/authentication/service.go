@@ -231,7 +231,7 @@ func (r *ReconcileAuthentication) iamTokenService(instance *operatorv1alpha1.Aut
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var managementIngressPort int32 = 8443
 	var redirectPort int32 = 10443
-	identityManagementService := &corev1.Service{
+	iamTokenService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "iam-token-service",
 			Namespace: instance.Namespace,
@@ -262,6 +262,6 @@ func (r *ReconcileAuthentication) iamTokenService(instance *operatorv1alpha1.Aut
 		reqLogger.Error(err, "Failed to set owner for Service")
 		return nil
 	}
-	return identityManagementService
+	return iamTokenService
 
 }

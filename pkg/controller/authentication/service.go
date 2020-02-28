@@ -81,6 +81,23 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 		return err
 	}
 
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "iam-token-service", Namespace: instance.Namespace}, currentService)
+	if err != nil && errors.IsNotFound(err) {
+		// Define a new service
+		iamTokenService := r.iamTokenService(instance)
+		reqLogger.Info("Creating a new Service", "Service.Namespace", instance.Namespace, "Service.Name", "iam-token-service")
+		err = r.client.Create(context.TODO(), iamTokenService)
+		if err != nil {
+			reqLogger.Error(err, "Failed to create new Service", "Service.Namespace", instance.Namespace, "Service.Name", "iam-token-service")
+			return err
+		}
+		// Service created successfully - return and requeue
+		*requeueResult = true
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to get Service")
+		return err
+	}
+
 	return nil
 
 }
@@ -206,5 +223,45 @@ func (r *ReconcileAuthentication) identityProviderService(instance *operatorv1al
 		return nil
 	}
 	return identityProviderService
+
+}
+
+func (r *ReconcileAuthentication) iamTokenService(instance *operatorv1alpha1.Authentication) *corev1.Service {
+
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	var managementIngressPort int32 = 8443
+	var redirectPort int32 = 10443
+	iamTokenService := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "iam-token-service",
+			Namespace: instance.Namespace,
+			Labels:    map[string]string{"component": "auth-idp"},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name:     "p10443",
+					Port:     redirectPort,
+					Protocol: corev1.ProtocolTCP,
+					TargetPort: intstr.IntOrString{
+						IntVal: managementIngressPort,
+					},
+				},
+			},
+			Selector: map[string]string{
+				"component": "management-ingress",
+			},
+			Type:            "ClusterIP",
+			SessionAffinity: corev1.ServiceAffinityClientIP,
+		},
+	}
+
+	// Set Authentication instance as the owner and controller of the Service
+	err := controllerutil.SetControllerReference(instance, iamTokenService, r.scheme)
+	if err != nil {
+		reqLogger.Error(err, "Failed to set owner for Service")
+		return nil
+	}
+	return iamTokenService
 
 }

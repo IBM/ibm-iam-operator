@@ -321,7 +321,12 @@ func buildPapContainer(papImage string) corev1.Container {
 			},
 			{
 				Name:  "IAM_TOKEN_SERVICE_URL",
-				Value: "https://platform-auth-service:9443/iam",
+				Value: "https://platform-auth-service:9443",
+			},
+			//@posriniv - get back
+			{
+				Name: "NODE_TLS_REJECT_UNAUTHORIZED",
+				Value: "0",
 			},
 		},
 	}

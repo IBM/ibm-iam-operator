@@ -726,7 +726,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		},
 		{
 			Name:  "IAM_TOKEN_SERVICE_URL",
-			Value: "https://platform-auth-service:9443/iam",
+			Value: "https://platform-auth-service:9443",
 		},
 		{
 			Name:  "IDENTITY_PROVIDER_URL",

@@ -176,7 +176,7 @@ func (r *ReconcilePolicyDecision) Reconcile(request reconcile.Request) (reconcil
 
 	// Check if this Service already exists and create it if it doesn't
 	currentService := &corev1.Service{}
-	recResult, err := r.handleService(instance, currentService)
+	recResult, err = r.handleService(instance, currentService)
 	if err != nil {
 		return recResult, err
 	}

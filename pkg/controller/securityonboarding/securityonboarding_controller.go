@@ -737,6 +737,15 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			Value: "https://iam-pap:39001",
 		},
 		{
+			Name: "NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
 			Name: "DEFAULT_TTL",
 			ValueFrom: &corev1.EnvVarSource{
 				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
@@ -797,15 +806,6 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					{
 						Name:      "mongodb-client-cert",
 						MountPath: "/certs/mongodb-client",
-					},
-					{
-						Name: "NAMESPACE",
-						ValueFrom: &corev1.EnvVarSource{
-							FieldRef: &corev1.ObjectFieldSelector{
-								APIVersion: "v1",
-								FieldPath:  "metadata.namespace",
-							},
-						},
 					},
 				},
 				Env: tmpEnvs,

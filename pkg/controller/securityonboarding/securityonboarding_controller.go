@@ -356,7 +356,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 		Name: "cluster-ca",
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
-				SecretName: "cluster-ca-cert",
+				SecretName: "cs-ca-certificate-secret",
 				Items: []corev1.KeyToPath{
 					{
 						Key:  "tls.key",
@@ -533,7 +533,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			Name: "cluster-ca",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: "cluster-ca-cert",
+					SecretName: "cs-ca-certificate-secret",
 					Items: []corev1.KeyToPath{
 						{
 							Key:  "tls.key",
@@ -797,6 +797,15 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					{
 						Name:      "mongodb-client-cert",
 						MountPath: "/certs/mongodb-client",
+					},
+					{
+						Name: "NAMESPACE",
+						ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "metadata.namespace",
+							},
+						},
 					},
 				},
 				Env: tmpEnvs,

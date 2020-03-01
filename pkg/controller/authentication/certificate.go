@@ -83,7 +83,7 @@ func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme
 	certSpec := certmgr.CertificateSpec{
 		SecretName: certificateData[certificateName]["secretName"],
 		IssuerRef: certmgr.ObjectReference{
-			Name: "cs-ca-issuer",
+			Name: "cs-ca-clusterissuer",
 			Kind: certmgr.ClusterIssuerKind,
 		},
 		CommonName: certificateData[certificateName]["cn"],

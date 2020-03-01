@@ -38,4 +38,7 @@ var (
 
 	CRDSchemeGroupVersion = schema.GroupVersion{Group: "apiextensions.k8s.io", Version: "v1beta1"}
 	CRDSchemeBuilder      = &scheme.Builder{GroupVersion: CRDSchemeGroupVersion}
+
+	UserGroupVersion = schema.GroupVersion{Group: "user.openshift.io", Version: "v1"}
+	UserBuilder      = &scheme.Builder{GroupVersion: UserGroupVersion}
 )

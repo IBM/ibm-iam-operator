@@ -25,4 +25,5 @@ func init() {
 	AddToSchemes = append(AddToSchemes, v1alpha1.SchemeBuilder.AddToScheme)
 	AddToSchemes = append(AddToSchemes, v1alpha1.CRDSchemeBuilder.AddToScheme)
 	AddToSchemes = append(AddToSchemes, v1alpha1.CertificateSchemeBuilder.AddToScheme)
+	AddToSchemes = append(AddToSchemes, v1alpha1.UserBuilder.AddToScheme)
 }

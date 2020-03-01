@@ -314,6 +314,15 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 									},
 								},
 								{
+									Name: "NAMESPACE",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											APIVersion: "v1",
+											FieldPath:  "metadata.namespace",
+										},
+									},
+								},
+								{
 									Name:  "IDENTITY_PROVIDER_URL",
 									Value: "http://platform-identity-provider:4300",
 								},

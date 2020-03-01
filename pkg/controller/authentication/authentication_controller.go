@@ -18,7 +18,7 @@ package authentication
 
 import (
 	"context"
-	//certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
+	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -98,13 +98,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Certificate and requeue the owner Authentication
-	/*err = c.Watch(&source.Kind{Type: &certmgr.Certificate{}}, &handler.EnqueueRequestForOwner{
+	err = c.Watch(&source.Kind{Type: &certmgr.Certificate{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &operatorv1alpha1.Authentication{},
 	})
 	if err != nil {
 		return err
-	}*/
+	}
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Certificate and requeue the owner Authentication
@@ -217,11 +217,11 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 	}
 
 	// Check if this Certificate already exists and create it if it doesn't
-	/*currentCertificate := &certmgr.Certificate{}
+	currentCertificate := &certmgr.Certificate{}
 	err = r.handleCertificate(instance, currentCertificate, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
-	}*/
+	}
 
 	// Check if this Service already exists and create it if it doesn't
 	currentService := &corev1.Service{}

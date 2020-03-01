@@ -356,7 +356,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 		Name: "cluster-ca",
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
-				SecretName: "cluster-ca-cert",
+				SecretName: "cs-ca-certificate-secret",
 				Items: []corev1.KeyToPath{
 					{
 						Key:  "tls.key",
@@ -533,7 +533,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			Name: "cluster-ca",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: "cluster-ca-cert",
+					SecretName: "cs-ca-certificate-secret",
 					Items: []corev1.KeyToPath{
 						{
 							Key:  "tls.key",
@@ -735,6 +735,15 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		{
 			Name:  "IAM_PAP_URL",
 			Value: "https://iam-pap:39001",
+		},
+		{
+			Name: "NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
 		},
 		{
 			Name: "DEFAULT_TTL",

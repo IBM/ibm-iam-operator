@@ -80,13 +80,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Certificate and requeue the owner PolicyDecision
-	/*err = c.Watch(&source.Kind{Type: &certmgr.Certificate{}}, &handler.EnqueueRequestForOwner{
+	err = c.Watch(&source.Kind{Type: &certmgr.Certificate{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &operatorv1alpha1.PolicyDecision{},
 	})
 	if err != nil {
 		return err
-	}*/
+	}
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Service and requeue the owner PolicyDecision
@@ -168,15 +168,15 @@ func (r *ReconcilePolicyDecision) Reconcile(request reconcile.Request) (reconcil
 	}
 
 	// Check if this Service already exists and create it if it doesn't
-	/*currentCertificate := &certmgr.Certificate{}
+	currentCertificate := &certmgr.Certificate{}
 	recResult, err := r.handleCertificate(instance, currentCertificate)
 	if err != nil {
 		return recResult, err
-	}*/
+	}
 
 	// Check if this Service already exists and create it if it doesn't
 	currentService := &corev1.Service{}
-	recResult, err := r.handleService(instance, currentService)
+	recResult, err = r.handleService(instance, currentService)
 	if err != nil {
 		return recResult, err
 	}
@@ -370,7 +370,7 @@ func (r *ReconcilePolicyDecision) certificateForPolicyDecision(instance *operato
 		Spec: certmgr.CertificateSpec{
 			SecretName: "auth-pdp-secret",
 			IssuerRef: certmgr.ObjectReference{
-				Name: "icp-ca-issuer",
+				Name: "cs-ca-issuer",
 				Kind: certmgr.ClusterIssuerKind,
 			},
 			CommonName: "iam-pdp",
@@ -606,7 +606,7 @@ func buildPdpVolumes(journalPath string) []corev1.Volume {
 			Name: "cluster-ca",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: "cluster-ca-cert",
+					SecretName: "cs-ca-certificate-secret",
 					Items: []corev1.KeyToPath{
 						{
 							Key:  "tls.key",

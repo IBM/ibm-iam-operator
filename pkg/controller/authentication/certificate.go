@@ -42,7 +42,7 @@ func generateCertificateData(instance *operatorv1alpha1.Authentication) {
 		"platform-identity-management": map[string]string{
 			"secretName":   "platform-identity-management",
 			"cn":           "platform-identity-management",
-			"completeName": "platform-identity-management.kube-system.svc",
+			"completeName": "platform-identity-management.ibm-common-services.svc",
 		},
 	}
 }
@@ -83,7 +83,7 @@ func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme
 	certSpec := certmgr.CertificateSpec{
 		SecretName: certificateData[certificateName]["secretName"],
 		IssuerRef: certmgr.ObjectReference{
-			Name: "icp-ca-issuer",
+			Name: "cs-ca-issuer",
 			Kind: certmgr.ClusterIssuerKind,
 		},
 		CommonName: certificateData[certificateName]["cn"],

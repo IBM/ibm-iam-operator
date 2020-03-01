@@ -164,7 +164,7 @@ var iamPapCertificateValues = IamPapCertificateValues{
 }
 
 var configvalues = ConfigValues{
-	ClusterCAIssuer: "icp-ca-issuer",
+	ClusterCAIssuer: "cs-ca-issuer",
 }
 
 /*
@@ -275,13 +275,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Certificate and requeue the owner Pap
-	/*err = c.Watch(&source.Kind{Type: &certmgr.Certificate{}}, &handler.EnqueueRequestForOwner{
+	err = c.Watch(&source.Kind{Type: &certmgr.Certificate{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &operatorv1alpha1.Pap{},
 	})
 	if err != nil {
 		return err
-	}*/
+	}
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Service and requeue the owner Pap
@@ -366,11 +366,11 @@ func (r *ReconcilePap) Reconcile(request reconcile.Request) (reconcile.Result, e
 	}
 
 	// Check if this Certificate already exists and create it if it doesn't
-	/*currentCertificate := &certmgr.Certificate{}
+	currentCertificate := &certmgr.Certificate{}
 	err = r.handleCertificate(instance, currentCertificate, &needToRequeue)
 	if err != nil {
 		return reconcile.Result{}, err
-	}*/
+	}
 
 	// Check if this Service already exists and create it if it doesn't
 	currentService := &corev1.Service{}
@@ -817,7 +817,7 @@ func buildPapVolumes(journalPath string) []corev1.Volume {
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					DefaultMode: &defaultMode,
-					SecretName:  "cluster-ca-cert",
+					SecretName:  "cs-ca-certificate-secret",
 					Items: []corev1.KeyToPath{
 						{
 							Key:  "tls.key",

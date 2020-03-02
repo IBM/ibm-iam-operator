@@ -82,7 +82,7 @@ metadata:
               "isOpenshiftEnv": true,
               "oidcIssuerURL": "https://127.0.0.1:8443/idauth/oidc/endpoint/OP",
               "openshiftPort": 443,
-              "roksEnabled": true,
+              "roksEnabled": false,
               "roksURL": "https://roks.domain.name:443",
               "roksUserPrefix": "IAM#",
               "wlpClientID": "4444be3a738841016ab76d71b650e836",

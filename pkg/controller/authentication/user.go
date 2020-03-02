@@ -65,13 +65,7 @@ func generateUserObject(instance *operatorv1alpha1.Authentication, scheme *runti
 		Identities: []string{},
 		Groups: []string{},
 	}
-
-	// Set Authentication instance as the owner and controller of the User
-	err := controllerutil.SetControllerReference(instance, newUser, scheme)
-	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for User")
-		return nil
-	}
+	
 	return newUser
 }
 

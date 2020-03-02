@@ -21,9 +21,9 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	userv1 "github.com/openshift/api/user/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func (r *ReconcileAuthentication) handleUser(instance *operatorv1alpha1.Authentication, currentUser *userv1.User, requeueResult *bool) error {
@@ -32,7 +32,7 @@ func (r *ReconcileAuthentication) handleUser(instance *operatorv1alpha1.Authenti
 	var err error
 
 	user := instance.Spec.Config.DefaultAdminUser
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: user, Namespace: instance.Namespace}, currentUser)
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: user, Namespace: ""}, currentUser)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new User
 		newUser := generateUserObject(instance, r.scheme, user)
@@ -57,12 +57,11 @@ func generateUserObject(instance *operatorv1alpha1.Authentication, scheme *runti
 
 	newUser := &userv1.User{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      userName,
+			Name: userName,
 		},
 		Identities: []string{},
-		Groups: []string{},
+		Groups:     []string{},
 	}
 
 	return newUser
 }
-

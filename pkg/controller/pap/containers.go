@@ -325,7 +325,7 @@ func buildPapContainer(papImage string) corev1.Container {
 			},
 			//@posriniv - get back
 			{
-				Name: "NODE_TLS_REJECT_UNAUTHORIZED",
+				Name:  "NODE_TLS_REJECT_UNAUTHORIZED",
 				Value: "0",
 			},
 		},

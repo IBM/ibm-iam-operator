@@ -20,15 +20,16 @@ import (
 	"context"
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	userv1 "github.com/openshift/api/user/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	userv1 "github.com/openshift/api/user/v1"
 	net "k8s.io/api/networking/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -206,6 +207,37 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, err
 	}
 
+	// Credit: kubebuilder book
+	finalizerName := "authentication.operator.ibm.com"
+	// Determine if the Authentication CR  is going to be deleted
+	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
+		// Object not being deleted, but add our finalizer so we know to remove this object later when it is going to be deleted
+		if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
+			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
+			if err := r.client.Update(context.Background(), instance); err != nil {
+				log.Error(err, "Error adding the finalizer to the CR")
+				return reconcile.Result{}, err
+			}
+		}
+	} else {
+		// Object scheduled to be deleted
+		if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
+			if err := r.deleteExternalResources(instance); err != nil {
+				log.Error(err, "Error deleting resources created by this operator")
+
+				return reconcile.Result{}, err
+			}
+
+			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
+			if err := r.client.Update(context.Background(), instance); err != nil {
+				log.Error(err, "Error updating the CR to remove the finalizer")
+				return reconcile.Result{}, err
+			}
+
+		}
+		return reconcile.Result{}, nil
+	}
+
 	// Check if this Certificate already exists and create it if it doesn't
 	currentCertificate := &certmgr.Certificate{}
 	err = r.handleCertificate(instance, currentCertificate, &requeueResult)
@@ -281,4 +313,108 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 	}
 
 	return reconcile.Result{}, nil
+}
+
+// Removes some of the resources created by this controller for the CR including
+// The clusterrole, clusterrolebinding and User resources created by Authentication
+func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1alpha1.Authentication) error {
+
+	crMap := generateCRData()
+	crbMap := generateCRBData("dummy", "dummy")
+	userName := instance.Spec.Config.DefaultAdminUser
+
+	// Remove Cluster Role
+	for crName, _ := range crMap {
+		if err := removeCR(r.client, crName); err != nil {
+			return err
+		}
+	}
+
+	// Remove Cluster Role Binding
+	for crbName, _ := range crbMap {
+		if err := removeCRB(r.client, crbName); err != nil {
+			return err
+		}
+	}
+
+	// Remove User
+
+	if err := removeUser(r.client, userName); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Helper functions to check and remove string from a slice of strings.
+func containsString(slice []string, s string) bool {
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
+}
+
+func removeString(slice []string, s string) (result []string) {
+	for _, item := range slice {
+		if item == s {
+			continue
+		}
+		result = append(result, item)
+	}
+	return
+}
+
+// Functions to remove cluster scoped resources
+
+func removeCR(client client.Client, crName string) error {
+	// Delete Clusterrole
+	clusterRole := &rbacv1.ClusterRole{}
+	if err := client.Get(context.Background(), types.NamespacedName{Name: crName, Namespace: ""}, clusterRole); err != nil && errors.IsNotFound(err) {
+		log.V(1).Info("Error getting cluster role", crName, err)
+		return nil
+	} else if err == nil {
+		if err = client.Delete(context.Background(), clusterRole); err != nil {
+			log.V(1).Info("Error deleting cluster role", "name", crName, "error message", err)
+			return err
+		}
+	} else {
+		return err
+	}
+	return nil
+}
+
+func removeCRB(client client.Client, crbName string) error {
+	// Delete ClusterRoleBinding
+	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
+	if err := client.Get(context.Background(), types.NamespacedName{Name: crbName, Namespace: ""}, clusterRoleBinding); err != nil && errors.IsNotFound(err) {
+		log.V(1).Info("Error getting cluster role binding", crbName, err)
+		return nil
+	} else if err == nil {
+		if err = client.Delete(context.Background(), clusterRoleBinding); err != nil {
+			log.V(1).Info("Error deleting cluster role binding", "name", crbName, "error message", err)
+			return err
+		}
+	} else {
+		return err
+	}
+	return nil
+}
+
+func removeUser(client client.Client, userName string) error {
+	// Delete User
+	user := &userv1.User{}
+	if err := client.Get(context.Background(), types.NamespacedName{Name: userName, Namespace: ""}, user); err != nil && errors.IsNotFound(err) {
+		log.V(1).Info("Error getting user", userName, err)
+		return nil
+	} else if err == nil {
+		if err = client.Delete(context.Background(), user); err != nil {
+			log.V(1).Info("Error deleting user", "name", userName, "error message", err)
+			return err
+		}
+	} else {
+		return err
+	}
+	return nil
 }

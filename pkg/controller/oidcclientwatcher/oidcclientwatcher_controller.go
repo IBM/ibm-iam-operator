@@ -136,6 +136,37 @@ func (r *ReconcileOIDCClientWatcher) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
+	// Credit: kubebuilder book
+	finalizerName := "oidclientwatcher.operator.ibm.com"
+	// Determine if the OIDC ClientWatcher is going to be deleted
+	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
+		// Object not being deleted, but add our finalizer so we know to remove this object later when it is going to be deleted
+		if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
+			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
+			if err := r.client.Update(context.Background(), instance); err != nil {
+				log.Error(err, "Error adding the finalizer to the CR")
+				return reconcile.Result{}, err
+			}
+		}
+	} else {
+		// Object scheduled to be deleted
+		if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
+			if err := r.deleteExternalResources(instance); err != nil {
+				log.Error(err, "Error deleting resources created by this operator")
+
+				return reconcile.Result{}, err
+			}
+
+			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
+			if err := r.client.Update(context.Background(), instance); err != nil {
+				log.Error(err, "Error updating the CR to remove the finalizer")
+				return reconcile.Result{}, err
+			}
+
+		}
+		return reconcile.Result{}, nil
+	}
+
 	// Check if this Deployment already exists and create it if it doesn't
 	currentDeployment := &appsv1.Deployment{}
 	recResult, err := r.handleDeployment(instance, currentDeployment)
@@ -662,4 +693,85 @@ func getPodNames(pods []corev1.Pod) []string {
 		reqLogger.Info("CS??? pod name=" + pod.Name)
 	}
 	return podNames
+}
+
+// Removes some of the resources created by this controller for the CR including
+// The clusterrole and custom resource definitions created by OIDC Client Watcher
+func (r *ReconcileOIDCClientWatcher) deleteExternalResources(instance *operatorv1alpha1.OIDCClientWatcher) error {
+
+	crList := []string{"icp-oidc-client-operate-aggregate", "icp-oidc-client-admin-aggregate"}
+	crdList := []string{"clients.oidc.security.ibm.com"}
+	// Remove Cluster Role
+
+	for _, cr := range crList {
+		if err := removeCR(r.client, cr); err != nil {
+			return err
+		}
+	}
+
+	// Remove CustomResourceDefinition
+
+	for _, crd := range crdList {
+		if err := removeCRD(r.client, crd); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Helper functions to check and remove string from a slice of strings.
+func containsString(slice []string, s string) bool {
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
+}
+
+func removeString(slice []string, s string) (result []string) {
+	for _, item := range slice {
+		if item == s {
+			continue
+		}
+		result = append(result, item)
+	}
+	return
+}
+
+// Functions to remove cluster scoped resources
+
+func removeCR(client client.Client, crName string) error {
+	// Delete Clusterrole
+	clusterRole := &rbacv1.ClusterRole{}
+	if err := client.Get(context.Background(), types.NamespacedName{Name: crName, Namespace: ""}, clusterRole); err != nil && errors.IsNotFound(err) {
+		log.V(1).Info("Error getting cluster role", crName, err)
+		return nil
+	} else if err == nil {
+		if err = client.Delete(context.Background(), clusterRole); err != nil {
+			log.V(1).Info("Error deleting cluster role", "name", crName, "error message", err)
+			return err
+		}
+	} else {
+		return err
+	}
+	return nil
+}
+
+func removeCRD(client client.Client, crdName string) error {
+	// Delete CustomResourceDefinition
+	customResourceDefinition := &extv1.CustomResourceDefinition{}
+	if err := client.Get(context.Background(), types.NamespacedName{Name: crdName, Namespace: ""}, customResourceDefinition); err != nil && errors.IsNotFound(err) {
+		log.V(1).Info("Error getting custome resource definition", "msg", err)
+		return nil
+	} else if err == nil {
+		if err = client.Delete(context.Background(), customResourceDefinition); err != nil {
+			log.V(1).Info("Error deleting custom resource definition", "name", crdName, "error message", err)
+			return err
+		}
+	} else {
+		return err
+	}
+	return nil
 }

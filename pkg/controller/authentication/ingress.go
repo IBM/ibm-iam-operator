@@ -30,7 +30,7 @@ import (
 
 func (r *ReconcileAuthentication) handleIngress(instance *operatorv1alpha1.Authentication, currentIngress *net.Ingress, requeueResult *bool) error {
 
-	ingressList := []string{"api-key", "explorer-idmgmt", "iam-token-redirect","iam-token", "ibmid-ui-callback", "id-mgmt", "idmgmt-v2-api", "platform-auth-dir",
+	ingressList := []string{"api-key", "explorer-idmgmt", "iam-token-redirect", "iam-token", "ibmid-ui-callback", "id-mgmt", "idmgmt-v2-api", "platform-auth-dir",
 		"platform-auth", "platform-id-auth-block", "platform-id-auth", "platform-id-provider", "platform-login", "platform-oidc-block", "platform-oidc", "platform-oidc-introspect",
 		"platform-oidc-keys", "platform-oidc-token-2", "platform-oidc-token", "service-id", "token-service-version", "saml-ui-callback", "version-idmgmt"}
 

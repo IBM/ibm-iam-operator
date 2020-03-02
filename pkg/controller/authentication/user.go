@@ -32,7 +32,7 @@ func (r *ReconcileAuthentication) handleUser(instance *operatorv1alpha1.Authenti
 	var err error
 
 	user := instance.Spec.Config.DefaultAdminUser
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: user, Namespace: instance.Namespace}, currentUser)
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: user, Namespace: ""}, currentUser)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new User
 		newUser := generateUserObject(instance, r.scheme, user)

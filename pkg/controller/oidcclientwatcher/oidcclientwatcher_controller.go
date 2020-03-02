@@ -699,13 +699,13 @@ func getPodNames(pods []corev1.Pod) []string {
 
 // Removes some of the resources created by this controller for the CR including
 // The clusterrolebinding, clusterrole, serviceaccount, and the cert-manager deployment
-func (r *ReconcileCertManager) deleteExternalResources(instance *operatorv1alpha1.CertManager) error {
+func (r *ReconcileOIDCClientWatcher) deleteExternalResources(instance *operatorv1alpha1.OIDCClientWatcher) error {
 	
 	crList := []string{"icp-oidc-client-operate-aggregate", "icp-oidc-client-admin-aggregate",}
 	crdList := []string{"clients.oidc.security.ibm.com", }
 	// Remove Cluster Role
 
-	for cr in range: crList {
+	for _,cr  := range crList {
 		if err := removeCR(r.client, cr); err != nil {
 			return err
 		}
@@ -713,7 +713,7 @@ func (r *ReconcileCertManager) deleteExternalResources(instance *operatorv1alpha
 
 	// Remove CustomResourceDefinition
 
-	for crd in range: crdList {
+	for _,crd := range crdList {
 		if err := removeCRD(r.client, crd); err != nil {
 			return err
 		}
@@ -747,7 +747,7 @@ func removeString(slice []string, s string) (result []string) {
 func removeCR(client client.Client, crName string) error {
 	// Delete Clusterrole
 	clusterRole := &rbacv1.ClusterRole{}
-	if err := client.Get(context.Background(), types.NamespacedName{Name: crName, Namespace: ""}, clusterRole); err != nil && apiErrors.IsNotFound(err) {
+	if err := client.Get(context.Background(), types.NamespacedName{Name: crName, Namespace: ""}, clusterRole); err != nil && errors.IsNotFound(err) {
 		log.V(1).Info("Error getting cluster role", crName, err)
 		return nil
 	} else if err == nil {
@@ -764,7 +764,7 @@ func removeCR(client client.Client, crName string) error {
 func removeCRD(client client.Client, crdName string) error {
 	// Delete Clusterrole
 	customResourceDefinition := &extv1.CustomResourceDefinition{}
-	if err := client.Get(context.Background(), types.NamespacedName{Name: crdName, Namespace: ""}, customResourceDefinition); err != nil && apiErrors.IsNotFound(err) {
+	if err := client.Get(context.Background(), types.NamespacedName{Name: crdName, Namespace: ""}, customResourceDefinition); err != nil && errors.IsNotFound(err) {
 		log.V(1).Info("Error getting custome resource definition", "msg", err)
 		return nil
 	} else if err == nil {

@@ -54,8 +54,6 @@ func (r *ReconcileAuthentication) handleUser(instance *operatorv1alpha1.Authenti
 }
 
 func generateUserObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, userName string) *userv1.User {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	
 
 	newUser := &userv1.User{
 		ObjectMeta: metav1.ObjectMeta{

@@ -135,5 +135,5 @@ type AuthenticationList struct {
 
 func init() {
 	SchemeBuilder.Register(&Authentication{}, &AuthenticationList{})
-	UserSchemeBuilder.Register(&userv1.User{}, &userv1.UserList{})
+	UserBuilder.Register(&userv1.User{}, &userv1.UserList{})
 }

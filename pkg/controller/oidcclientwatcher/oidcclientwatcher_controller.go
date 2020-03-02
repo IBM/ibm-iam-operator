@@ -137,7 +137,7 @@ func (r *ReconcileOIDCClientWatcher) Reconcile(request reconcile.Request) (recon
 	}
 
 	// Credit: kubebuilder book
-	finalizerName := "oidclientwatcher.operators.ibm.com"
+	finalizerName := "oidclientwatcher.operator.ibm.com"
 	// Determine if the certmanager crd is going to be deleted
 	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Object not being deleted, but add our finalizer so we know to remove this object later when it is going to be deleted
@@ -164,7 +164,7 @@ func (r *ReconcileOIDCClientWatcher) Reconcile(request reconcile.Request) (recon
 			}
 
 		}
-		return reconcile.Result{}, err
+		return reconcile.Result{}, nil
 	}
 
 	// Check if this Deployment already exists and create it if it doesn't
@@ -698,7 +698,7 @@ func getPodNames(pods []corev1.Pod) []string {
 }
 
 // Removes some of the resources created by this controller for the CR including
-// The clusterrolebinding, clusterrole, serviceaccount, and the cert-manager deployment
+// The clusterrole and custom resource definitions created by OIDC Client Watcher
 func (r *ReconcileOIDCClientWatcher) deleteExternalResources(instance *operatorv1alpha1.OIDCClientWatcher) error {
 	
 	crList := []string{"icp-oidc-client-operate-aggregate", "icp-oidc-client-admin-aggregate",}

@@ -137,6 +137,37 @@ func (r *ReconcilePolicyController) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, recErr
 	}
 
+	// Credit: kubebuilder book
+	finalizerName := "policycontroller.operator.ibm.com"
+	// Determine if the certmanager crd is going to be deleted
+	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
+		// Object not being deleted, but add our finalizer so we know to remove this object later when it is going to be deleted
+		if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
+			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
+			if err := r.client.Update(context.Background(), instance); err != nil {
+				log.Error(err, "Error adding the finalizer to the CR")
+				return reconcile.Result{}, err
+			}
+		}
+	} else {
+		// Object scheduled to be deleted
+		if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
+			if err := r.deleteExternalResources(instance); err != nil {
+				log.Error(err, "Error deleting resources created by this operator")
+
+				return reconcile.Result{}, err
+			}
+
+			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
+			if err := r.client.Update(context.Background(), instance); err != nil {
+				log.Error(err, "Error updating the CR to remove the finalizer")
+				return reconcile.Result{}, err
+			}
+
+		}
+		return reconcile.Result{}, nil
+	}
+
 	// If the Deployment does not exist, create it
 	iamPolControllerDeployment := &appsv1.Deployment{}
 	recResult, recErr := r.handleDeployment(instance, iamPolControllerDeployment)
@@ -576,4 +607,107 @@ func getPodNames(pods []corev1.Pod) []string {
 		reqLogger.Info("CS??? pod name=" + pod.Name)
 	}
 	return podNames
+}
+
+// Removes some of the resources created by this controller for the CR including
+// The clusterrole and custom resource definitions created by OIDC Client Watcher
+func (r *ReconcilePolicyController) deleteExternalResources(instance *operatorv1alpha1.PolicyController) error {
+	
+	crName := "iam-policy-controller-role"
+	crbName := "iam-policy-controller-rolebinding"
+	crdName := "iampolicies.iam.policies.ibm.com"
+	
+	// Remove Cluster Role
+
+	if err := removeCR(r.client, crName); err != nil {
+		return err
+	}
+
+	// Remove Cluster Role
+
+	if err := removeCRB(r.client, crbName); err != nil {
+		return err
+	}
+
+	// Remove CustomResourceDefinition
+
+	if err := removeCRD(r.client, crdName); err != nil {
+		return err
+	}
+	
+
+	return nil
+}
+
+// Helper functions to check and remove string from a slice of strings.
+func containsString(slice []string, s string) bool {
+    for _, item := range slice {
+        if item == s {
+            return true
+        }
+    }
+    return false
+}
+
+func removeString(slice []string, s string) (result []string) {
+    for _, item := range slice {
+        if item == s {
+            continue
+        }
+        result = append(result, item)
+    }
+    return
+}
+
+// Functions to remove cluster scoped resources
+
+func removeCR(client client.Client, crName string) error {
+	// Delete Clusterrole
+	clusterRole := &rbacv1.ClusterRole{}
+	if err := client.Get(context.Background(), types.NamespacedName{Name: crName, Namespace: ""}, clusterRole); err != nil && errors.IsNotFound(err) {
+		log.V(1).Info("Error getting cluster role", crName, err)
+		return nil
+	} else if err == nil {
+		if err = client.Delete(context.Background(), clusterRole); err != nil {
+			log.V(1).Info("Error deleting cluster role", "name", crName, "error message", err)
+			return err
+		}
+	} else {
+		return err
+	}
+	return nil
+}
+
+func removeCRB(client client.Client, crbName string) error {
+	// Delete ClusterRoleBinding
+	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
+	if err := client.Get(context.Background(), types.NamespacedName{Name: crbName, Namespace: ""}, clusterRoleBinding); err != nil && errors.IsNotFound(err) {
+		log.V(1).Info("Error getting cluster role", crbName, err)
+		return nil
+	} else if err == nil {
+		if err = client.Delete(context.Background(), clusterRoleBinding); err != nil {
+			log.V(1).Info("Error deleting cluster role", "name", crbName, "error message", err)
+			return err
+		}
+	} else {
+		return err
+	}
+	return nil
+}
+
+func removeCRD(client client.Client, crdName string) error {
+	// Delete Clusterrole
+	customResourceDefinition := &extv1.CustomResourceDefinition{}
+	if err := client.Get(context.Background(), types.NamespacedName{Name: crdName, Namespace: ""}, customResourceDefinition); err != nil && errors.IsNotFound(err) {
+		log.V(1).Info("Error getting custome resource definition", "msg", err)
+		return nil
+	} else if err == nil {
+		if err = client.Delete(context.Background(), customResourceDefinition); err != nil {
+			log.V(1).Info("Error deleting custom resource definition", "name", crdName, "error message", err)
+			return err
+		}
+	} else {
+		return err
+	}
+	return nil
 }

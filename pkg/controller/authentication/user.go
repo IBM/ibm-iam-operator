@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func (r *ReconcileAuthentication) handleUser(instance *operatorv1alpha1.Authentication, currentUser *userv1.User, requeueResult *bool) error {
@@ -65,7 +64,7 @@ func generateUserObject(instance *operatorv1alpha1.Authentication, scheme *runti
 		Identities: []string{},
 		Groups: []string{},
 	}
-	
+
 	return newUser
 }
 

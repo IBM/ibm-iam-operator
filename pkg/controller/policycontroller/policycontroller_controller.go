@@ -139,7 +139,7 @@ func (r *ReconcilePolicyController) Reconcile(request reconcile.Request) (reconc
 
 	// Credit: kubebuilder book
 	finalizerName := "policycontroller.operator.ibm.com"
-	// Determine if the certmanager crd is going to be deleted
+	// Determine if the Policy Controller CR is going to be deleted
 	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Object not being deleted, but add our finalizer so we know to remove this object later when it is going to be deleted
 		if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
@@ -610,7 +610,7 @@ func getPodNames(pods []corev1.Pod) []string {
 }
 
 // Removes some of the resources created by this controller for the CR including
-// The clusterrole and custom resource definitions created by OIDC Client Watcher
+// The clusterrole, clusterrolebinding custom resource definition created by Policy Controller
 func (r *ReconcilePolicyController) deleteExternalResources(instance *operatorv1alpha1.PolicyController) error {
 	
 	crName := "iam-policy-controller-role"
@@ -623,7 +623,7 @@ func (r *ReconcilePolicyController) deleteExternalResources(instance *operatorv1
 		return err
 	}
 
-	// Remove Cluster Role
+	// Remove Cluster Role Binding
 
 	if err := removeCRB(r.client, crbName); err != nil {
 		return err
@@ -682,11 +682,11 @@ func removeCRB(client client.Client, crbName string) error {
 	// Delete ClusterRoleBinding
 	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: crbName, Namespace: ""}, clusterRoleBinding); err != nil && errors.IsNotFound(err) {
-		log.V(1).Info("Error getting cluster role", crbName, err)
+		log.V(1).Info("Error getting cluster role binding", crbName, err)
 		return nil
 	} else if err == nil {
 		if err = client.Delete(context.Background(), clusterRoleBinding); err != nil {
-			log.V(1).Info("Error deleting cluster role", "name", crbName, "error message", err)
+			log.V(1).Info("Error deleting cluster role binding", "name", crbName, "error message", err)
 			return err
 		}
 	} else {
@@ -696,7 +696,7 @@ func removeCRB(client client.Client, crbName string) error {
 }
 
 func removeCRD(client client.Client, crdName string) error {
-	// Delete Clusterrole
+	// Delete CustomResourceDefintion
 	customResourceDefinition := &extv1.CustomResourceDefinition{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: crdName, Namespace: ""}, customResourceDefinition); err != nil && errors.IsNotFound(err) {
 		log.V(1).Info("Error getting custome resource definition", "msg", err)

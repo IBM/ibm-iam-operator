@@ -138,7 +138,7 @@ func (r *ReconcileOIDCClientWatcher) Reconcile(request reconcile.Request) (recon
 
 	// Credit: kubebuilder book
 	finalizerName := "oidclientwatcher.operator.ibm.com"
-	// Determine if the certmanager crd is going to be deleted
+	// Determine if the OIDC ClientWatcher is going to be deleted
 	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Object not being deleted, but add our finalizer so we know to remove this object later when it is going to be deleted
 		if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
@@ -762,7 +762,7 @@ func removeCR(client client.Client, crName string) error {
 }
 
 func removeCRD(client client.Client, crdName string) error {
-	// Delete Clusterrole
+	// Delete CustomResourceDefinition
 	customResourceDefinition := &extv1.CustomResourceDefinition{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: crdName, Namespace: ""}, customResourceDefinition); err != nil && errors.IsNotFound(err) {
 		log.V(1).Info("Error getting custome resource definition", "msg", err)

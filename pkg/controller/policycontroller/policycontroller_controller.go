@@ -612,11 +612,11 @@ func getPodNames(pods []corev1.Pod) []string {
 // Removes some of the resources created by this controller for the CR including
 // The clusterrole, clusterrolebinding custom resource definition created by Policy Controller
 func (r *ReconcilePolicyController) deleteExternalResources(instance *operatorv1alpha1.PolicyController) error {
-	
+
 	crName := "iam-policy-controller-role"
 	crbName := "iam-policy-controller-rolebinding"
 	crdName := "iampolicies.iam.policies.ibm.com"
-	
+
 	// Remove Cluster Role
 
 	if err := removeCR(r.client, crName); err != nil {
@@ -634,29 +634,28 @@ func (r *ReconcilePolicyController) deleteExternalResources(instance *operatorv1
 	if err := removeCRD(r.client, crdName); err != nil {
 		return err
 	}
-	
 
 	return nil
 }
 
 // Helper functions to check and remove string from a slice of strings.
 func containsString(slice []string, s string) bool {
-    for _, item := range slice {
-        if item == s {
-            return true
-        }
-    }
-    return false
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
 }
 
 func removeString(slice []string, s string) (result []string) {
-    for _, item := range slice {
-        if item == s {
-            continue
-        }
-        result = append(result, item)
-    }
-    return
+	for _, item := range slice {
+		if item == s {
+			continue
+		}
+		result = append(result, item)
+	}
+	return
 }
 
 // Functions to remove cluster scoped resources

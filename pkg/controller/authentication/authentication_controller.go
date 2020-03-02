@@ -20,18 +20,18 @@ import (
 	"context"
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	userv1 "github.com/openshift/api/user/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	userv1 "github.com/openshift/api/user/v1"
 	net "k8s.io/api/networking/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"k8s.io/apimachinery/pkg/types"
-	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -210,7 +210,7 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 
 	// Credit: kubebuilder book
 	finalizerName := "authentication.operator.ibm.com"
-	// Determine if the certmanager crd is going to be deleted
+	// Determine if the Authentication CR  is going to be deleted
 	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Object not being deleted, but add our finalizer so we know to remove this object later when it is going to be deleted
 		if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
@@ -316,24 +316,23 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 	return reconcile.Result{}, nil
 }
 
-
 // Removes some of the resources created by this controller for the CR including
-// The clusterrole, clusterrolebinding custom resource definition created by Policy Controller
+// The clusterrole, clusterrolebinding and User resources created by Authentication
 func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1alpha1.Authentication) error {
-	
+
 	crMap := generateCRData()
-	crbMap := generateCRBData("dummy","dummy")
+	crbMap := generateCRBData("dummy", "dummy")
 	userName := instance.Spec.Config.DefaultAdminUser
-	
+
 	// Remove Cluster Role
-    for crName,_ := range crMap {
+	for crName, _ := range crMap {
 		if err := removeCR(r.client, crName); err != nil {
 			return err
 		}
 	}
-	
+
 	// Remove Cluster Role Binding
-	for crbName,_ := range crbMap {
+	for crbName, _ := range crbMap {
 		if err := removeCRB(r.client, crbName); err != nil {
 			return err
 		}
@@ -344,29 +343,28 @@ func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1al
 	if err := removeUser(r.client, userName); err != nil {
 		return err
 	}
-	
 
 	return nil
 }
 
 // Helper functions to check and remove string from a slice of strings.
 func containsString(slice []string, s string) bool {
-    for _, item := range slice {
-        if item == s {
-            return true
-        }
-    }
-    return false
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
 }
 
 func removeString(slice []string, s string) (result []string) {
-    for _, item := range slice {
-        if item == s {
-            continue
-        }
-        result = append(result, item)
-    }
-    return
+	for _, item := range slice {
+		if item == s {
+			continue
+		}
+		result = append(result, item)
+	}
+	return
 }
 
 // Functions to remove cluster scoped resources
@@ -414,23 +412,6 @@ func removeUser(client client.Client, userName string) error {
 	} else if err == nil {
 		if err = client.Delete(context.Background(), user); err != nil {
 			log.V(1).Info("Error deleting user", "name", userName, "error message", err)
-			return err
-		}
-	} else {
-		return err
-	}
-	return nil
-}
-
-func removeCRD(client client.Client, crdName string) error {
-	// Delete CustomResourceDefinition
-	customResourceDefinition := &extv1.CustomResourceDefinition{}
-	if err := client.Get(context.Background(), types.NamespacedName{Name: crdName, Namespace: ""}, customResourceDefinition); err != nil && errors.IsNotFound(err) {
-		log.V(1).Info("Error getting custome resource definition", "msg", err)
-		return nil
-	} else if err == nil {
-		if err = client.Delete(context.Background(), customResourceDefinition); err != nil {
-			log.V(1).Info("Error deleting custom resource definition", "name", crdName, "error message", err)
 			return err
 		}
 	} else {

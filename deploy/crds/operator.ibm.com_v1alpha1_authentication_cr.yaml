@@ -24,7 +24,7 @@ spec:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-identity-manager"
     imageTag: "3.3.1"
-    masterNodesList: "10.0.0.1 10.0.0.2 10.0.0.3"
+    masterNodesList: "10.0.0.1"
   identityProvider:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-identity-provider"

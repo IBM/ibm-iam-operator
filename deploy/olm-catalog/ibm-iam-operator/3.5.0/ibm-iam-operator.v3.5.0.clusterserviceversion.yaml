@@ -93,7 +93,7 @@ metadata:
               "imageName": "icp-identity-manager",
               "imageRegistry": "quay.io/opencloudio",
               "imageTag": "3.3.1",
-              "masterNodesList": "10.0.0.1 10.0.0.2 10.0.0.3"
+              "masterNodesList": "10.0.0.1"
             },
             "identityProvider": {
               "imageName": "icp-identity-provider",

@@ -25,7 +25,7 @@ spec:
 
 - Create an image pull secret for INTEGRATION on the openshift cluster in the `ibm-common-services` namespace
 
-`c -n ibm-common-services create secret docker-registry myintegrationkey --docker-server=hyc-cloud-private-integration-docker-local.artifactory.swg-devops.com --docker-username=USERID --docker-password=PASSWORD --docker-email=EMAILID`
+`oc -n ibm-common-services create secret docker-registry myintegrationkey --docker-server=hyc-cloud-private-integration-docker-local.artifactory.swg-devops.com --docker-username=USERID --docker-password=PASSWORD --docker-email=EMAILID`
 
 - Install the ODLM Operator 
 

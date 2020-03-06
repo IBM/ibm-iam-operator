@@ -680,7 +680,7 @@ func platformLoginIngress(instance *operatorv1alpha1.Authentication, scheme *run
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/login/",
+									Path: "/login",
 									Backend: net.IngressBackend{
 										ServiceName: "platform-identity-provider",
 										ServicePort: intstr.IntOrString{
@@ -767,20 +767,19 @@ func platformOidcIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 				"kubernetes.io/ingress.class":              "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends":   "true",
 				"icp.management.ibm.com/proxy-buffer-size": "64k",
-				"icp.management.ibm.com/upstream-uri":      "/v1/auth/authorize?client_id=$oauth_client_id&redirect_uri=https://$http_host/auth/liberty/callback&response_type=code&scope=openid+email+profile&state=$expires_time&orig=$request_uri",
 				"icp.management.ibm.com/configuration-snippet": `
-											add_header 'Access-Control-Allow-Origin' 'https://127.0.0.1';
-											add_header 'Access-Control-Allow-Credentials' 'false' always;
-											add_header 'Access-Control-Allow-Methods' 'GET, POST, HEAD' always;
-											add_header 'X-Frame-Options' 'SAMEORIGIN' always;
-											add_header 'X-Content-Type-Options' 'nosniff' always;
-											add_header 'X-XSS-Protection' '1' always;
-											add_header 'Access-Control-Allow-Headers' 'Accept,Authorization,Cache-Control,Content-Type,DNT,If-Modified-Since,Keep-Alive,Origin,User-Agent,X-Requested-With' always;
-											if ($request_uri !~ .*call_proxy.*) {
-											error_page 401 @401;
-											}
-											proxy_intercept_errors on;
-									`,
+				   add_header 'Access-Control-Allow-Origin' 'https://127.0.0.1';
+				   add_header 'Access-Control-Allow-Credentials' 'false' always;
+				   add_header 'Access-Control-Allow-Methods' 'GET, POST, HEAD' always;
+				   add_header 'X-Frame-Options' 'SAMEORIGIN' always;
+				   add_header 'X-Content-Type-Options' 'nosniff' always;
+				   add_header 'X-XSS-Protection' '1' always;
+				   add_header 'Access-Control-Allow-Headers' 'Accept,Authorization,Cache-Control,Content-Type,DNT,If-Modified-Since,Keep-Alive,Origin,User-Agent,X-Requested-With' always;
+				   if ($request_uri !~ .*call_proxy.*) {
+				      error_page 401 @401;
+				   }
+				   proxy_intercept_errors on;
+                                  `,
 			},
 		},
 		Spec: net.IngressSpec{

@@ -19,6 +19,10 @@ package authentication
 import (
 	"context"
 	"crypto/md5"
+	"math/rand"
+    "time"
+    regen "github.com/zach-klippenstein/goregen"
+
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -32,13 +36,15 @@ func generateSecretData(instance *operatorv1alpha1.Authentication) map[string]ma
 
 	md5Hash := md5.Sum([]byte(instance.Spec.Config.ClusterName + "encryption_key"))
 	encryptionKey := string(md5Hash[:])
+	passwordRule := `^([a-zA-Z0-9\-]){32,}$`
+	adminPassword := generateAdminPassword(passwordRule)
 	secretData := map[string]map[string][]byte{
 		"platform-auth-ldaps-ca-cert": map[string][]byte{
 			"certificate": []byte(""),
 		},
 		"platform-auth-idp-credentials": map[string][]byte{
 			"admin_username": []byte(instance.Spec.Config.DefaultAdminUser),
-			"admin_password": []byte(instance.Spec.Config.DefaultAdminPassword),
+			"admin_password": []byte(adminPassword),
 		},
 		"platform-auth-idp-encryption": map[string][]byte{
 			"ENCRYPTION_KEY": []byte(encryptionKey),
@@ -114,4 +120,14 @@ func generateSecretObject(instance *operatorv1alpha1.Authentication, scheme *run
 		return nil
 	}
 	return newSecret
+}
+
+
+func generateAdminPassword(passwordRule string) string{
+
+	generator, _ := regen.NewGenerator(passwordRule, &regen.GeneratorArgs{
+		RngSource: rand.NewSource(time.Now().UnixNano()),
+		MaxUnboundedRepeatCount: 1,})
+	password := generator.Generate()
+	return password
 }

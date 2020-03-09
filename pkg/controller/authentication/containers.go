@@ -837,7 +837,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		{
 			Name: "IAM_TOKEN_SERVICE_URL",
 			Value: "https://127.0.0.1:9443",
-		}
+		},
 		{
 			Name:  "MASTER_NODES_LIST",
 			Value: instance.Spec.IdentityManager.MasterNodesList,

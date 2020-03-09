@@ -12,7 +12,7 @@ metadata:
           },
           "spec": {
             "imageRegistry": "quay.io/opencloudio/icp-oidcclient-watcher",
-            "imageTagPostfix": "3.3.0",
+            "imageTagPostfix": "3.3.1",
             "operatorVersion": "0.14.1",
             "replicas": 1
           }
@@ -32,11 +32,11 @@ metadata:
             },
             "imageName": "iam-policy-decision",
             "imageRegistry": "quay.io/opencloudio",
-            "imageTag": "3.3.0",
+            "imageTag": "3.3.1",
             "initMongodb": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.0"
+              "imageTag": "3.3.2"
             },
             "operatorVersion": "0.14.1",
             "replicas": 1
@@ -58,14 +58,14 @@ metadata:
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.0",
+              "imageTag": "3.3.2",
               "ldapsCACert": "platform-auth-ldaps-ca-cert",
               "routerCertSecret": "route-tls-secret"
             },
             "clientRegistration": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.0"
+              "imageTag": "3.3.2"
             },
             "config": {
               "authUniqueHosts": "internal-ip1 internal-ip2 mycluster.icp",
@@ -92,18 +92,18 @@ metadata:
             "identityManager": {
               "imageName": "icp-identity-manager",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.1",
+              "imageTag": "3.3.3",
               "masterNodesList": "10.0.0.1"
             },
             "identityProvider": {
               "imageName": "icp-identity-provider",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.1"
+              "imageTag": "3.3.2"
             },
             "initMongodb": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.0"
+              "imageTag": "3.3.2"
             },
             "operatorVersion": "0.14.1",
             "replicas": 1
@@ -126,7 +126,7 @@ metadata:
             "papService": {
               "imageName": "iam-policy-administration",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.0"
+              "imageTag": "3.3.2"
             },
             "replicas": 1
           }
@@ -139,7 +139,7 @@ metadata:
           },
           "spec": {
             "imageRegistry": "quay.io/opencloudio/iam-policy-controller",
-            "imageTagPostfix": "3.3.0",
+            "imageTagPostfix": "3.3.1",
             "operatorVersion": "0.14.1",
             "replicas": 1
           }
@@ -152,7 +152,7 @@ metadata:
           },
           "spec": {
             "imageRegistry": "quay.io/opencloudio/icp-secret-watcher",
-            "imageTagPostfix": "3.3.0",
+            "imageTagPostfix": "3.3.1",
             "operatorVersion": "0.14.1",
             "replicas": 1
           }
@@ -178,27 +178,27 @@ metadata:
             "initAuthService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.1"
+              "imageTag": "3.3.2"
             },
             "initIdentityManager": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.1"
+              "imageTag": "3.3.2"
             },
             "initIdentityProvider": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.1"
+              "imageTag": "3.3.2"
             },
             "initPAPSpec": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.1"
+              "imageTag": "3.3.2"
             },
             "initTokenService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.1"
+              "imageTag": "3.3.2"
             },
             "operatorVersion": "0.14.1",
             "replicas": 1

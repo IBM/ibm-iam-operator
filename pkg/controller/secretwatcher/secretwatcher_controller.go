@@ -262,6 +262,24 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 								EmptyDir: &corev1.EmptyDirVolumeSource{},
 							},
 						},
+						{
+							Name: "cluster-ca",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: "cs-ca-certificate-secret",
+									Items: []corev1.KeyToPath{
+										{
+											Key:  "tls.key",
+											Path: "ca.key",
+										},
+										{
+											Key:  "tls.crt",
+											Path: "ca.crt",
+										},
+									},
+								},
+							},
+						},
 					},
 					Containers: []corev1.Container{
 						{
@@ -314,7 +332,7 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 									},
 								},
 								{
-									Name: "NAMESPACE",
+									Name: "POD_NAMESPACE",
 									ValueFrom: &corev1.EnvVarSource{
 										FieldRef: &corev1.ObjectFieldSelector{
 											APIVersion: "v1",
@@ -328,13 +346,17 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 								},
 								{
 									Name:  "IAM_TOKEN_SERVICE_URL",
-									Value: "https://platform-auth-service:9443/iam",
+									Value: "https://platform-auth-service:9443",
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "tmp",
 									MountPath: "/tmp",
+								},
+								{
+									Name: "cluster-ca",
+									MountPath: "/certs",
 								},
 							},
 							LivenessProbe: &corev1.Probe{

@@ -16,22 +16,22 @@ spec:
   initAuthService:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
-    imageTag: "3.3.1"
+    imageTag: "3.3.2"
   initIdentityProvider:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
-    imageTag: "3.3.1"
+    imageTag: "3.3.2"
   initIdentityManager:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
-    imageTag: "3.3.1"
+    imageTag: "3.3.2"
   initTokenService:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
-    imageTag: "3.3.1"
+    imageTag: "3.3.2"
   initPAPSpec:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
-    imageTag: "3.3.1"
+    imageTag: "3.3.2"
   impersonation:
     enableImpersonation: false

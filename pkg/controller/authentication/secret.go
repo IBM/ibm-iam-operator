@@ -19,9 +19,9 @@ package authentication
 import (
 	"context"
 	"crypto/md5"
+	regen "github.com/zach-klippenstein/goregen"
 	"math/rand"
-    "time"
-    regen "github.com/zach-klippenstein/goregen"
+	"time"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -122,12 +122,11 @@ func generateSecretObject(instance *operatorv1alpha1.Authentication, scheme *run
 	return newSecret
 }
 
-
-func generateAdminPassword(passwordRule string) string{
+func generateAdminPassword(passwordRule string) string {
 
 	generator, _ := regen.NewGenerator(passwordRule, &regen.GeneratorArgs{
-		RngSource: rand.NewSource(time.Now().UnixNano()),
-		MaxUnboundedRepeatCount: 1,})
+		RngSource:               rand.NewSource(time.Now().UnixNano()),
+		MaxUnboundedRepeatCount: 1})
 	password := generator.Generate()
 	return password
 }

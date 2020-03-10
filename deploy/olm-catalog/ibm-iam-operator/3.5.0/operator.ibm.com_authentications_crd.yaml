@@ -113,6 +113,8 @@ spec:
                   type: integer
                 roksEnabled:
                   type: boolean
+                nonceEnabled:
+                  type: boolean
                 roksURL:
                   type: string
                 roksUserPrefix:
@@ -139,6 +141,7 @@ spec:
               - oidcIssuerURL
               - openshiftPort
               - roksEnabled
+              - nonceEnabled
               - roksURL
               - roksUserPrefix
               - wlpClientID

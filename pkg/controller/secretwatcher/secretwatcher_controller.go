@@ -217,9 +217,11 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 					Labels: labels3,
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
-						"productName":    "IBM Cloud Platform Common Services",
-						"productID":      "IBMCloudPlatformCommonServices_342_apache_0000",
-						"productVersion": "3.4.2",
+						"productName": "IBM Cloud Platform Common Services",
+						"productID": "068a62892a1e4db39641342e592daa25",
+						"productVersion": "3.3.0",
+						"productMetric": "FREE",
+						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongo, icp-management-ingress",
 						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},
 				},
@@ -419,7 +421,7 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 //CS??? need separate func for each image to set "instanceName"???
 func labelsForSecretWatcherPod(instanceName string, deploymentName string) map[string]string {
 	return map[string]string{"app": deploymentName, "component": "secret-watcher", "secretwatcher_cr": instanceName,
-		"app.kubernetes.io/name": deploymentName, "app.kubernetes.io/component": "secret-watcher", "release": "secret-watcher"}
+		"app.kubernetes.io/name": deploymentName, "app.kubernetes.io/component": "secret-watcher", "app.kubernetes.io/instance": "common-iam", "release": "secret-watcher"}
 }
 
 //CS??? need separate func for each image to set "app"???

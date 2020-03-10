@@ -459,7 +459,10 @@ func (r *ReconcilePolicyDecision) ingressForPolicyDecision(instance *operatorv1a
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "iam-pdp",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-pdp"},
+			Labels:    map[string]string{
+				"app": "auth-pdp",
+				"app.kubernetes.io/instance": "common-iam",
+			},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends": "true",
@@ -529,12 +532,15 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 						"app":       "auth-pdp",
 						"k8s-app":   "auth-pdp",
 						"component": "auth-pdp",
+						"app.kubernetes.io/instance": "common-iam",
 					},
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
-						"productName":    "IBM Cloud Platform Common Services",
-						"productID":      "IBMCloudPlatformCommonServices_342_apache_0000",
-						"productVersion": "3.4.2",
+						"productName": "IBM Cloud Platform Common Services",
+						"productID": "068a62892a1e4db39641342e592daa25",
+						"productVersion": "3.3.0",
+						"productMetric": "FREE",
+						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongo, icp-management-ingress",
 						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},
 				},

@@ -18,7 +18,6 @@ package authentication
 
 import (
 	"context"
-	"crypto/md5"
 	regen "github.com/zach-klippenstein/goregen"
 	"math/rand"
 	"time"
@@ -34,10 +33,13 @@ import (
 
 func generateSecretData(instance *operatorv1alpha1.Authentication) map[string]map[string][]byte {
 
-	md5Hash := md5.Sum([]byte(instance.Spec.Config.ClusterName + "encryption_key"))
-	encryptionKey := string(md5Hash[:])
-	passwordRule := `^([a-zA-Z0-9\-]){32,}$`
-	adminPassword := generateAdminPassword(passwordRule)
+	
+	rule := `^([a-zA-Z0-9\-]){32,}$`
+	adminPassword := generateRandomString(rule)
+	encryptionKey := generateRandomString(rule)
+	wlpClientID := generateRandomString(rule)
+	wlpClientSecret := generateRandomString(rule)
+	wlpClientRegistrationSecret := generateRandomString(rule)
 	secretData := map[string]map[string][]byte{
 		"platform-auth-ldaps-ca-cert": map[string][]byte{
 			"certificate": []byte(""),
@@ -53,10 +55,10 @@ func generateSecretData(instance *operatorv1alpha1.Authentication) map[string]ma
 			"outputEncoding": []byte("hex"),
 		},
 		"platform-oidc-credentials": map[string][]byte{
-			"WLP_CLIENT_ID":                     []byte(instance.Spec.Config.WLPClientID),
-			"WLP_CLIENT_SECRET":                 []byte(instance.Spec.Config.WLPClientSecret),
+			"WLP_CLIENT_ID":                     []byte(wlpClientID),
+			"WLP_CLIENT_SECRET":                 []byte(wlpClientSecret),
 			"WLP_SCOPE":                         []byte("openid+profile+email"),
-			"OAUTH2_CLIENT_REGISTRATION_SECRET": []byte(instance.Spec.Config.WLPClientRegistrationSecret),
+			"OAUTH2_CLIENT_REGISTRATION_SECRET": []byte(wlpClientRegistrationSecret),
 			"IBMID_CLIENT_SECRET":               []byte("903305fb599c8328a4d86d4cbdd07368"),
 			"IBMID_PROFILE_CLIENT_SECRET":       []byte("C1bR0rO7kE0cE3xM2tV1gI0mG1cH3jK4dD7iQ8rW6pF1aF4mQ5"),
 		},
@@ -122,11 +124,11 @@ func generateSecretObject(instance *operatorv1alpha1.Authentication, scheme *run
 	return newSecret
 }
 
-func generateAdminPassword(passwordRule string) string {
+func generateRandomString(rule string) string {
 
-	generator, _ := regen.NewGenerator(passwordRule, &regen.GeneratorArgs{
+	generator, _ := regen.NewGenerator(rule, &regen.GeneratorArgs{
 		RngSource:               rand.NewSource(time.Now().UnixNano()),
 		MaxUnboundedRepeatCount: 1})
-	password := generator.Generate()
-	return password
+	randomString := generator.Generate()
+	return randomString
 }

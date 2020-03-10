@@ -39,6 +39,16 @@ import (
 )
 
 var log = logf.Log.WithName("controller_securityonboarding")
+var runAsUser int64 = 21000
+var fsGroup int64 = 21000
+var cpu20 = resource.NewMilliQuantity(20, resource.DecimalSI)          // 20m
+var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
+var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
+var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI)  // 256Mi
+var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI) // 128Mi
+var memory64 = resource.NewQuantity(64*1024*1024, resource.BinarySI) // 64Mi
+var memory512 = resource.NewQuantity(512*1024*1024, resource.BinarySI) // 512Mi
+var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024Mi
 var serviceAccountName string = "ibm-iam-operator"
 
 /**
@@ -332,6 +342,23 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 			Command:         []string{"sh", "-c", "sleep 75; until curl -k -i -fsS https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration | grep '200 OK'; do sleep 3; done;"},
 			Image:           instance.Spec.InitAuthService.ImageRegistry + "/" + instance.Spec.InitAuthService.ImageName + ":" + instance.Spec.InitAuthService.ImageTag,
 			ImagePullPolicy: corev1.PullPolicy("Always"),
+			SecurityContext: &corev1.SecurityContext{
+				Privileged:               &falseVar,
+				RunAsNonRoot:             &trueVar,
+				ReadOnlyRootFilesystem:   &trueVar,
+				AllowPrivilegeEscalation: &falseVar,
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+			},
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
 		},
 	}
 	tmpVolumes := []corev1.Volume{}
@@ -399,12 +426,44 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 		RestartPolicy:      "OnFailure",
 		ServiceAccountName: serviceAccountName,
 		InitContainers:     tmpInitContainers,
+		Tolerations: []corev1.Toleration{
+			{
+				Key:      "dedicated",
+				Operator: corev1.TolerationOpExists,
+				Effect:   corev1.TaintEffectNoSchedule,
+			},
+			{
+				Key:      "CriticalAddonsOnly",
+				Operator: corev1.TolerationOpExists,
+			},
+		},
+		SecurityContext: &corev1.PodSecurityContext{
+			RunAsUser: &runAsUser,
+			FSGroup:   &fsGroup,
+		},
 		Containers: []corev1.Container{
 			{
 				Name:            "security-onboarding",
 				Image:           instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + ":" + instance.Spec.ImageTag,
 				ImagePullPolicy: corev1.PullPolicy("Always"),
 				Command:         []string{"python", "/app/scripts/onboard-script.py"},
+				SecurityContext: &corev1.SecurityContext{
+					Privileged:               &falseVar,
+					RunAsNonRoot:             &trueVar,
+					ReadOnlyRootFilesystem:   &trueVar,
+					AllowPrivilegeEscalation: &falseVar,
+					Capabilities: &corev1.Capabilities{
+						Drop: []corev1.Capability{"ALL"},
+					},
+				},
+				Resources: corev1.ResourceRequirements{
+					Limits: map[corev1.ResourceName]resource.Quantity{
+						corev1.ResourceCPU:    *cpu200,
+						corev1.ResourceMemory: *memory512},
+					Requests: map[corev1.ResourceName]resource.Quantity{
+						corev1.ResourceCPU:    *cpu20,
+						corev1.ResourceMemory: *memory64},
+				},
 				Env: []corev1.EnvVar{
 					{
 						Name: "ICP_API_KEY",
@@ -448,6 +507,13 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "security-onboarding",
+					Annotations: map[string]string{
+						"scheduler.alpha.kubernetes.io/critical-pod": "",
+						"productName":    "IBM Cloud Platform Common Services",
+						"productID":      "IBMCloudPlatformCommonServices_342_apache_0000",
+						"productVersion": "3.4.2",
+						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
+					},
 				},
 				Spec: podSpec,
 			},
@@ -475,6 +541,23 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			Command:         []string{"sh", "-c", "sleep 75; until curl -k -i -fsS https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration | grep '200 OK'; do sleep 3; done;"},
 			Image:           instance.Spec.InitAuthService.ImageRegistry + "/" + instance.Spec.InitAuthService.ImageName + ":" + instance.Spec.InitAuthService.ImageTag,
 			ImagePullPolicy: corev1.PullPolicy("Always"),
+			SecurityContext: &corev1.SecurityContext{
+				Privileged:               &falseVar,
+				RunAsNonRoot:             &trueVar,
+				ReadOnlyRootFilesystem:   &trueVar,
+				AllowPrivilegeEscalation: &falseVar,
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+			},
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
 		},
 		{
 			Name:            "init-identity-provider",
@@ -486,6 +569,23 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					Name:      "cluster-ca",
 					MountPath: "/certs",
 				},
+			},
+			SecurityContext: &corev1.SecurityContext{
+				Privileged:               &falseVar,
+				RunAsNonRoot:             &trueVar,
+				ReadOnlyRootFilesystem:   &trueVar,
+				AllowPrivilegeEscalation: &falseVar,
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+			},
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
 			},
 		},
 		{
@@ -499,12 +599,46 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					MountPath: "/certs",
 				},
 			},
+			SecurityContext: &corev1.SecurityContext{
+				Privileged:               &falseVar,
+				RunAsNonRoot:             &trueVar,
+				ReadOnlyRootFilesystem:   &trueVar,
+				AllowPrivilegeEscalation: &falseVar,
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+			},
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
 		},
 		{
 			Name:            "init-token-service",
 			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-auth-service:9443/iam/oidc/keys | grep '200 OK'; do sleep 3; done;"},
 			Image:           instance.Spec.InitTokenService.ImageRegistry + "/" + instance.Spec.InitTokenService.ImageName + ":" + instance.Spec.InitTokenService.ImageTag,
 			ImagePullPolicy: corev1.PullPolicy("Always"),
+			SecurityContext: &corev1.SecurityContext{
+				Privileged:               &falseVar,
+				RunAsNonRoot:             &trueVar,
+				ReadOnlyRootFilesystem:   &trueVar,
+				AllowPrivilegeEscalation: &falseVar,
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+			},
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
 		},
 		{
 			Name:            "init-pap",
@@ -516,6 +650,23 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					Name:      "cluster-ca",
 					MountPath: "/certs",
 				},
+			},
+			SecurityContext: &corev1.SecurityContext{
+				Privileged:               &falseVar,
+				RunAsNonRoot:             &trueVar,
+				ReadOnlyRootFilesystem:   &trueVar,
+				AllowPrivilegeEscalation: &falseVar,
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+			},
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
 			},
 		},
 	}
@@ -780,12 +931,44 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		InitContainers:     tmpInitContainers,
 		Volumes:            tmpVolumes,
 		ServiceAccountName: serviceAccountName,
+		SecurityContext: &corev1.PodSecurityContext{
+			RunAsUser: &runAsUser,
+			FSGroup:   &fsGroup,
+		},
+		Tolerations: []corev1.Toleration{
+			{
+				Key:      "dedicated",
+				Operator: corev1.TolerationOpExists,
+				Effect:   corev1.TaintEffectNoSchedule,
+			},
+			{
+				Key:      "CriticalAddonsOnly",
+				Operator: corev1.TolerationOpExists,
+			},
+		},
 		Containers: []corev1.Container{
 			{
 				Name:            "iam-onboarding",
 				Command:         []string{"python", "/app/acs_utils/build/icp_iam_am_bootstrap.py"},
 				Image:           instance.Spec.IAMOnboarding.ImageRegistry + "/" + instance.Spec.IAMOnboarding.ImageName + ":" + instance.Spec.IAMOnboarding.ImageTag,
 				ImagePullPolicy: corev1.PullPolicy("Always"),
+				SecurityContext: &corev1.SecurityContext{
+					Privileged:               &falseVar,
+					RunAsNonRoot:             &trueVar,
+					ReadOnlyRootFilesystem:   &trueVar,
+					AllowPrivilegeEscalation: &falseVar,
+					Capabilities: &corev1.Capabilities{
+						Drop: []corev1.Capability{"ALL"},
+					},
+				},
+				Resources: corev1.ResourceRequirements{
+					Limits: map[corev1.ResourceName]resource.Quantity{
+						corev1.ResourceCPU:    *cpu200,
+						corev1.ResourceMemory: *memory1024},
+					Requests: map[corev1.ResourceName]resource.Quantity{
+						corev1.ResourceCPU:    *cpu20,
+						corev1.ResourceMemory: *memory64},
+				},
 				VolumeMounts: []corev1.VolumeMount{
 					{
 						Name:      "mongodb-ca-cert",
@@ -830,6 +1013,13 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "iam-onboarding",
+					Annotations: map[string]string{
+						"scheduler.alpha.kubernetes.io/critical-pod": "",
+						"productName":    "IBM Cloud Platform Common Services",
+						"productID":      "IBMCloudPlatformCommonServices_342_apache_0000",
+						"productVersion": "3.4.2",
+						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
+					},
 				},
 				Spec: podSpec,
 			},

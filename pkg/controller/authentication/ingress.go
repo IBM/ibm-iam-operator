@@ -124,10 +124,10 @@ func explorerIdmgmtIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends": "true",
 				"icp.management.ibm.com/configuration-snippet": `
-										if ($request_uri ~* "/idmgmt/(.*)") {
-											proxy_pass https://$proxy_upstream_name/$1;
-										}
-										`,
+					if ($request_uri ~* "/idmgmt/(.*)") {
+						proxy_pass https://$proxy_upstream_name/$1;
+					}
+					`,
 			},
 		},
 		Spec: net.IngressSpec{
@@ -317,10 +317,10 @@ func idMgmtIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Sc
 				"icp.management.ibm.com/authz-type":      "rbac",
 				"icp.management.ibm.com/secure-backends": "true",
 				"icp.management.ibm.com/configuration-snippet": `
-											if ($request_uri ~* "/idmgmt/(.*)") {
-												proxy_pass https://$proxy_upstream_name/$1;
-											}
-										`,
+					if ($request_uri ~* "/idmgmt/(.*)") {
+						proxy_pass https://$proxy_upstream_name/$1;
+					}
+					`,
 			},
 		},
 		Spec: net.IngressSpec{
@@ -464,15 +464,15 @@ func platformAuthIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 				"icp.management.ibm.com/secure-backends":   "true",
 				"icp.management.ibm.com/proxy-buffer-size": "64k",
 				"icp.management.ibm.com/configuration-snippet": `
-										add_header 'Access-Control-Allow-Origin' 'https://127.0.0.1';
-										add_header 'Access-Control-Allow-Credentials' 'false' always;
-										add_header 'Access-Control-Allow-Methods' 'GET, POST, HEAD' always;
-										add_header 'Access-Control-Allow-Headers' 'Accept,Authorization,Cache-Control,Content-Type,DNT,If-Modified-Since,Keep-Alive,Origin,User-Agent,X-Requested-With' always;
-										if ($request_uri !~ .*call_proxy.*) {
-											error_page 401 @401;
-										}
-										proxy_intercept_errors on;
-									`,
+					add_header 'Access-Control-Allow-Origin' 'https://127.0.0.1';
+					add_header 'Access-Control-Allow-Credentials' 'false' always;
+					add_header 'Access-Control-Allow-Methods' 'GET, POST, HEAD' always;
+					add_header 'Access-Control-Allow-Headers' 'Accept,Authorization,Cache-Control,Content-Type,DNT,If-Modified-Since,Keep-Alive,Origin,User-Agent,X-Requested-With' always;
+					if ($request_uri !~ .*call_proxy.*) {
+						error_page 401 @401;
+					}
+					proxy_intercept_errors on;
+					`,
 			},
 		},
 		Spec: net.IngressSpec{
@@ -520,8 +520,8 @@ func platformIdAuthBlockIngress(instance *operatorv1alpha1.Authentication, schem
 				"kubernetes.io/ingress.class":              "ibm-icp-management",
 				"icp.management.ibm.com/location-modifier": "=",
 				"icp.management.ibm.com/configuration-snippet": `
-										add_header 'X-XSS-Protection' '1' always;
-									`,
+					add_header 'X-XSS-Protection' '1' always;
+					`,
 			},
 		},
 		Spec: net.IngressSpec{
@@ -666,11 +666,11 @@ func platformLoginIngress(instance *operatorv1alpha1.Authentication, scheme *run
 				"icp.management.ibm.com/proxy-buffer-size": "64k",
 				"icp.management.ibm.com/upstream-uri":      "/v1/auth/authorize?client_id=$oauth_client_id&redirect_uri=https://$http_host/auth/liberty/callback&response_type=code&scope=openid+email+profile&state=$expires_time&orig=$request_uri",
 				"icp.management.ibm.com/configuration-snippet": `
-										add_header 'X-Frame-Options' 'SAMEORIGIN' always;
-										set_by_lua $expires_time 'return ngx.time()';
-										set_by_lua $oauth_client_id 'return os.getenv("WLP_CLIENT_ID")';
-										set_by_lua $oauth_auth_redirector 'return os.getenv("OAUTH_AUTH_REDIRECTOR")';
-									`,
+					add_header 'X-Frame-Options' 'SAMEORIGIN' always;
+					set_by_lua $expires_time 'return ngx.time()';
+					set_by_lua $oauth_client_id 'return os.getenv("WLP_CLIENT_ID")';
+					set_by_lua $oauth_auth_redirector 'return os.getenv("OAUTH_AUTH_REDIRECTOR")';
+					`,
 			},
 		},
 		Spec: net.IngressSpec{
@@ -779,7 +779,7 @@ func platformOidcIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 				      error_page 401 @401;
 				   }
 				   proxy_intercept_errors on;
-                                  `,
+                    `,
 			},
 		},
 		Spec: net.IngressSpec{
@@ -932,7 +932,7 @@ func platformOidcToken2Ingress(instance *operatorv1alpha1.Authentication, scheme
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/oidc/token",
+									Path: "/oidc/token/",
 									Backend: net.IngressBackend{
 										ServiceName: "platform-auth-service",
 										ServicePort: intstr.IntOrString{

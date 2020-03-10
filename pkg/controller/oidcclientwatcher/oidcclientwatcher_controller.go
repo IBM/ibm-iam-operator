@@ -488,6 +488,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 						RunAsUser: &runAsUser,
 						FSGroup:   &fsGroup,
 					},
+					PriorityClassName: "system-cluster-critical",
 					HostIPC: false,
 					HostPID: false,
 					Affinity: &corev1.Affinity{
@@ -575,7 +576,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 								},
 								{
 									Name:  "IDENTITY_PROVIDER_URL",
-									Value: "http://platform-identity-provider:4300",
+									Value: "https://platform-identity-provider:4300",
 								},
 								{
 									Name:  "IAM_AUTH_SERVICE_URL",

@@ -342,12 +342,20 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 								},
 								{
 									Name:  "IDENTITY_PROVIDER_URL",
-									Value: "http://platform-identity-provider:4300",
+									Value: "https://platform-identity-provider:4300",
 								},
 								{
 									Name:  "IAM_TOKEN_SERVICE_URL",
 									Value: "https://platform-auth-service:9443",
 								},
+							},
+							Resources: corev1.ResourceRequirements{
+								Limits: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceCPU:    *cpu200,
+									corev1.ResourceMemory: *memory128},
+								Requests: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceCPU:    *cpu10,
+									corev1.ResourceMemory: *memory16},
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{

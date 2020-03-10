@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -49,6 +50,8 @@ var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI) // 128Mi
 var memory64 = resource.NewQuantity(64*1024*1024, resource.BinarySI) // 64Mi
 var memory512 = resource.NewQuantity(512*1024*1024, resource.BinarySI) // 512Mi
 var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024Mi
+var trueVar bool = true
+var falseVar bool = false
 var serviceAccountName string = "ibm-iam-operator"
 
 /**

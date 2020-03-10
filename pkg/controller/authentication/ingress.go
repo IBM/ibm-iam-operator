@@ -931,8 +931,8 @@ func platformOidcToken2Ingress(instance *operatorv1alpha1.Authentication, scheme
 					IngressRuleValue: net.IngressRuleValue{
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
-								{
-									Path: "/oidc/token/",
+								{// @posriniv - double check the route
+									Path: "/oidc/token",
 									Backend: net.IngressBackend{
 										ServiceName: "platform-auth-service",
 										ServicePort: intstr.IntOrString{

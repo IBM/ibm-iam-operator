@@ -835,7 +835,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			Value: "https://127.0.0.1",
 		},
 		{
-			Name: "IAM_TOKEN_SERVICE_URL",
+			Name:  "IAM_TOKEN_SERVICE_URL",
 			Value: "https://127.0.0.1:9443",
 		},
 		{

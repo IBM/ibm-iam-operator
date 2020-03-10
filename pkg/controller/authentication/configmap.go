@@ -99,7 +99,7 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"logrotate":                          "/var/log/audit/*.log {\n copytruncate\n  rotate 24\n  hourly\n  missingok\n  notifempty\n}",
 			"PDP_REDIS_CACHE_DEFAULT_TTL":        "600",
 			"FIPS_ENABLED":                       strconv.FormatBool(instance.Spec.Config.FIPSEnabled),
-            "NONCE_ENABLED":                      strconv.FormatBool(instance.Spec.Config.NONCEEnabled),
+			"NONCE_ENABLED":                      strconv.FormatBool(instance.Spec.Config.NONCEEnabled),
 			"ROKS_ENABLED":                       strconv.FormatBool(instance.Spec.Config.ROKSEnabled),
 			"ROKS_URL":                           instance.Spec.Config.ROKSURL,
 			"ROKS_USER_PREFIX":                   instance.Spec.Config.ROKSUserPrefix,

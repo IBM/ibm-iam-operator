@@ -97,6 +97,7 @@ type ConfigSpec struct {
 	ICPPort                     int32  `json:"icpPort"`
 	FIPSEnabled                 bool   `json:"fipsEnabled"`
 	ROKSEnabled                 bool   `json:"roksEnabled"`
+	NONCEEnabled                bool   `json:"nonceEnabled"`
 	ROKSURL                     string `json:"roksURL"`
 	ROKSUserPrefix              string `json:"roksUserPrefix"`
 	EnableImpersonation         bool   `json:"enableImpersonation"`

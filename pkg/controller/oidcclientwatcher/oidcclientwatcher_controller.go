@@ -488,7 +488,6 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 						RunAsUser: &runAsUser,
 						FSGroup:   &fsGroup,
 					},
-					PriorityClassName: "system-cluster-critical",
 					HostIPC: false,
 					HostPID: false,
 					Affinity: &corev1.Affinity{

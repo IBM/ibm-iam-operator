@@ -157,7 +157,7 @@ func buildContainer(jobName string, image string) []corev1.Container {
 			},
 			Resources: corev1.ResourceRequirements{
 				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceCPU:    *cpu1000,
 					corev1.ResourceMemory: *memory1024},
 				Requests: map[corev1.ResourceName]resource.Quantity{
 					corev1.ResourceCPU:    *cpu100,

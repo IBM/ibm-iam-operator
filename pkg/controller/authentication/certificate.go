@@ -92,7 +92,7 @@ func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme
 	if certificateName == "platform-identity-management" {
 		certSpec.DNSNames = append(certSpec.DNSNames, certificateData[certificateName]["completeName"])
 	}
-	if certificateName == "platform-auth-service" {
+	if certificateName == "platform-auth-cert" {
 		certSpec.IPAddresses = []string{"127.0.0.1", "::1"}
 	}
 	newCertificate := &certmgr.Certificate{

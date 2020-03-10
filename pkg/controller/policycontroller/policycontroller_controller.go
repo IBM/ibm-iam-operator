@@ -50,7 +50,7 @@ var runAsUser int64 = 21000
 var fsGroup int64 = 21000
 var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)        // 100m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
-var memory16 = resource.NewQuantity(100*1024*1024, resource.BinarySI)  // 16Mi
+var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI)  // 256Mi
 var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI) // 128Mi
 var serviceAccountName string = "ibm-iam-operator"
 
@@ -484,7 +484,6 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 						"app": "iam-policy-controller",
 					},
 					Annotations: map[string]string{
-						"scheduler.alpha.kubernetes.io/critical-pod": "",
 						"productName":    "IBM Cloud Platform Common Services",
 						"productID":      "IBMCloudPlatformCommonServices_341_apache_0000",
 						"productVersion": "3.4.2",
@@ -548,6 +547,7 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 									MountPath: "/tmp",
 								},
 							},
+							Args: []string{"--v=0","--update-frequency=60",},
 							LivenessProbe: &corev1.Probe{
 								Handler: corev1.Handler{
 									Exec: &corev1.ExecAction{
@@ -578,10 +578,10 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 							Resources: corev1.ResourceRequirements{
 								Limits: map[corev1.ResourceName]resource.Quantity{
 									corev1.ResourceCPU:    *cpu200,
-									corev1.ResourceMemory: *memory128},
+									corev1.ResourceMemory: *memory256},
 								Requests: map[corev1.ResourceName]resource.Quantity{
 									corev1.ResourceCPU:    *cpu100,
-									corev1.ResourceMemory: *memory16},
+									corev1.ResourceMemory: *memory128},
 							},
 						},
 					},

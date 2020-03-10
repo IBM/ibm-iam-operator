@@ -92,11 +92,11 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"SESSION_TIMEOUT":             "43200",
 			"OIDC_ISSUER_URL":             instance.Spec.Config.OIDCIssuerURL,
 			"logrotate-conf": "\n # rotate log files weekly\ndaily\n\n# use the syslog group by" +
-				"default, since this is the owning group # of /var/log/syslog.\n#su root syslog\n\n#" +
-				"keep 4 weeks worth of backlogs\nrotate 4\n\n# create new (empty) log files after" +
-				"rotating old ones \ncreate\n\n# uncomment this if you want your log files compressed\n" +
-				"#compress\n\n# packages drop log rotation information into this directory\n include" +
-				"/etc/logrotate.d\n# no packages own wtmp, or btmp -- we'll rotate them here\n",
+				" default, since this is the owning group # of /var/log/syslog.\n#su root syslog\n\n#" +
+				" keep 4 weeks worth of backlogs\nrotate 4\n\n# create new (empty) log files after" +
+				" rotating old ones \ncreate\n\n# uncomment this if you want your log files compressed\n" +
+				" #compress\n\n# packages drop log rotation information into this directory\n include" +
+				" /etc/logrotate.d\n# no packages own wtmp, or btmp -- we'll rotate them here\n",
 			"logrotate":                          "/var/log/audit/*.log {\n copytruncate\n  rotate 24\n  hourly\n  missingok\n  notifempty\n}",
 			"PDP_REDIS_CACHE_DEFAULT_TTL":        "600",
 			"FIPS_ENABLED":                       strconv.FormatBool(instance.Spec.Config.FIPSEnabled),

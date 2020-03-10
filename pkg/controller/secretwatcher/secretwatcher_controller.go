@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"k8s.io/apimachinery/pkg/api/resource"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -45,6 +46,10 @@ var seconds60 int64 = 60
 var runAsUser int64 = 21000
 var fsGroup int64 = 21000
 var serviceAccountName string = "ibm-iam-operator"
+var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)          // 10m
+var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
+var memory16 = resource.NewQuantity(16*1024*1024, resource.BinarySI)  // 16Mi
+var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI) // 128Mi
 
 var log = logf.Log.WithName("controller_secretwatcher")
 
@@ -342,12 +347,20 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 								},
 								{
 									Name:  "IDENTITY_PROVIDER_URL",
-									Value: "http://platform-identity-provider:4300",
+									Value: "https://platform-identity-provider:4300",
 								},
 								{
 									Name:  "IAM_TOKEN_SERVICE_URL",
 									Value: "https://platform-auth-service:9443",
 								},
+							},
+							Resources: corev1.ResourceRequirements{
+								Limits: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceCPU:    *cpu200,
+									corev1.ResourceMemory: *memory128},
+								Requests: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceCPU:    *cpu10,
+									corev1.ResourceMemory: *memory16},
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{

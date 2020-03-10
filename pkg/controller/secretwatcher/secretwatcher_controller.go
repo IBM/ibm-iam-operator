@@ -46,6 +46,10 @@ var seconds60 int64 = 60
 var runAsUser int64 = 21000
 var fsGroup int64 = 21000
 var serviceAccountName string = "ibm-iam-operator"
+var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)          // 10m
+var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
+var memory16 = resource.NewQuantity(16*1024*1024, resource.BinarySI)  // 16Mi
+var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI) // 128Mi
 
 var log = logf.Log.WithName("controller_secretwatcher")
 

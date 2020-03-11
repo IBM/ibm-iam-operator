@@ -21,6 +21,7 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	reg "k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"io/ioutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -57,6 +58,7 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 
 	servicePath := "/identity/api/v1/users/validateandmutate"
 	failurePolicy := reg.Ignore
+	certData, _ := ioutil.ReadFile("/certs/ca.crt")
 	newWebhook := &reg.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: webhook,
@@ -66,7 +68,7 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 				Name:          "iam.hooks.securityenforcement.admission.cloud.ibm.com",
 				FailurePolicy: &failurePolicy,
 				ClientConfig: reg.WebhookClientConfig{
-					CABundle: []byte("AdfasdlgkjyDERGKasdf"),
+					CABundle: certData,
 					Service: &reg.ServiceReference{
 						Name:      "platform-identity-management",
 						Namespace: "ibm-common-services",

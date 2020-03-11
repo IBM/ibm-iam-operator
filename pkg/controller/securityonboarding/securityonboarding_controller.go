@@ -506,7 +506,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 			Namespace: instance.Namespace,
 			Labels:    map[string]string{
 				"app": "security-onboarding",
-				"app.kubernetes.io/instance": "common-iam",
+				"app.kubernetes.io/instance": "security-onboarding",
 			},
 		},
 		Spec: batchv1.JobSpec{
@@ -519,7 +519,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 						"productID": "068a62892a1e4db39641342e592daa25",
 						"productVersion": "3.3.0",
 						"productMetric": "FREE",
-						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongo, icp-management-ingress",
+						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
 						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},
 				},
@@ -1017,7 +1017,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			Namespace: instance.Namespace,
 			Labels:    map[string]string{
 				"app": "iam-onboarding",
-				"app.kubernetes.io/instance": "common-iam",
+				"app.kubernetes.io/instance": "iam-onboarding",
 			},
 		},
 		Spec: batchv1.JobSpec{
@@ -1030,7 +1030,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 						"productID": "068a62892a1e4db39641342e592daa25",
 						"productVersion": "3.3.0",
 						"productMetric": "FREE",
-						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongo, icp-management-ingress",
+						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
 						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},
 				},

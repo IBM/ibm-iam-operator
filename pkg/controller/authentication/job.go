@@ -72,7 +72,7 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 					Name:   jobName,
 					Labels: map[string]string{
 						"app": jobName,
-						"app.kubernetes.io/instance": "common-iam",
+						"app.kubernetes.io/instance": "oidc-client-registration",
 					},
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
@@ -81,7 +81,7 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 						"productID": "068a62892a1e4db39641342e592daa25",
 						"productVersion": "3.3.0",
 						"productMetric": "FREE",
-						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongo, icp-management-ingress",
+						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
 					},
 				},
 				Spec: corev1.PodSpec{

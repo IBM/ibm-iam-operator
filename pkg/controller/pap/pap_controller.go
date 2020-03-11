@@ -663,10 +663,7 @@ func (r *ReconcilePap) ingressForPap(instance *operatorv1alpha1.Pap) *net.Ingres
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      iamPapServiceValues.Name,
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{
-				"app": iamPapServiceValues.PodName,
-				"app.kubernetes.io/instance": "common-iam",
-			},
+			Labels:    map[string]string{"app": iamPapServiceValues.PodName},
 			Annotations: map[string]string{
 				"icp.management.ibm.com/secure-backends": "true",
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
@@ -735,7 +732,7 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 						"app":       iamPapServiceValues.PodName,
 						"k8s-app":   iamPapServiceValues.PodName,
 						"component": iamPapServiceValues.PodName,
-						"app.kubernetes.io/instance": "common-iam",
+						"app.kubernetes.io/instance": "auth-pap",
 					},
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
@@ -743,7 +740,7 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 						"productID": "068a62892a1e4db39641342e592daa25",
 						"productVersion": "3.3.0",
 						"productMetric": "FREE",
-						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongo, icp-management-ingress",
+						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
 						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},
 				},

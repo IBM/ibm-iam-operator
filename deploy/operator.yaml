@@ -31,3 +31,16 @@ spec:
                   fieldPath: metadata.name
             - name: OPERATOR_NAME
               value: "ibm-iam-operator"
+          volumeMounts:
+            - mountPath: "/certs"
+              name: cluster-ca-cert
+      volumes:
+        - name: cluster-ca-cert
+          secret:
+            defaultMode: 420
+            items:
+            - key: tls.key
+              path: ca.key
+            - key: tls.crt
+              path: ca.crt
+            secretName: cs-ca-certificate-secret

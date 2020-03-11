@@ -31,7 +31,7 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 	webhook := "namespace-admission-config"
-	
+
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: webhook, Namespace: ""}, currentWebhook)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new Webhook
@@ -63,21 +63,21 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 		},
 		Webhooks: []reg.MutatingWebhook{
 			reg.MutatingWebhook{
-				Name: "iam.hooks.securityenforcement.admission.cloud.ibm.com",
+				Name:          "iam.hooks.securityenforcement.admission.cloud.ibm.com",
 				FailurePolicy: &failurePolicy,
 				ClientConfig: reg.WebhookClientConfig{
 					CABundle: []byte("AdfasdlgkjyDERGKasdf"),
 					Service: &reg.ServiceReference{
-						Name: "platform-identity-management",
+						Name:      "platform-identity-management",
 						Namespace: "ibm-common-services",
-						Path: &servicePath,
+						Path:      &servicePath,
 					},
 				},
 				NamespaceSelector: &metav1.LabelSelector{
 					MatchExpressions: []metav1.LabelSelectorRequirement{
 						metav1.LabelSelectorRequirement{
-							Key: "icp",
-							Values: []string{"system",},
+							Key:      "icp",
+							Values:   []string{"system"},
 							Operator: metav1.LabelSelectorOpNotIn,
 						},
 					},
@@ -85,11 +85,11 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 				Rules: []reg.RuleWithOperations{
 					reg.RuleWithOperations{
 						Rule: reg.Rule{
-							APIGroups: []string{"*"},
+							APIGroups:   []string{"*"},
 							APIVersions: []string{"*"},
-							Resources: []string{"namespaces"},
+							Resources:   []string{"namespaces"},
 						},
-						Operations: []reg.OperationType{reg.Create,reg.Update,reg.Delete,reg.Connect},
+						Operations: []reg.OperationType{reg.Create, reg.Update, reg.Delete, reg.Connect},
 					},
 				},
 			},

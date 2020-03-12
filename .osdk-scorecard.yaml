@@ -1,0 +1,24 @@
+scorecard:
+  # Setting a global scorecard option
+  output: json
+  plugins:
+    # `basic` tests configured to test 2 CRs
+    - basic:
+        cr-manifest:
+          - "deploy/crds/operator.ibm.com_v1alpha1_authentication_cr.yaml"
+          - "deploy/crds/operator.ibm.com_v1alpha1_oidcclientwatcher_cr.yaml"
+          - "deploy/crds/operator.ibm.com_v1alpha1_pap_cr.yaml"
+          - "deploy/crds/operator.ibm.com_v1alpha1_policycontroller_cr.yaml"
+          - "deploy/crds/operator.ibm.com_v1alpha1_policydecision_cr.yaml"
+          - "deploy/crds/operator.ibm.com_v1alpha1_secretwatcher_cr.yaml"
+          - "deploy/crds/operator.ibm.com_v1alpha1_securityonboarding_cr.yaml"
+    - olm:
+        cr-manifest:
+          - "deploy/crds/operator.ibm.com_v1alpha1_authentication_cr.yaml"
+          - "deploy/crds/operator.ibm.com_v1alpha1_oidcclientwatcher_cr.yaml"
+          - "deploy/crds/operator.ibm.com_v1alpha1_pap_cr.yaml"
+          - "deploy/crds/operator.ibm.com_v1alpha1_policycontroller_cr.yaml"
+          - "deploy/crds/operator.ibm.com_v1alpha1_policydecision_cr.yaml"
+          - "deploy/crds/operator.ibm.com_v1alpha1_secretwatcher_cr.yaml"
+          - "deploy/crds/operator.ibm.com_v1alpha1_securityonboarding_cr.yaml"     
+        csv-path: "deploy/olm-catalog/ibm-iam-operator.v3.5.0.clusterserviceversion.yaml"

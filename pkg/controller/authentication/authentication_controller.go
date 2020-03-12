@@ -21,6 +21,7 @@ import (
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	userv1 "github.com/openshift/api/user/v1"
+	reg "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -294,6 +295,12 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, err
 	}
 
+	currentWebhook := &reg.MutatingWebhookConfiguration{}
+	err = r.handleWebhook(instance, currentWebhook, &requeueResult)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	// Check if this Deployment already exists and create it if it doesn't
 	currentDeployment := &appsv1.Deployment{}
 	err = r.handleDeployment(instance, currentDeployment, &requeueResult)
@@ -322,6 +329,7 @@ func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1al
 	crMap := generateCRData()
 	crbMap := generateCRBData("dummy", "dummy")
 	userName := instance.Spec.Config.DefaultAdminUser
+	webhook := "namespace-admission-config"
 
 	// Remove Cluster Role
 	for crName, _ := range crMap {
@@ -340,6 +348,12 @@ func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1al
 	// Remove User
 
 	if err := removeUser(r.client, userName); err != nil {
+		return err
+	}
+
+	// Remove Webhook
+
+	if err := removeWebhook(r.client, webhook); err != nil {
 		return err
 	}
 
@@ -411,6 +425,23 @@ func removeUser(client client.Client, userName string) error {
 	} else if err == nil {
 		if err = client.Delete(context.Background(), user); err != nil {
 			log.V(1).Info("Error deleting user", "name", userName, "error message", err)
+			return err
+		}
+	} else {
+		return err
+	}
+	return nil
+}
+
+func removeWebhook(client client.Client, webhookName string) error {
+	// Delete Webhook
+	webhook := &reg.MutatingWebhookConfiguration{}
+	if err := client.Get(context.Background(), types.NamespacedName{Name: webhookName, Namespace: ""}, webhook); err != nil && errors.IsNotFound(err) {
+		log.V(1).Info("Error getting webhook", webhookName, err)
+		return nil
+	} else if err == nil {
+		if err = client.Delete(context.Background(), webhook); err != nil {
+			log.V(1).Info("Error deleting webhook", "name", webhookName, "error message", err)
 			return err
 		}
 	} else {

@@ -33,7 +33,6 @@ import (
 
 func generateSecretData(instance *operatorv1alpha1.Authentication) map[string]map[string][]byte {
 
-	
 	rule := `^([a-zA-Z0-9\-]){32,}$`
 	adminPassword := generateRandomString(rule)
 	encryptionKey := generateRandomString(rule)

@@ -472,12 +472,15 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app": "oidcclient-watcher",
+						"app.kubernetes.io/instance": "oidcclient-watcher",
 					},
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
-						"productName":    "IBM Cloud Platform Common Services",
-						"productID":      "IBMCloudPlatformCommonServices_342_apache_0000",
-						"productVersion": "3.4.2",
+						"productName": "IBM Cloud Platform Common Services",
+						"productID": "068a62892a1e4db39641342e592daa25",
+						"productVersion": "3.3.0",
+						"productMetric": "FREE",
+						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
 						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},
 				},

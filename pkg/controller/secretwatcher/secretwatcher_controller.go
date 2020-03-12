@@ -22,6 +22,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"k8s.io/apimachinery/pkg/api/resource"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -48,7 +48,7 @@ var fsGroup int64 = 21000
 var serviceAccountName string = "ibm-iam-operator"
 var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)          // 10m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
-var memory16 = resource.NewQuantity(16*1024*1024, resource.BinarySI)  // 16Mi
+var memory16 = resource.NewQuantity(16*1024*1024, resource.BinarySI)   // 16Mi
 var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI) // 128Mi
 
 var log = logf.Log.WithName("controller_secretwatcher")
@@ -368,7 +368,7 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 									MountPath: "/tmp",
 								},
 								{
-									Name: "cluster-ca",
+									Name:      "cluster-ca",
 									MountPath: "/certs",
 								},
 							},

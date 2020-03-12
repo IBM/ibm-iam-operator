@@ -49,6 +49,7 @@ spec:
     isOpenshiftEnv: true
     openshiftPort: 443
     roksEnabled: false
+    nonceEnabled: false
     roksURL: "https://roks.domain.name:443"
     roksUserPrefix: "IAM#"
     wlpClientID: "4444be3a738841016ab76d71b650e836"

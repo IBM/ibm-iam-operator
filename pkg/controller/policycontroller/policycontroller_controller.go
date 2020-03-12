@@ -50,7 +50,7 @@ var runAsUser int64 = 21000
 var fsGroup int64 = 21000
 var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)        // 100m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
-var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI)  // 256Mi
+var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI) // 256Mi
 var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI) // 128Mi
 var serviceAccountName string = "ibm-iam-operator"
 
@@ -547,7 +547,7 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 									MountPath: "/tmp",
 								},
 							},
-							Args: []string{"--v=0","--update-frequency=60",},
+							Args: []string{"--v=0", "--update-frequency=60"},
 							LivenessProbe: &corev1.Probe{
 								Handler: corev1.Handler{
 									Exec: &corev1.ExecAction{

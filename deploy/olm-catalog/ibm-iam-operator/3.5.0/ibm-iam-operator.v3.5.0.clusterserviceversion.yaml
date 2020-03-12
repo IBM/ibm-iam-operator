@@ -423,8 +423,21 @@ spec:
                 image: quay.io/opencloudio/ibm-iam-operator:latest
                 imagePullPolicy: Always
                 name: ibm-iam-operator
+                volumeMounts:
+                - mountPath: "/certs"
+                  name: cluster-ca-cert
                 resources: {}
               serviceAccountName: ibm-iam-operator
+              volumes:
+              - name: cluster-ca-cert
+                secret:
+                  defaultMode: 420
+                  items:
+                  - key: tls.key
+                    path: ca.key
+                  - key: tls.crt
+                    path: ca.crt
+                  secretName: cs-ca-certificate-secret
       permissions:
       - rules:
         - apiGroups:

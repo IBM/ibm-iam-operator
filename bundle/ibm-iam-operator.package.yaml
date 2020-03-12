@@ -1,0 +1,5 @@
+channels:
+- currentCSV: ibm-iam-operator.v3.5.0
+  name: alpha
+defaultChannel: alpha
+packageName: ibm-iam-operator

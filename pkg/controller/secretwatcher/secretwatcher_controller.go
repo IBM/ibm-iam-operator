@@ -371,7 +371,7 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 								},
 								{
 									Name:      "cluster-ca",
-									MountPath: "/certs",
+									MountPath: "/certs/cluster-ca",
 								},
 							},
 							LivenessProbe: &corev1.Probe{

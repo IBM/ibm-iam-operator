@@ -10,7 +10,7 @@ LABEL org.label-schema.vendor="IBM" \
     name="ibm-iam-operator" \
     vendor="IBM" \
     description="IBM IAM Operator" \
-    summary="IBM IAM Operator
+    summary="IBM IAM Operator"
 
 ENV OPERATOR=/usr/local/bin/ibm-iam-operator \
     USER_UID=1001 \

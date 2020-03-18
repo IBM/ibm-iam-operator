@@ -117,5 +117,3 @@ func generateSecretObject(instance *operatorv1alpha1.Authentication, scheme *run
 	}
 	return newSecret
 }
-
-

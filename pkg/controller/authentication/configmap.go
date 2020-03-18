@@ -24,15 +24,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"os"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"strconv"
 	"strings"
 )
 
 func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentConfigMap *corev1.ConfigMap, requeueResult *bool) error {
 
-	configMapList := []string{"platform-auth-idp", "registration-script", "registration-json", }
+	configMapList := []string{"platform-auth-idp", "registration-script", "registration-json"}
 
 	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{authIdpConfigMap, registrationScriptConfigMap}
 
@@ -148,11 +148,10 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 
 func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, scheme *runtime.Scheme) *corev1.ConfigMap {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-    icpConsoleURL := os.Getenv("ICP_CONSOLE_URL")
+	icpConsoleURL := os.Getenv("ICP_CONSOLE_URL")
 	strings.ReplaceAll(registrationJson, "WLP_CLIENT_ID", wlpClientID)
 	strings.ReplaceAll(registrationJson, "WLP_CLIENT_SECRET", wlpClientSecret)
 	strings.ReplaceAll(registrationJson, "ICP_CONSOLE_URL", icpConsoleURL)
-
 
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{

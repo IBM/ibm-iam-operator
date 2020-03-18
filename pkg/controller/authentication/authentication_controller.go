@@ -21,17 +21,18 @@ import (
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	userv1 "github.com/openshift/api/user/v1"
+	regen "github.com/zach-klippenstein/goregen"
 	reg "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	regen "github.com/zach-klippenstein/goregen"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"math/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -39,7 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"math/rand"
 	"time"
 )
 
@@ -255,11 +255,10 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	
+
 	rule := `^([a-zA-Z0-9\-]){32,}$`
 	wlpClientID := generateRandomString(rule)
 	wlpClientSecret := generateRandomString(rule)
-
 
 	// Check if this Secret already exists and create it if it doesn't
 	currentSecret := &corev1.Secret{}

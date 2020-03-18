@@ -526,17 +526,17 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app":       "auth-pdp",
-						"k8s-app":   "auth-pdp",
-						"component": "auth-pdp",
+						"app":                        "auth-pdp",
+						"k8s-app":                    "auth-pdp",
+						"component":                  "auth-pdp",
 						"app.kubernetes.io/instance": "auth-pdp",
 					},
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
-						"productName": "IBM Cloud Platform Common Services",
-						"productID": "068a62892a1e4db39641342e592daa25",
-						"productVersion": "3.3.0",
-						"productMetric": "FREE",
+						"productName":                        "IBM Cloud Platform Common Services",
+						"productID":                          "068a62892a1e4db39641342e592daa25",
+						"productVersion":                     "3.3.0",
+						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
 						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},

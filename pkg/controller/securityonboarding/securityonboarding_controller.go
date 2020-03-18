@@ -504,8 +504,8 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "security-onboarding",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{
-				"app": "security-onboarding",
+			Labels: map[string]string{
+				"app":                        "security-onboarding",
 				"app.kubernetes.io/instance": "security-onboarding",
 			},
 		},
@@ -515,10 +515,10 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 					Name: "security-onboarding",
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
-						"productName": "IBM Cloud Platform Common Services",
-						"productID": "068a62892a1e4db39641342e592daa25",
-						"productVersion": "3.3.0",
-						"productMetric": "FREE",
+						"productName":                        "IBM Cloud Platform Common Services",
+						"productID":                          "068a62892a1e4db39641342e592daa25",
+						"productVersion":                     "3.3.0",
+						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
 						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},
@@ -1015,8 +1015,8 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "iam-onboarding",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{
-				"app": "iam-onboarding",
+			Labels: map[string]string{
+				"app":                        "iam-onboarding",
 				"app.kubernetes.io/instance": "iam-onboarding",
 			},
 		},
@@ -1026,10 +1026,10 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					Name: "iam-onboarding",
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
-						"productName": "IBM Cloud Platform Common Services",
-						"productID": "068a62892a1e4db39641342e592daa25",
-						"productVersion": "3.3.0",
-						"productMetric": "FREE",
+						"productName":                        "IBM Cloud Platform Common Services",
+						"productID":                          "068a62892a1e4db39641342e592daa25",
+						"productVersion":                     "3.3.0",
+						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
 						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},

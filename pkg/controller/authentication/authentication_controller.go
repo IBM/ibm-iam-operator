@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	regen "github.com/zach-klippenstein/goregen"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,6 +39,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"math/rand"
+	"time"
 )
 
 var log = logf.Log.WithName("controller_authentication")
@@ -252,10 +255,15 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 	if err != nil {
 		return reconcile.Result{}, err
 	}
+	
+	rule := `^([a-zA-Z0-9\-]){32,}$`
+	wlpClientID := generateRandomString(rule)
+	wlpClientSecret := generateRandomString(rule)
+
 
 	// Check if this Secret already exists and create it if it doesn't
 	currentSecret := &corev1.Secret{}
-	err = r.handleSecret(instance, currentSecret, &requeueResult)
+	err = r.handleSecret(instance, wlpClientID, wlpClientSecret, currentSecret, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -269,7 +277,7 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 
 	//Check if this ConfigMap already exists and create it if it doesn't
 	currentConfigMap := &corev1.ConfigMap{}
-	err = r.handleConfigMap(instance, currentConfigMap, &requeueResult)
+	err = r.handleConfigMap(instance, wlpClientID, wlpClientSecret, currentConfigMap, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -448,4 +456,13 @@ func removeWebhook(client client.Client, webhookName string) error {
 		return err
 	}
 	return nil
+}
+
+func generateRandomString(rule string) string {
+
+	generator, _ := regen.NewGenerator(rule, &regen.GeneratorArgs{
+		RngSource:               rand.NewSource(time.Now().UnixNano()),
+		MaxUnboundedRepeatCount: 1})
+	randomString := generator.Generate()
+	return randomString
 }

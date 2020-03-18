@@ -18,9 +18,6 @@ package authentication
 
 import (
 	"context"
-	regen "github.com/zach-klippenstein/goregen"
-	"math/rand"
-	"time"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -31,13 +28,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func generateSecretData(instance *operatorv1alpha1.Authentication) map[string]map[string][]byte {
+func generateSecretData(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string) map[string]map[string][]byte {
 
 	rule := `^([a-zA-Z0-9\-]){32,}$`
 	adminPassword := generateRandomString(rule)
 	encryptionKey := generateRandomString(rule)
-	wlpClientID := generateRandomString(rule)
-	wlpClientSecret := generateRandomString(rule)
 	wlpClientRegistrationSecret := generateRandomString(rule)
 	secretData := map[string]map[string][]byte{
 		"platform-auth-ldaps-ca-cert": map[string][]byte{
@@ -72,9 +67,9 @@ func generateSecretData(instance *operatorv1alpha1.Authentication) map[string]ma
 	return secretData
 }
 
-func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authentication, currentSecret *corev1.Secret, requeueResult *bool) error {
+func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentSecret *corev1.Secret, requeueResult *bool) error {
 
-	secretData := generateSecretData(instance)
+	secretData := generateSecretData(instance, wlpClientID, wlpClientSecret)
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
@@ -123,11 +118,4 @@ func generateSecretObject(instance *operatorv1alpha1.Authentication, scheme *run
 	return newSecret
 }
 
-func generateRandomString(rule string) string {
 
-	generator, _ := regen.NewGenerator(rule, &regen.GeneratorArgs{
-		RngSource:               rand.NewSource(time.Now().UnixNano()),
-		MaxUnboundedRepeatCount: 1})
-	randomString := generator.Generate()
-	return randomString
-}

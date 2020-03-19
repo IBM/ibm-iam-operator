@@ -149,9 +149,9 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, scheme *runtime.Scheme) *corev1.ConfigMap {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	icpConsoleURL := os.Getenv("ICP_CONSOLE_URL")
-	strings.ReplaceAll(registrationJson, "WLP_CLIENT_ID", wlpClientID)
-	strings.ReplaceAll(registrationJson, "WLP_CLIENT_SECRET", wlpClientSecret)
-	strings.ReplaceAll(registrationJson, "ICP_CONSOLE_URL", icpConsoleURL)
+	registrationJson = strings.ReplaceAll(registrationJson, "WLP_CLIENT_ID", wlpClientID)
+	registrationJson = strings.ReplaceAll(registrationJson, "WLP_CLIENT_SECRET", wlpClientSecret)
+	registrationJson = strings.ReplaceAll(registrationJson, "ICP_CONSOLE_URL", icpConsoleURL)
 
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{

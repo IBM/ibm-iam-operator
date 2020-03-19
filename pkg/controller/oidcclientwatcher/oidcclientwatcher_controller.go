@@ -502,7 +502,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 											{
 												Key:      "beta.kubernetes.io/arch",
 												Operator: corev1.NodeSelectorOpIn,
-												Values:   []string{"amd64"},
+												Values:   []string{gorun.GOARCH},
 											},
 										},
 									},

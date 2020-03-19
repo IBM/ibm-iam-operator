@@ -512,7 +512,7 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 											{
 												Key:      "beta.kubernetes.io/arch",
 												Operator: corev1.NodeSelectorOpIn,
-												Values:   []string{"amd64"},
+												Values:   []string{gorun.GOARCH},
 											},
 										},
 									},

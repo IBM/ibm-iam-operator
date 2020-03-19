@@ -243,7 +243,7 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 											{
 												Key:      "beta.kubernetes.io/arch",
 												Operator: corev1.NodeSelectorOpIn,
-												Values:   []string{"amd64"},
+												Values:   []string{gorun.GOARCH},
 											},
 										},
 									},

@@ -146,7 +146,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 											{
 												Key:      "beta.kubernetes.io/arch",
 												Operator: corev1.NodeSelectorOpIn,
-												Values:   []string{"amd64"},
+												Values:   []string{gorun.GOARCH},
 											},
 										},
 									},

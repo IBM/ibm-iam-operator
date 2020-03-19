@@ -758,7 +758,7 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 											{
 												Key:      "beta.kubernetes.io/arch",
 												Operator: corev1.NodeSelectorOpIn,
-												Values:   []string{"amd64"},
+												Values:   []string{gorun.GOARCH},
 											},
 										},
 									},

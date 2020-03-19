@@ -21,6 +21,7 @@ import (
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	userv1 "github.com/openshift/api/user/v1"
+	regen "github.com/zach-klippenstein/goregen"
 	reg "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"math/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -38,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"time"
 )
 
 var log = logf.Log.WithName("controller_authentication")
@@ -253,9 +256,13 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, err
 	}
 
+	rule := `^([a-zA-Z0-9\-]){32,}$`
+	wlpClientID := generateRandomString(rule)
+	wlpClientSecret := generateRandomString(rule)
+
 	// Check if this Secret already exists and create it if it doesn't
 	currentSecret := &corev1.Secret{}
-	err = r.handleSecret(instance, currentSecret, &requeueResult)
+	err = r.handleSecret(instance, wlpClientID, wlpClientSecret, currentSecret, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -269,7 +276,7 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 
 	//Check if this ConfigMap already exists and create it if it doesn't
 	currentConfigMap := &corev1.ConfigMap{}
-	err = r.handleConfigMap(instance, currentConfigMap, &requeueResult)
+	err = r.handleConfigMap(instance, wlpClientID, wlpClientSecret, currentConfigMap, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -448,4 +455,13 @@ func removeWebhook(client client.Client, webhookName string) error {
 		return err
 	}
 	return nil
+}
+
+func generateRandomString(rule string) string {
+
+	generator, _ := regen.NewGenerator(rule, &regen.GeneratorArgs{
+		RngSource:               rand.NewSource(time.Now().UnixNano()),
+		MaxUnboundedRepeatCount: 1})
+	randomString := generator.Generate()
+	return randomString
 }

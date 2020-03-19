@@ -481,14 +481,14 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app": "iam-policy-controller",
+						"app":                        "iam-policy-controller",
 						"app.kubernetes.io/instance": "iam-policy-controller",
 					},
 					Annotations: map[string]string{
-						"productName": "IBM Cloud Platform Common Services",
-						"productID": "068a62892a1e4db39641342e592daa25",
-						"productVersion": "3.3.0",
-						"productMetric": "FREE",
+						"productName":                        "IBM Cloud Platform Common Services",
+						"productID":                          "068a62892a1e4db39641342e592daa25",
+						"productVersion":                     "3.3.0",
+						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
 						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},

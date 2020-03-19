@@ -69,18 +69,18 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   jobName,
+					Name: jobName,
 					Labels: map[string]string{
-						"app": jobName,
+						"app":                        jobName,
 						"app.kubernetes.io/instance": "oidc-client-registration",
 					},
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
 						"seccomp.security.alpha.kubernetes.io/pod":   "docker/default",
-						"productName": "IBM Cloud Platform Common Services",
-						"productID": "068a62892a1e4db39641342e592daa25",
-						"productVersion": "3.3.0",
-						"productMetric": "FREE",
+						"productName":                        "IBM Cloud Platform Common Services",
+						"productID":                          "068a62892a1e4db39641342e592daa25",
+						"productVersion":                     "3.3.0",
+						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
 					},
 				},

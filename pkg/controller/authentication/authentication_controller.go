@@ -256,7 +256,7 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, err
 	}
 
-	rule := `^([a-zA-Z0-9\-]){32,}$`
+	rule := `^[a-z0-9]([a-z0-9\-\.]){30,}[a-z0-9]$`
 	wlpClientID := generateRandomString(rule)
 	wlpClientSecret := generateRandomString(rule)
 

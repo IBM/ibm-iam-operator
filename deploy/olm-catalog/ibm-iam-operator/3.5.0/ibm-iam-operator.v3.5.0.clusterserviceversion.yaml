@@ -361,6 +361,9 @@ spec:
         - kind: clusterroles
           name: ''
           version: v1
+        - kind: clusterrolebindings
+          name: ''
+          version: v1
         - kind: paps
           name: ''
           version: v1alpha1

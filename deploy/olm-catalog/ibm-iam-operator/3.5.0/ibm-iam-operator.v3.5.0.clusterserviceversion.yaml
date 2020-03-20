@@ -226,9 +226,9 @@ spec:
       name: authentications.operator.ibm.com
       displayName: Authentication
       resources:
-        - kind: Secret
+        - kind: secrets
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: paps
           name: ''
           version: v1alpha1
@@ -874,7 +874,7 @@ spec:
       resources:
         - kind: secrets
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: paps
           name: ''
           version: v1alpha1

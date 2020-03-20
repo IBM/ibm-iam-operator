@@ -229,7 +229,16 @@ spec:
         - kind: secrets
           name: ''
           version: v1
+        - kind: mutatingwebhookconfigurations
+          name: ''
+          version: v1beta1
         - kind: paps
+          name: ''
+          version: v1alpha1
+        - kind: clusterroles
+          name: ''
+          version: v1alpha1
+        - kind: clusterrolebidings
           name: ''
           version: v1alpha1
         - kind: policycontrollers

@@ -1,0 +1,447 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "OIDCClientWatcher",
+          "metadata": {
+            "name": "example-oidcclientwatcher"
+          },
+          "spec": {
+            "imageRegistry": "quay.io/opencloudio/icp-oidcclient-watcher",
+            "imageTagPostfix": "3.3.0",
+            "operatorVersion": "0.14.1",
+            "replicas": 1
+          }
+        },
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "PolicyDecision",
+          "metadata": {
+            "name": "example-policydecision"
+          },
+          "spec": {
+            "auditService": {
+              "imageName": "icp-audit-service",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.1",
+              "journalPath": "/run/systemd/journal"
+            },
+            "imageName": "iam-policy-decision",
+            "imageRegistry": "quay.io/opencloudio",
+            "imageTag": "3.3.0",
+            "initMongodb": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.0"
+            },
+            "operatorVersion": "0.14.1",
+            "replicas": 1
+          }
+        },
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "Authentication",
+          "metadata": {
+            "name": "example-authentication"
+          },
+          "spec": {
+            "auditService": {
+              "imageName": "icp-audit-service",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.1",
+              "journalPath": "/run/systemd/journal"
+            },
+            "authService": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.0",
+              "ldapsCACert": "platform-auth-ldaps-ca-cert",
+              "routerCertSecret": "route-tls-secret"
+            },
+            "clientRegistration": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.0"
+            },
+            "config": {
+              "authUniqueHosts": "internal-ip1 internal-ip2 mycluster.icp",
+              "clusterCADomain": "mycluster.icp",
+              "clusterExternalAddress": "10.0.0.1",
+              "clusterInternalAddress": "10.0.0.1",
+              "clusterName": "mycluster",
+              "defaultAdminPassword": "password",
+              "defaultAdminUser": "admin",
+              "enableImpersonation": false,
+              "fipsEnabled": true,
+              "icpPort": 8443,
+              "installType": "fresh",
+              "isOpenshiftEnv": true,
+              "oidcIssuerURL": "https://127.0.0.1:8443/idauth/oidc/endpoint/OP",
+              "openshiftPort": 443,
+              "roksEnabled": false,
+              "roksURL": "https://roks.domain.name:443",
+              "roksUserPrefix": "IAM#",
+              "wlpClientID": "4444be3a738841016ab76d71b650e836",
+              "wlpClientRegistrationSecret": "f1362ca4d20b8389af2d1ea68042c9af",
+              "wlpClientSecret": "aa73bf39752053bf723d1143fb4cf8a2"
+            },
+            "identityManager": {
+              "imageName": "icp-identity-manager",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.1",
+              "masterNodesList": "10.0.0.1"
+            },
+            "identityProvider": {
+              "imageName": "icp-identity-provider",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.1"
+            },
+            "initMongodb": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.0"
+            },
+            "operatorVersion": "0.14.1",
+            "replicas": 1
+          }
+        },
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "Pap",
+          "metadata": {
+            "name": "example-pap"
+          },
+          "spec": {
+            "auditService": {
+              "imageName": "icp-audit-service",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.1",
+              "journalPath": "/run/systemd/journal"
+            },
+            "operatorVersion": "3.5.0",
+            "papService": {
+              "imageName": "iam-policy-administration",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.0"
+            },
+            "replicas": 1
+          }
+        },
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "PolicyController",
+          "metadata": {
+            "name": "policycontroller-deployment"
+          },
+          "spec": {
+            "imageRegistry": "quay.io/opencloudio/iam-policy-controller",
+            "imageTagPostfix": "3.3.0",
+            "operatorVersion": "0.14.1",
+            "replicas": 1
+          }
+        },
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "SecretWatcher",
+          "metadata": {
+            "name": "secretwatcher-deployment"
+          },
+          "spec": {
+            "imageRegistry": "quay.io/opencloudio/icp-secret-watcher",
+            "imageTagPostfix": "3.3.0",
+            "operatorVersion": "0.14.1",
+            "replicas": 1
+          }
+        },
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "SecurityOnboarding",
+          "metadata": {
+            "name": "example-securityonboarding"
+          },
+          "spec": {
+            "iamOnboarding": {
+              "imageName": "icp-iam-onboarding",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.1"
+            },
+            "imageName": "icp-iam-onboarding",
+            "imageRegistry": "quay.io/opencloudio",
+            "imageTag": "3.3.1",
+            "impersonation": {
+              "enableImpersonation": false
+            },
+            "initAuthService": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.1"
+            },
+            "initIdentityManager": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.1"
+            },
+            "initIdentityProvider": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.1"
+            },
+            "initPAPSpec": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.1"
+            },
+            "initTokenService": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.1"
+            },
+            "operatorVersion": "0.14.1",
+            "replicas": 1
+          }
+        }
+      ]
+    capabilities: Basic Install
+  name: ibm-iam-operator.v1.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: Authentication is the Schema for the authentications API
+      kind: Authentication
+      name: authentications.operator.ibm.com
+      version: v1alpha1
+    - description: OIDCClientWatcher is the Schema for the oidcclientwatchers API
+      kind: OIDCClientWatcher
+      name: oidcclientwatchers.operator.ibm.com
+      version: v1alpha1
+    - description: Pap is the Schema for the paps API
+      kind: Pap
+      name: paps.operator.ibm.com
+      version: v1alpha1
+    - description: PolicyController is the Schema for the policycontrollers API
+      kind: PolicyController
+      name: policycontrollers.operator.ibm.com
+      version: v1alpha1
+    - description: PolicyDecision is the Schema for the policydecisions API
+      kind: PolicyDecision
+      name: policydecisions.operator.ibm.com
+      version: v1alpha1
+    - description: SecretWatcher is the Schema for the secretwatchers API
+      kind: SecretWatcher
+      name: secretwatchers.operator.ibm.com
+      version: v1alpha1
+    - description: SecurityOnboarding is the Schema for the securityonboardings API
+      kind: SecurityOnboarding
+      name: securityonboardings.operator.ibm.com
+      version: v1alpha1
+  description: Placeholder description
+  displayName: Ibm Iam Operator
+  install:
+    spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - apiextensions.k8s.io
+          resources:
+          - customresourcedefinitions
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - rbac.authorization.k8s.io/v1
+          resources:
+          - clusterrolebindings
+          - clusterroles
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - '*'
+          resources:
+          - '*'
+          verbs:
+          - '*'
+        serviceAccountName: ibm-iam-operator
+      deployments:
+      - name: ibm-iam-operator
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              name: ibm-iam-operator
+          strategy: {}
+          template:
+            metadata:
+              labels:
+                name: ibm-iam-operator
+            spec:
+              containers:
+              - command:
+                - ibm-iam-operator
+                env:
+                - name: WATCH_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.annotations['olm.targetNamespaces']
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: OPERATOR_NAME
+                  value: ibm-iam-operator
+                image: quay.io/opencloudio/ibm-iam-operator:latest
+                imagePullPolicy: Always
+                name: ibm-iam-operator
+                resources: {}
+              serviceAccountName: ibm-iam-operator
+      permissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          - services
+          - services/finalizers
+          - endpoints
+          - persistentvolumeclaims
+          - events
+          - configmaps
+          - secrets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - daemonsets
+          - replicasets
+          - statefulsets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          verbs:
+          - get
+          - create
+        - apiGroups:
+          - apps
+          resourceNames:
+          - ibm-iam-operator
+          resources:
+          - deployments/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - get
+        - apiGroups:
+          - apps
+          resources:
+          - replicasets
+          - deployments
+          verbs:
+          - get
+        - apiGroups:
+          - operator.ibm.com
+          resources:
+          - '*'
+          - policydecisions
+          - oidcclientwatchers
+          - authentications
+          - policycontrollers
+          - paps
+          - securityonboardings
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - certmanager.k8s.io
+          resources:
+          - '*'
+          - certificates
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - networking.k8s.io
+          resources:
+          - '*'
+          - ingresses
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - batch
+          resources:
+          - jobs
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        serviceAccountName: ibm-iam-operator
+    strategy: deployment
+  installModes:
+  - supported: true
+    type: OwnNamespace
+  - supported: true
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  maturity: alpha
+  provider: {}
+  replaces: ibm-iam-operator.v0.0.0
+  version: 1.0.0

@@ -352,9 +352,15 @@ spec:
       name: oidcclientwatchers.operator.ibm.com
       displayName: OIDCClientWatcher
       resources:
-        - kind: Secret
+        - kind: secrets
           name: ''
           version: v1alpha1
+        - kind: mutatingwebhookconfigurations
+          name: ''
+          version: v1beta1
+        - kind: clusterroles
+          name: ''
+          version: v1
         - kind: paps
           name: ''
           version: v1alpha1
@@ -453,7 +459,7 @@ spec:
       name: paps.operator.ibm.com
       displayName: Pap
       resources:
-        - kind: Secret
+        - kind: secrets
           name: ''
           version: v1alpha1
         - kind: paps
@@ -554,7 +560,7 @@ spec:
       name: policycontrollers.operator.ibm.com
       displayName: PolicyController
       resources:
-        - kind: Secret
+        - kind: secrets
           name: ''
           version: v1alpha1
         - kind: paps
@@ -655,7 +661,7 @@ spec:
       name: policydecisions.operator.ibm.com
       displayName: PolicyDecision
       resources:
-        - kind: Secret
+        - kind: secrets
           name: ''
           version: v1alpha1
         - kind: paps
@@ -771,7 +777,7 @@ spec:
       name: secretwatchers.operator.ibm.com
       displayName: SecretWatcher
       resources:
-        - kind: Secret
+        - kind: secrets
           name: ''
           version: v1alpha
         - kind: paps

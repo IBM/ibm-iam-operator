@@ -243,16 +243,16 @@ spec:
           version: v1alpha1
         - kind: policycontrollers
           name: ''
-          version: v1beta1
+          version: v1alpha1
         - kind: ingresses
           name: ''
-          version: v1alpha1
+          version: v1beta1
         - kind: securityonboardings
           name: ''
-          version: v1beta1
+          version: v1alpha1
         - kind: customresourcedefinitions
           name: ''
-          version: v1alpha1
+          version: v1beta1
         - kind: policydecisions
           name: ''
           version: v1alpha1
@@ -264,7 +264,7 @@ spec:
           version: v1alpha1
         - kind: authentications
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: Pods
           name: ''
           version: v1
@@ -355,6 +355,11 @@ spec:
         path: OperatorsStatus
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of nodes.
+        displayName: Node Status
+        path: NodesStatus
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:nodeStatuses
       version: v1alpha1
     - description: OIDCClientWatcher is the Schema for the oidcclientwatchers API
       kind: OIDCClientWatcher
@@ -378,16 +383,16 @@ spec:
           version: v1alpha1
         - kind: policycontrollers
           name: ''
-          version: v1beta1
+          version: v1alpha1
         - kind: ingresses
           name: ''
-          version: v1alpha1
+          version: v1beta1
         - kind: securityonboardings
           name: ''
-          version: v1beta1
+          version: v1alpha1
         - kind: customresourcedefinitions
           name: ''
-          version: v1alpha1
+          version: v1beta1
         - kind: policydecisions
           name: ''
           version: v1alpha1
@@ -399,7 +404,7 @@ spec:
           version: v1alpha1
         - kind: authentications
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: Pods
           name: ''
           version: v1
@@ -431,6 +436,12 @@ spec:
           name: ''
           version: v1
         - kind: replicasets
+          name: ''
+          version: v1
+        - kind: securityonboardings
+          name: ''
+          version: v1alpha1
+        - kind: servicemonitors
           name: ''
           version: v1
       specDescriptors:
@@ -465,6 +476,11 @@ spec:
         path: OperatorsStatus
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of nodes.
+        displayName: Node Status
+        path: NodesStatus
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:nodeStatuses
       version: v1alpha1
     - description: Pap is the Schema for the paps API
       kind: Pap
@@ -479,16 +495,16 @@ spec:
           version: v1alpha1
         - kind: policycontrollers
           name: ''
-          version: v1beta1
+          version: v1alpha1
         - kind: ingresses
           name: ''
-          version: v1alpha1
+          version: v1beta1
         - kind: securityonboardings
           name: ''
-          version: v1beta1
+          version: v1alpha1
         - kind: customresourcedefinitions
           name: ''
-          version: v1alpha1
+          version: v1beta1
         - kind: policydecisions
           name: ''
           version: v1alpha1
@@ -500,7 +516,7 @@ spec:
           version: v1
         - kind: authentications
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: Pods
           name: ''
           version: v1
@@ -566,6 +582,11 @@ spec:
         path: OperatorsStatus
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of nodes.
+        displayName: Node Status
+        path: NodesStatus
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:nodeStatuses
       version: v1alpha1
     - description: PolicyController is the Schema for the policycontrollers API
       kind: PolicyController
@@ -580,16 +601,16 @@ spec:
           version: v1alpha1
         - kind: policycontrollers
           name: ''
-          version: v1beta1
+          version: v1alpha1
         - kind: ingresses
           name: ''
-          version: v1alpha1
+          version: v1beta1
         - kind: securityonboardings
           name: ''
-          version: v1beta1
+          version: v1alpha1
         - kind: customresourcedefinitions
           name: ''
-          version: v1alpha1
+          version: v1beta1
         - kind: policydecisions
           name: ''
           version: v1alpha1
@@ -598,10 +619,10 @@ spec:
           version: v1alpha1
         - kind: servicemonitors
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: authentications
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: Pods
           name: ''
           version: v1
@@ -667,6 +688,11 @@ spec:
         path: OperatorsStatus
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of nodes.
+        displayName: Node Status
+        path: NodesStatus
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:nodeStatuses
       version: v1alpha1
     - description: PolicyDecision is the Schema for the policydecisions API
       kind: PolicyDecision
@@ -681,16 +707,16 @@ spec:
           version: v1alpha1
         - kind: policycontrollers
           name: ''
-          version: v1beta1
+          version: v1alpha1
         - kind: ingresses
           name: ''
-          version: v1alpha1
+          version: v1beta1
         - kind: securityonboardings
           name: ''
-          version: v1beta1
+          version: v1alpha1
         - kind: customresourcedefinitions
           name: ''
-          version: v1alpha1
+          version: v1beta1
         - kind: policydecisions
           name: ''
           version: v1alpha1
@@ -702,7 +728,7 @@ spec:
           version: v1alpha1
         - kind: authentications
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: Pods
           name: ''
           version: v1
@@ -783,6 +809,11 @@ spec:
         path: OperatorsStatus
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of nodes.
+        displayName: Node Status
+        path: NodesStatus
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:nodeStatuses
       version: v1alpha1
     - description: SecretWatcher is the Schema for the secretwatchers API
       kind: SecretWatcher
@@ -797,16 +828,16 @@ spec:
           version: v1alpha1
         - kind: policycontrollers
           name: ''
-          version: v1beta1
+          version: v1alpha1
         - kind: ingresses
           name: ''
-          version: v1alpha1
+          version: v1beta1
         - kind: securityonboardings
           name: ''
-          version: v1beta1
+          version: v1alpha1
         - kind: customresourcedefinitions
           name: ''
-          version: v1alpha1
+          version: v1beta1
         - kind: policydecisions
           name: ''
           version: v1alpha1
@@ -818,7 +849,7 @@ spec:
           version: v1alpha1
         - kind: authentications
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: Pods
           name: ''
           version: v1
@@ -898,16 +929,16 @@ spec:
           version: v1alpha1
         - kind: policycontrollers
           name: ''
-          version: v1beta1
+          version: v1alpha1
         - kind: ingresses
           name: ''
-          version: v1alpha1
+          version: v1beta1
         - kind: securityonboardings
           name: ''
-          version: v1beta1
+          version: v1alpha1
         - kind: customresourcedefinitions
           name: ''
-          version: v1alpha1
+          version: v1beta1
         - kind: policydecisions
           name: ''
           version: v1alpha1
@@ -916,10 +947,10 @@ spec:
           version: v1alpha1
         - kind: servicemonitors
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: authentications
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: Pods
           name: ''
           version: v1

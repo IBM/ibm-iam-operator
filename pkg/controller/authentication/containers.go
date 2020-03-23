@@ -21,6 +21,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"os"
 	"strconv"
 )
 
@@ -368,7 +369,8 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 }
 
 func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string) corev1.Container {
-
+	
+	icpConsoleURL := os.Getenv("ICP_CONSOLE_URL")
 	envVars := []corev1.EnvVar{
 		{
 			Name:  "MONGO_DB_NAME",
@@ -588,10 +590,14 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			Name:  "IAM_OIDC_TOKEN_SERVICE_URL",
 			Value: "https://127.0.0.1:9443/iam",
 		},
+		{
+			Name:  "MASTER_HOST",
+			Value: icpConsoleURL,
+		},
 	}
 
 	idpEnvVarList := []string{"NODE_ENV", "LOG_LEVEL_IDPROVIDER", "LOG_LEVEL_MW", "IDTOKEN_LIFETIME", "ROKS_ENABLED", "ROKS_URL", "OS_TOKEN_LENGTH", "LIBERTY_TOKEN_LENGTH",
-		"MASTER_HOST", "IDENTITY_PROVIDER_URL", "BASE_AUTH_URL", "BASE_OIDC_URL", "OIDC_ISSUER_URL", "HTTP_ONLY"}
+		"IDENTITY_PROVIDER_URL", "BASE_AUTH_URL", "BASE_OIDC_URL", "OIDC_ISSUER_URL", "HTTP_ONLY"}
 
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
 

@@ -237,10 +237,10 @@ spec:
           version: v1alpha1
         - kind: clusterroles
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: clusterrolebidings
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: policycontrollers
           name: ''
           version: v1alpha1
@@ -261,7 +261,7 @@ spec:
           version: v1alpha1
         - kind: servicemonitors
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: authentications
           name: ''
           version: v1alpha1
@@ -282,16 +282,16 @@ spec:
           version: v1
         - kind: configmaps
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: certificates
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: deployments
           name: ''
-          version: v1alpha1
-        - kind: oidcclientwatcher
-          name: ''
           version: v1
+        - kind: oidcclientwatchers
+          name: ''
+          version: v1alpha1
         - kind: users
           name: ''
           version: v1
@@ -357,9 +357,9 @@ spec:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       - description: The status of nodes.
         displayName: Node Status
-        path: NodesStatus
+        path: nodes
         x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:nodeStatuses
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1
     - description: OIDCClientWatcher is the Schema for the oidcclientwatchers API
       kind: OIDCClientWatcher
@@ -368,7 +368,7 @@ spec:
       resources:
         - kind: secrets
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: mutatingwebhookconfigurations
           name: ''
           version: v1beta1
@@ -398,9 +398,6 @@ spec:
           version: v1alpha1
         - kind: secretwatchers
           name: ''
-          version: v1
-        - kind: servicemonitors
-          name: ''
           version: v1alpha1
         - kind: authentications
           name: ''
@@ -422,16 +419,16 @@ spec:
           version: v1
         - kind: configmaps
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: certificates
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: deployments
           name: ''
           version: v1alpha1
         - kind: oidcclientwatchers
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: users
           name: ''
           version: v1
@@ -478,9 +475,9 @@ spec:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       - description: The status of nodes.
         displayName: Node Status
-        path: NodesStatus
+        path: nodes
         x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:nodeStatuses
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1
     - description: Pap is the Schema for the paps API
       kind: Pap
@@ -489,7 +486,7 @@ spec:
       resources:
         - kind: secrets
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: paps
           name: ''
           version: v1alpha1
@@ -510,7 +507,7 @@ spec:
           version: v1alpha1
         - kind: secretwatchers
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: servicemonitors
           name: ''
           version: v1
@@ -534,16 +531,16 @@ spec:
           version: v1
         - kind: configmaps
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: certificates
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: deployments
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: oidcclientwatchers
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: users
           name: ''
           version: v1
@@ -584,9 +581,9 @@ spec:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       - description: The status of nodes.
         displayName: Node Status
-        path: NodesStatus
+        path: nodes
         x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:nodeStatuses
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1
     - description: PolicyController is the Schema for the policycontrollers API
       kind: PolicyController
@@ -595,7 +592,13 @@ spec:
       resources:
         - kind: secrets
           name: ''
-          version: v1alpha1
+          version: v1
+        - kind: clusterroles
+          name: ''
+          version: v1
+        - kind: clusterrolebindings
+          name: ''
+          version: v1
         - kind: paps
           name: ''
           version: v1alpha1
@@ -640,16 +643,16 @@ spec:
           version: v1
         - kind: configmaps
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: certificates
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: deployments
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: oidcclientwatchers
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: users
           name: ''
           version: v1
@@ -690,9 +693,9 @@ spec:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       - description: The status of nodes.
         displayName: Node Status
-        path: NodesStatus
+        path: nodes
         x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:nodeStatuses
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1
     - description: PolicyDecision is the Schema for the policydecisions API
       kind: PolicyDecision
@@ -701,7 +704,7 @@ spec:
       resources:
         - kind: secrets
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: paps
           name: ''
           version: v1alpha1
@@ -725,7 +728,7 @@ spec:
           version: v1alpha1
         - kind: servicemonitors
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: authentications
           name: ''
           version: v1alpha1
@@ -746,16 +749,16 @@ spec:
           version: v1
         - kind: configmaps
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: certificates
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: deployments
           name: ''
           version: v1alpha1
         - kind: oidcclientwatchers
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: users
           name: ''
           version: v1
@@ -811,9 +814,9 @@ spec:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       - description: The status of nodes.
         displayName: Node Status
-        path: NodesStatus
+        path: nodes
         x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:nodeStatuses
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1
     - description: SecretWatcher is the Schema for the secretwatchers API
       kind: SecretWatcher
@@ -822,7 +825,7 @@ spec:
       resources:
         - kind: secrets
           name: ''
-          version: v1alpha
+          version: v1
         - kind: paps
           name: ''
           version: v1alpha1
@@ -846,7 +849,7 @@ spec:
           version: v1alpha1
         - kind: servicemonitors
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: authentications
           name: ''
           version: v1alpha1
@@ -870,13 +873,13 @@ spec:
           version: v1
         - kind: certificates
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: deployments
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: oidcclientwatchers
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: users
           name: ''
           version: v1
@@ -968,16 +971,16 @@ spec:
           version: v1
         - kind: configmaps
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: certificates
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: deployments
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: oidcclientwatchers
           name: ''
-          version: v1
+          version: v1alpha1
         - kind: users
           name: ''
           version: v1

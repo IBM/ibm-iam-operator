@@ -918,6 +918,11 @@ spec:
         path: OperatorsStatus
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of nodes.
+        displayName: Node Status
+        path: nodes
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1
     - description: SecurityOnboarding is the Schema for the securityonboardings API
       kind: SecurityOnboarding
@@ -1057,6 +1062,11 @@ spec:
       - description: The status of operators.
         displayName: Operator Status
         path: OperatorsStatus
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of pods.
+        displayName: Pod Status
+        path: podNames
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1

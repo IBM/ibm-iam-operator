@@ -47,10 +47,10 @@ var seconds60 int64 = 60
 var runAsUser int64 = 21000
 var fsGroup int64 = 21000
 var serviceAccountName string = "ibm-iam-operator"
-var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)          // 10m
+var cpu50 = resource.NewMilliQuantity(50, resource.DecimalSI)          // 50m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
-var memory16 = resource.NewQuantity(16*1024*1024, resource.BinarySI)   // 16Mi
-var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI) // 128Mi
+var memory64 = resource.NewQuantity(64*1024*1024, resource.BinarySI)   // 64Mi
+var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI) // 256Mi
 
 var log = logf.Log.WithName("controller_secretwatcher")
 
@@ -360,10 +360,10 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 							Resources: corev1.ResourceRequirements{
 								Limits: map[corev1.ResourceName]resource.Quantity{
 									corev1.ResourceCPU:    *cpu200,
-									corev1.ResourceMemory: *memory128},
+									corev1.ResourceMemory: *memory256},
 								Requests: map[corev1.ResourceName]resource.Quantity{
-									corev1.ResourceCPU:    *cpu10,
-									corev1.ResourceMemory: *memory16},
+									corev1.ResourceCPU:    *cpu50,
+									corev1.ResourceMemory: *memory64},
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{

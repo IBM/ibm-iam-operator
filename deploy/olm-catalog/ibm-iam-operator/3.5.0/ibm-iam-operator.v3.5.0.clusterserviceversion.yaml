@@ -1064,9 +1064,14 @@ spec:
         path: OperatorsStatus
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
-      - description: The status of pods.
-        displayName: Pod Status
+      - description: The status of pod names.
+        displayName: PodNames Status
         path: podNames
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of nodes.
+        displayName: Node Status
+        path: nodes
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1

@@ -238,7 +238,7 @@ spec:
         - kind: clusterroles
           name: ''
           version: v1
-        - kind: clusterrolebidings
+        - kind: clusterrolebindings
           name: ''
           version: v1
         - kind: policycontrollers
@@ -425,7 +425,7 @@ spec:
           version: v1alpha1
         - kind: deployments
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: oidcclientwatchers
           name: ''
           version: v1alpha1
@@ -755,7 +755,7 @@ spec:
           version: v1alpha1
         - kind: deployments
           name: ''
-          version: v1alpha1
+          version: v1
         - kind: oidcclientwatchers
           name: ''
           version: v1alpha1

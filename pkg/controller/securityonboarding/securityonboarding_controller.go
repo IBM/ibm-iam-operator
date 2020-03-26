@@ -178,7 +178,8 @@ func (r *ReconcileSecurityOnboarding) Reconcile(request reconcile.Request) (reco
                 return reconcile.Result{}, err
         }
         podNames := getPodNames(podList.Items)
-        reqLogger.Info("Complete - podNames"+podNames)
+        reqLogger.Info("Complete - podNames")
+        fmt.Printf("%+q", podNames)
         // Update status.Nodes if needed
         if !reflect.DeepEqual(podNames, instance.Status.PodNames) {
                 instance.Status.PodNames = podNames

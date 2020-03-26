@@ -21,7 +21,7 @@ spec:
       containers:
         - name: ibm-iam-operator
           # Replace this with the built image name
-          image: quay.io/opencloudio/ibm-iam-operator:latest
+          image: quay.io/opencloudio/ibm-iam-operator:3.5.0
           command:
           - ibm-iam-operator
           imagePullPolicy: Always

@@ -165,11 +165,11 @@ func (r *ReconcileSecurityOnboarding) Reconcile(request reconcile.Request) (reco
 
 	reqLogger.Info("Complete - handleConfigMap")
         // Update the SecurityOnboarding status with the pod names
-        // List the pods for this SecurityOnboarding's deployment
+        // List the pods for this SecurityOnboarding's job
         podList := &corev1.PodList{}
         listOpts := []client.ListOption{
                 client.InNamespace(instance.Namespace),
-                client.MatchingLabels(map[string]string{"job": "security-onboarding"}),
+                client.MatchingLabels(map[string]string{"job-name": "security-onboarding"}),
         }
         if err = r.client.List(context.TODO(), podList, listOpts...); err != nil {
                 reqLogger.Error(err, "Failed to list pods", "SecurityOnboarding.Namespace", instance.Namespace, "SecurityOnboarding.Name", instance.Name)

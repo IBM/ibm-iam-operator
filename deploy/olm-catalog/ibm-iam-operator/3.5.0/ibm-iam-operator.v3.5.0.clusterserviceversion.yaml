@@ -585,7 +585,7 @@ spec:
   maintainers:
   - email: support@ibm.com
     name: IBM Support
-  maturity: stable-v1
+  maturity: stable
   provider:
     name: IBM
   version: 3.5.0

@@ -149,7 +149,7 @@ metadata:
           "apiVersion": "operator.ibm.com/v1alpha1",
           "kind": "SecretWatcher",
           "metadata": {
-            "name": "necretwatcher-deployment"
+            "name": "secretwatcher-deployment"
           },
           "spec": {
             "imageRegistry": "quay.io/opencloudio/icp-secret-watcher",

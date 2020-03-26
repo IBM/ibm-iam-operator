@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+        "reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -164,8 +165,40 @@ func (r *ReconcileSecurityOnboarding) Reconcile(request reconcile.Request) (reco
 	}
 
 	reqLogger.Info("Complete - handleConfigMap")
-
+        // Update the SecurityOnboarding status with the pod names
+        // List the pods for this SecurityOnboarding's job
+        jobList := &batchv1.JobList{}
+        listOpts := []client.ListOption{
+                client.InNamespace(instance.Namespace),
+                client.MatchingLabels(map[string]string{"app": "security-onboarding"}),
+        }
+        reqLogger.Info("Complete - got job list")
+        if err = r.client.List(context.TODO(), jobList, listOpts...); err != nil {
+                reqLogger.Error(err, "Failed to list jobs", "SecurityOnboarding.Namespace", instance.Namespace, "SecurityOnboarding.Name", instance.Name)
+                return reconcile.Result{}, err
+        }
+        jobNames := getJobNames(jobList.Items)
+        // Update status.Nodes if needed
+        if !reflect.DeepEqual(jobNames, instance.Status.PodNames) {
+                instance.Status.PodNames =  jobNames
+                err := r.client.Status().Update(context.TODO(), instance)
+                if err != nil {
+                        reqLogger.Error(err, "Failed to update SecurityOnboarding status")
+                        return reconcile.Result{}, err
+                }
+        }
 	return reconcile.Result{}, nil
+}
+
+// getJobNames returns the pod names of the array of pods passed in
+func getJobNames(jobs []batchv1.Job) []string {
+        reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
+        var jobNames []string
+        for _, job := range jobs {
+                jobNames = append(jobNames, job.Name)
+                reqLogger.Info("CS??? pod name=" + job.Name)
+        }
+        return jobNames
 }
 
 func (r *ReconcileSecurityOnboarding) handleConfigMap(instance *operatorv1alpha1.SecurityOnboarding) (reconcile.Result, error) {

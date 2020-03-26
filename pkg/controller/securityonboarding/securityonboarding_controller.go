@@ -164,8 +164,41 @@ func (r *ReconcileSecurityOnboarding) Reconcile(request reconcile.Request) (reco
 	}
 
 	reqLogger.Info("Complete - handleConfigMap")
+        // Update the SecurityOnboarding status with the pod names
+        // List the pods for this SecurityOnboarding's deployment
+        podList := &corev1.PodList{}
+        listOpts := []client.ListOption{
+                client.InNamespace(instance.Namespace),
+                client.MatchingLabels(map[string]string{"job": "security-onboarding"}),
+        }
+        if err = r.client.List(context.TODO(), podList, listOpts...); err != nil {
+                reqLogger.Error(err, "Failed to list pods", "SecurityOnboarding.Namespace", instance.Namespace, "SecurityOnboarding.Name", instance.Name)
+                return reconcile.Result{}, err
+        }
+        podNames := getPodNames(podList.Items)
+
+        // Update status.Nodes if needed
+        if !reflect.DeepEqual(podNames, instance.Status.Nodes) {
+                instance.Status.Nodes = podNames
+                err := r.client.Status().Update(context.TODO(), instance)
+                if err != nil {
+                        reqLogger.Error(err, "Failed to update SecurityOnboarding status")
+                        return reconcile.Result{}, err
+                }
+        }
 
 	return reconcile.Result{}, nil
+}
+
+// getPodNames returns the pod names of the array of pods passed in
+func getPodNames(pods []corev1.Pod) []string {
+        reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
+        var podNames []string
+        for _, pod := range pods {
+                podNames = append(podNames, pod.Name)
+                reqLogger.Info("CS??? pod name=" + pod.Name)
+        }
+        return podNames
 }
 
 func (r *ReconcileSecurityOnboarding) handleConfigMap(instance *operatorv1alpha1.SecurityOnboarding) (reconcile.Result, error) {

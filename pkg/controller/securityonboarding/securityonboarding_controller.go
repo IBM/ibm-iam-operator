@@ -182,7 +182,7 @@ func (r *ReconcileSecurityOnboarding) Reconcile(request reconcile.Request) (reco
         fmt.Printf("%+q", podNames)
         // Update status.Nodes if needed
         if !reflect.DeepEqual(podNames, instance.Status.PodNames) {
-                instance.Status.PodNames = podNames
+                instance.Status.PodNames =  [1]string{"security-onboarding"}
                 err := r.client.Status().Update(context.TODO(), instance)
                 if err != nil {
                         reqLogger.Error(err, "Failed to update SecurityOnboarding status")

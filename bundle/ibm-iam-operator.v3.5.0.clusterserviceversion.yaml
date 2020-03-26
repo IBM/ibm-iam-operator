@@ -149,7 +149,7 @@ metadata:
           "apiVersion": "operator.ibm.com/v1alpha1",
           "kind": "SecretWatcher",
           "metadata": {
-            "name": "secretwatcher-deployment"
+            "name": "necretwatcher-deployment"
           },
           "spec": {
             "imageRegistry": "quay.io/opencloudio/icp-secret-watcher",
@@ -225,16 +225,139 @@ spec:
       kind: Authentication
       name: authentications.operator.ibm.com
       displayName: Authentication
+      resources:
+        - kind: secrets
+          name: ''
+          version: v1
+        - kind: mutatingwebhookconfigurations
+          name: ''
+          version: v1beta1
+        - kind: paps
+          name: ''
+          version: v1alpha1
+        - kind: clusterroles
+          name: ''
+          version: v1
+        - kind: clusterrolebindings
+          name: ''
+          version: v1
+        - kind: policycontrollers
+          name: ''
+          version: v1alpha1
+        - kind: ingresses
+          name: ''
+          version: v1beta1
+        - kind: securityonboardings
+          name: ''
+          version: v1alpha1
+        - kind: customresourcedefinitions
+          name: ''
+          version: v1beta1
+        - kind: policydecisions
+          name: ''
+          version: v1alpha1
+        - kind: secretwatchers
+          name: ''
+          version: v1alpha1
+        - kind: servicemonitors
+          name: ''
+          version: v1
+        - kind: authentications
+          name: ''
+          version: v1alpha1
+        - kind: Pods
+          name: ''
+          version: v1
+        - kind: statefulsets
+          name: ''
+          version: v1
+        - kind: services
+          name: ''
+          version: v1
+        - kind: persistentvolumeclaims
+          name: ''
+          version: v1
+        - kind: Jobs
+          name: ''
+          version: v1
+        - kind: configmaps
+          name: ''
+          version: v1
+        - kind: certificates
+          name: ''
+          version: v1alpha1
+        - kind: deployments
+          name: ''
+          version: v1
+        - kind: oidcclientwatchers
+          name: ''
+          version: v1alpha1
+        - kind: users
+          name: ''
+          version: v1
+        - kind: replicasets
+          name: ''
+          version: v1
       specDescriptors:
       - description: A list defines the catalog information for operators.
         displayName: Operators
         path: operators
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for identity manager.
+        displayName: identityManager
+        path: identityManager
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for operator version.
+        displayName: OperatorVersion
+        path: operatorVersion
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for audit service.
+        displayName: AuditService
+        path: auditService
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for auth service.
+        displayName: authService
+        path: authService
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for identity provider.
+        displayName: identityProvider
+        path: identityProvider
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for init mongodb.
+        displayName: initMongodb
+        path: initMongodb
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for replicas.
+        displayName: Replicas
+        path: replicas
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for client registration.
+        displayName: ClientRegistration
+        path: clientRegistration
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for config.
+        displayName: Config
+        path: config
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text' 
       statusDescriptors:
       - description: The status of operators.
         displayName: Operator Status
         path: OperatorsStatus
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of nodes.
+        displayName: Node Status
+        path: nodes
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1
@@ -242,16 +365,117 @@ spec:
       kind: OIDCClientWatcher
       name: oidcclientwatchers.operator.ibm.com
       displayName: OIDCClientWatcher
+      resources:
+        - kind: secrets
+          name: ''
+          version: v1
+        - kind: mutatingwebhookconfigurations
+          name: ''
+          version: v1beta1
+        - kind: clusterroles
+          name: ''
+          version: v1
+        - kind: clusterrolebindings
+          name: ''
+          version: v1
+        - kind: paps
+          name: ''
+          version: v1alpha1
+        - kind: policycontrollers
+          name: ''
+          version: v1alpha1
+        - kind: ingresses
+          name: ''
+          version: v1beta1
+        - kind: securityonboardings
+          name: ''
+          version: v1alpha1
+        - kind: customresourcedefinitions
+          name: ''
+          version: v1beta1
+        - kind: policydecisions
+          name: ''
+          version: v1alpha1
+        - kind: secretwatchers
+          name: ''
+          version: v1alpha1
+        - kind: authentications
+          name: ''
+          version: v1alpha1
+        - kind: Pods
+          name: ''
+          version: v1
+        - kind: statefulsets
+          name: ''
+          version: v1
+        - kind: services
+          name: ''
+          version: v1
+        - kind: persistentvolumeclaims
+          name: ''
+          version: v1
+        - kind: Jobs
+          name: ''
+          version: v1
+        - kind: configmaps
+          name: ''
+          version: v1
+        - kind: certificates
+          name: ''
+          version: v1alpha1
+        - kind: deployments
+          name: ''
+          version: v1
+        - kind: oidcclientwatchers
+          name: ''
+          version: v1alpha1
+        - kind: users
+          name: ''
+          version: v1
+        - kind: replicasets
+          name: ''
+          version: v1
+        - kind: securityonboardings
+          name: ''
+          version: v1alpha1
+        - kind: servicemonitors
+          name: ''
+          version: v1
       specDescriptors:
       - description: A list defines the catalog information for operators.
         displayName: Operators
         path: operators
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image registry.
+        displayName: imageRegistry
+        path: imageRegistry
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image tag postfix.
+        displayName: imageTagPostfix
+        path: imageTagPostfix
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for operator version.
+        displayName: operatorVersion
+        path: operatorVersion
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for replicas.
+        displayName: Replicas
+        path: replicas
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
       statusDescriptors:
       - description: The status of operators.
         displayName: Operator Status
         path: OperatorsStatus
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of nodes.
+        displayName: Node Status
+        path: nodes
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1
@@ -259,16 +483,105 @@ spec:
       kind: Pap
       name: paps.operator.ibm.com
       displayName: Pap
+      resources:
+        - kind: secrets
+          name: ''
+          version: v1
+        - kind: paps
+          name: ''
+          version: v1alpha1
+        - kind: policycontrollers
+          name: ''
+          version: v1alpha1
+        - kind: ingresses
+          name: ''
+          version: v1beta1
+        - kind: securityonboardings
+          name: ''
+          version: v1alpha1
+        - kind: customresourcedefinitions
+          name: ''
+          version: v1beta1
+        - kind: policydecisions
+          name: ''
+          version: v1alpha1
+        - kind: secretwatchers
+          name: ''
+          version: v1alpha1
+        - kind: servicemonitors
+          name: ''
+          version: v1
+        - kind: authentications
+          name: ''
+          version: v1alpha1
+        - kind: Pods
+          name: ''
+          version: v1
+        - kind: statefulsets
+          name: ''
+          version: v1
+        - kind: services
+          name: ''
+          version: v1
+        - kind: persistentvolumeclaims
+          name: ''
+          version: v1
+        - kind: Jobs
+          name: ''
+          version: v1
+        - kind: configmaps
+          name: ''
+          version: v1
+        - kind: certificates
+          name: ''
+          version: v1alpha1
+        - kind: deployments
+          name: ''
+          version: v1
+        - kind: oidcclientwatchers
+          name: ''
+          version: v1alpha1
+        - kind: users
+          name: ''
+          version: v1
+        - kind: replicasets
+          name: ''
+          version: v1
       specDescriptors:
       - description: A list defines the catalog information for operators.
         displayName: Operators
         path: operators
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for replicas.
+        displayName: Replicas
+        path: replicas
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for audit service.
+        displayName: AuditService
+        path: auditService
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for operator version.
+        displayName: OperatorVersion
+        path: operatorVersion
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for pap service.
+        displayName: PapService
+        path: papService
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
       statusDescriptors:
       - description: The status of operators.
         displayName: Operator Status
         path: OperatorsStatus
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of nodes.
+        displayName: Node Status
+        path: nodes
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1
@@ -276,16 +589,111 @@ spec:
       kind: PolicyController
       name: policycontrollers.operator.ibm.com
       displayName: PolicyController
+      resources:
+        - kind: secrets
+          name: ''
+          version: v1
+        - kind: clusterroles
+          name: ''
+          version: v1
+        - kind: clusterrolebindings
+          name: ''
+          version: v1
+        - kind: paps
+          name: ''
+          version: v1alpha1
+        - kind: policycontrollers
+          name: ''
+          version: v1alpha1
+        - kind: ingresses
+          name: ''
+          version: v1beta1
+        - kind: securityonboardings
+          name: ''
+          version: v1alpha1
+        - kind: customresourcedefinitions
+          name: ''
+          version: v1beta1
+        - kind: policydecisions
+          name: ''
+          version: v1alpha1
+        - kind: secretwatchers
+          name: ''
+          version: v1alpha1
+        - kind: servicemonitors
+          name: ''
+          version: v1
+        - kind: authentications
+          name: ''
+          version: v1alpha1
+        - kind: Pods
+          name: ''
+          version: v1
+        - kind: statefulsets
+          name: ''
+          version: v1
+        - kind: services
+          name: ''
+          version: v1
+        - kind: persistentvolumeclaims
+          name: ''
+          version: v1
+        - kind: Jobs
+          name: ''
+          version: v1
+        - kind: configmaps
+          name: ''
+          version: v1
+        - kind: certificates
+          name: ''
+          version: v1alpha1
+        - kind: deployments
+          name: ''
+          version: v1
+        - kind: oidcclientwatchers
+          name: ''
+          version: v1alpha1
+        - kind: users
+          name: ''
+          version: v1
+        - kind: replicasets
+          name: ''
+          version: v1
       specDescriptors:
       - description: A list defines the catalog information for operators.
         displayName: Operators
         path: operators
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image registry.
+        displayName: imageRegistry
+        path: imageRegistry
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image tag postfix.
+        displayName: imageTagPostfix
+        path: imageTagPostfix
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for operator version.
+        displayName: operatorVersion
+        path: operatorVersion
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for replicas.
+        displayName: Replicas
+        path: replicas
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
       statusDescriptors:
       - description: The status of operators.
         displayName: Operator Status
         path: OperatorsStatus
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of nodes.
+        displayName: Node Status
+        path: nodes
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1
@@ -293,16 +701,120 @@ spec:
       kind: PolicyDecision
       name: policydecisions.operator.ibm.com
       displayName: PolicyDecision
+      resources:
+        - kind: secrets
+          name: ''
+          version: v1
+        - kind: paps
+          name: ''
+          version: v1alpha1
+        - kind: policycontrollers
+          name: ''
+          version: v1alpha1
+        - kind: ingresses
+          name: ''
+          version: v1beta1
+        - kind: securityonboardings
+          name: ''
+          version: v1alpha1
+        - kind: customresourcedefinitions
+          name: ''
+          version: v1beta1
+        - kind: policydecisions
+          name: ''
+          version: v1alpha1
+        - kind: secretwatchers
+          name: ''
+          version: v1alpha1
+        - kind: servicemonitors
+          name: ''
+          version: v1
+        - kind: authentications
+          name: ''
+          version: v1alpha1
+        - kind: Pods
+          name: ''
+          version: v1
+        - kind: statefulsets
+          name: ''
+          version: v1
+        - kind: services
+          name: ''
+          version: v1
+        - kind: persistentvolumeclaims
+          name: ''
+          version: v1
+        - kind: Jobs
+          name: ''
+          version: v1
+        - kind: configmaps
+          name: ''
+          version: v1
+        - kind: certificates
+          name: ''
+          version: v1alpha1
+        - kind: deployments
+          name: ''
+          version: v1
+        - kind: oidcclientwatchers
+          name: ''
+          version: v1alpha1
+        - kind: users
+          name: ''
+          version: v1
+        - kind: replicasets
+          name: ''
+          version: v1
       specDescriptors:
       - description: A list defines the catalog information for operators.
         displayName: Operators
         path: operators
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image registry.
+        displayName: imageRegistry
+        path: imageRegistry
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image tag.
+        displayName: imageTag
+        path: imageTag
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for init mongodb.
+        displayName: initMongodb
+        path: initMongodb
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for operator version.
+        displayName: operatorVersion
+        path: operatorVersion
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for replicas.
+        displayName: replicas
+        path: replicas
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for audit service.
+        displayName: auditService
+        path: auditService
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image name.
+        displayName: imageName
+        path: imageName
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
       statusDescriptors:
       - description: The status of operators.
         displayName: Operator Status
         path: OperatorsStatus
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of nodes.
+        displayName: Node Status
+        path: nodes
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1
@@ -310,16 +822,105 @@ spec:
       kind: SecretWatcher
       name: secretwatchers.operator.ibm.com
       displayName: SecretWatcher
+      resources:
+        - kind: secrets
+          name: ''
+          version: v1
+        - kind: paps
+          name: ''
+          version: v1alpha1
+        - kind: policycontrollers
+          name: ''
+          version: v1alpha1
+        - kind: ingresses
+          name: ''
+          version: v1beta1
+        - kind: securityonboardings
+          name: ''
+          version: v1alpha1
+        - kind: customresourcedefinitions
+          name: ''
+          version: v1beta1
+        - kind: policydecisions
+          name: ''
+          version: v1alpha1
+        - kind: secretwatchers
+          name: ''
+          version: v1alpha1
+        - kind: servicemonitors
+          name: ''
+          version: v1
+        - kind: authentications
+          name: ''
+          version: v1alpha1
+        - kind: Pods
+          name: ''
+          version: v1
+        - kind: statefulsets
+          name: ''
+          version: v1
+        - kind: services
+          name: ''
+          version: v1
+        - kind: persistentvolumeclaims
+          name: ''
+          version: v1
+        - kind: Jobs
+          name: ''
+          version: v1
+        - kind: configmaps
+          name: ''
+          version: v1
+        - kind: certificates
+          name: ''
+          version: v1alpha1
+        - kind: deployments
+          name: ''
+          version: v1
+        - kind: oidcclientwatchers
+          name: ''
+          version: v1alpha1
+        - kind: users
+          name: ''
+          version: v1
+        - kind: replicasets
+          name: ''
+          version: v1
       specDescriptors:
       - description: A list defines the catalog information for operators.
         displayName: Operators
         path: operators
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image registry.
+        displayName: imageRegistry
+        path: imageRegistry
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image tag postfix.
+        displayName: imageTagPostfix
+        path: imageTagPostfix
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for operator version.
+        displayName: operatorVersion
+        path: operatorVersion
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for replicas.
+        displayName: Replicas
+        path: replicas
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
       statusDescriptors:
       - description: The status of operators.
         displayName: Operator Status
         path: OperatorsStatus
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of nodes.
+        displayName: Node Status
+        path: nodes
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1
@@ -327,10 +928,134 @@ spec:
       kind: SecurityOnboarding
       name: securityonboardings.operator.ibm.com
       displayName: SecurityOnboarding
+      resources:
+        - kind: secrets
+          name: ''
+          version: v1
+        - kind: paps
+          name: ''
+          version: v1alpha1
+        - kind: policycontrollers
+          name: ''
+          version: v1alpha1
+        - kind: ingresses
+          name: ''
+          version: v1beta1
+        - kind: securityonboardings
+          name: ''
+          version: v1alpha1
+        - kind: customresourcedefinitions
+          name: ''
+          version: v1beta1
+        - kind: policydecisions
+          name: ''
+          version: v1alpha1
+        - kind: secretwatchers
+          name: ''
+          version: v1alpha1
+        - kind: servicemonitors
+          name: ''
+          version: v1
+        - kind: authentications
+          name: ''
+          version: v1alpha1
+        - kind: Pods
+          name: ''
+          version: v1
+        - kind: statefulsets
+          name: ''
+          version: v1
+        - kind: services
+          name: ''
+          version: v1
+        - kind: persistentvolumeclaims
+          name: ''
+          version: v1
+        - kind: Jobs
+          name: ''
+          version: v1
+        - kind: configmaps
+          name: ''
+          version: v1
+        - kind: certificates
+          name: ''
+          version: v1alpha1
+        - kind: deployments
+          name: ''
+          version: v1
+        - kind: oidcclientwatchers
+          name: ''
+          version: v1alpha1
+        - kind: users
+          name: ''
+          version: v1
+        - kind: replicasets
+          name: ''
+          version: v1
       specDescriptors:
       - description: A list defines the catalog information for operators.
         displayName: Operators
         path: operators
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image name.
+        displayName: imageName
+        path: imageName
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for impersonation.
+        displayName: impersonation
+        path: impersonation
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for init identity manager.
+        displayName: initIdentityManager
+        path: initIdentityManager
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for replicas.
+        displayName: Replicas
+        path: replicas
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for iam onboarding.
+        displayName: iamOnboarding
+        path: iamOnboarding
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image registry.
+        displayName: imageRegistry
+        path: imageRegistry
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image tag.
+        displayName: imageTag
+        path: imageTag
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for init auth service.
+        displayName: initAuthService
+        path: initAuthService
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for init identity provider.
+        displayName: initIdentityProvider
+        path: initIdentityProvider
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for init pap spec.
+        displayName: initPAPSpec
+        path: initPAPSpec
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for init token service.
+        displayName: initTokenService
+        path: initTokenService
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for operator version.
+        displayName: operatorVersion
+        path: operatorVersion
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
       statusDescriptors:
@@ -338,7 +1063,12 @@ spec:
         displayName: Operator Status
         path: OperatorsStatus
         x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+        - 'urn:alm:descriptor:com.tectonic.ui:podStatuses'
+      - description: The status of pod names.
+        displayName: PodNames Status
+        path: podNames
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:podStatuses'
       version: v1alpha1
     required:
     - description: CertManager is the Schema for the certmanagers API
@@ -420,11 +1150,29 @@ spec:
                       fieldPath: metadata.name
                 - name: OPERATOR_NAME
                   value: ibm-iam-operator
+                - name: ICP_CONSOLE_URL
+                  valueFrom:
+                    configMapKeyRef:
+                      name: management-ingress-info
+                      key: MANAGEMENT_INGRESS_ROUTE_HOST
                 image: quay.io/opencloudio/ibm-iam-operator:latest
                 imagePullPolicy: Always
                 name: ibm-iam-operator
+                volumeMounts:
+                - mountPath: "/certs"
+                  name: cluster-ca-cert
                 resources: {}
               serviceAccountName: ibm-iam-operator
+              volumes:
+              - name: cluster-ca-cert
+                secret:
+                  defaultMode: 420
+                  items:
+                  - key: tls.key
+                    path: ca.key
+                  - key: tls.crt
+                    path: ca.crt
+                  secretName: cs-ca-certificate-secret
       permissions:
       - rules:
         - apiGroups:

@@ -163,7 +163,12 @@ func (r *ReconcileSecurityOnboarding) Reconcile(request reconcile.Request) (reco
 	if err != nil {
 		return recResult, err
 	}
-
+        instance.Status.PodNames =  []string{"security-onboarding"}
+        err := r.client.Status().Update(context.TODO(), instance)
+        if err != nil {
+                reqLogger.Error(err, "Failed to update SecurityOnboarding status")
+                return reconcile.Result{}, err
+        }
 	reqLogger.Info("Complete - handleConfigMap")
         // Update the SecurityOnboarding status with the pod names
         // List the pods for this SecurityOnboarding's job

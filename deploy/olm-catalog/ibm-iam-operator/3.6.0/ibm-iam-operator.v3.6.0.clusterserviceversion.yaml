@@ -209,27 +209,27 @@ metadata:
           "apiVersion": "operator.ibm.com/v1alpha1",
           "kind": "OperandRequest",
           "metadata": {
-            "name": "ibm-iam-request",
+            "name": "ibm-iam-request"
           },
           "spec": {
             "requests": [
               {
                 "operands": [
                   {
-                    "name": "ibm-mongodb-operator",
+                    "name": "ibm-mongodb-operator"
                   },
                   {
-                    "name": "ibm-cert-manager-operator",
+                    "name": "ibm-cert-manager-operator"
                   },
                   {
-                    "name": "ibm-management-ingress-operator",
+                    "name": "ibm-management-ingress-operator"
                   },
                 ],
-                "registry": "common-service",
-              },
+                "registry": "common-service"
+              }
             ]
-          },
-        },
+          }
+        }
       ]
     capabilities: Basic Install
     categories: Security

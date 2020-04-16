@@ -451,7 +451,7 @@ func (r *ReconcileOIDCClientWatcher) crdForOIDCClientWatcher(instance *operatorv
 // deploymentForOIDCClientWatcher returns a OIDCClientWatcher Deployment object
 func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *operatorv1alpha1.OIDCClientWatcher) *appsv1.Deployment {
 	reqLogger := log.WithValues("deploymentForOIDCClientWatcher", "Entry", "instance.Name", instance.Name)
-	image := instance.Spec.ImageRegistry + ":" + instance.Spec.ImageTagPostfix
+	image := instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + ":" + instance.Spec.ImageTagPostfix
 	replicas := instance.Spec.Replicas
 
 	ocwDep := &appsv1.Deployment{

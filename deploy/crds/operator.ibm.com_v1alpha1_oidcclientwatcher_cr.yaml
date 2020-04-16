@@ -5,6 +5,7 @@ metadata:
   name: example-oidcclientwatcher
 spec:
   operatorVersion: "0.14.1"
-  imageRegistry: "quay.io/opencloudio/icp-oidcclient-watcher"
+  imageName: "icp-oidcclient-watcher"
+  imageRegistry: "quay.io/opencloudio"
   imageTagPostfix: "3.3.1"
   replicas: 1

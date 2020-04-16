@@ -11,7 +11,8 @@ metadata:
             "name": "example-oidcclientwatcher"
           },
           "spec": {
-            "imageRegistry": "quay.io/opencloudio/icp-oidcclient-watcher",
+            "imageName": "icp-oidcclient-watcher",
+            "imageRegistry": "quay.io/opencloudio",            
             "imageTagPostfix": "3.3.1",
             "operatorVersion": "0.14.1",
             "replicas": 1
@@ -139,7 +140,8 @@ metadata:
             "name": "policycontroller-deployment"
           },
           "spec": {
-            "imageRegistry": "quay.io/opencloudio/iam-policy-controller",
+            "imageName": "iam-policy-controller",
+            "imageRegistry": "quay.io/opencloudio",
             "imageTagPostfix": "3.3.1",
             "operatorVersion": "0.14.1",
             "replicas": 1
@@ -152,7 +154,8 @@ metadata:
             "name": "secretwatcher-deployment"
           },
           "spec": {
-            "imageRegistry": "quay.io/opencloudio/icp-secret-watcher",
+            "imageName": "icp-secret-watcher",
+            "imageRegistry": "quay.io/opencloudio",
             "imageTagPostfix": "3.3.1",
             "operatorVersion": "0.14.1",
             "replicas": 1
@@ -203,6 +206,31 @@ metadata:
             },
             "operatorVersion": "0.14.1",
             "replicas": 1
+          }
+        },
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "OperandRequest",
+          "metadata": {
+            "name": "ibm-iam-request"
+          },
+          "spec": {
+            "requests": [
+              {
+                "operands": [
+                  {
+                    "name": "ibm-mongodb-operator"
+                  },
+                  {
+                    "name": "ibm-cert-manager-operator"
+                  },
+                  {
+                    "name": "ibm-management-ingress-operator"
+                  }
+                ],
+                "registry": "common-service"
+              }
+            ]
           }
         }
       ]
@@ -1069,17 +1097,6 @@ spec:
         path: podNames
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:podStatuses'
-      version: v1alpha1
-    required:
-    - description: CertManager is the Schema for the certmanagers API
-      displayName: CertManager
-      kind: CertManager
-      name: certmanagers.operator.ibm.com
-      version: v1alpha1
-    - description: MongoDB is the Schema for the mongodbs API
-      displayName: MongoDB
-      kind: MongoDB
-      name: mongodbs.operator.ibm.com
       version: v1alpha1
   description: The IAM Operator provides a Kubernetes CRD-Based API to deploy and
     upgrade IAM services.

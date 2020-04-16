@@ -223,7 +223,7 @@ metadata:
                   },
                   {
                     "name": "ibm-management-ingress-operator"
-                  },
+                  }
                 ],
                 "registry": "common-service"
               }

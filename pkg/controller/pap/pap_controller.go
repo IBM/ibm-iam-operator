@@ -147,7 +147,7 @@ var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
 var user int64 = 21000
-var serviceAccountName string = "ibm-iam-operator"
+var serviceAccountName string = "ibm-iam-operand"
 
 //var port int32 = 39001
 var iamPapServiceValues = IamPapServiceValues{

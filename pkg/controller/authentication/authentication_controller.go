@@ -44,7 +44,7 @@ import (
 )
 
 var log = logf.Log.WithName("controller_authentication")
-var user int64 = 21000
+var user int64 = 1000552100
 var fullAccess int32 = 0777
 var trueVar bool = true
 var falseVar bool = false

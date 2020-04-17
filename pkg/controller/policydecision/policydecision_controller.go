@@ -45,7 +45,7 @@ var trueVar bool = true
 var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
-var user int64 = 21000
+var user int64 = 1000552100
 var port int32 = 7998
 var serviceAccountName string = "ibm-iam-operator"
 
@@ -539,7 +539,6 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 						"productVersion":                     "3.3.0",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
-						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -580,7 +579,6 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 					InitContainers: buildInitContainers(mongoDBImage),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &user,
-						FSGroup:   &user,
 					},
 				},
 			},

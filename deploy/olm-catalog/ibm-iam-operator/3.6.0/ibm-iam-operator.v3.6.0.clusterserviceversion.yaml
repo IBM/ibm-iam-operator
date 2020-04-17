@@ -1133,12 +1133,6 @@ spec:
           - patch
           - update
           - watch
-        - apiGroups:
-          - '*'
-          resources:
-          - '*'
-          verbs:
-          - '*'
         serviceAccountName: ibm-iam-operator
       deployments:
       - name: ibm-iam-operator

@@ -76,7 +76,6 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 					},
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
-						"seccomp.security.alpha.kubernetes.io/pod":   "docker/default",
 						"productName":                        "IBM Cloud Platform Common Services",
 						"productID":                          "068a62892a1e4db39641342e592daa25",
 						"productVersion":                     "3.3.0",
@@ -104,7 +103,6 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 					Containers: buildContainer(jobName, image),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &user,
-						FSGroup:   &user,
 					},
 				},
 			},

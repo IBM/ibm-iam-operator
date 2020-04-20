@@ -31,6 +31,8 @@ spec:
         spec:
           description: OIDCClientWatcherSpec defines the desired state of OIDCClientWatcher
           properties:
+            imageName:
+              type: string
             imageRegistry:
               type: string
             imageTagPostfix:

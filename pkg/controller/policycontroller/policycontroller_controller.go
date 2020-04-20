@@ -52,7 +52,7 @@ var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)        // 100m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
 var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI) // 256Mi
 var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI) // 128Mi
-var serviceAccountName string = "ibm-iam-operator"
+var serviceAccountName string = "ibm-iam-operand"
 
 var log = logf.Log.WithName("controller_policycontroller")
 

@@ -52,7 +52,7 @@ var memory512 = resource.NewQuantity(512*1024*1024, resource.BinarySI)   // 512M
 var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024Mi
 var trueVar bool = true
 var falseVar bool = false
-var serviceAccountName string = "ibm-iam-operator"
+var serviceAccountName string = "ibm-iam-operand"
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller

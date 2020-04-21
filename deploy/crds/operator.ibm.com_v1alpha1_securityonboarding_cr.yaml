@@ -2,6 +2,10 @@ apiVersion: operator.ibm.com/v1alpha1
 kind: SecurityOnboarding
 metadata:
   name: example-securityonboarding
+  labels:
+    app.kubernetes.io/instance: ibm-iam-operator
+    app.kubernetes.io/managed-by: ibm-iam-operator
+    app.kubernetes.io/name: ibm-iam-operator
 spec:
   # Add fields here
   operatorVersion: "0.14.1"

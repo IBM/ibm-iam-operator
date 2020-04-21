@@ -46,7 +46,7 @@ var defaultMode int32 = 420
 var seconds60 int64 = 60
 var runAsUser int64 = 21000
 var fsGroup int64 = 21000
-var serviceAccountName string = "ibm-iam-operator"
+var serviceAccountName string = "ibm-iam-operand"
 var cpu50 = resource.NewMilliQuantity(50, resource.DecimalSI)          // 50m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
 var memory64 = resource.NewQuantity(64*1024*1024, resource.BinarySI)   // 64Mi
@@ -199,7 +199,7 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 	labels1 := labelsForSecretWatcherMeta(secretWatcherDeploymentName)
 	labels2 := labelsForSecretWatcherSelect(instance.Name, secretWatcherDeploymentName)
 	labels3 := labelsForSecretWatcherPod(instance.Name, secretWatcherDeploymentName)
-	image := instance.Spec.ImageRegistry + ":" + instance.Spec.ImageTagPostfix
+	image := instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + ":" + instance.Spec.ImageTagPostfix
 	replicas := instance.Spec.Replicas
 
 	swDep := &appsv1.Deployment{

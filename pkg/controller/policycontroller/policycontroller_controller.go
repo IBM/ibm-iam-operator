@@ -53,7 +53,7 @@ var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)        // 100m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
 var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI) // 256Mi
 var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI) // 128Mi
-var serviceAccountName string = "ibm-iam-operator"
+var serviceAccountName string = "ibm-iam-operand"
 
 var log = logf.Log.WithName("controller_policycontroller")
 
@@ -461,7 +461,7 @@ func (r *ReconcilePolicyController) custResourceDefinitionForPolicyController(in
 // deploymentForPolicyController returns a IAM PolicyController Deployment object
 func (r *ReconcilePolicyController) deploymentForPolicyController(instance *operatorv1alpha1.PolicyController) *appsv1.Deployment {
 	reqLogger := log.WithValues("deploymentForPolicyController", "Entry", "instance.Name", instance.Name)
-	image := instance.Spec.ImageRegistry + ":" + instance.Spec.ImageTagPostfix
+	image := instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + ":" + instance.Spec.ImageTagPostfix
 	replicas := instance.Spec.Replicas
 
 	iamPolicyDep := &appsv1.Deployment{

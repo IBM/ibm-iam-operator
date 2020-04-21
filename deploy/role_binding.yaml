@@ -22,3 +22,28 @@ roleRef:
     kind: ClusterRole
     name: ibm-iam-operator
     apiGroup: rbac.authorization.k8s.io
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ibm-iam-operand
+subjects:
+- kind: ServiceAccount
+  name: ibm-iam-operand
+roleRef:
+  kind: Role
+  name: ibm-iam-operand
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ibm-iam-operand
+subjects:
+- kind: ServiceAccount
+  name: ibm-iam-operand
+  namespace: ibm-common-services
+roleRef:
+    kind: ClusterRole
+    name: ibm-iam-operand
+    apiGroup: rbac.authorization.k8s.io

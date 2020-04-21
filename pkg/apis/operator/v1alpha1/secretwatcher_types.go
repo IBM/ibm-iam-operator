@@ -32,6 +32,7 @@ type SecretWatcherSpec struct {
 	Replicas        int32  `json:"replicas"`
 	ImageRegistry   string `json:"imageRegistry,omitempty"`
 	ImageTagPostfix string `json:"imageTagPostfix,omitempty"`
+	ImageName				string `json:"imageName,omitempty"`
 }
 
 // SecretWatcherStatus defines the observed state of SecretWatcher

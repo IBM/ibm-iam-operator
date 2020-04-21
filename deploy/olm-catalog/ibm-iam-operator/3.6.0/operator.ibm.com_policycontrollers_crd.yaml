@@ -31,6 +31,8 @@ spec:
         spec:
           description: PolicyControllerSpec defines the desired state of PolicyController
           properties:
+            imageName:
+              type: string
             imageRegistry:
               type: string
             imageTagPostfix:

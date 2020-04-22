@@ -200,13 +200,7 @@ rules:
   resources:
   - '*'
   verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
+  - '*'
 - apiGroups:
   - iam.policies.ibm.com
   resources:
@@ -592,13 +586,7 @@ rules:
   resources:
   - '*'
   verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
+  - '*'
 - apiGroups:
   - iam.policies.ibm.com
   resources:

@@ -1195,13 +1195,7 @@ spec:
           resources:
           - '*'
           verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
+          - '*'
         - apiGroups:
           - iam.policies.ibm.com
           resources:
@@ -1264,13 +1258,7 @@ spec:
           resources:
           - '*'
           verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
+          - '*'
         - apiGroups:
           - iam.policies.ibm.com
           resources:

@@ -93,3 +93,7 @@ spec:
 ## SecurityContextConstraints Requirements
 
 The IAM operator service does not support running under the OpenShift Container Platform default restricted security context constraints.
+
+## PodSecurityPolicy Requirements
+
+The IAM operator does not define any specific security constraints.

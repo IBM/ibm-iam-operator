@@ -208,12 +208,6 @@ rules:
   - update
   - watch
 - apiGroups:
-  - oidc.security.ibm.com
-  resources:
-  - '*'
-  verbs:
-  - '*'
-- apiGroups:
   - iam.policies.ibm.com
   resources:
   - '*'
@@ -605,12 +599,6 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - oidc.security.ibm.com
-  resources:
-  - '*'
-  verbs:
-  - '*'
 - apiGroups:
   - iam.policies.ibm.com
   resources:

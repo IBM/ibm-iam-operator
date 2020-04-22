@@ -211,6 +211,12 @@ rules:
   - '*'
   verbs:
   - '*'
+- apiGroups:
+  - certmanager.k8s.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
 
 
 
@@ -541,7 +547,7 @@ rules:
   - persistentvolumeclaims
   - events
   - configmaps
-  - secret
+  - secrets
   - namespaces
   verbs:
   - create

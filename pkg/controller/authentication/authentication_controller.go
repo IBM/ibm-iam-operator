@@ -53,7 +53,7 @@ var partialAccess int32 = 420
 var authServicePort int32 = 9443
 var identityProviderPort int32 = 4300
 var identityManagerPort int32 = 4500
-var serviceAccountName string = "ibm-iam-operand"
+var serviceAccountName string = "ibm-iam-operand-privileged"
 
 var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)            // 10m
 var cpu20 = resource.NewMilliQuantity(20, resource.DecimalSI)            // 20m

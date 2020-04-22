@@ -124,7 +124,7 @@ metadata:
               "imageTag": "3.4.0",
               "journalPath": "/run/systemd/journal"
             },
-            "operatorVersion": "3.5.0",
+            "operatorVersion": "3.6.0",
             "papService": {
               "imageName": "iam-policy-administration",
               "imageRegistry": "quay.io/opencloudio",
@@ -237,7 +237,7 @@ metadata:
     capabilities: Basic Install
     categories: Security
     certified: "false"
-    containerImage: quay.io/opencloudio/ibm-iam-operator:3.6.0
+    containerImage: quay.io/opencloudio/ibm-iam-operator:latest
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
       the lifecycle of IAM services. With this operator, you can simply deploy and
       upgrade the IAM services
@@ -1198,7 +1198,7 @@ spec:
                     configMapKeyRef:
                       key: MANAGEMENT_INGRESS_ROUTE_HOST
                       name: management-ingress-info
-                image: quay.io/opencloudio/ibm-iam-operator:3.5.0
+                image: quay.io/opencloudio/ibm-iam-operator:latest
                 imagePullPolicy: Always
                 name: ibm-iam-operator
                 resources: {}

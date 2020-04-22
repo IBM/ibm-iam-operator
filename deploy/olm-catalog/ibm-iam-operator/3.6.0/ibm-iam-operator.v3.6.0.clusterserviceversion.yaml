@@ -1453,7 +1453,7 @@ spec:
           - patch
           - update
           - watch
-        serviceAccountName: ibm-iam-restricted
+        serviceAccountName: ibm-iam-operand-restricted
       - rules:
         - apiGroups:
           - ""

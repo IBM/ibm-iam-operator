@@ -1785,4 +1785,5 @@ spec:
   maturity: stable
   provider:
     name: IBM
+  replaces: ibm-iam-operator.v3.5.0
   version: 3.6.0

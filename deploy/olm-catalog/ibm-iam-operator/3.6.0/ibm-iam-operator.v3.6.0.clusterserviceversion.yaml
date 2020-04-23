@@ -1187,6 +1187,7 @@ spec:
           - events
           - configmaps
           - secrets
+          - secrets/finalizers
           - namespaces
           verbs:
           - create
@@ -1239,15 +1240,9 @@ spec:
         - apiGroups:
           - oidc.security.ibm.com
           resources:
-          - clients
+          - '*'
           verbs:
-          - create
-          - get
-          - list
-          - patch
-          - update
-          - watch
-          - delete
+          - '*'
         - apiGroups:
           - user.openshift.io
           resources:

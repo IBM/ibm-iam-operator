@@ -62,47 +62,6 @@ type ConfigValues struct {
 	ClusterCAIssuer string
 }
 
-// AuthPapValues defines the values of auth-pap container
-type AuthPapValues struct {
-	Name        string
-	HostNetwork bool
-	Image       struct {
-		Repository string
-		Tag        string
-		PullPolicy string
-	}
-	Resources struct {
-		Requests struct {
-			CPU    string
-			Memory string
-		}
-		Limits struct {
-			CPU    string
-			Memory string
-		}
-	}
-	ContainerSecurityContext struct {
-		Privileged               bool
-		RunAsNonRoot             bool
-		ReadOnlyRootFilesystem   bool
-		AllowPrivilegeEscalation bool
-		Capabilities             struct {
-			Drop []string
-		}
-	}
-	PodSecurityContext struct {
-		RunAsUser int
-		FsGroup   int
-	}
-	NodeSelector struct {
-		Master string
-	}
-	Tolerations []struct {
-		Key      string
-		Operator string
-		Effect   string
-	}
-}
 
 // IcpAuditValues defines the values of icp-audit container
 type IcpAuditValues struct {
@@ -147,7 +106,7 @@ var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
 var user int64 = 21000
-var serviceAccountName string = "ibm-iam-operand"
+var serviceAccountName string = "ibm-iam-operand-privileged"
 
 //var port int32 = 39001
 var iamPapServiceValues = IamPapServiceValues{
@@ -168,81 +127,7 @@ var configvalues = ConfigValues{
 	ClusterCAIssuer: "cs-ca-clusterissuer",
 }
 
-/*
-var authPapValues = AuthPapValues{
-	Name:        "auth-pap",
-	HostNetwork: false,
-	Image:       struct {
-		Repository string
-		Tag        string
-		PullPolicy string
-	}{
-		Repository: "ibmcom/iam-policy-administration",
-		Tag:        "3.3.2",
-		PullPolicy: "Always",
-	},
-	Resources: struct {
-		Requests: struct {
-			CPU    string
-			Memory string
-		}{
-			CPU:   "50m",
-			Memory: "200Mi",
-		},
-		Limits: struct {
-			CPU    string
-			Memory string
-		}{
-			CPU:    "1000m",
-			Memory: "1024Mi",
-		}
-	},
-	ContainerSecurityContext: struct {
-		Privileged               bool
-		RunAsNonRoot             bool
-		ReadOnlyRootFilesystem   bool
-		AllowPrivilegeEscalation bool
-		Capabilities             struct {
-			Drop []string
-		}
-	}{
-		Privileged:               false,
-		RunAsNonRoot:             true,
-		ReadOnlyRootFilesystem:   true,
-		AllowPrivilegeEscalation: false,
-		Capabilities:            struct {
-			Drop []string
-		}{
-			Drop: []string {"ALL"},
-		}
-	},
-	PodSecurityContext: struct {
-		RunAsUser int
-		FsGroup   int
-	}{
-		RunAsUser: 21000,
-		FsGroup:   21000,
-	},
-	NodeSelector: struct {
-		Master string
-	}{
-		Master: "true",
-	},
-	Tolerations: []struct {
-		Key      string
-		Operator string
-		Effect   string
-	}{
-		Key      "dedicated",
-		Operator "Exists",
-		Effect   "NoSchedule",
-	},{
-		Key      "CriticalAddonsOnly",
-		Operator "Exists",
-		Effect   "",
-	},
-}
-*/
+
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -742,7 +627,6 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 						"productVersion":                     "3.3.0",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
-						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -782,7 +666,6 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 					Containers: buildContainers(auditImage, papImage, journalPath),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &user,
-						FSGroup:   &user,
 					},
 				},
 			},

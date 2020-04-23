@@ -41,8 +41,7 @@ import (
 )
 
 var log = logf.Log.WithName("controller_securityonboarding")
-var runAsUser int64 = 21000
-var fsGroup int64 = 21000
+var runAsUser int64 = 1000552100
 var cpu20 = resource.NewMilliQuantity(20, resource.DecimalSI)            // 20m
 var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)          // 200m
@@ -53,7 +52,7 @@ var memory512 = resource.NewQuantity(512*1024*1024, resource.BinarySI)   // 512M
 var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024Mi
 var trueVar bool = true
 var falseVar bool = false
-var serviceAccountName string = "ibm-iam-operand"
+var serviceAccountName string = "ibm-iam-operand-restricted"
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -475,7 +474,6 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 		},
 		SecurityContext: &corev1.PodSecurityContext{
 			RunAsUser: &runAsUser,
-			FSGroup:   &fsGroup,
 		},
 		Containers: []corev1.Container{
 			{
@@ -553,7 +551,6 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 						"productVersion":                     "3.3.0",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
-						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},
 				},
 				Spec: podSpec,
@@ -974,7 +971,6 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		ServiceAccountName: serviceAccountName,
 		SecurityContext: &corev1.PodSecurityContext{
 			RunAsUser: &runAsUser,
-			FSGroup:   &fsGroup,
 		},
 		Tolerations: []corev1.Toleration{
 			{
@@ -1064,7 +1060,6 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 						"productVersion":                     "3.3.0",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
-						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},
 				},
 				Spec: podSpec,

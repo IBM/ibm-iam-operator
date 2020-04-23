@@ -46,13 +46,12 @@ var trueVar bool = true
 var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
-var runAsUser int64 = 21000
-var fsGroup int64 = 21000
+var runAsUser int64 = 1000552100
 var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)          // 10m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
 var memory16 = resource.NewQuantity(16*1024*1024, resource.BinarySI)   // 16Mi
 var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI) // 128Mi
-var serviceAccountName string = "ibm-iam-operand"
+var serviceAccountName string = "ibm-iam-operand-restricted"
 
 var log = logf.Log.WithName("controller_oidcclientwatcher")
 
@@ -482,7 +481,6 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 						"productVersion":                     "3.3.0",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
-						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -490,7 +488,6 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 					ServiceAccountName:            serviceAccountName,
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &runAsUser,
-						FSGroup:   &fsGroup,
 					},
 					HostIPC: false,
 					HostPID: false,

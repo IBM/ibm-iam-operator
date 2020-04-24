@@ -15,10 +15,10 @@ spec:
     journalPath: "/run/systemd/journal"
   imageRegistry: "quay.io/opencloudio"
   imageName: "iam-policy-decision"
-  imageTag: "3.3.1"
+  imageTag: "3.3.2"
   initMongodb:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
-    imageTag: "3.3.2"
+    imageTag: "3.3.3"
   operatorVersion: "0.14.1"
   replicas: 1

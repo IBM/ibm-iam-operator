@@ -17,26 +17,26 @@ spec:
   authService:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
-    imageTag: "3.3.2"
+    imageTag: "3.3.3"
     ldapsCACert: "platform-auth-ldaps-ca-cert"
     routerCertSecret: "route-tls-secret"
   clientRegistration:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
-    imageTag: "3.3.2"
+    imageTag: "3.3.3"
   identityManager:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-identity-manager"
-    imageTag: "3.3.3"
+    imageTag: "3.3.4"
     masterNodesList: "10.0.0.1"
   identityProvider:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-identity-provider"
-    imageTag: "3.3.2"
+    imageTag: "3.3.3"
   initMongodb:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
-    imageTag: "3.3.2"
+    imageTag: "3.3.3"
   config:
     oidcIssuerURL: "https://127.0.0.1:443/idauth/oidc/endpoint/OP"
     authUniqueHosts: "internal-ip1 internal-ip2 mycluster.icp"

@@ -12,30 +12,30 @@ spec:
   replicas: 1
   imageRegistry: "quay.io/opencloudio"
   imageName: "icp-iam-onboarding"
-  imageTag: "3.3.1"
+  imageTag: "3.3.2"
   iamOnboarding:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-iam-onboarding"
-    imageTag: "3.3.1"
+    imageTag: "3.3.2"
   initAuthService:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
-    imageTag: "3.3.2"
+    imageTag: "3.3.3"
   initIdentityProvider:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
-    imageTag: "3.3.2"
+    imageTag: "3.3.3"
   initIdentityManager:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
-    imageTag: "3.3.2"
+    imageTag: "3.3.3"
   initTokenService:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
-    imageTag: "3.3.2"
+    imageTag: "3.3.3"
   initPAPSpec:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
-    imageTag: "3.3.2"
+    imageTag: "3.3.3"
   impersonation:
     enableImpersonation: false

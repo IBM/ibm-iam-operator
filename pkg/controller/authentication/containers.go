@@ -369,7 +369,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 }
 
 func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string) corev1.Container {
-	
+
 	icpConsoleURL := os.Getenv("ICP_CONSOLE_URL")
 	envVars := []corev1.EnvVar{
 		{
@@ -593,6 +593,17 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		{
 			Name:  "MASTER_HOST",
 			Value: icpConsoleURL,
+		},
+		{
+			Name: "ICP_PORT",
+			ValueFrom: &corev1.EnvVarSource{
+				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp",
+					},
+					Key: "ICP_PORT",
+				},
+			},
 		},
 	}
 

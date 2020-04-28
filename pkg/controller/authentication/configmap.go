@@ -85,6 +85,7 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"IDENTITY_PROVIDER_URL":       "https://127.0.0.1:4300",
 			"IDENTITY_MGMT_URL":           "https://127.0.0.1:4500",
 			"MASTER_HOST":                 instance.Spec.Config.ClusterCADomain,
+			"ICP_PORT":                    instance.Spec.Config.ICPPort,
 			"NODE_ENV":                    "production",
 			"AUDIT_ENABLED_IDPROVIDER":    "false",
 			"AUDIT_ENABLED_IDMGMT":        "false",

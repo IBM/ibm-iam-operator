@@ -41,7 +41,6 @@ import (
 )
 
 var log = logf.Log.WithName("controller_securityonboarding")
-var runAsUser int64 = 1000552100
 var cpu20 = resource.NewMilliQuantity(20, resource.DecimalSI)            // 20m
 var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)          // 200m
@@ -471,9 +470,6 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 				Key:      "CriticalAddonsOnly",
 				Operator: corev1.TolerationOpExists,
 			},
-		},
-		SecurityContext: &corev1.PodSecurityContext{
-			RunAsUser: &runAsUser,
 		},
 		Containers: []corev1.Container{
 			{
@@ -969,9 +965,6 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		InitContainers:     tmpInitContainers,
 		Volumes:            tmpVolumes,
 		ServiceAccountName: serviceAccountName,
-		SecurityContext: &corev1.PodSecurityContext{
-			RunAsUser: &runAsUser,
-		},
 		Tolerations: []corev1.Toleration{
 			{
 				Key:      "dedicated",

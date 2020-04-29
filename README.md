@@ -1,8 +1,7 @@
 # Title
 
-```
 # ibm-iam-operator
-```
+Operator used to install the cloud pak common iam services.
 
 **Important:** Do not install this operator directly. Only install this operator using the IBM Common Services Operator. For more information about installing this operator and other Common Services operators, see [Installer documentation](http://ibm.biz/cpcs_opinstall) (https://www.ibm.com/support/knowledgecenter/SSHKN6/kc_welcome_cs.html).
 
@@ -11,7 +10,7 @@ If you are using this operator as part of an IBM Cloud Pak, see the documentatio
 ```
 You can use the ibm-iam-operator to install the authentication and authorization services for the IBM Cloud Platform Common Services.
 
-With this Common Web UI console, you can access information and features in the console from other IBM Cloud Platform Common Services, IBM Certified Containers (IBM products), or IBM Cloud Paks that are installed.
+With these services, you can configure security for IBM Cloud Platform Common Services, IBM Certified Containers (IBM products), or IBM Cloud Paks that are installed.
 ```
 
 For more information about the available IBM Cloud Platform Common Services, see the [IBM Knowledge Center](http://ibm.biz/cpcsdocs).
@@ -74,19 +73,6 @@ Use the following commands to debug the operator:
 
 For more instructions on how to run end-to-end testing with the Operand Deployment Lifecycle Manager, see [ODLM guide](https://github.com/IBM/operand-deployment-lifecycle-manager/blob/master/docs/install/common-service-integration.md#end-to-end-test).
 
-# ibm-iam-operator
-Operator used to install the cloud pak common iam services.
-
-
-# Procedure to install
-
-
-## Add the operator source on your openshift cluster
-
-- Follow the instructions in the Knowledge Center link:
-```
-https://www.ibm.com/support/knowledgecenter/SSHKN6/kc_welcome_cs.html
-```
 
 ## SecurityContextConstraints Requirements
 

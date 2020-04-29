@@ -46,7 +46,6 @@ var trueVar bool = true
 var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
-var runAsUser int64 = 1000552100
 var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)          // 10m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
 var memory16 = resource.NewQuantity(16*1024*1024, resource.BinarySI)   // 16Mi
@@ -486,9 +485,6 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 				Spec: corev1.PodSpec{
 					TerminationGracePeriodSeconds: &seconds60,
 					ServiceAccountName:            serviceAccountName,
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser: &runAsUser,
-					},
 					HostIPC: false,
 					HostPID: false,
 					Affinity: &corev1.Affinity{

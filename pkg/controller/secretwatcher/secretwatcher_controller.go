@@ -44,7 +44,6 @@ var trueVar bool = true
 var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
-var runAsUser int64 = 1000552100
 var serviceAccountName string = "ibm-iam-operand-restricted"
 var cpu50 = resource.NewMilliQuantity(50, resource.DecimalSI)          // 50m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
@@ -225,10 +224,7 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 					},
 				},
 				Spec: corev1.PodSpec{
-					TerminationGracePeriodSeconds: &seconds60,
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser: &runAsUser,
-					},
+					TerminationGracePeriodSeconds: &seconds60, 
 					HostIPC:            false,
 					HostPID:            false,
 					ServiceAccountName: serviceAccountName,

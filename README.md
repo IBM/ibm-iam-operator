@@ -1,5 +1,3 @@
-# Title
-
 # ibm-iam-operator
 Operator used to install the cloud pak common iam services.
 

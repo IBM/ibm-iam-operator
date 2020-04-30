@@ -13,7 +13,7 @@ metadata:
           "spec": {
             "imageName": "icp-oidcclient-watcher",
             "imageRegistry": "quay.io/opencloudio",            
-            "imageTagPostfix": "3.3.1",
+            "imageTagPostfix": "3.3.2",
             "operatorVersion": "0.14.1",
             "replicas": 1
           }
@@ -33,11 +33,11 @@ metadata:
             },
             "imageName": "iam-policy-decision",
             "imageRegistry": "quay.io/opencloudio",
-            "imageTag": "3.3.1",
+            "imageTag": "3.3.2",
             "initMongodb": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.2"
+              "imageTag": "3.3.3"
             },
             "operatorVersion": "0.14.1",
             "replicas": 1
@@ -59,14 +59,14 @@ metadata:
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.2",
+              "imageTag": "3.3.3",
               "ldapsCACert": "platform-auth-ldaps-ca-cert",
               "routerCertSecret": "route-tls-secret"
             },
             "clientRegistration": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.2"
+              "imageTag": "3.3.3"
             },
             "config": {
               "authUniqueHosts": "internal-ip1 internal-ip2 mycluster.icp",
@@ -94,18 +94,18 @@ metadata:
             "identityManager": {
               "imageName": "icp-identity-manager",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.3",
+              "imageTag": "3.3.4",
               "masterNodesList": "10.0.0.1"
             },
             "identityProvider": {
               "imageName": "icp-identity-provider",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.2"
+              "imageTag": "3.3.3"
             },
             "initMongodb": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.2"
+              "imageTag": "3.3.3"
             },
             "operatorVersion": "0.14.1",
             "replicas": 1
@@ -128,7 +128,7 @@ metadata:
             "papService": {
               "imageName": "iam-policy-administration",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.2"
+              "imageTag": "3.3.3"
             },
             "replicas": 1
           }
@@ -142,7 +142,7 @@ metadata:
           "spec": {
             "imageName": "iam-policy-controller",
             "imageRegistry": "quay.io/opencloudio",
-            "imageTagPostfix": "3.3.1",
+            "imageTagPostfix": "3.3.2",
             "operatorVersion": "0.14.1",
             "replicas": 1
           }
@@ -156,7 +156,7 @@ metadata:
           "spec": {
             "imageName": "icp-secret-watcher",
             "imageRegistry": "quay.io/opencloudio",
-            "imageTagPostfix": "3.3.1",
+            "imageTagPostfix": "3.3.2",
             "operatorVersion": "0.14.1",
             "replicas": 1
           }
@@ -171,28 +171,28 @@ metadata:
             "iamOnboarding": {
               "imageName": "icp-iam-onboarding",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.1"
+              "imageTag": "3.3.2"
             },
             "imageName": "icp-iam-onboarding",
             "imageRegistry": "quay.io/opencloudio",
-            "imageTag": "3.3.1",
+            "imageTag": "3.3.2",
             "impersonation": {
               "enableImpersonation": false
             },
             "initAuthService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.2"
+              "imageTag": "3.3.3"
             },
             "initIdentityManager": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.2"
+              "imageTag": "3.3.3"
             },
             "initIdentityProvider": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.2"
+              "imageTag": "3.3.3"
             },
             "initPAPSpec": {
               "imageName": "icp-platform-auth",
@@ -202,7 +202,7 @@ metadata:
             "initTokenService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.2"
+              "imageTag": "3.3.3"
             },
             "operatorVersion": "0.14.1",
             "replicas": 1
@@ -1109,6 +1109,41 @@ spec:
       clusterPermissions:
       - rules:
         - apiGroups:
+          - ""
+          resources:
+          - pods
+          - services
+          - services/finalizers
+          - endpoints
+          - persistentvolumeclaims
+          - events
+          - configmaps
+          - secret
+          - namespaces
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - daemonsets
+          - replicasets
+          - statefulsets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
           - apiextensions.k8s.io
           resources:
           - customresourcedefinitions
@@ -1139,7 +1174,100 @@ spec:
           - '*'
           verbs:
           - '*'
-        serviceAccountName: ibm-iam-operand
+        serviceAccountName: ibm-iam-operand-privileged
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          - services
+          - services/finalizers
+          - endpoints
+          - persistentvolumeclaims
+          - events
+          - configmaps
+          - secrets
+          - secrets/finalizers
+          - namespaces
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - daemonsets
+          - replicasets
+          - statefulsets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apiextensions.k8s.io
+          resources:
+          - customresourcedefinitions
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - rbac.authorization.k8s.io/v1
+          resources:
+          - clusterrolebindings
+          - clusterroles
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - oidc.security.ibm.com
+          resources:
+          - '*'
+          verbs:
+          - '*'
+        - apiGroups:
+          - user.openshift.io
+          resources:
+          - '*'
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+          - delete
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - '*'
+          verbs:
+          - '*'
+        - apiGroups:
+          - iam.policies.ibm.com
+          resources:
+          - '*'
+          verbs:
+          - '*'
+        serviceAccountName: ibm-iam-operand-restricted
       - rules:
         - apiGroups:
           - apiextensions.k8s.io
@@ -1154,6 +1282,19 @@ spec:
           - update
           - watch
         - apiGroups:
+          - admissionregistration.k8s.io
+          resources:
+          - mutatingwebhookconfigurations
+          - validatingwebhookconfigurations
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
           - rbac.authorization.k8s.io/v1
           resources:
           - clusterrolebindings
@@ -1167,7 +1308,43 @@ spec:
           - update
           - watch
         - apiGroups:
+          - oidc.security.ibm.com
+          resources:
+          - clients
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+          - delete
+        - apiGroups:
+          - user.openshift.io
+          resources:
           - '*'
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+          - delete
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - '*'
+          verbs:
+          - '*'
+        - apiGroups:
+          - iam.policies.ibm.com
+          resources:
+          - '*'
+          verbs:
+          - '*'
+        - apiGroups:
+          - certmanager.k8s.io
           resources:
           - '*'
           verbs:
@@ -1348,7 +1525,127 @@ spec:
           - patch
           - update
           - watch
-        serviceAccountName: ibm-iam-operand
+        serviceAccountName: ibm-iam-operand-restricted
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          - services
+          - services/finalizers
+          - endpoints
+          - persistentvolumeclaims
+          - events
+          - configmaps
+          - secrets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - daemonsets
+          - replicasets
+          - statefulsets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          verbs:
+          - get
+          - create
+        - apiGroups:
+          - apps
+          resourceNames:
+          - ibm-iam-operator
+          resources:
+          - deployments/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - get
+        - apiGroups:
+          - apps
+          resources:
+          - replicasets
+          - deployments
+          verbs:
+          - get
+        - apiGroups:
+          - operator.ibm.com
+          resources:
+          - '*'
+          - policydecisions
+          - oidcclientwatchers
+          - authentications
+          - policycontrollers
+          - paps
+          - securityonboardings
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - certmanager.k8s.io
+          resources:
+          - '*'
+          - certificates
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - networking.k8s.io
+          resources:
+          - '*'
+          - ingresses
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - batch
+          resources:
+          - jobs
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        serviceAccountName: ibm-iam-operand-privileged
       - rules:
         - apiGroups:
           - ""
@@ -1488,4 +1785,5 @@ spec:
   maturity: stable
   provider:
     name: IBM
+  replaces: ibm-iam-operator.v3.5.0
   version: 3.6.0

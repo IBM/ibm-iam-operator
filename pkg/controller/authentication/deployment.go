@@ -130,7 +130,6 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 						"productVersion":                     "3.3.0",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
-						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -171,7 +170,6 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 					InitContainers: buildInitContainers(mongoDBImage),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &user,
-						FSGroup:   &user,
 					},
 				},
 			},

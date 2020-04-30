@@ -44,9 +44,7 @@ var trueVar bool = true
 var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
-var runAsUser int64 = 21000
-var fsGroup int64 = 21000
-var serviceAccountName string = "ibm-iam-operand"
+var serviceAccountName string = "ibm-iam-operand-restricted"
 var cpu50 = resource.NewMilliQuantity(50, resource.DecimalSI)          // 50m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
 var memory64 = resource.NewQuantity(64*1024*1024, resource.BinarySI)   // 64Mi
@@ -223,15 +221,10 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 						"productVersion":                     "3.3.0",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
-						"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 					},
 				},
 				Spec: corev1.PodSpec{
-					TerminationGracePeriodSeconds: &seconds60,
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser: &runAsUser,
-						FSGroup:   &fsGroup,
-					},
+					TerminationGracePeriodSeconds: &seconds60, 
 					HostIPC:            false,
 					HostPID:            false,
 					ServiceAccountName: serviceAccountName,

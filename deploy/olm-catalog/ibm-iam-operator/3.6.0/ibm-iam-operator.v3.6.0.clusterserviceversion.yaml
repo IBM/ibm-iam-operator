@@ -252,7 +252,7 @@ metadata:
               },
               "public-auth-config": {
                 "configmap" : "platform-auth-idp"
-              },
+              }
             }
           }
         }

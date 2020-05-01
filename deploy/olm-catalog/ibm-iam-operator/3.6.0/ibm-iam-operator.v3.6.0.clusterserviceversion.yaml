@@ -250,6 +250,15 @@ metadata:
               "public-auth-creds": {
                 "secret" : "platform-auth-idp-credentials"
               },
+              "public-auth-cert": {
+                "secret" : "platform-auth-cert"
+              },
+              "public-cam-secret": {
+                "secret" : "oauth-client-secret"
+              },
+              "public-cam-map": {
+                "configmap" : "oauth-client-map"
+              },
               "public-auth-config": {
                 "configmap" : "platform-auth-idp"
               }

@@ -32,9 +32,9 @@ import (
 
 func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentConfigMap *corev1.ConfigMap, requeueResult *bool) error {
 
-	configMapList := []string{"platform-auth-idp", "registration-script", "registration-json"}
+	configMapList := []string{"platform-auth-idp", "registration-script", "oauth-client-map", "registration-json"}
 
-	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{authIdpConfigMap, registrationScriptConfigMap}
+	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{authIdpConfigMap, registrationScriptConfigMap, oauthClientConfigMap}
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
@@ -137,7 +137,7 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 		},
 	}
 
-	// Set PolicyDecision instance as the owner and controller of the ConfigMap
+	// Set Authentication instance as the owner and controller of the ConfigMap
 	err := controllerutil.SetControllerReference(instance, newConfigMap, scheme)
 	if err != nil {
 		reqLogger.Error(err, "Failed to set owner for ConfigMap")
@@ -164,7 +164,7 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 		},
 	}
 
-	// Set PolicyDecision instance as the owner and controller of the ConfigMap
+	// Set Authentication instance as the owner and controller of the ConfigMap
 	err := controllerutil.SetControllerReference(instance, newConfigMap, scheme)
 	if err != nil {
 		reqLogger.Error(err, "Failed to set owner for ConfigMap")
@@ -187,7 +187,35 @@ func registrationScriptConfigMap(instance *operatorv1alpha1.Authentication, sche
 		},
 	}
 
-	// Set PolicyDecision instance as the owner and controller of the ConfigMap
+	// Set Authentication instance as the owner and controller of the ConfigMap
+	err := controllerutil.SetControllerReference(instance, newConfigMap, scheme)
+	if err != nil {
+		reqLogger.Error(err, "Failed to set owner for ConfigMap")
+		return nil
+	}
+	return newConfigMap
+
+}
+
+func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
+
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	icpConsoleURL := os.Getenv("ICP_CONSOLE_URL")
+	newConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "oauth-client-map",
+			Namespace: instance.Namespace,
+			Labels:    map[string]string{"app": "auth-idp"},
+		},
+		Data: map[string]string{
+			"MASTER_IP": icpConsoleURL,
+			"PROXY_IP": icpConsoleURL,
+			"CLUSTER_CA_DOMAIN": instance.Spec.Config.ClusterCADomain,
+			"CLUSTER_NAME": instance.Spec.Config.ClusterName,
+		},
+	}
+
+	// Set Authentication instance as the owner and controller of the ConfigMap
 	err := controllerutil.SetControllerReference(instance, newConfigMap, scheme)
 	if err != nil {
 		reqLogger.Error(err, "Failed to set owner for ConfigMap")

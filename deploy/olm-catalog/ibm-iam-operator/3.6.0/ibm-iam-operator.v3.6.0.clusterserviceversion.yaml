@@ -232,6 +232,33 @@ metadata:
               }
             ]
           }
+        },
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "OperandBindInfo",
+          "metadata": {
+            "name": "ibm-iam-bindinfo"
+            "namespace": "ibm-common-services"
+          },
+          "spec": {
+            "operand": "ibm-iam-operator",
+            "registry": "common-service",
+            "description": "Binding information that should be accessible to iam adopters",
+            "bindings": [
+              {
+                "scope": "public-oidc-creds",
+                "secret": "platform-oidc-credentials"
+              },
+              {
+                "scope": "public-auth-creds",
+                "secret": "platform-auth-idp-credentials"
+              },
+              {
+                "scope": "public-auth-info",
+                "configmap": "platform-auth-idp"
+              }
+            ]
+          }
         }
       ]
     capabilities: Basic Install

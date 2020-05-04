@@ -107,7 +107,7 @@ If, as a developer, you are looking to build and test this operator to try out a
   - anytime you modify `<kind>_types.go`, run `generate k8s`, `generate crds`, and `openapi-gen` again to update the CRD and the generated code
 
 - Create the controller. It will create resources like Deployments, DaemonSets, etc.
-  - `operator-sdk add controller --api-version=operator.ibm.com/v1alpha1 --kind=Metering`
+  - `operator-sdk add controller --api-version=operator.ibm.com/v1alpha1 --kind=IAM`
   - there is 1 controller for each Kind/CRD
   - the controller will watch and reconcile the resources owned by the CR
   - for information about the Go types that implement Deployments, DaemonSets, etc, go to https://godoc.org/k8s.io/api/apps/v1
@@ -119,7 +119,7 @@ If, as a developer, you are looking to build and test this operator to try out a
   - `cd /home/ibmadmin/workspace/cs-operators/iam-operator`
   - `oc login...`
   - `kubectl create -f deploy/crds/operator.ibm.com_authentications_crd.yaml`
-  - `kubectl get crd meterings.operator.ibm.com`
+  - `kubectl get crd authentications.operator.ibm.com`
   - delete and create again if the CRD changes
     - `kubectl delete crd authentications.operator.ibm.com`
 

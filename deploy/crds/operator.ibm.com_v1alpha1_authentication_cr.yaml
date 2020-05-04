@@ -12,7 +12,7 @@ spec:
   auditService: 
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-audit-service"
-    imageTag: "3.4.0"
+    imageTag: "3.4.1"
     journalPath: "/run/systemd/journal"
   authService:
     imageRegistry: "quay.io/opencloudio"

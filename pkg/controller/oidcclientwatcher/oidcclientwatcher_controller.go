@@ -250,20 +250,31 @@ func (r *ReconcileOIDCClientWatcher) handleDeployment(instance *operatorv1alpha1
 	// Check if this Deployment already exists
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "oidcclient-watcher", Namespace: instance.Namespace}, currentDeployment)
-	if err != nil && errors.IsNotFound(err) {
-		// Define a new deployment
-		ocwDep := r.deploymentForOIDCClientWatcher(instance)
-		reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", ocwDep.Namespace, "Deployment.Name", ocwDep.Name)
-		err = r.client.Create(context.TODO(), ocwDep)
-		if err != nil {
-			reqLogger.Error(err, "Failed to create new Deployment", "Deployment.Namespace", ocwDep.Namespace, "Deployment.Name", ocwDep.Name)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Define a new deployment
+			ocwDep := r.deploymentForOIDCClientWatcher(instance)
+			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", ocwDep.Namespace, "Deployment.Name", ocwDep.Name)
+			err = r.client.Create(context.TODO(), ocwDep)
+			if err != nil {
+				reqLogger.Error(err, "Failed to create new Deployment", "Deployment.Namespace", ocwDep.Namespace, "Deployment.Name", ocwDep.Name)
+				return reconcile.Result{}, err
+			}
+			// Deployment created successfully - return and requeue
+			return reconcile.Result{Requeue: true}, nil
+		} else {
+			reqLogger.Error(err, "Failed to get Deployment")
 			return reconcile.Result{}, err
 		}
-		// Deployment created successfully - return and requeue
-		return reconcile.Result{Requeue: true}, nil
-	} else if err != nil {
-		reqLogger.Error(err, "Failed to get Deployment")
-		return reconcile.Result{}, err
+	} else {
+		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
+		ocwDep := r.deploymentForOIDCClientWatcher(instance)
+		currentDeployment.Spec = ocwDep.Spec
+		err = r.client.Update(context.TODO(), currentDeployment)
+		if err != nil {
+			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
+			return reconcile.Result{}, err
+		}
 	}
 
 	// Ensure the deployment replicas is the same as the spec

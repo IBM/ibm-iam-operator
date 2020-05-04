@@ -37,17 +37,28 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	deployment := "auth-idp"
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: deployment, Namespace: instance.Namespace}, currentDeployment)
-	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", deployment)
-		newDeployment := generateDeploymentObject(instance, r.scheme, deployment)
-		err = r.client.Create(context.TODO(), newDeployment)
-		if err != nil {
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", deployment)
+			newDeployment := generateDeploymentObject(instance, r.scheme, deployment)
+			err = r.client.Create(context.TODO(), newDeployment)
+			if err != nil {
+				return err
+			}
+			// Deployment created successfully - return and requeue
+			*requeueResult = true
+		} else {
 			return err
 		}
-		// Deployment created successfully - return and requeue
-		*requeueResult = true
-	} else if err != nil {
-		return err
+	} else {
+		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
+		ocwDep := generateDeploymentObject(instance, r.scheme, deployment)
+		currentDeployment.Spec = ocwDep.Spec
+		err = r.client.Update(context.TODO(), currentDeployment)
+		if err != nil {
+			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
+			return err
+		}
 	}
 
 	podList := &corev1.PodList{}

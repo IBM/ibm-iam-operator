@@ -19,7 +19,7 @@ package authentication
 import (
 	"context"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
-	"github.com/IBM/ibm-iam-operator/pkg/apis/controller/shas"
+	"github.com/IBM/ibm-iam-operator/pkg/controller/shas"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	gorun "runtime"
@@ -102,11 +102,12 @@ func getPodNames(pods []corev1.Pod) []string {
 
 func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string) *appsv1.Deployment {
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
-	authServiceImage := instance.Spec.AuthService.ImageRegistry + "/" + instance.Spec.AuthService.ImageName + ":" + instance.Spec.AuthService.ImageTag
-	identityProviderImage := instance.Spec.IdentityProvider.ImageRegistry + "/" + instance.Spec.IdentityProvider.ImageName + ":" + instance.Spec.IdentityProvider.ImageTag
-	identityManagerImage := instance.Spec.IdentityManager.ImageRegistry + "/" + instance.Spec.IdentityManager.ImageName + ":" + instance.Spec.IdentityManager.ImageTag
-	mongoDBImage := instance.Spec.InitMongodb.ImageRegistry + "/" + instance.Spec.InitMongodb.ImageName + ":" + instance.Spec.InitMongodb.ImageTag
-	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + ":" + instance.Spec.AuditService.ImageTag
+	arch := gorun.GOARCH
+	authServiceImage := instance.Spec.AuthService.ImageRegistry + "/" + instance.Spec.AuthService.ImageName + "@" + shas.AuthServiceSHA[arch]
+	identityProviderImage := instance.Spec.IdentityProvider.ImageRegistry + "/" + instance.Spec.IdentityProvider.ImageName + "@" + shas.IdentityProviderSHA[arch]
+	identityManagerImage := instance.Spec.IdentityManager.ImageRegistry + "/" + instance.Spec.IdentityManager.ImageName + "@" + shas.IdentityManagerSHA[arch]
+	mongoDBImage := instance.Spec.InitMongodb.ImageRegistry + "/" + instance.Spec.InitMongodb.ImageName + "@" + shas.InitSHA[arch]
+	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + "@" + shas.AuditSHA[arch]
 	replicas := instance.Spec.Replicas
 	journalPath := instance.Spec.AuditService.JournalPath
 	ldapCACert := instance.Spec.AuthService.LdapsCACert

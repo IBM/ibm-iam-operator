@@ -26,6 +26,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	gorun "runtime"
+	"github.com/IBM/ibm-iam-operator/pkg/controller/shas"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -471,7 +472,8 @@ func (r *ReconcilePolicyController) custResourceDefinitionForPolicyController(in
 // deploymentForPolicyController returns a IAM PolicyController Deployment object
 func (r *ReconcilePolicyController) deploymentForPolicyController(instance *operatorv1alpha1.PolicyController) *appsv1.Deployment {
 	reqLogger := log.WithValues("deploymentForPolicyController", "Entry", "instance.Name", instance.Name)
-	image := instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + ":" + instance.Spec.ImageTagPostfix
+	arch := gorun.GOARCH
+	image := instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + "@" + shas.PolicyControllerSHA[arch]
 	replicas := instance.Spec.Replicas
 
 	iamPolicyDep := &appsv1.Deployment{

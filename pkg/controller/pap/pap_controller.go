@@ -22,7 +22,7 @@ import (
 
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
-	"github.com/IBM/ibm-iam-operator/pkg/apis/controller/shas"
+	"github.com/IBM/ibm-iam-operator/pkg/controller/shas"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	gorun "runtime"
@@ -605,8 +605,9 @@ func (r *ReconcilePap) ingressForPap(instance *operatorv1alpha1.Pap) *net.Ingres
 func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.Deployment {
 
 	reqLogger := log.WithValues("deploymentForPap", "Entry", "instance.Name", instance.Name)
-	papImage := instance.Spec.PapService.ImageRegistry + "/" + instance.Spec.PapService.ImageName + ":" + instance.Spec.PapService.ImageTag
-	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + ":" + instance.Spec.AuditService.ImageTag
+	arch := gorun.GOARCH
+	papImage := instance.Spec.PapService.ImageRegistry + "/" + instance.Spec.PapService.ImageName + "@" + shas.PolicyAdministrationSHA[arch]
+	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + "@" + shas.AuditSHA[arch]
 	replicas := instance.Spec.Replicas
 	journalPath := instance.Spec.AuditService.JournalPath
 

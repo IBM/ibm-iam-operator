@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.1-409
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.2-267
 
 LABEL org.label-schema.vendor="IBM" \
     org.label-schema.name="ibm-iam-operator" \

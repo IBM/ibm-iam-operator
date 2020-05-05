@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"github.com/IBM/ibm-iam-operator/pkg/apis/controller/shas"
 )
 
 var log = logf.Log.WithName("controller_securityonboarding")
@@ -52,6 +53,7 @@ var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024
 var trueVar bool = true
 var falseVar bool = false
 var serviceAccountName string = "ibm-iam-operand-restricted"
+
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller

@@ -114,7 +114,7 @@ If, as a developer, you are looking to build and test this operator to try out a
   - for information about the Go types that implement Pods, VolumeMounts, etc, go to https://godoc.org/k8s.io/api/core/v1
   - for information about the Go types that implement Ingress, etc, go to https://godoc.org/k8s.io/api/networking/v1beta1
 
-## Testing
+### Running locally
 - Create the CRD. Do this one time before starting the operator.
   - `cd /home/ibmadmin/workspace/cs-operators/iam-operator`
   - `oc login...`

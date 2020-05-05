@@ -478,7 +478,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 		Containers: []corev1.Container{
 			{
 				Name:            "security-onboarding",
-				Image:           instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + "@" + shas.IAMOnboarding[arch],
+				Image:           instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + "@" + shas.IAMOnboardingSHA[arch],
 				ImagePullPolicy: corev1.PullPolicy("Always"),
 				Command:         []string{"python", "/app/scripts/onboard-script.py"},
 				SecurityContext: &corev1.SecurityContext{

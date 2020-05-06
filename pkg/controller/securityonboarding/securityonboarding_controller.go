@@ -378,7 +378,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 		{
 			Name:            "init-auth-service",
 			Command:         []string{"sh", "-c", "sleep 75; until curl -k -i -fsS https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration | grep '200 OK'; do sleep 3; done;"},
-			Image:           instance.Spec.InitAuthService.ImageRegistry + "/" + instance.Spec.InitAuthService.ImageName + shatag.GetImageRef("AUTH_SERVICE_IMAGE_TAG_OR_SHA"),
+			Image:           instance.Spec.InitAuthService.ImageRegistry + "/" + instance.Spec.InitAuthService.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA"),
 			ImagePullPolicy: corev1.PullPolicy("Always"),
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
@@ -478,7 +478,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 		Containers: []corev1.Container{
 			{
 				Name:            "security-onboarding",
-				Image:           instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + shatag.GetImageRef("IAM_ONBOARDING_IMAGE_TAG_OR_SHA"),
+				Image:           instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + shatag.GetImageRef("IAM_ONBOARDING_TAG_OR_SHA"),
 				ImagePullPolicy: corev1.PullPolicy("Always"),
 				Command:         []string{"python", "/app/scripts/onboard-script.py"},
 				SecurityContext: &corev1.SecurityContext{
@@ -577,7 +577,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		{
 			Name:            "init-auth-service",
 			Command:         []string{"sh", "-c", "sleep 75; until curl -k -i -fsS https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration | grep '200 OK'; do sleep 3; done;"},
-			Image:           instance.Spec.InitAuthService.ImageRegistry + "/" + instance.Spec.InitAuthService.ImageName + shatag.GetImageRef("AUTH_SERVICE_IMAGE_TAG_OR_SHA"),
+			Image:           instance.Spec.InitAuthService.ImageRegistry + "/" + instance.Spec.InitAuthService.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA"),
 			ImagePullPolicy: corev1.PullPolicy("Always"),
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
@@ -600,7 +600,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		{
 			Name:            "init-identity-provider",
 			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-provider:4300 | grep '200 OK'; do sleep 3; done;"},
-			Image:           instance.Spec.InitIdentityProvider.ImageRegistry + "/" + instance.Spec.InitIdentityProvider.ImageName + shatag.GetImageRef("AUTH_SERVICE_IMAGE_TAG_OR_SHA"),
+			Image:           instance.Spec.InitIdentityProvider.ImageRegistry + "/" + instance.Spec.InitIdentityProvider.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA"),
 			ImagePullPolicy: corev1.PullPolicy("Always"),
 			VolumeMounts: []corev1.VolumeMount{
 				{
@@ -629,7 +629,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		{
 			Name:            "init-identity-manager",
 			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-management:4500 | grep '200 OK'; do sleep 3; done;"},
-			Image:           instance.Spec.InitIdentityManager.ImageRegistry + "/" + instance.Spec.InitIdentityManager.ImageName + shatag.GetImageRef("AUTH_SERVICE_IMAGE_TAG_OR_SHA"),
+			Image:           instance.Spec.InitIdentityManager.ImageRegistry + "/" + instance.Spec.InitIdentityManager.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA"),
 			ImagePullPolicy: corev1.PullPolicy("Always"),
 			VolumeMounts: []corev1.VolumeMount{
 				{
@@ -658,7 +658,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		{
 			Name:            "init-token-service",
 			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-auth-service:9443/iam/oidc/keys | grep '200 OK'; do sleep 3; done;"},
-			Image:           instance.Spec.InitTokenService.ImageRegistry + "/" + instance.Spec.InitTokenService.ImageName + shatag.GetImageRef("AUTH_SERVICE_IMAGE_TAG_OR_SHA"),
+			Image:           instance.Spec.InitTokenService.ImageRegistry + "/" + instance.Spec.InitTokenService.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA"),
 			ImagePullPolicy: corev1.PullPolicy("Always"),
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
@@ -681,7 +681,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		{
 			Name:            "init-pap",
 			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://iam-pap:39001/v1/health | grep '200 OK'; do sleep 3; done;"},
-			Image:           instance.Spec.InitPAP.ImageRegistry + "/" + instance.Spec.InitPAP.ImageName + shatag.GetImageRef("AUTH_SERVICE_IMAGE_TAG_OR_SHA"),
+			Image:           instance.Spec.InitPAP.ImageRegistry + "/" + instance.Spec.InitPAP.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA"),
 			ImagePullPolicy: corev1.PullPolicy("Always"),
 			VolumeMounts: []corev1.VolumeMount{
 				{
@@ -984,7 +984,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			{
 				Name:            "iam-onboarding",
 				Command:         []string{"python", "/app/acs_utils/build/icp_iam_am_bootstrap.py"},
-				Image:           instance.Spec.IAMOnboarding.ImageRegistry + "/" + instance.Spec.IAMOnboarding.ImageName + shatag.GetImageRef("IAM_ONBOARDING_IMAGE_TAG_OR_SHA"),
+				Image:           instance.Spec.IAMOnboarding.ImageRegistry + "/" + instance.Spec.IAMOnboarding.ImageName + shatag.GetImageRef("IAM_ONBOARDING_TAG_OR_SHA"),
 				ImagePullPolicy: corev1.PullPolicy("Always"),
 				SecurityContext: &corev1.SecurityContext{
 					Privileged:               &falseVar,

@@ -471,7 +471,7 @@ func (r *ReconcilePolicyController) custResourceDefinitionForPolicyController(in
 // deploymentForPolicyController returns a IAM PolicyController Deployment object
 func (r *ReconcilePolicyController) deploymentForPolicyController(instance *operatorv1alpha1.PolicyController) *appsv1.Deployment {
 	reqLogger := log.WithValues("deploymentForPolicyController", "Entry", "instance.Name", instance.Name)
-	image := instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + shatag.GetImageRef("POLICY_CONTROLLER_IMAGE_TAG_OR_SHA")
+	image := instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + shatag.GetImageRef("POLICY_CONTROLLER_TAG_OR_SHA")
 	replicas := instance.Spec.Replicas
 
 	iamPolicyDep := &appsv1.Deployment{

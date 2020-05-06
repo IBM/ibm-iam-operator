@@ -102,11 +102,11 @@ func getPodNames(pods []corev1.Pod) []string {
 
 func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string) *appsv1.Deployment {
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
-	authServiceImage := instance.Spec.AuthService.ImageRegistry + "/" + instance.Spec.AuthService.ImageName + shatag.GetImageRef("AUTH_SERVICE_IMAGE_TAG_OR_SHA")
-	identityProviderImage := instance.Spec.IdentityProvider.ImageRegistry + "/" + instance.Spec.IdentityProvider.ImageName + shatag.GetImageRef("IDENTITY_PROVIDER_IMAGE_TAG_OR_SHA")
-	identityManagerImage := instance.Spec.IdentityManager.ImageRegistry + "/" + instance.Spec.IdentityManager.ImageName + shatag.GetImageRef("IDENTITY_MANAGER_IMAGE_TAG_OR_SHA")
-	mongoDBImage := instance.Spec.InitMongodb.ImageRegistry + "/" + instance.Spec.InitMongodb.ImageName + shatag.GetImageRef("AUTH_SERVICE_IMAGE_TAG_OR_SHA")
-	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + shatag.GetImageRef("AUDIT_IMAGE_TAG_OR_SHA")
+	authServiceImage := instance.Spec.AuthService.ImageRegistry + "/" + instance.Spec.AuthService.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA")
+	identityProviderImage := instance.Spec.IdentityProvider.ImageRegistry + "/" + instance.Spec.IdentityProvider.ImageName + shatag.GetImageRef("IDENTITY_PROVIDER_TAG_OR_SHA")
+	identityManagerImage := instance.Spec.IdentityManager.ImageRegistry + "/" + instance.Spec.IdentityManager.ImageName + shatag.GetImageRef("IDENTITY_MANAGER_TAG_OR_SHA")
+	mongoDBImage := instance.Spec.InitMongodb.ImageRegistry + "/" + instance.Spec.InitMongodb.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA")
+	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + shatag.GetImageRef("AUDIT_TAG_OR_SHA")
 	replicas := instance.Spec.Replicas
 	journalPath := instance.Spec.AuditService.JournalPath
 	ldapCACert := instance.Spec.AuthService.LdapsCACert

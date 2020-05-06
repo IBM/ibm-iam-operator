@@ -210,7 +210,7 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 	labels1 := labelsForSecretWatcherMeta(secretWatcherDeploymentName)
 	labels2 := labelsForSecretWatcherSelect(instance.Name, secretWatcherDeploymentName)
 	labels3 := labelsForSecretWatcherPod(instance.Name, secretWatcherDeploymentName)
-	image := instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + shatag.GetImageRef("SECRET_WATCHER_IMAGE_TAG_OR_SHA")
+	image := instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + shatag.GetImageRef("SECRET_WATCHER_TAG_OR_SHA")
 	replicas := instance.Spec.Replicas
 
 	swDep := &appsv1.Deployment{

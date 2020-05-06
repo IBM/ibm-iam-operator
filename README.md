@@ -52,81 +52,86 @@ These steps are based on the [Operator Framework: Getting Started](https://githu
 - Repositories
   - https://github.com/IBM/ibm-iam-operator
 
-- Set the Go environment variables.
+Complete the following steps:
 
+1. Set the Go environment variables.
   `export GOPATH=/home/<username>/go`  
   `export GO111MODULE=on`  
   `export GOPRIVATE="github.ibm.com"`
 
-- Create the operator skeleton.
+2. Create the operator skeleton.
   - `cd /home/ibmadmin/workspace/cs-operators`
   - `operator-sdk new iam-operator --repo github.com/ibm/iam-operator`
-  - the main program for the operator, `cmd/manager/main.go`, initializes and runs the Manager
-  - the Manager will automatically register the scheme for all custom resources defined under `pkg/apis/...`
-    and run all controllers under `pkg/controller/...`
-  - the Manager can restrict the namespace that all controllers will watch for resources
+  
+  The main program for the operator, `cmd/manager/main.go`, initializes and runs the Manager. The Manager completes the following tasks:
+  - Automatically registers the scheme for all custom resources that are defined under `pkg/apis/...`.
+  - Runs all controllers under `pkg/controller/...`. 
+  - Restrict the namespace that all controllers watch for resources.
 
-- Create the API definition ("Kind") which is used to create the CRD
-  - `cd /home/ibmadmin/workspace/cs-operators/iam-operator`
-  - create `hack/boilerplate.go.txt`
-	- contains copyright for generated code
-  - `operator-sdk add api --api-version=operator.ibm.com/v1alpha1 --kind=IAM`
-	- generates `pkg/apis/operator/v1alpha1/<kind>_types.go`
-	  - example: `pkg/apis/operator/v1alpha1/authentications.go`
-    - generates `deploy/crds/operator.ibm.com_<kind>s_crd.yaml`
-      - example: `deploy/crds/operator.ibm.com_authentications_crd.yaml`
-    - generates `deploy/crds/operator.ibm.com_v1alpha1_<kind>_cr.yaml`
-      - example: `deploy/crds/operator.ibm.com_v1alpha1_authentications_cr.yaml`
-  - the operator can manage more than 1 Kind
+3. Create the API definition ("Kind") that is used to create the CRD.
+  a. `cd /home/ibmadmin/workspace/cs-operators/iam-operator`.
+  b. Create `hack/boilerplate.go.txt` that contains the copyright information for the generated code.
+  c. Create the API definition ("Kind") by running the following command:
+     `operator-sdk add api --api-version=operator.ibm.com/v1alpha1 --kind=IAM`
+     The command complete the following tasks:
+       - Generates `pkg/apis/operator/v1alpha1/<kind>_types.go`. For example, `pkg/apis/operator/v1alpha1/authentications.go`.
+       - Generates `deploy/crds/operator.ibm.com_<kind>s_crd.yaml`. For example, `deploy/crds/operator.ibm.com_authentications_crd.yaml`.
+       - Generates `deploy/crds/operator.ibm.com_v1alpha1_<kind>_cr.yaml`. For example, `deploy/crds/operator.ibm.com_v1alpha1_authentications_cr.yaml`.
+       
+     The operator can manage more than one `Kind` API resource.
+     
+4. Edit `<kind>_types.go` and add the fields that are exposed to the user. Then, regenerate the CRD.
+  a. Edit `<kind>_types.go` and add fields to the `<Kind>Spec` struct. Then, run the following command:
+     `operator-sdk generate k8s`
+     The command updates `zz_generated.deepcopy.go`.
+  b. Generate CRDs.
+     **Note:** The **Operator Framework: Getting Started** provides the `operator-sdk generate openapi` command to generate CRD. However, the command is deprecated. You can run the following commands instead:
+     - `operator-sdk generate crds`
+	  - The command updates `operator.ibm.com_authentications_crd.yaml`.
+     - `openapi-gen --logtostderr=true -o "" -i ./pkg/apis/operator/v1alpha1 -O zz_generated.openapi -p ./pkg/apis/operator/v1alpha1 -h hack/boilerplate.go.txt -r "-"`
+          - The command creates `zz_generated.openapi.go`. 
+            If you need to build `openapi-gen`, follow these steps. The binary is built in `$GOPATH/bin`.
+            ```
+            git clone https://github.com/kubernetes/kube-openapi.git
+            cd kube-openapi
+            go mod tidy
+            go build -o ./bin/openapi-gen k8s.io/kube-openapi/cmd/openapi-gen
+            ```
+    **Note:** Every time you modify `<kind>_types.go`, run `generate k8s`, `generate crds`, and `openapi-gen` to update the CRD and the generated code.
 
-- Edit `<kind>_types.go` and add the fields that will be exposed to the user. Then regenerate the CRD.
-  - edit `<kind>_types.go` and add fields to the `<Kind>Spec` struct
-  - `operator-sdk generate k8s`
-	- updates `zz_generated.deepcopy.go`
-  - "Operator Framework: Getting Started" says to run `operator-sdk generate openapi`. That command is deprecated, so run the next 2 commands instead.
-    - `operator-sdk generate crds`
-	  - updates `operator.ibm.com_authentications_crd.yaml`
-    - `openapi-gen --logtostderr=true -o "" -i ./pkg/apis/operator/v1alpha1 -O zz_generated.openapi -p ./pkg/apis/operator/v1alpha1 -h hack/boilerplate.go.txt -r "-"`
-      - creates `zz_generated.openapi.go`
-      - if you need to build `openapi-gen`, follow these steps. The binary will be built in `$GOPATH/bin`.
-        ```
-        git clone https://github.com/kubernetes/kube-openapi.git
-        cd kube-openapi
-        go mod tidy
-        go build -o ./bin/openapi-gen k8s.io/kube-openapi/cmd/openapi-gen
-        ```
-  - anytime you modify `<kind>_types.go`, run `generate k8s`, `generate crds`, and `openapi-gen` again to update the CRD and the generated code
+5. Create the controller, which creates resources such as Deployments, DaemonSets, and other resources.
+  `operator-sdk add controller --api-version=operator.ibm.com/v1alpha1 --kind=IAM`
+  
+  **Notes:**
+  - There is one controller for each Kind/CRD.
+  - The controller watches and reconciles the resources that are owned by the CR.
+  - For information about the Go types that implement Deployments, DaemonSets, and other resources, see https://godoc.org/k8s.io/api/apps/v1.
+  - For information about the Go types that implement Pods, VolumeMounts, and other resources, see https://godoc.org/k8s.io/api/core/v1.
+  - For information about the Go types that implement Ingress and other resources, see https://godoc.org/k8s.io/api/networking/v1beta1.
 
-- Create the controller. It will create resources like Deployments, DaemonSets, etc.
-  - `operator-sdk add controller --api-version=operator.ibm.com/v1alpha1 --kind=IAM`
-  - there is 1 controller for each Kind/CRD
-  - the controller will watch and reconcile the resources owned by the CR
-  - for information about the Go types that implement Deployments, DaemonSets, etc, go to https://godoc.org/k8s.io/api/apps/v1
-  - for information about the Go types that implement Pods, VolumeMounts, etc, go to https://godoc.org/k8s.io/api/core/v1
-  - for information about the Go types that implement Ingress, etc, go to https://godoc.org/k8s.io/api/networking/v1beta1
+#### Running locally
 
-### Running locally
-- Create the CRD. Do this one time before starting the operator.
-  - `cd /home/ibmadmin/workspace/cs-operators/iam-operator`
-  - `oc login...`
-  - `kubectl create -f deploy/crds/operator.ibm.com_authentications_crd.yaml`
-  - `kubectl get crd authentications.operator.ibm.com`
-  - delete and create again if the CRD changes
+1. Create the CRD. Do this one time before you start the operator.
+  a. `cd /home/ibmadmin/workspace/cs-operators/iam-operator`
+  b. `oc login`
+  c. `kubectl create -f deploy/crds/operator.ibm.com_authentications_crd.yaml`
+  d. `kubectl get crd authentications.operator.ibm.com`
+  
+  If the CRD changes, delete and create again: 
     - `kubectl delete crd authentications.operator.ibm.com`
 
-- Run the operator locally
-  - `cd /home/ibmadmin/workspace/cs-operators/iam-operator`
-  - `oc login...`
-  - `export OPERATOR_NAME=iam-operator`
-  - `operator-sdk up local --namespace=<namespace>`
+2. Run the operator locally.
+  a. `cd /home/ibmadmin/workspace/cs-operators/iam-operator`
+  b. `oc login`
+  c. `export OPERATOR_NAME=iam-operator`
+  d. `operator-sdk up local --namespace=<namespace>`
 
-- Create a CR which is an instance of the CRD
-  - edit `deploy/crds/operator.ibm.com_v1alpha1_authentications_cr.yaml`
-  - `kubectl create -f deploy/crds/operator.ibm.com_v1alpha1_authentications_cr.yaml`
+3. Create a CR, which is an instance of the CRD.
+  1. Edit `deploy/crds/operator.ibm.com_v1alpha1_authentications_cr.yaml`.
+  2. `kubectl create -f deploy/crds/operator.ibm.com_v1alpha1_authentications_cr.yaml`
 
-- Delete the CR and the associated resources that were created
+4. Delete the CR and the associated resources that were created.
   - `kubectl delete authentications example-authentication`
-```
 
 ## SecurityContextConstraints Requirements
 

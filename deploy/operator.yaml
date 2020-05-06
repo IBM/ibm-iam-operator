@@ -79,6 +79,11 @@ spec:
                 configMapKeyRef:
                   name: management-ingress-info
                   key: MANAGEMENT_INGRESS_ROUTE_HOST
+            - name: ICP_PROXY_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ibmcloud-cluster-info
+                  key: proxy_address
           resources:
             limits:
               cpu: 20m

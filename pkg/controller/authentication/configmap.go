@@ -201,6 +201,7 @@ func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, scheme *run
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	icpConsoleURL := os.Getenv("ICP_CONSOLE_URL")
+	icpProxyURL := os.Getenv("ICP_PROXY_URL")
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "oauth-client-map",
@@ -209,8 +210,8 @@ func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, scheme *run
 		},
 		Data: map[string]string{
 			"MASTER_IP": icpConsoleURL,
-			"PROXY_IP": icpConsoleURL,
-			"CLUSTER_CA_DOMAIN": instance.Spec.Config.ClusterCADomain,
+			"PROXY_IP": icpProxyURL,
+			"CLUSTER_CA_DOMAIN": icpConsoleURL,
 			"CLUSTER_NAME": instance.Spec.Config.ClusterName,
 		},
 	}

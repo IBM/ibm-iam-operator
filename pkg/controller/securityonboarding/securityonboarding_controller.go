@@ -26,7 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
-	gorun "runtime"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -54,7 +53,6 @@ var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024
 var trueVar bool = true
 var falseVar bool = false
 var serviceAccountName string = "ibm-iam-operand-restricted"
-var arch = gorun.GOARCH
 
 
 /**

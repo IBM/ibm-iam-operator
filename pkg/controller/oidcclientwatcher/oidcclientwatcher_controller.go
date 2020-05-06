@@ -19,7 +19,7 @@ package oidcclientwatcher
 import (
 	"context"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
-	"github.com/IBM/ibm-iam-operator/pkg/controller/shas"
+	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -461,8 +461,7 @@ func (r *ReconcileOIDCClientWatcher) crdForOIDCClientWatcher(instance *operatorv
 // deploymentForOIDCClientWatcher returns a OIDCClientWatcher Deployment object
 func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *operatorv1alpha1.OIDCClientWatcher) *appsv1.Deployment {
 	reqLogger := log.WithValues("deploymentForOIDCClientWatcher", "Entry", "instance.Name", instance.Name)
-	arch := gorun.GOARCH
-	image := instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + "@" + shas.ClientWatcherSHA[arch]
+	image := instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + shatag.GetImageRef("CLIENT_WATCHER_IMAGE_TAG_OR_SHA")
 	replicas := instance.Spec.Replicas
 
 	ocwDep := &appsv1.Deployment{

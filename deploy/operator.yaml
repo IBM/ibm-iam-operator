@@ -44,6 +44,26 @@ spec:
           - ibm-iam-operator
           imagePullPolicy: Always
           env:
+            - name: AUTH_SERVICE_TAG_OR_SHA
+              value: "3.3.3"
+            - name: IDENTITY_PROVIDER_TAG_OR_SHA
+              value: "3.3.3"
+            - name: IDENTITY_MANAGER_TAG_OR_SHA
+              value: "3.3.4"
+            - name: POLICY_ADMINISTRATION_TAG_OR_SHA
+              value: "3.3.3"
+            - name: POLICY_DECISION_TAG_OR_SHA
+              value: "3.3.2"
+            - name: SECRET_WATCHER_TAG_OR_SHA
+              value: "3.3.2"
+            - name: CLIENT_WATCHER_TAG_OR_SHA
+              value: "3.3.2"
+            - name: POLICY_CONTROLLER_TAG_OR_SHA
+              value: "3.3.2"
+            - name: IAM_ONBOARDING_TAG_OR_SHA
+              value: "3.3.2"
+            - name: AUDIT_TAG_OR_SHA
+              value: "3.4.1"
             - name: WATCH_NAMESPACE
               valueFrom:
                 fieldRef:

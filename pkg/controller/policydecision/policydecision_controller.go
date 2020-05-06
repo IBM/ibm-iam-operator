@@ -23,7 +23,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	gorun "runtime"
-	"github.com/IBM/ibm-iam-operator/pkg/controller/shas"
+	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	net "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -514,10 +514,9 @@ func (r *ReconcilePolicyDecision) ingressForPolicyDecision(instance *operatorv1a
 func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operatorv1alpha1.PolicyDecision) *appsv1.Deployment {
 
 	reqLogger := log.WithValues("deploymentForPolicyDecision", "Entry", "instance.Name", instance.Name)
-	arch := gorun.GOARCH
-	pdpImage := instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + "@" + shas.PolicyDecisionSHA[arch]
-	mongoDBImage := instance.Spec.InitMongodb.ImageRegistry + "/" + instance.Spec.InitMongodb.ImageName + "@" + shas.InitSHA[arch]
-	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + "@" + shas.AuditSHA[arch]
+	pdpImage := instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + shatag.GetImageRef("POLICY_DECISION_IMAGE_TAG_OR_SHA")
+	mongoDBImage := instance.Spec.InitMongodb.ImageRegistry + "/" + instance.Spec.InitMongodb.ImageName + shatag.GetImageRef("AUTH_SERVICE_IMAGE_TAG_OR_SHA")
+	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + shatag.GetImageRef("AUDIT_IMAGE_TAG_OR_SHA")
 	replicas := instance.Spec.Replicas
 	journalPath := instance.Spec.AuditService.JournalPath
 

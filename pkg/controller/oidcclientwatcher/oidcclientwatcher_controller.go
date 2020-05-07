@@ -173,14 +173,14 @@ func (r *ReconcileOIDCClientWatcher) Reconcile(request reconcile.Request) (recon
 		return recResult, err
 	}
 
-	currentClusterRole := &rbacv1.ClusterRole{}
-	recResult, err = r.handleClusterRole(instance, currentClusterRole)
+	currentCRD := &extv1.CustomResourceDefinition{}
+	recResult, err = r.handleCRD(instance, currentCRD)
 	if err != nil {
 		return recResult, err
 	}
 
-	currentCRD := &extv1.CustomResourceDefinition{}
-	recResult, err = r.handleCRD(instance, currentCRD)
+	currentClusterRole := &rbacv1.ClusterRole{}
+	recResult, err = r.handleClusterRole(instance, currentClusterRole)
 	if err != nil {
 		return recResult, err
 	}
@@ -210,10 +210,10 @@ func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha
 	if err != nil && errors.IsNotFound(err) {
 		// Define operator cluster role
 		operatorClusterRole := r.operatorClusterRoleForOIDCClientWatcher(instance)
-		reqLogger.Info("Creating a new ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-admin-aggregate")
+		reqLogger.Info("Creating a new ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-operate-aggregate")
 		err = r.client.Create(context.TODO(), operatorClusterRole)
 		if err != nil {
-			reqLogger.Error(err, "Failed to create new ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-admin-aggregate")
+			reqLogger.Error(err, "Failed to create new ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-operate-aggregate")
 			return reconcile.Result{}, err
 		}
 	} else if err != nil {

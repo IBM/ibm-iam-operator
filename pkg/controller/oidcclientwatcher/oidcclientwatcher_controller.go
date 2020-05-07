@@ -236,8 +236,8 @@ func (r *ReconcileOIDCClientWatcher) handleCRD(instance *operatorv1alpha1.OIDCCl
 			reqLogger.Error(err, "Failed to create new CRD", "CRD.Namespace", instance.Namespace, "CRD.Name", "clients.oidc.security.ibm.com")
 			return reconcile.Result{}, err
 		}
-		// new CRD created successfully - return and requeue
-		return reconcile.Result{Requeue: true}, nil
+		// new CRD created successfully - return
+		return reconcile.Result{}, nil
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get CRD")
 		return reconcile.Result{}, err

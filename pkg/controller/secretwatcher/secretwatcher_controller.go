@@ -127,29 +127,41 @@ func (r *ReconcileSecretWatcher) Reconcile(request reconcile.Request) (reconcile
 			// Return and don't requeue
 			reqLogger.Info("SecretWatcher resource not instance. Ignoring since object must be deleted")
 			return reconcile.Result{}, nil
+		} else {
+			// Error reading the object - requeue the request.
+			reqLogger.Error(err, "Failed to get SecretWatcher")
+			return reconcile.Result{}, err
 		}
-		// Error reading the object - requeue the request.
-		reqLogger.Error(err, "Failed to get SecretWatcher")
-		return reconcile.Result{}, err
 	}
 
 	// Check if the deployment already exists, if not create a new one
 	instance := &appsv1.Deployment{}
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "secret-watcher", Namespace: SecretWatcher.Namespace}, instance)
-	if err != nil && errors.IsNotFound(err) {
-		// Define a new deployment
-		swDep := r.deploymentForSecretWatcher(SecretWatcher)
-		reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", swDep.Namespace, "Deployment.Name", swDep.Name)
-		err = r.client.Create(context.TODO(), swDep)
-		if err != nil {
-			reqLogger.Error(err, "Failed to create new Deployment", "Deployment.Namespace", swDep.Namespace, "Deployment.Name", swDep.Name)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Define a new deployment
+			swDep := r.deploymentForSecretWatcher(SecretWatcher)
+			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", swDep.Namespace, "Deployment.Name", swDep.Name)
+			err = r.client.Create(context.TODO(), swDep)
+			if err != nil {
+				reqLogger.Error(err, "Failed to create new Deployment", "Deployment.Namespace", swDep.Namespace, "Deployment.Name", swDep.Name)
+				return reconcile.Result{}, err
+			}
+			// Deployment created successfully - return and requeue
+			return reconcile.Result{Requeue: true}, nil
+		} else {
+			reqLogger.Error(err, "Failed to get Deployment")
 			return reconcile.Result{}, err
 		}
-		// Deployment created successfully - return and requeue
-		return reconcile.Result{Requeue: true}, nil
-	} else if err != nil {
-		reqLogger.Error(err, "Failed to get Deployment")
-		return reconcile.Result{}, err
+	} else {
+		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", instance.Name)
+		newDeployment := r.deploymentForSecretWatcher(SecretWatcher)
+		instance.Spec = newDeployment.Spec
+		err = r.client.Update(context.TODO(), instance)
+		if err != nil {
+			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", instance.Name)
+			return reconcile.Result{}, err
+		}
 	}
 
 	// Ensure the deployment replicas is the same as the spec

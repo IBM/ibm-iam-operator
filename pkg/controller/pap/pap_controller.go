@@ -396,16 +396,28 @@ func (r *ReconcilePap) handleDeployment(instance *operatorv1alpha1.Pap, currentD
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: iamPapServiceValues.PodName, Namespace: instance.Namespace}, currentDeployment)
 	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", iamPapServiceValues.PodName)
-		newDeployment := r.deploymentForPap(instance)
-		err = r.client.Create(context.TODO(), newDeployment)
-		if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", iamPapServiceValues.PodName)
+			newDeployment := r.deploymentForPap(instance)
+			err = r.client.Create(context.TODO(), newDeployment)
+			if err != nil {
+				return err
+			}
+			// Deployment created successfully - don't requeue
+			return nil
+		} else {
+			reqLogger.Error(err, "Failed to get Deployment")
 			return err
 		}
-		// Deployment created successfully - don't requeue
-		return nil
-	} else if err != nil {
-		return err
+	} else {
+		newDeployment := r.deploymentForPap(instance)
+		currentDeployment.Spec = newDeployment.Spec
+		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
+		err = r.client.Update(context.TODO(), currentDeployment)
+		if err != nil {
+			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
+			return err
+		}
 	}
 
 	podList := &corev1.PodList{}

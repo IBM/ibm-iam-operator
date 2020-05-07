@@ -308,17 +308,27 @@ func (r *ReconcilePolicyDecision) handleDeployment(instance *operatorv1alpha1.Po
 	// Check if this Deployment already exists
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "auth-pdp", Namespace: instance.Namespace}, currentDeployment)
-	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", "auth-pdp")
-		newDeployment := r.deploymentForPolicyDecision(instance)
-		err = r.client.Create(context.TODO(), newDeployment)
-		if err != nil {
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", "auth-pdp")
+			newDeployment := r.deploymentForPolicyDecision(instance)
+			err = r.client.Create(context.TODO(), newDeployment)
+
+			// Deployment created successfully - don't requeue
+			return reconcile.Result{}, nil
+		} else {
+			reqLogger.Error(err, "Failed to get Deployment")
 			return reconcile.Result{}, err
 		}
-		// Deployment created successfully - don't requeue
-		return reconcile.Result{}, nil
-	} else if err != nil {
-		return reconcile.Result{}, err
+	} else {
+		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", "auth-pdp")
+		newDeployment := r.deploymentForPolicyDecision(instance)
+		currentDeployment.Spec = newDeployment.Spec
+		err = r.client.Update(context.TODO(), currentDeployment)
+		if err != nil {
+			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
+			return reconcile.Result{}, err
+		}
 	}
 
 	podList := &corev1.PodList{}

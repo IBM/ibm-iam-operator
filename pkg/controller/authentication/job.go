@@ -19,6 +19,7 @@ package authentication
 import (
 	"context"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -58,7 +59,7 @@ func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentic
 
 func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, jobName string) *batchv1.Job {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	image := instance.Spec.ClientRegistration.ImageRegistry + "/" + instance.Spec.ClientRegistration.ImageName + ":" + instance.Spec.ClientRegistration.ImageTag
+	image := instance.Spec.ClientRegistration.ImageRegistry + "/" + instance.Spec.ClientRegistration.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA")
 
 	newJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{

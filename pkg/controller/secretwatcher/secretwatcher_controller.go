@@ -22,6 +22,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	gorun "runtime"
+	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -209,7 +210,7 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 	labels1 := labelsForSecretWatcherMeta(secretWatcherDeploymentName)
 	labels2 := labelsForSecretWatcherSelect(instance.Name, secretWatcherDeploymentName)
 	labels3 := labelsForSecretWatcherPod(instance.Name, secretWatcherDeploymentName)
-	image := instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + ":" + instance.Spec.ImageTagPostfix
+	image := instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + shatag.GetImageRef("SECRET_WATCHER_TAG_OR_SHA")
 	replicas := instance.Spec.Replicas
 
 	swDep := &appsv1.Deployment{

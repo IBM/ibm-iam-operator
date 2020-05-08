@@ -251,7 +251,7 @@ metadata:
                 "secret" : "platform-auth-idp-credentials"
               },
               "public-auth-cert": {
-                "secret" : "platform-auth-cert"
+                "secret" : "platform-auth-secret"
               },
               "public-cam-secret": {
                 "secret" : "oauth-client-secret"

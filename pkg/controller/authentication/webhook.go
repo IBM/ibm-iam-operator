@@ -16,8 +16,6 @@
 
 package authentication
 
-var defaultTimeoutSeconds int32 = 10
-
 import (
 	"context"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
@@ -28,6 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 )
+
+var defaultTimeoutSeconds int32 = 10
 
 func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authentication, currentWebhook *reg.MutatingWebhookConfiguration, requeueResult *bool) error {
 
@@ -96,7 +96,7 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 						Operations: []reg.OperationType{reg.Create, reg.Update, reg.Delete, reg.Connect},
 					},
 				},
-				TimeoutSeconds: defaultTimeoutSeconds,
+				TimeoutSeconds: &defaultTimeoutSeconds,
 			},
 		},
 	}

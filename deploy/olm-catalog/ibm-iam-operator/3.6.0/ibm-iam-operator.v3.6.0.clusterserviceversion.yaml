@@ -12,7 +12,7 @@ metadata:
           },
           "spec": {
             "imageRegistry": "quay.io/opencloudio/icp-oidcclient-watcher",
-            "imageTagPostfix": "3.3.1",
+            "imageTagPostfix": "3.3.2",
             "operatorVersion": "0.14.1",
             "replicas": 1
           }
@@ -140,7 +140,7 @@ metadata:
           },
           "spec": {
             "imageRegistry": "quay.io/opencloudio/iam-policy-controller",
-            "imageTagPostfix": "3.3.1",
+            "imageTagPostfix": "3.3.2",
             "operatorVersion": "0.14.1",
             "replicas": 1
           }
@@ -153,7 +153,7 @@ metadata:
           },
           "spec": {
             "imageRegistry": "quay.io/opencloudio/icp-secret-watcher",
-            "imageTagPostfix": "3.3.1",
+            "imageTagPostfix": "3.3.2",
             "operatorVersion": "0.14.1",
             "replicas": 1
           }

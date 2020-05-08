@@ -1,94 +1,137 @@
 # ibm-iam-operator
-Operator used to install the cloud pak common iam services.
 
+The `ibm-iam-operator` installs the IBM Cloud Platform Common Services Identity and access management (IAM) service.
 
-# Procedure to install
+**Important:** Do not install this operator directly. Install this operator only by using the IBM Common Service Operator. For more information about installing the IBM Common Service Operator operator, see [Installer documentation](http://ibm.biz/cpcs_opinstall) (https://www.ibm.com/support/knowledgecenter/SSHKN6/kc_welcome_cs.html).
 
+If you are using the operator as part of an IBM Cloud Pak, see the documentation for that IBM Cloud Pak to learn more about how to install and use the operator service. For more information about IBM Cloud Paks, see [IBM Cloud Paks that use Common Services](http://ibm.biz/cpcs_cloudpaks).
 
-## Add the operator source on your openshift cluster
+You can use the `ibm-iam-operator` to install the authentication and authorization services for the IBM Cloud Platform Common Services.
 
-- Click the + button at the top right hand side corner of the Openshift console and add the operator source
-```
-apiVersion: operators.coreos.com/v1
-kind: OperatorSource
-metadata:
-  name: opencloud-operators
-  namespace: openshift-marketplace
-spec:
-  authorizationToken: {}
-  displayName: IBMCS Operators
-  endpoint: https://quay.io/cnr
-  publisher: IBM
-  registryNamespace: opencloudio
-  type: appregistry
-```
+With these services, you can configure security for IBM Cloud Platform Common Services, IBM Certified Containers (IBM products), or IBM Cloud Paks that are installed.
 
-- Create an image pull secret for INTEGRATION on the openshift cluster in the `ibm-common-services` namespace
+For more information about the available IBM Cloud Platform Common Services, see the [IBM Knowledge Center](http://ibm.biz/cpcsdocs).
 
-`oc -n ibm-common-services create secret docker-registry myintegrationkey --docker-server=hyc-cloud-private-integration-docker-local.artifactory.swg-devops.com --docker-username=USERID --docker-password=PASSWORD --docker-email=EMAILID`
+## Supported platforms
 
-- Install the ODLM Operator 
+ - Red Hat OpenShift Container Platform 4.2 or newer installed on one of the following platforms:
 
-- Edit the Operand Config of the ODLM Operator and set the management ingress routeHost according to your Openshift Cluster
-```
- - name: ibm-commonui-operator
-      spec:
-        commonWebUI: {}
-        legacyHeader: {}
-    - name: ibm-management-ingress-operator
-      spec:
-        managementIngress:
-          routeHost: cp-console.apps.basked.os.fyre.ibm.com
-        image:
-          repository: hyc-cloud-private-integration-docker-local.artifactory.swg-devops.com/ibmcom/icp-management-ingress-ARCH
-          tag: 2.5.1
-    - name: ibm-ingress-nginx-operator
-      spec:
-        nginxIngress: {}
-```
+   - Linux x86_64
+   - Linux on Power (ppc64le)
+   - Linux on IBM Z and LinuxONE
 
-- Create the Operand Request through the ODLM operator
+## Operator versions
 
-- Assign the image pull secret to the service accounts for services to download images from integration
-```
-oc -n ibm-common-services patch serviceaccount default -p '{"imagePullSecrets": [{"name": "myintegrationkey"}]}'
-oc -n ibm-common-services patch serviceaccount cert-manager -p '{"imagePullSecrets": [{"name": "myintegrationkey"}]}'
-oc -n ibm-common-services patch serviceaccount management-ingress -p '{"imagePullSecrets": [{"name": "myintegrationkey"}]}'
-```
+- 3.6.0
+  - With this version, support for OpenShift 4.3 is added.
+- 3.5.0
 
-- Create the CA Cert and Cluter Issuers
-```
-apiVersion: certmanager.k8s.io/v1alpha1
-kind: Issuer
-metadata:
-  name: cs-ss-issuer
-  namespace: ibm-common-services
-spec:
-  selfSigned: {}
----
-apiVersion: certmanager.k8s.io/v1alpha1
-kind: Certificate
-metadata:
-  name: cs-ca-certificate
-  namespace: ibm-common-services
-spec:
-  issuerRef:
-    name: cs-ss-issuer
-    kind: Issuer
-  secretName: cs-ca-certificate-secret
-  commonName: ca-certificate
-  isCA: true
----
-apiVersion: certmanager.k8s.io/v1alpha1
-kind: ClusterIssuer
-metadata:
-  name: cs-ca-clusterissuer
-spec:
-  ca:
-    secretName: cs-ca-certificate-secret
-```
+## Prerequisites
 
-- Delete the `ibm-management-ingress-operator-xxxx` pod if you don't see any `management-ingress-xxx` pod in the `ibm-common-services` namespace
+Before you install this operator, you need to first install the operator dependencies and prerequisites:
+
+- For the list of operator dependencies, see the IBM Knowledge Center [Common Services dependencies documentation](http://ibm.biz/cpcs_opdependencies).
+
+- For the list of prerequisites for installing the operator, see the IBM Knowledge Center [Preparing to install services documentation](http://ibm.biz/cpcs_opinstprereq).
+
+## Documentation
+
+To install the operator by using the IBM Common Services Operator, follow the installation and configuration instructions that are in the IBM Knowledge Center.
+
+- If you are using the operator as part of an IBM Cloud Pak, see the documentation for that IBM Cloud Pak [IBM Cloud Paks that use Common Services](http://ibm.biz/cpcs_cloudpaks).
+- If you are using the operator with an IBM Containerized Software, see the IBM Cloud Platform Common Services Knowledge Center [Installer documentation](http://ibm.biz/cpcs_opinstall).
+
+### End-to-End testing
+
+For more instructions about how to run end-to-end testing with the Operand Deployment Lifecycle Manager, see [ODLM guide](https://github.com/IBM/operand-deployment-lifecycle-manager/blob/master/docs/install/common-service-integration.md#end-to-end-test).
+
+### Quick start guide
+
+These steps are based on the [Operator Framework: Getting Started](https://github.com/operator-framework/getting-started#getting-started) and [Creating an App Operator](https://github.com/operator-framework/operator-sdk#create-and-deploy-an-app-operator).
+
+- Repositories
+  - https://github.com/IBM/ibm-iam-operator
+
+Complete the following steps:
+
+1. Set the Go environment variables.
+  `export GOPATH=/home/<username>/go`  
+  `export GO111MODULE=on`  
+  `export GOPRIVATE="github.ibm.com"`
+
+2. Create the operator skeleton.
+  - `cd /home/ibmadmin/workspace/cs-operators`
+  - `operator-sdk new iam-operator --repo github.com/ibm/iam-operator`
+  
+  The main program for the operator, `cmd/manager/main.go`, initializes and runs the Manager. The Manager completes the following tasks:
+  - Automatically registers the scheme for all custom resources that are defined under `pkg/apis/...`.
+  - Runs all controllers under `pkg/controller/...`. 
+  - Restrict the namespace that all controllers watch for resources.
+
+3. Create the API definition ("Kind") that is used to create the CRD.
+  a. `cd /home/ibmadmin/workspace/cs-operators/iam-operator`.
+  b. Create `hack/boilerplate.go.txt` that contains the copyright information for the generated code.
+  c. Create the API definition ("Kind") by running the following command:
+     `operator-sdk add api --api-version=operator.ibm.com/v1alpha1 --kind=IAM`
+     The command complete the following tasks:
+       - Generates `pkg/apis/operator/v1alpha1/<kind>_types.go`. For example, `pkg/apis/operator/v1alpha1/authentications.go`.
+       - Generates `deploy/crds/operator.ibm.com_<kind>s_crd.yaml`. For example, `deploy/crds/operator.ibm.com_authentications_crd.yaml`.
+       - Generates `deploy/crds/operator.ibm.com_v1alpha1_<kind>_cr.yaml`. For example, `deploy/crds/operator.ibm.com_v1alpha1_authentications_cr.yaml`.
+       
+     The operator can manage more than one `Kind` API resource.
+     
+4. Edit `<kind>_types.go` and add the fields that are exposed to the user. Then, regenerate the CRD.
+  a. Edit `<kind>_types.go` and add fields to the `<Kind>Spec` struct. Then, run the following command:
+     `operator-sdk generate k8s`
+     The command updates `zz_generated.deepcopy.go`.
+  b. Generate CRDs.
+     **Note:** The **Operator Framework: Getting Started** provides the `operator-sdk generate openapi` command to generate CRD. However, the command is deprecated. You can run the following commands instead:
+     - `operator-sdk generate crds`
+	  - The command updates `operator.ibm.com_authentications_crd.yaml`.
+     - `openapi-gen --logtostderr=true -o "" -i ./pkg/apis/operator/v1alpha1 -O zz_generated.openapi -p ./pkg/apis/operator/v1alpha1 -h hack/boilerplate.go.txt -r "-"`
+          - The command creates `zz_generated.openapi.go`. 
+            If you need to build `openapi-gen`, follow these steps. The binary is built in `$GOPATH/bin`.
+            ```
+            git clone https://github.com/kubernetes/kube-openapi.git
+            cd kube-openapi
+            go mod tidy
+            go build -o ./bin/openapi-gen k8s.io/kube-openapi/cmd/openapi-gen
+            ```
+    **Note:** Every time you modify `<kind>_types.go`, run `generate k8s`, `generate crds`, and `openapi-gen` to update the CRD and the generated code.
+
+5. Create the controller, which creates resources such as Deployments, DaemonSets, and other resources.
+  `operator-sdk add controller --api-version=operator.ibm.com/v1alpha1 --kind=IAM`
+  
+  **Notes:**
+  - There is one controller for each Kind/CRD.
+  - The controller watches and reconciles the resources that are owned by the CR.
+  - For information about the Go types that implement Deployments, DaemonSets, and other resources, see https://godoc.org/k8s.io/api/apps/v1.
+  - For information about the Go types that implement Pods, VolumeMounts, and other resources, see https://godoc.org/k8s.io/api/core/v1.
+  - For information about the Go types that implement Ingress and other resources, see https://godoc.org/k8s.io/api/networking/v1beta1.
+
+#### Running locally
+
+1. Create the CRD. Do this one time before you start the operator.
+  a. `cd /home/ibmadmin/workspace/cs-operators/iam-operator`
+  b. `oc login`
+  c. `kubectl create -f deploy/crds/operator.ibm.com_authentications_crd.yaml`
+  d. `kubectl get crd authentications.operator.ibm.com`
+  
+  If the CRD changes, delete and create again: 
+    - `kubectl delete crd authentications.operator.ibm.com`
+
+2. Run the operator locally.
+  a. `cd /home/ibmadmin/workspace/cs-operators/iam-operator`
+  b. `oc login`
+  c. `export OPERATOR_NAME=iam-operator`
+  d. `operator-sdk up local --namespace=<namespace>`
+
+3. Create a CR, which is an instance of the CRD.
+  1. Edit `deploy/crds/operator.ibm.com_v1alpha1_authentications_cr.yaml`.
+  2. `kubectl create -f deploy/crds/operator.ibm.com_v1alpha1_authentications_cr.yaml`
+
+4. Delete the CR and the associated resources that were created.
+  - `kubectl delete authentications example-authentication`
 
 ## SecurityContextConstraints Requirements
 

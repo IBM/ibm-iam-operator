@@ -250,6 +250,15 @@ metadata:
               "public-auth-creds": {
                 "secret" : "platform-auth-idp-credentials"
               },
+              "public-auth-cert": {
+                "secret" : "platform-auth-secret"
+              },
+              "public-cam-secret": {
+                "secret" : "oauth-client-secret"
+              },
+              "public-cam-map": {
+                "configmap" : "oauth-client-map"
+              },
               "public-auth-config": {
                 "configmap" : "platform-auth-idp"
               }
@@ -1430,6 +1439,11 @@ spec:
                     configMapKeyRef:
                       key: MANAGEMENT_INGRESS_ROUTE_HOST
                       name: management-ingress-info
+                - name: ICP_PROXY_URL
+                  valueFrom:
+                    configMapKeyRef:
+                      name: ibmcloud-cluster-info
+                      key: proxy_address
                 image: quay.io/opencloudio/ibm-iam-operator:latest
                 imagePullPolicy: Always
                 name: ibm-iam-operator

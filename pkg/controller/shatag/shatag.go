@@ -29,10 +29,21 @@ func GetImageRef(envVar string ) string{
 	imageTagOrSHA := os.Getenv(envVar)
 	if strings.HasPrefix(imageTagOrSHA, "sha256:") {
 		imageSuffix = "@" + imageTagOrSHA
-	} else {
+	} else {		
 		imageSuffix = ":" + imageTagOrSHA
 	}
 
 	return imageSuffix
 }
  
+func ValidateImageFormat(image string) string {
+	tagIndex := strings.Index(image, ":")
+	shaIndex := strings.Index(image, "@")
+	
+	if string(image[tagIndex - 1]) == "/" {
+		return image[:tagIndex-1] + "" + image[tagIndex:]
+	} else if string(image[shaIndex - 1]) == "/" {
+		return image[:shaIndex-1] + "" + image[shaIndex:]
+	}	
+	return image
+}

@@ -16,6 +16,8 @@
 
 package authentication
 
+var defaultTimeoutSeconds int32 = 10
+
 import (
 	"context"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
@@ -94,6 +96,7 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 						Operations: []reg.OperationType{reg.Create, reg.Update, reg.Delete, reg.Connect},
 					},
 				},
+				TimeoutSeconds: defaultTimeoutSeconds,
 			},
 		},
 	}

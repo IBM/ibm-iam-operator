@@ -27,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+var defaultTimeoutSeconds int32 = 10
+
 func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authentication, currentWebhook *reg.MutatingWebhookConfiguration, requeueResult *bool) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
@@ -94,6 +96,7 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 						Operations: []reg.OperationType{reg.Create, reg.Update, reg.Delete, reg.Connect},
 					},
 				},
+				TimeoutSeconds: &defaultTimeoutSeconds,
 			},
 		},
 	}

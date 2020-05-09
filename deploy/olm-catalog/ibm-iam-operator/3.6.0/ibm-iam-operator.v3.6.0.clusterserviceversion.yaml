@@ -1423,7 +1423,7 @@ spec:
                 - name: IAM_ONBOARDING_TAG_OR_SHA
                   value: "3.3.2"
                 - name: AUDIT_TAG_OR_SHA
-                  value: "3.4.0"
+                  value: "3.4.1"
                 - name: WATCH_NAMESPACE
                   valueFrom:
                     fieldRef:

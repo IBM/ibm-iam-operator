@@ -27,7 +27,7 @@ metadata:
             "auditService": {
               "imageName": "icp-audit-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.4.0",
+              "imageTag": "3.4.1",
               "journalPath": "/run/systemd/journal"
             },
             "imageName": "iam-policy-decision",
@@ -52,7 +52,7 @@ metadata:
             "auditService": {
               "imageName": "icp-audit-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.4.0",
+              "imageTag": "3.4.1",
               "journalPath": "/run/systemd/journal"
             },
             "authService": {
@@ -120,7 +120,7 @@ metadata:
             "auditService": {
               "imageName": "icp-audit-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.4.0",
+              "imageTag": "3.4.1",
               "journalPath": "/run/systemd/journal"
             },
             "operatorVersion": "3.6.0",
@@ -1420,7 +1420,7 @@ spec:
                 - name: IAM_ONBOARDING_TAG_OR_SHA
                   value: "3.3.2"
                 - name: AUDIT_TAG_OR_SHA
-                  value: "3.4.0"
+                  value: "3.4.1"
                 - name: WATCH_NAMESPACE
                   valueFrom:
                     fieldRef:

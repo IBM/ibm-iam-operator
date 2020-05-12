@@ -79,7 +79,7 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
 						"productName":                        "IBM Cloud Platform Common Services",
 						"productID":                          "068a62892a1e4db39641342e592daa25",
-						"productVersion":                     "3.3.0",
+						"productVersion":                     "3.4.0",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
 					},

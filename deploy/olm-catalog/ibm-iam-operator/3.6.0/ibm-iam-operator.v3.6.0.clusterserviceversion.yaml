@@ -1130,9 +1130,10 @@ spec:
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:podStatuses'
       version: v1alpha1
-  description: # The `ibm-iam-operator` installs the IBM Cloud Platform Common Services Identity and access management (IAM) service.
+  description: |-
+    The `ibm-iam-operator` installs the IBM Cloud Platform Common Services Identity and access management (IAM) service.
 
-    **Important:** Do not install this operator directly. Install this operator only by using the IBM Common Service Operator. For more information about installing this operator and other Common Services operators, see [Installer documentation](http://ibm.biz/cpcs_opinstall) (https://www.ibm.com/support/knowledgecenter/SSHKN6/kc_welcome_cs.html). If you are using the operator as part of an IBM Cloud Pak, see the documentation for that IBM Cloud Pak to learn more about how to install and use the operator service. For more information about IBM Cloud Paks, see [IBM Cloud Paks that use Common Services](http://ibm.biz/cpcs_cloudpaks).
+    **Important:** Do not install this operator directly. Install this operator only by using the IBM Common Service Operator. For more information about installing this operator and other Common Services operators, see [Installer documentation](http://ibm.biz/cpcs_opinstall). If you are using the operator as part of an IBM Cloud Pak, see the documentation for that IBM Cloud Pak to learn more about how to install and use the operator service. For more information about IBM Cloud Paks, see [IBM Cloud Paks that use Common Services](http://ibm.biz/cpcs_cloudpaks).
 
     You can use the `ibm-iam-operator` to install the authentication and authorization services for the IBM Cloud Platform Common Services.
 
@@ -1142,17 +1143,17 @@ spec:
 
     ## Supported platforms
 
-     - Red Hat OpenShift Container Platform 4.2 or newer installed on one of the following platforms:
+     - Red Hat OpenShift Container Platform 4.3 or newer installed on one of the following platforms:
 
-       - Linux x86_64
-       - Linux on Power (ppc64le)
-       - Linux on IBM Z and LinuxONE
+        - Linux x86_64
+        - Linux on Power (ppc64le)
+        - Linux on IBM Z and LinuxONE
 
     ## Operator versions
 
-    - 3.6.0
-      - With this version, support for OpenShift 4.3 is added.
-    - 3.5.0
+     - 3.6.0
+        - With this version, support for OpenShift 4.3 is added.
+     - 3.5.0
 
     ## Prerequisites
 
@@ -1880,4 +1881,3 @@ spec:
     name: IBM
   replaces: ibm-iam-operator.v3.5.0
   version: 3.6.0
-

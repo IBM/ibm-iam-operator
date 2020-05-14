@@ -28,12 +28,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+var rule2 = `^([a-zA-Z0-9\-]){32,}$`
+var adminPassword = generateRandomString(rule2)
+var encryptionKey = generateRandomString(rule2)
+var wlpClientRegistrationSecret = generateRandomString(rule2)
+
+
 func generateSecretData(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string) map[string]map[string][]byte {
 
-	rule := `^([a-zA-Z0-9\-]){32,}$`
-	adminPassword := generateRandomString(rule)
-	encryptionKey := generateRandomString(rule)
-	wlpClientRegistrationSecret := generateRandomString(rule)
 	secretData := map[string]map[string][]byte{
 		"platform-auth-ldaps-ca-cert": map[string][]byte{
 			"certificate": []byte(""),

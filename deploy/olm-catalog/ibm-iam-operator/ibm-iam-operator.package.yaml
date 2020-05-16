@@ -5,5 +5,5 @@ channels:
   name: beta
 - currentCSV: ibm-iam-operator.v3.5.0
   name: stable-v1
-defaultChannel: beta
+defaultChannel: stable-v1
 packageName: ibm-iam-operator

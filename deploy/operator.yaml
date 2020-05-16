@@ -45,25 +45,25 @@ spec:
           imagePullPolicy: Always
           env:
             - name: AUTH_SERVICE_TAG_OR_SHA
-              value: "3.3.3"
+              value: "sha256:82a145515d5f0621d91cf6ac4854682e00d9bb6bd53394b91871b1bbbb443087"
             - name: IDENTITY_PROVIDER_TAG_OR_SHA
-              value: "3.3.3"
+              value: "sha256:2b2b172f4b2fb66222a790f43ebd27d6adceff9e421150936a3d863beff5256d"
             - name: IDENTITY_MANAGER_TAG_OR_SHA
-              value: "3.3.4"
+              value: "sha256:70b347289b562d4111d16b33ee0258b3aabf252edab975b5c32f2cf4f33b7548"
             - name: POLICY_ADMINISTRATION_TAG_OR_SHA
-              value: "3.3.3"
+              value: "sha256:470fd0df32a5c9a2d79a19186d63234c92de0962e4f73afa3c84135cd0de8a84"
             - name: POLICY_DECISION_TAG_OR_SHA
-              value: "3.3.2"
+              value: "sha256:845ac91a25d72daaf56469a4437e6a5100ec18d27ef209cba254a89f396be8fe"
             - name: SECRET_WATCHER_TAG_OR_SHA
-              value: "3.3.2"
+              value: "sha256:3770f2f53025e4eaeefef85912aa146207e38fa99f668e312d605e003181bd21"
             - name: CLIENT_WATCHER_TAG_OR_SHA
-              value: "3.3.2"
+              value: "sha256:0c49e27b3d4f32001e568a62abdfaecdb41f10194cf5a9ccf87ebfbdd2808fd4"
             - name: POLICY_CONTROLLER_TAG_OR_SHA
-              value: "3.3.2"
+              value: "sha256:2d3029b7efc0f6dd841d61e0d454d0cdfca539aff01b57d462f11891dac32b2f"
             - name: IAM_ONBOARDING_TAG_OR_SHA
-              value: "3.3.2"
+              value: "sha256:f8efc1d236be029376eb73ff57270695b94b33cceed8aee57f7fb5edc8c488e6"
             - name: AUDIT_TAG_OR_SHA
-              value: "3.4.0"
+              value: "sha256:24a220374c39652f8b031637d852995bfaec5be2601f9e4c41eb1925531f466d"
             - name: WATCH_NAMESPACE
               valueFrom:
                 fieldRef:

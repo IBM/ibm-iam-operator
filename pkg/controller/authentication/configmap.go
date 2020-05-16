@@ -114,6 +114,7 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"OS_TOKEN_LENGTH":                    "45",
 			"LIBERTY_DEBUG_ENABLED":              "false",
 			"LOGJAM_DHKEYSIZE_2048_BITS_ENABLED": "true",
+			"LDAP_RECURSIVE_SEARCH":              "true",
 			"LDAP_ATTR_CACHE_SIZE":               "2000",
 			"LDAP_ATTR_CACHE_TIMEOUT":            "1200s",
 			"LDAP_ATTR_CACHE_ENABLED":            "true",

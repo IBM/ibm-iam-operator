@@ -241,6 +241,7 @@ metadata:
           }
         }
       ]
+    olm.skipRange: '>=3.5.0 <3.6.1'
     capabilities: Basic Install
   name: ibm-iam-operator.v3.6.1
   namespace: placeholder
@@ -1002,5 +1003,5 @@ spec:
   - {}
   maturity: alpha
   provider: {}
-  replaces: ibm-iam-operator.v0.0.0
+  replaces: ibm-iam-operator.v3.5.0
   version: 3.6.1

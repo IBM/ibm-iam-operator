@@ -1133,7 +1133,7 @@ spec:
   description: |-
     The `ibm-iam-operator` installs the IBM Cloud Platform Common Services Identity and access management (IAM) service.
 
-    **Important:** Do not install this operator directly. Install this operator only by using the IBM Common Service Operator. For more information about installing this operator and other Common Services operators, see [Installer documentation](http://ibm.biz/cpcs_opinstall). If you are using the operator as part of an IBM Cloud Pak, see the documentation for that IBM Cloud Pak to learn more about how to install and use the operator service. For more information about IBM Cloud Paks, see [IBM Cloud Paks that use Common Services](http://ibm.biz/cpcs_cloudpaks).
+    **Important:** Do not install this operator directly. Install this operator only by using the IBM Common Service Operator. For more information about installing this operator and other Common Services operators, see [Installer documentation](http://ibm.biz/cpcs_opinstall). Additionally, you can exit this panel and navigate to the IBM Common Services tile in OperatorHub to learn more about the operator. If you are using the operator as part of an IBM Cloud Pak, see the documentation for that IBM Cloud Pak to learn more about how to install and use the operator service. For more information about IBM Cloud Paks, see [IBM Cloud Paks that use Common Services](http://ibm.biz/cpcs_cloudpaks).
 
     You can use the `ibm-iam-operator` to install the authentication and authorization services for the IBM Cloud Platform Common Services.
 

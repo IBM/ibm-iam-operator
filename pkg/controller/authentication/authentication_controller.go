@@ -71,6 +71,11 @@ var memory512 = resource.NewQuantity(512*1024*1024, resource.BinarySI)   // 512M
 var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024Mi
 var memory2560 = resource.NewQuantity(2560*1024*1024, resource.BinarySI) // 2560Mi
 
+var rule = `^([a-z0-9]){32,}$`
+var wlpClientID = generateRandomString(rule)
+var wlpClientSecret = generateRandomString(rule)
+
+
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
 * business logic.  Delete these comments after modifying this file.*
@@ -255,10 +260,6 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-
-	rule := `^([a-z0-9]){32,}$`
-	wlpClientID := generateRandomString(rule)
-	wlpClientSecret := generateRandomString(rule)
 
 	// Check if this Secret already exists and create it if it doesn't
 	currentSecret := &corev1.Secret{}

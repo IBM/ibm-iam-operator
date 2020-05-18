@@ -317,7 +317,7 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: Authentication is the Schema for the authentications API
+    - description: Authentication is the schema for the authentications API
       kind: Authentication
       name: authentications.operator.ibm.com
       displayName: Authentication
@@ -457,7 +457,7 @@ spec:
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1
-    - description: OIDCClientWatcher is the Schema for the oidcclientwatchers API
+    - description: OIDCClientWatcher is the schema for the oidcclientwatchers API
       kind: OIDCClientWatcher
       name: oidcclientwatchers.operator.ibm.com
       displayName: OIDCClientWatcher
@@ -575,7 +575,7 @@ spec:
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1
-    - description: Pap is the Schema for the paps API
+    - description: Pap is the schema for the paps API
       kind: Pap
       name: paps.operator.ibm.com
       displayName: Pap
@@ -681,7 +681,7 @@ spec:
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1
-    - description: PolicyController is the Schema for the policycontrollers API
+    - description: PolicyController is the schema for the policycontrollers API
       kind: PolicyController
       name: policycontrollers.operator.ibm.com
       displayName: PolicyController
@@ -793,7 +793,7 @@ spec:
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1
-    - description: PolicyDecision is the Schema for the policydecisions API
+    - description: PolicyDecision is the schema for the policydecisions API
       kind: PolicyDecision
       name: policydecisions.operator.ibm.com
       displayName: PolicyDecision
@@ -914,7 +914,7 @@ spec:
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1
-    - description: SecretWatcher is the Schema for the secretwatchers API
+    - description: SecretWatcher is the schema for the secretwatchers API
       kind: SecretWatcher
       name: secretwatchers.operator.ibm.com
       displayName: SecretWatcher
@@ -1020,7 +1020,7 @@ spec:
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:podStatuses
       version: v1alpha1
-    - description: SecurityOnboarding is the Schema for the securityonboardings API
+    - description: SecurityOnboarding is the schema for the securityonboardings API
       kind: SecurityOnboarding
       name: securityonboardings.operator.ibm.com
       displayName: SecurityOnboarding

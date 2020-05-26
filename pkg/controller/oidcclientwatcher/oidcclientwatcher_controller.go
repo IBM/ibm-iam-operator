@@ -50,7 +50,7 @@ var seconds60 int64 = 60
 var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)          // 10m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
 var memory16 = resource.NewQuantity(16*1024*1024, resource.BinarySI)   // 16Mi
-var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI) // 128Mi
+var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI) // 256Mi
 var serviceAccountName string = "ibm-iam-operand-restricted"
 
 var log = logf.Log.WithName("controller_oidcclientwatcher")
@@ -543,7 +543,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 							Resources: corev1.ResourceRequirements{
 								Limits: map[corev1.ResourceName]resource.Quantity{
 									corev1.ResourceCPU:    *cpu200,
-									corev1.ResourceMemory: *memory128},
+									corev1.ResourceMemory: *memory256},
 								Requests: map[corev1.ResourceName]resource.Quantity{
 									corev1.ResourceCPU:    *cpu10,
 									corev1.ResourceMemory: *memory16},

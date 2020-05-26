@@ -42,25 +42,40 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 
 	for index, configMap := range configMapList {
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: instance.Namespace}, currentConfigMap)
-		if err != nil && errors.IsNotFound(err) {
-			// Define a new ConfigMap
+		if err != nil {
+
+			if errors.IsNotFound(err) {
+				// Define a new ConfigMap
+				if configMapList[index] == "registration-json" {
+					newConfigMap = registrationJsonConfigMap(instance, wlpClientID, wlpClientSecret, r.scheme)
+				} else {
+					newConfigMap = functionList[index](instance, r.scheme)
+				}
+				reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
+				err = r.client.Create(context.TODO(), newConfigMap)
+				if err != nil {
+					reqLogger.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
+					return err
+				}
+				// ConfigMap created successfully - return and requeue
+				*requeueResult = true
+			} else {
+				return err
+			}
+		} else {
+			reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 			if configMapList[index] == "registration-json" {
 				newConfigMap = registrationJsonConfigMap(instance, wlpClientID, wlpClientSecret, r.scheme)
 			} else {
 				newConfigMap = functionList[index](instance, r.scheme)
 			}
-			reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
-			err = r.client.Create(context.TODO(), newConfigMap)
+			currentConfigMap.Data = newConfigMap.Data
+			err = r.client.Update(context.TODO(), currentConfigMap)
 			if err != nil {
-				reqLogger.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
+				reqLogger.Error(err, "Failed to update an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "Configmap.Name", currentConfigMap.Name)
 				return err
 			}
-			// ConfigMap created successfully - return and requeue
-			*requeueResult = true
-		} else if err != nil {
-			reqLogger.Error(err, "Failed to get ConfigMap")
-			return err
-		}
+		}	
 
 	}
 

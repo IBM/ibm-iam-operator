@@ -49,7 +49,7 @@ var serviceAccountName string = "ibm-iam-operand-restricted"
 var cpu50 = resource.NewMilliQuantity(50, resource.DecimalSI)          // 50m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
 var memory64 = resource.NewQuantity(64*1024*1024, resource.BinarySI)   // 64Mi
-var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI) // 256Mi
+var memory512 = resource.NewQuantity(512*1024*1024, resource.BinarySI) // 512Mi
 
 var log = logf.Log.WithName("controller_secretwatcher")
 
@@ -366,7 +366,7 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 							Resources: corev1.ResourceRequirements{
 								Limits: map[corev1.ResourceName]resource.Quantity{
 									corev1.ResourceCPU:    *cpu200,
-									corev1.ResourceMemory: *memory256},
+									corev1.ResourceMemory: *memory512},
 								Requests: map[corev1.ResourceName]resource.Quantity{
 									corev1.ResourceCPU:    *cpu50,
 									corev1.ResourceMemory: *memory64},

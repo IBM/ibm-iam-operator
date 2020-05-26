@@ -86,11 +86,11 @@ spec:
                   key: proxy_address
           resources:
             limits:
-              cpu: 20m
-              memory: 90Mi
+              cpu: 25m
+              memory: 200Mi
             requests:
               cpu: 10m
-              memory: 50Mi
+              memory: 80Mi
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

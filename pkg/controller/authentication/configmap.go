@@ -69,11 +69,11 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 				newConfigMap = functionList[index](instance, r.scheme)
 				if _,keyExists := currentConfigMap.Data["LDAP_RECURSIVE_SEARCH"]; !keyExists{
 					currentConfigMap.Data["LDAP_RECURSIVE_SEARCH"] = newConfigMap.Data["LDAP_RECURSIVE_SEARCH"]
-				}
-				err = r.client.Update(context.TODO(), currentConfigMap)
-				if err != nil {
-					reqLogger.Error(err, "Failed to update an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "Configmap.Name", currentConfigMap.Name)
-					return err
+					err = r.client.Update(context.TODO(), currentConfigMap)
+					if err != nil {
+						reqLogger.Error(err, "Failed to update an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "Configmap.Name", currentConfigMap.Name)
+						return err
+					}
 				}
 			}
 		}	

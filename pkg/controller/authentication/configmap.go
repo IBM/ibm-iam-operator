@@ -63,13 +63,12 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 				return err
 			}
 		} else {
+			// @posriniv - find a more efficient solution
 			reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-			if configMapList[index] == "registration-json" {
-				newConfigMap = registrationJsonConfigMap(instance, wlpClientID, wlpClientSecret, r.scheme)
-			} else {
+			if configMapList[index] == "platform-auth-idp" {
 				newConfigMap = functionList[index](instance, r.scheme)
 			}
-			currentConfigMap.Data = newConfigMap.Data
+			currentConfigMap.Data["LDAP_RECURSIVE_SEARCH"] = newConfigMap.Data["LDAP_RECURSIVE_SEARCH"]
 			err = r.client.Update(context.TODO(), currentConfigMap)
 			if err != nil {
 				reqLogger.Error(err, "Failed to update an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "Configmap.Name", currentConfigMap.Name)

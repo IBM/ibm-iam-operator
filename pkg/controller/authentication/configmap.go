@@ -60,7 +60,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 				// ConfigMap created successfully - return and requeue
 				*requeueResult = true
 			} else {
-				reqLogger.Error(err, "Failed to get ConfigMap")
+				reqLogger.Error(err, "Failed to get ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
 				return err
 			}
 		} else {

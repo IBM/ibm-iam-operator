@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-var rule2 = `^([a-zA-Z0-9\-]){32,}$`
+var rule2 = `^([a-zA-Z0-9]){32,}$`
 var adminPassword = generateRandomString(rule2)
 var encryptionKey = generateRandomString(rule2)
 var wlpClientRegistrationSecret = generateRandomString(rule2)

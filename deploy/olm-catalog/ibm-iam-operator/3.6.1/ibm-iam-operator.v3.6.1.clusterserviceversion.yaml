@@ -1505,7 +1505,7 @@ spec:
                 - ibm-iam-operator
                 env:
                 - name: AUTH_SERVICE_TAG_OR_SHA
-                  value: sha256:82a145515d5f0621d91cf6ac4854682e00d9bb6bd53394b91871b1bbbb443087
+                  value: sha256:fe712333134576b9894e70e2e3b5748916e0b3dcfb61820ab6c1133bbc8f3692
                 - name: IDENTITY_PROVIDER_TAG_OR_SHA
                   value: sha256:2b2b172f4b2fb66222a790f43ebd27d6adceff9e421150936a3d863beff5256d
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
@@ -1515,7 +1515,7 @@ spec:
                 - name: POLICY_DECISION_TAG_OR_SHA
                   value: sha256:845ac91a25d72daaf56469a4437e6a5100ec18d27ef209cba254a89f396be8fe
                 - name: SECRET_WATCHER_TAG_OR_SHA
-                  value: sha256:3770f2f53025e4eaeefef85912aa146207e38fa99f668e312d605e003181bd21
+                  value: sha256:bfe42fc0463da7d30e5b83f8a5767314d991eb66c3e7a03532e20502d3c13190
                 - name: CLIENT_WATCHER_TAG_OR_SHA
                   value: sha256:0c49e27b3d4f32001e568a62abdfaecdb41f10194cf5a9ccf87ebfbdd2808fd4
                 - name: POLICY_CONTROLLER_TAG_OR_SHA

@@ -50,7 +50,7 @@ var defaultMode int32 = 420
 var seconds60 int64 = 60
 var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)        // 100m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
-var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI) // 256Mi
+var memory384 = resource.NewQuantity(384*1024*1024, resource.BinarySI) // 384Mi
 var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI) // 128Mi
 var serviceAccountName string = "ibm-iam-operand-restricted"
 
@@ -587,7 +587,7 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 							Resources: corev1.ResourceRequirements{
 								Limits: map[corev1.ResourceName]resource.Quantity{
 									corev1.ResourceCPU:    *cpu200,
-									corev1.ResourceMemory: *memory256},
+									corev1.ResourceMemory: *memory384},
 								Requests: map[corev1.ResourceName]resource.Quantity{
 									corev1.ResourceCPU:    *cpu100,
 									corev1.ResourceMemory: *memory128},

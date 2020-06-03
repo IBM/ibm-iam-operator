@@ -39,7 +39,7 @@ spec:
       containers:
         - name: ibm-iam-operator
           # Replace this with the built image name
-          image: quay.io/opencloudio/ibm-iam-operator@sha256:a20391a35f3662e8884799f3553ec43545031b956f1fe19590a06c884df441f3
+          image: quay.io/opencloudio/ibm-iam-operator:latest
           command:
           - ibm-iam-operator
           imagePullPolicy: Always
@@ -87,7 +87,7 @@ spec:
           resources:
             limits:
               cpu: 25m
-              memory: 200Mi
+              memory: 320Mi
             requests:
               cpu: 10m
               memory: 80Mi

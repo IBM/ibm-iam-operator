@@ -1374,6 +1374,18 @@ spec:
           - watch
           - delete
         - apiGroups:
+          - oauth.openshift.io
+          resources:
+          - '*'
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+          - delete
+        - apiGroups:
           - rbac.authorization.k8s.io
           resources:
           - '*'

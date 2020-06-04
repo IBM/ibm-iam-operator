@@ -21,7 +21,8 @@ For more information about the available IBM Cloud Platform Common Services, see
    - Linux on IBM Z and LinuxONE
 
 ## Operator versions
-
+- 3.6.1
+  - Beta release
 - 3.6.0
   - With this version, support for OpenShift 4.3 is added.
 - 3.5.0

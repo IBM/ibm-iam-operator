@@ -1556,7 +1556,7 @@ spec:
                     configMapKeyRef:
                       key: proxy_address
                       name: ibmcloud-cluster-info
-                image: quay.io/opencloudio/ibm-iam-operator:latest
+                image: quay.io/opencloudio/ibm-iam-operator@sha256:d964562765fdb8a051b237dde5e7e96ac16aff13f2f0d4b4f2423951deeaf7b0
                 imagePullPolicy: Always
                 name: ibm-iam-operator
                 resources:

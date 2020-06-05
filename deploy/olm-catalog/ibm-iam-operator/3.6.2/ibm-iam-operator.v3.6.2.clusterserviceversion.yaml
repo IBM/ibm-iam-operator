@@ -143,7 +143,7 @@ metadata:
               "imageTag": "3.4.1",
               "journalPath": "/run/systemd/journal"
             },
-            "operatorVersion": "3.6.0",
+            "operatorVersion": "3.6.2",
             "papService": {
               "imageName": "iam-policy-administration",
               "imageRegistry": "quay.io/opencloudio",
@@ -1967,5 +1967,5 @@ spec:
   maturity: stable
   provider:
     name: IBM
-  replaces: ibm-iam-operator.v3.6.0
+  replaces: ibm-iam-operator.v3.6.1
   version: 3.6.2

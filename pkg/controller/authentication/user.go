@@ -18,12 +18,14 @@ package authentication
 
 import (
 	"context"
-	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+
 	userv1 "github.com/openshift/api/user/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+
+	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 )
 
 func (r *ReconcileAuthentication) handleUser(instance *operatorv1alpha1.Authentication, currentUser *userv1.User, requeueResult *bool) error {

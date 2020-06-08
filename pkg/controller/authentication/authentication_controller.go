@@ -18,8 +18,9 @@ package authentication
 
 import (
 	"context"
-	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
-	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	"math/rand"
+	"time"
+
 	userv1 "github.com/openshift/api/user/v1"
 	regen "github.com/zach-klippenstein/goregen"
 	reg "k8s.io/api/admissionregistration/v1beta1"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"math/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -40,7 +40,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"time"
+
+	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
+	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 )
 
 var log = logf.Log.WithName("controller_authentication")
@@ -74,7 +76,6 @@ var memory2560 = resource.NewQuantity(2560*1024*1024, resource.BinarySI) // 2560
 var rule = `^([a-z0-9]){32,}$`
 var wlpClientID = generateRandomString(rule)
 var wlpClientSecret = generateRandomString(rule)
-
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller

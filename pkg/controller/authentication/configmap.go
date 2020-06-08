@@ -18,16 +18,18 @@ package authentication
 
 import (
 	"context"
-	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	"os"
+	"strconv"
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"os"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"strconv"
-	"strings"
+
+	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 )
 
 func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentConfigMap *corev1.ConfigMap, requeueResult *bool) error {
@@ -66,7 +68,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 		} else {
 			// @posriniv - find a more efficient solution
 			if configMapList[index] == "platform-auth-idp" {
-				if _,keyExists := currentConfigMap.Data["LDAP_RECURSIVE_SEARCH"]; !keyExists{
+				if _, keyExists := currentConfigMap.Data["LDAP_RECURSIVE_SEARCH"]; !keyExists {
 					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.scheme)
 					currentConfigMap.Data["LDAP_RECURSIVE_SEARCH"] = newConfigMap.Data["LDAP_RECURSIVE_SEARCH"]
@@ -77,7 +79,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					}
 				}
 			}
-		}	
+		}
 
 	}
 
@@ -228,10 +230,10 @@ func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, scheme *run
 			Labels:    map[string]string{"app": "auth-idp"},
 		},
 		Data: map[string]string{
-			"MASTER_IP": icpConsoleURL,
-			"PROXY_IP": icpProxyURL,
+			"MASTER_IP":         icpConsoleURL,
+			"PROXY_IP":          icpProxyURL,
 			"CLUSTER_CA_DOMAIN": icpConsoleURL,
-			"CLUSTER_NAME": instance.Spec.Config.ClusterName,
+			"CLUSTER_NAME":      instance.Spec.Config.ClusterName,
 		},
 	}
 

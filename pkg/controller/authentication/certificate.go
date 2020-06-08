@@ -18,13 +18,15 @@ package authentication
 
 import (
 	"context"
-	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
-	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
+	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 )
 
 var certificateData map[string]map[string]string

@@ -18,11 +18,13 @@ package authentication
 
 import (
 	"context"
-	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+
+	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 )
 
 type SubjectData struct {
@@ -38,7 +40,7 @@ type CRBData struct {
 func generateCRBData(defaultAdminUser string, oidcIssuerURL string) map[string]CRBData {
 
 	return map[string]CRBData{
-		"icp:default:accountadmin": CRBData{
+		"icp:default:accountadmin": {
 			Subject: []SubjectData{
 				{
 					Name: "icp:default:accountadmin",
@@ -47,7 +49,7 @@ func generateCRBData(defaultAdminUser string, oidcIssuerURL string) map[string]C
 			},
 			RoleName: "icp:accountadmin",
 		},
-		"icp:default:member": CRBData{
+		"icp:default:member": {
 			Subject: []SubjectData{
 				{
 					Name: "icp:default:member",
@@ -56,7 +58,7 @@ func generateCRBData(defaultAdminUser string, oidcIssuerURL string) map[string]C
 			},
 			RoleName: "extension",
 		},
-		"icp:default:teamadmin": CRBData{
+		"icp:default:teamadmin": {
 			Subject: []SubjectData{
 				{
 					Name: "icp:default:teamadmin",
@@ -65,7 +67,7 @@ func generateCRBData(defaultAdminUser string, oidcIssuerURL string) map[string]C
 			},
 			RoleName: "icp:teamadmin",
 		},
-		"icp::editors": CRBData{
+		"icp::editors": {
 			Subject: []SubjectData{
 				{
 					Name: "icp::editor",
@@ -74,7 +76,7 @@ func generateCRBData(defaultAdminUser string, oidcIssuerURL string) map[string]C
 			},
 			RoleName: "icp-clusterservicestatus-reader",
 		},
-		"icp::operators": CRBData{
+		"icp::operators": {
 			Subject: []SubjectData{
 				{
 					Name: "icp::operator",
@@ -83,7 +85,7 @@ func generateCRBData(defaultAdminUser string, oidcIssuerURL string) map[string]C
 			},
 			RoleName: "icp-clusterservicestatus-reader",
 		},
-		"oidc-admin-binding": CRBData{
+		"oidc-admin-binding": {
 			Subject: []SubjectData{
 				{
 					Name: oidcIssuerURL + "#" + defaultAdminUser,

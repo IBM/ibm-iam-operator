@@ -21,6 +21,8 @@ For more information about the available IBM Cloud Platform Common Services, see
    - Linux on IBM Z and LinuxONE
 
 ## Operator versions
+- 3.6.2 
+  - stable v1 on 6/6/2020
 - 3.6.1
   - Beta release
 - 3.6.0

@@ -70,4 +70,3 @@ var registrationJson string = `{
    "redirect_uris":["https://ICP_CONSOLE_URL/auth/liberty/callback","https://127.0.0.1:443/idauth/oidc/endpoint/OP"]
 }
 `
-

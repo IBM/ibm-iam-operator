@@ -19,14 +19,12 @@ package policycontroller
 import (
 	"context"
 	"reflect"
+	gorun "runtime"
 
-	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	gorun "runtime"
-	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +38,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 )
 
 const iamPolicyControllerDepName = "iam-policy-controller"
@@ -419,24 +420,24 @@ func (r *ReconcilePolicyController) custResourceDefinitionForPolicyController(in
 			Validation: &extv1.CustomResourceValidation{
 				OpenAPIV3Schema: &extv1.JSONSchemaProps{
 					Properties: map[string]extv1.JSONSchemaProps{
-						"labelSelector": extv1.JSONSchemaProps{
+						"labelSelector": {
 							Description: `selecting a list of namespaces where the policy applies`,
 							Type:        "object",
 						},
-						"maxClusterRoleBindingUsers": extv1.JSONSchemaProps{
+						"maxClusterRoleBindingUsers": {
 							Description: `selecting a list of namespaces where the policy applies`,
 							Type:        "integer",
 							Format:      "int64",
 						},
-						"maxRoleBindingViolationsPerNamespace": extv1.JSONSchemaProps{
+						"maxRoleBindingViolationsPerNamespace": {
 							Type:   "integer",
 							Format: "int64",
 						},
-						"namespaceSelector": extv1.JSONSchemaProps{
+						"namespaceSelector": {
 							Description: `enforce, inform`,
 							Type:        "string",
 						},
-						"remediationAction": extv1.JSONSchemaProps{
+						"remediationAction": {
 							Type: "string",
 						},
 					},
@@ -505,10 +506,10 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 				},
 				Spec: corev1.PodSpec{
 					TerminationGracePeriodSeconds: &seconds60,
-					ServiceAccountName: serviceAccountName,
-					HostNetwork:        false,
-					HostIPC:            false,
-					HostPID:            false,
+					ServiceAccountName:            serviceAccountName,
+					HostNetwork:                   false,
+					HostIPC:                       false,
+					HostPID:                       false,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{

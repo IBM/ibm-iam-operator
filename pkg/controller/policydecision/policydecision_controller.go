@@ -18,19 +18,17 @@ package policydecision
 
 import (
 	"context"
-	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
-	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	"reflect"
+	gorun "runtime"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	gorun "runtime"
-	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	net "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -39,16 +37,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
+	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 )
 
 var log = logf.Log.WithName("controller_policydecision")
-var trueVar bool = true
-var falseVar bool = false
-var defaultMode int32 = 420
+var trueVar = true
+var falseVar = false
 var seconds60 int64 = 60
 var user int64 = 1000552100
 var port int32 = 7998
-var serviceAccountName string = "ibm-iam-operand-privileged"
+var serviceAccountName = "ibm-iam-operand-privileged"
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -208,7 +209,8 @@ func (r *ReconcilePolicyDecision) Reconcile(request reconcile.Request) (reconcil
 
 }
 
-func (r *ReconcilePolicyDecision) handleCertificate(instance *operatorv1alpha1.PolicyDecision, currentCertificate *certmgr.Certificate) (reconcile.Result, error) {
+func (r *ReconcilePolicyDecision) handleCertificate(instance *operatorv1alpha1.PolicyDecision,
+	currentCertificate *certmgr.Certificate) (reconcile.Result, error) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "auth-pdp-cert", Namespace: instance.Namespace}, currentCertificate)
@@ -314,22 +316,23 @@ func (r *ReconcilePolicyDecision) handleDeployment(instance *operatorv1alpha1.Po
 			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", "auth-pdp")
 			newDeployment := r.deploymentForPolicyDecision(instance)
 			err = r.client.Create(context.TODO(), newDeployment)
-
+			if err != nil {
+				reqLogger.Error(err, "Failed to create a Deployment", "Deployment.Namespace", newDeployment.Namespace, "Deployment.Name", newDeployment.Name)
+			}
 			// Deployment created successfully - don't requeue
 			return reconcile.Result{}, nil
-		} else {
-			reqLogger.Error(err, "Failed to get Deployment")
-			return reconcile.Result{}, err
 		}
-	} else {
-		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", "auth-pdp")
-		newDeployment := r.deploymentForPolicyDecision(instance)
-		currentDeployment.Spec = newDeployment.Spec
-		err = r.client.Update(context.TODO(), currentDeployment)
-		if err != nil {
-			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
-			return reconcile.Result{}, err
-		}
+		reqLogger.Error(err, "Failed to get Deployment")
+		return reconcile.Result{}, err
+	}
+	reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", "auth-pdp")
+	newDeployment := r.deploymentForPolicyDecision(instance)
+	currentDeployment.Spec = newDeployment.Spec
+	err = r.client.Update(context.TODO(), currentDeployment)
+	if err != nil {
+		reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace",
+			currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
+		return reconcile.Result{}, err
 	}
 
 	podList := &corev1.PodList{}

@@ -18,19 +18,18 @@ package oidcclientwatcher
 
 import (
 	"context"
-	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
-	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
+	"reflect"
+	gorun "runtime"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	gorun "runtime"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -39,6 +38,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 )
 
 const oidcClientWatcherDeploymentName = "oidcclient-watcher"
@@ -403,25 +405,25 @@ func (r *ReconcileOIDCClientWatcher) crdForOIDCClientWatcher(instance *operatorv
 			Validation: &extv1.CustomResourceValidation{
 				OpenAPIV3Schema: &extv1.JSONSchemaProps{
 					Properties: map[string]extv1.JSONSchemaProps{
-						"apiVersion": extv1.JSONSchemaProps{
+						"apiVersion": {
 							Description: `APIVersion defines the versioned schema of this representation
 							of an object. Servers should convert recognized schemas to the latest
 							internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources`,
 							Type: "string",
 						},
-						"kind": extv1.JSONSchemaProps{
+						"kind": {
 							Description: `Kind is a string value representing the REST resource this
 							object represents. Servers may infer this from the endpoint the client
 							submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds`,
 							Type: "string",
 						},
-						"metadata": extv1.JSONSchemaProps{
+						"metadata": {
 							Type: "object",
 						},
-						"spec": extv1.JSONSchemaProps{
+						"spec": {
 							Type: "object",
 						},
-						"status": extv1.JSONSchemaProps{
+						"status": {
 							Type: "object",
 						},
 					},
@@ -497,8 +499,8 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 				Spec: corev1.PodSpec{
 					TerminationGracePeriodSeconds: &seconds60,
 					ServiceAccountName:            serviceAccountName,
-					HostIPC: false,
-					HostPID: false,
+					HostIPC:                       false,
+					HostPID:                       false,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{

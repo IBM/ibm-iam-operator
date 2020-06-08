@@ -18,17 +18,16 @@ package secretwatcher
 
 import (
 	"context"
-	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	"reflect"
+	gorun "runtime"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	gorun "runtime"
-	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -37,6 +36,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 )
 
 const secretWatcherDeploymentName = "secret-watcher"
@@ -237,10 +239,10 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 					},
 				},
 				Spec: corev1.PodSpec{
-					TerminationGracePeriodSeconds: &seconds60, 
-					HostIPC:            false,
-					HostPID:            false,
-					ServiceAccountName: serviceAccountName,
+					TerminationGracePeriodSeconds: &seconds60,
+					HostIPC:                       false,
+					HostPID:                       false,
+					ServiceAccountName:            serviceAccountName,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{

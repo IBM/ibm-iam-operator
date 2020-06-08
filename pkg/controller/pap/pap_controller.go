@@ -19,13 +19,10 @@ package pap
 import (
 	"context"
 	"reflect"
+	gorun "runtime"
 
-	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
-	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
-	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	gorun "runtime"
 	net "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +37,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
+	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 )
 
 // IamPapServiceValues defines the values of iam-pap service
@@ -62,7 +63,6 @@ type IamPapCertificateValues struct {
 type ConfigValues struct {
 	ClusterCAIssuer string
 }
-
 
 // IcpAuditValues defines the values of icp-audit container
 type IcpAuditValues struct {
@@ -127,8 +127,6 @@ var iamPapCertificateValues = IamPapCertificateValues{
 var configvalues = ConfigValues{
 	ClusterCAIssuer: "cs-ca-clusterissuer",
 }
-
-
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller

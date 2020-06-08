@@ -17,12 +17,14 @@
 package authentication
 
 import (
-	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	"os"
+	"strconv"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"os"
-	"strconv"
+
+	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 )
 
 func buildInitContainers(mongoDBImage string) []corev1.Container {
@@ -369,7 +371,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 }
 
 func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string) corev1.Container {
-	
+
 	icpConsoleURL := os.Getenv("ICP_CONSOLE_URL")
 	envVars := []corev1.EnvVar{
 		{

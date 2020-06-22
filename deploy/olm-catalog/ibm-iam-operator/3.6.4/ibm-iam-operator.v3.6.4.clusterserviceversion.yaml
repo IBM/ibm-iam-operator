@@ -214,7 +214,7 @@ metadata:
             "initAuthService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4"
+              "imageTag": "3.3.4"
             },
             "initIdentityManager": {
               "imageName": "icp-platform-auth",

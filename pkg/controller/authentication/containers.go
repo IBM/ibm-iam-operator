@@ -694,6 +694,17 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 }
 
 func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string) corev1.Container {
+	
+	//@posriniv - find a better solution
+	replicaCount := int(instance.Spec.Replicas)
+	masterNodesList := ""
+	baseIp := "10.0.0."
+	for i := 1; i <= replicaCount; i++{
+		masterNodesList += baseIp + strconv.Itoa(i)
+		if i != replicaCount{
+			masterNodesList += " "
+		}
+	}
 
 	envVars := []corev1.EnvVar{
 		{
@@ -846,7 +857,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		},
 		{
 			Name:  "MASTER_NODES_LIST",
-			Value: instance.Spec.IdentityManager.MasterNodesList,
+			Value: masterNodesList,
 		},
 		{
 			Name: "LOCAL_NODE_IP",

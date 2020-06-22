@@ -695,6 +695,17 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 
 func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string) corev1.Container {
 
+	// Generate a dummy master node list for backward compatibility - @posriniv, find out a better solution
+	replicaCount := instance.Spec.Replicas
+	masterNodeList := ""
+	baseIp := "10.0.0."
+	for i := 1; i<=replicaCount; i++ {
+		masterNodeList += baseIp + strconv.Itoa(i)
+		if i != replicaCount{
+			masterNodeList += " "
+		}
+	}
+
 	envVars := []corev1.EnvVar{
 		{
 			Name:  "MONGO_DB_NAME",
@@ -846,7 +857,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		},
 		{
 			Name:  "MASTER_NODES_LIST",
-			Value: instance.Spec.IdentityManager.MasterNodesList,
+			Value: masterNodeList,
 		},
 		{
 			Name: "LOCAL_NODE_IP",

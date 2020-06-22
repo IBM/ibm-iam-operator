@@ -95,7 +95,7 @@ metadata:
               "icpPort": 8443,
               "installType": "fresh",
               "isOpenshiftEnv": true,
-              "nonceEnabled": false,
+              "nonceEnabled": true,
               "oidcIssuerURL": "https://127.0.0.1:443/idauth/oidc/endpoint/OP",
               "openshiftPort": 443,
               "roksEnabled": false,

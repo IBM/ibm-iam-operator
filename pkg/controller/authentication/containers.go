@@ -699,7 +699,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 	replicaCount := int(instance.Spec.Replicas)
 	masterNodesList := ""
 	baseIp := "10.0.0."
-	for i:=1; i<=replicaCount;i++ {
+	for i := 1; i <= replicaCount; i++{
 		masterNodesList += baseIp + strconv.Itoa(i)
 		if i != replicaCount{
 			masterNodesList += " "

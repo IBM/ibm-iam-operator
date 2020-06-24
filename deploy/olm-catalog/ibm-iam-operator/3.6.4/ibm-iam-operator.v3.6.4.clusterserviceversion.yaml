@@ -304,7 +304,7 @@ metadata:
     capabilities: Basic Install
     categories: Security
     certified: "false"
-    containerImage: quay.io/opencloudio/ibm-iam-operator:latest
+    containerImage: quay.io/opencloudio/ibm-iam-operator@sha256:11871c577bc2c12bea0ce893c3ad7e4aa3499aed43c9b95ef7a60ae6cd5dfd3c
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
       the lifecycle of IAM services. With this operator, you can simply deploy and
       upgrade the IAM services
@@ -1519,25 +1519,25 @@ spec:
                 - ibm-iam-operator
                 env:
                 - name: AUTH_SERVICE_TAG_OR_SHA
-                  value: "3.3.4"
+                  value: sha256:1d6f44c1f6813b68c9f17ada40f3fde8a35644f22dd436cb34e9d6dd18ac42dd
                 - name: IDENTITY_PROVIDER_TAG_OR_SHA
-                  value: "3.3.4"
+                  value: sha256:8587ffb240c5ba12411be9860a2ba6c4d1a8274e159e875567a79c081e543ffb
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
-                  value: "3.3.4"
+                  value: sha256:0ec0dd6a69d2811d55267397d5d5bdb64b23aaa824ee0ffde596334e97982537
                 - name: POLICY_ADMINISTRATION_TAG_OR_SHA
-                  value: "3.3.3"
+                  value: sha256:470fd0df32a5c9a2d79a19186d63234c92de0962e4f73afa3c84135cd0de8a84
                 - name: POLICY_DECISION_TAG_OR_SHA
-                  value: "3.3.3"
+                  value: sha256:2deab004a3f92253c20e67cbb79f46d76321d7c5e9b30ceab58b840139205afe
                 - name: SECRET_WATCHER_TAG_OR_SHA
-                  value: "3.3.3"
+                  value: sha256:bfe42fc0463da7d30e5b83f8a5767314d991eb66c3e7a03532e20502d3c13190
                 - name: CLIENT_WATCHER_TAG_OR_SHA
-                  value: "3.3.2"
+                  value: sha256:0c49e27b3d4f32001e568a62abdfaecdb41f10194cf5a9ccf87ebfbdd2808fd4
                 - name: POLICY_CONTROLLER_TAG_OR_SHA
-                  value: "3.3.2"
+                  value: sha256:2d3029b7efc0f6dd841d61e0d454d0cdfca539aff01b57d462f11891dac32b2f
                 - name: IAM_ONBOARDING_TAG_OR_SHA
-                  value: "3.3.2"
+                  value: sha256:f8efc1d236be029376eb73ff57270695b94b33cceed8aee57f7fb5edc8c488e6
                 - name: AUDIT_TAG_OR_SHA
-                  value: "3.4.1"
+                  value: sha256:24a220374c39652f8b031637d852995bfaec5be2601f9e4c41eb1925531f466d
                 - name: WATCH_NAMESPACE
                   valueFrom:
                     fieldRef:
@@ -1558,7 +1558,7 @@ spec:
                     configMapKeyRef:
                       key: proxy_address
                       name: ibmcloud-cluster-info
-                image: quay.io/opencloudio/ibm-iam-operator:latest
+                image: quay.io/opencloudio/ibm-iam-operator@sha256:11871c577bc2c12bea0ce893c3ad7e4aa3499aed43c9b95ef7a60ae6cd5dfd3c
                 imagePullPolicy: Always
                 name: ibm-iam-operator
                 resources:

@@ -45,15 +45,15 @@ spec:
           imagePullPolicy: Always
           env:
             - name: AUTH_SERVICE_TAG_OR_SHA
-              value: "sha256:fe712333134576b9894e70e2e3b5748916e0b3dcfb61820ab6c1133bbc8f3692"
+              value: "sha256:1d6f44c1f6813b68c9f17ada40f3fde8a35644f22dd436cb34e9d6dd18ac42dd"
             - name: IDENTITY_PROVIDER_TAG_OR_SHA
               value: "sha256:8587ffb240c5ba12411be9860a2ba6c4d1a8274e159e875567a79c081e543ffb"
             - name: IDENTITY_MANAGER_TAG_OR_SHA
-              value: "sha256:70b347289b562d4111d16b33ee0258b3aabf252edab975b5c32f2cf4f33b7548"
+              value: "sha256:0ec0dd6a69d2811d55267397d5d5bdb64b23aaa824ee0ffde596334e97982537"
             - name: POLICY_ADMINISTRATION_TAG_OR_SHA
               value: "sha256:470fd0df32a5c9a2d79a19186d63234c92de0962e4f73afa3c84135cd0de8a84"
             - name: POLICY_DECISION_TAG_OR_SHA
-              value: "sha256:87ea7e0b51acb55b0075ca537f27024874f356e383f60662e3f83506212cf1f1"
+              value: "sha256:2deab004a3f92253c20e67cbb79f46d76321d7c5e9b30ceab58b840139205afe"
             - name: SECRET_WATCHER_TAG_OR_SHA
               value: "sha256:bfe42fc0463da7d30e5b83f8a5767314d991eb66c3e7a03532e20502d3c13190"
             - name: CLIENT_WATCHER_TAG_OR_SHA

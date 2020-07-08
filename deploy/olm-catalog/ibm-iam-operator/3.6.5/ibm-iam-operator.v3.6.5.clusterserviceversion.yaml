@@ -1400,7 +1400,7 @@ spec:
           - '*'
           verbs:
           - '*'
-                - apiGroups:
+        - apiGroups:
           - monitoring.coreos.com
           resources:
           - servicemonitors

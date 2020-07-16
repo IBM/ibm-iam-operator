@@ -34,14 +34,31 @@ import (
 
 func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Authentication, currentDeployment *appsv1.Deployment, requeueResult *bool) error {
 
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	
+	// Check for the presence of dependencies
+	consoleConfigMapName := "management-ingress-info"
+	consoleConfigMap := &corev1.ConfigMap{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: consoleConfigMapName, Namespace: instance.Namespace}, consoleConfigMap)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Error(err, "The configmap ", consoleConfigMapName ," is not created yet")
+			return err
+		} else {
+			reqLogger.Error(err, "Failed to get ConfigMap",  consoleConfigMap)
+			return err
+		}
+	}
+	icpConsoleURL := consoleConfigMap.Data["MANAGEMENT_INGRESS_ROUTE_HOST"]
+
 	// Check if this Deployment already exists
 	deployment := "auth-idp"
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: deployment, Namespace: instance.Namespace}, currentDeployment)
+	
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: deployment, Namespace: instance.Namespace}, currentDeployment)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", deployment)
-			newDeployment := generateDeploymentObject(instance, r.scheme, deployment)
+			newDeployment := generateDeploymentObject(instance, r.scheme, deployment, icpConsoleURL)
 			err = r.client.Create(context.TODO(), newDeployment)
 			if err != nil {
 				return err
@@ -53,7 +70,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 		}
 	} else {
 		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
-		ocwDep := generateDeploymentObject(instance, r.scheme, deployment)
+		ocwDep := generateDeploymentObject(instance, r.scheme, deployment, icpConsoleURL)
 		currentDeployment.Spec = ocwDep.Spec
 		err = r.client.Update(context.TODO(), currentDeployment)
 		if err != nil {
@@ -100,7 +117,7 @@ func getPodNames(pods []corev1.Pod) []string {
 	return podNames
 }
 
-func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string) *appsv1.Deployment {
+func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string) *appsv1.Deployment {
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	authServiceImage := instance.Spec.AuthService.ImageRegistry + "/" + instance.Spec.AuthService.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA")
 	identityProviderImage := instance.Spec.IdentityProvider.ImageRegistry + "/" + instance.Spec.IdentityProvider.ImageName + shatag.GetImageRef("IDENTITY_PROVIDER_TAG_OR_SHA")
@@ -179,7 +196,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 						},
 					},
 					Volumes:        buildIdpVolumes(journalPath, ldapCACert, routerCertSecret),
-					Containers:     buildContainers(instance, auditImage, authServiceImage, identityProviderImage, identityManagerImage, journalPath),
+					Containers:     buildContainers(instance, auditImage, authServiceImage, identityProviderImage, identityManagerImage, journalPath, icpConsoleURL),
 					InitContainers: buildInitContainers(mongoDBImage, mongoInitResources),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &user,

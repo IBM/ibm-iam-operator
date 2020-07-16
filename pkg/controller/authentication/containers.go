@@ -20,7 +20,6 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"os"
 	"strconv"
 )
 
@@ -349,9 +348,8 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 
 }
 
-func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string) corev1.Container {
+func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string) corev1.Container {
 	
-	icpConsoleURL := os.Getenv("ICP_CONSOLE_URL")
 	resources := instance.Spec.IdentityProvider.Resources
 	envVars := []corev1.EnvVar{
 		{
@@ -985,12 +983,12 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 
 }
 
-func buildContainers(instance *operatorv1alpha1.Authentication, auditImage string, authServiceImage string, identityProviderImage string, identityManagerImage string, journalPath string) []corev1.Container {
+func buildContainers(instance *operatorv1alpha1.Authentication, auditImage string, authServiceImage string, identityProviderImage string, identityManagerImage string, journalPath string, icpConsoleURL string) []corev1.Container {
 
     auditResources := instance.Spec.AuditService.Resources
 	auditContainer := buildAuditContainer(auditImage, journalPath,auditResources)
 	authServiceContainer := buildAuthServiceContainer(instance, authServiceImage)
-	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage)
+	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL)
 	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage)
 
 	return []corev1.Container{auditContainer, authServiceContainer, identityProviderContainer, identityManagerContainer}

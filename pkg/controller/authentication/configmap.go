@@ -24,7 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"os"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"strconv"
 	"strings"
@@ -34,11 +33,43 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 
 	configMapList := []string{"platform-auth-idp", "registration-script", "oauth-client-map", "registration-json"}
 
-	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{authIdpConfigMap, registrationScriptConfigMap, oauthClientConfigMap}
+	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{authIdpConfigMap, registrationScriptConfigMap }
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 	var newConfigMap *corev1.ConfigMap
+
+	// Checking Dependencies
+
+	consoleConfigMapName := "management-ingress-info"
+	consoleConfigMap := &corev1.ConfigMap{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: consoleConfigMapName, Namespace: instance.Namespace}, consoleConfigMap)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Error(err, "The configmap ", consoleConfigMapName ," is not created yet")
+			return err
+		} else {
+			reqLogger.Error(err, "Failed to get ConfigMap",  consoleConfigMap)
+			return err
+		}
+	}
+	icpConsoleURL := consoleConfigMap.Data["MANAGEMENT_INGRESS_ROUTE_HOST"]
+
+	proxyConfigMapName := "ibmcloud-cluster-info"
+	proxyConfigMap := &corev1.ConfigMap{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: proxyConfigMapName, Namespace: instance.Namespace}, proxyConfigMap)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Error(err, "The configmap ", proxyConfigMapName ," is not created yet")
+			return err
+		} else {
+			reqLogger.Error(err, "Failed to get ConfigMap",  proxyConfigMap)
+			return err
+		}
+	}
+	icpProxyURL := proxyConfigMap.Data["proxy_address"]
+
+	// Creation the configmaps
 
 	for index, configMap := range configMapList {
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: instance.Namespace}, currentConfigMap)
@@ -47,7 +78,9 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 			if errors.IsNotFound(err) {
 				// Define a new ConfigMap
 				if configMapList[index] == "registration-json" {
-					newConfigMap = registrationJsonConfigMap(instance, wlpClientID, wlpClientSecret, r.scheme)
+					newConfigMap = registrationJsonConfigMap(instance, wlpClientID, wlpClientSecret, icpConsoleURL, r.scheme)
+				} else if configMapList[index] == "oauth-client-map" {
+					newConfigMap = oauthClientConfigMap(instance, icpConsoleURL, icpProxyURL, r.scheme)
 				} else {
 					newConfigMap = functionList[index](instance, r.scheme)
 				}
@@ -189,9 +222,8 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 	return newConfigMap
 }
 
-func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, scheme *runtime.Scheme) *corev1.ConfigMap {
+func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, icpConsoleURL string, scheme *runtime.Scheme) *corev1.ConfigMap {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	icpConsoleURL := os.Getenv("ICP_CONSOLE_URL")
 	tempRegistrationJson := registrationJson
 	tempRegistrationJson = strings.ReplaceAll(tempRegistrationJson, "WLP_CLIENT_ID", wlpClientID)
 	tempRegistrationJson = strings.ReplaceAll(tempRegistrationJson, "WLP_CLIENT_SECRET", wlpClientSecret)
@@ -241,11 +273,9 @@ func registrationScriptConfigMap(instance *operatorv1alpha1.Authentication, sche
 
 }
 
-func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
+func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, icpConsoleURL string, icpProxyURL string, scheme *runtime.Scheme) *corev1.ConfigMap {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	icpConsoleURL := os.Getenv("ICP_CONSOLE_URL")
-	icpProxyURL := os.Getenv("ICP_PROXY_URL")
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "oauth-client-map",

@@ -154,11 +154,12 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"SAML_NAMEID_FORMAT":                 "unspecified",
 			"MONGO_READ_TIMEOUT":		      "40000",
 			"MONGO_READ_PREFERENCE":	     "primaryPreferred",
-			"MONGO_CONNECT_TIMEOUT":             "40000",
-			"MONGO_SELECTION_TIMEOUT":           "40000",
+			"MONGO_CONNECT_TIMEOUT":             "30000",
+			"MONGO_SELECTION_TIMEOUT":           "30000",
 			"MONGO_WAIT_TIME":                   "20000",
 			"MONGO_POOL_MIN_SIZE":               "5",
 			"MONGO_POOL_MAX_SIZE":               "15",
+			"MONGO_MAX_STALENESS":               "90",
 		},
 	}
 

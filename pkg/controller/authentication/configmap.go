@@ -152,6 +152,13 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"IBMID_PROFILE_CLIENT_ID":            "1c36586c-cf48-4bce-9b9b-1a0480cc798b",
 			"IBMID_PROFILE_FIELDS":               "displayName,name,emails",
 			"SAML_NAMEID_FORMAT":                 "unspecified",
+			"MONGO_READ_TIMEOUT":		      "40000",
+			"MONGO_READ_PREFERENCE":	     "primaryPreferred",
+			"MONGO_CONNECT_TIMEOUT":             "40000",
+			"MONGO_SELECTION_TIMEOUT":           "40000",
+			"MONGO_WAIT_TIME":                   "20000",
+			"MONGO_POOL_MIN_SIZE":               "5",
+			"MONGO_POOL_MAX_SIZE":               "15",
 		},
 	}
 

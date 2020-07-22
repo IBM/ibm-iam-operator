@@ -158,7 +158,7 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"MONGO_SELECTION_TIMEOUT": "40000",
 			"MONGO_WAIT_TIME": "20000",
 			"POOL_MIN_SIZE": "5",
-			"POOL_MAX_SIZE": "15"
+			"POOL_MAX_SIZE": "15",
 		},
 	}
 

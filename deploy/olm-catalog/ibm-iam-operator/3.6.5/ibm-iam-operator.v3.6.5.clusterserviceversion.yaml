@@ -304,7 +304,7 @@ metadata:
     capabilities: Basic Install
     categories: Security
     certified: "false"
-    containerImage: quay.io/opencloudio/ibm-iam-operator:latest
+    containerImage: quay.io/opencloudio/ibm-iam-operator@sha256:ac4ff9b5060451be5047d8cc4eb5e780a23edeb270dfff910e850828a0e6688e
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
       the lifecycle of IAM services. With this operator, you can simply deploy and
       upgrade the IAM services
@@ -1780,9 +1780,9 @@ spec:
                 - ibm-iam-operator
                 env:
                 - name: AUTH_SERVICE_TAG_OR_SHA
-                  value: sha256:81958082548f844e399c1c212661a0e9301ddc70befe7e1874aa0c95ca16075a
+                  value: sha256:a5020f5ce596d4def3060031cb7f6a6d44fd591fb1253e3ad0b8c9ed1152bc9a
                 - name: IDENTITY_PROVIDER_TAG_OR_SHA
-                  value: sha256:530f94f4889dfa65eedeae0e42d36038a9e0da6f84489c2029fa98b2e6fd6069
+                  value: sha256:42c863d654f52278695814e95ff703897f6a972d38552a5733a651cb94b03033
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
                   value: sha256:0ec0dd6a69d2811d55267397d5d5bdb64b23aaa824ee0ffde596334e97982537
                 - name: POLICY_ADMINISTRATION_TAG_OR_SHA

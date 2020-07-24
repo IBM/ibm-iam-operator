@@ -304,7 +304,7 @@ metadata:
     capabilities: Basic Install
     categories: Security
     certified: "false"
-    containerImage: quay.io/opencloudio/ibm-iam-operator@sha256:ac4ff9b5060451be5047d8cc4eb5e780a23edeb270dfff910e850828a0e6688e
+    containerImage: quay.io/opencloudio/ibm-iam-operator@sha256:81a8b536c06a8f3186c4cbff6a27806f7afc9467b07280d458fe6c595b396310
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
       the lifecycle of IAM services. With this operator, you can simply deploy and
       upgrade the IAM services
@@ -1819,7 +1819,7 @@ spec:
                     configMapKeyRef:
                       key: proxy_address
                       name: ibmcloud-cluster-info
-                image: quay.io/opencloudio/ibm-iam-operator:latest
+                image: quay.io/opencloudio/ibm-iam-operator@sha256:81a8b536c06a8f3186c4cbff6a27806f7afc9467b07280d458fe6c595b396310
                 imagePullPolicy: Always
                 name: ibm-iam-operator
                 resources:

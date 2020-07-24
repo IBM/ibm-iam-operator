@@ -66,10 +66,27 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 		} else {
 			// @posriniv - find a more efficient solution
 			if configMapList[index] == "platform-auth-idp" {
+				cmUpdateRequired := false
 				if _,keyExists := currentConfigMap.Data["LDAP_RECURSIVE_SEARCH"]; !keyExists{
 					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.scheme)
 					currentConfigMap.Data["LDAP_RECURSIVE_SEARCH"] = newConfigMap.Data["LDAP_RECURSIVE_SEARCH"]
+					cmUpdateRequired = true
+				}
+				if _,keyExists := currentConfigMap.Data["MONGO_READ_TIMEOUT"]; !keyExists{
+					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					newConfigMap = functionList[index](instance, r.scheme)
+					currentConfigMap.Data["MONGO_READ_TIMEOUT"] = newConfigMap.Data["MONGO_READ_TIMEOUT"]
+					currentConfigMap.Data["MONGO_MAX_STALENESS"] = newConfigMap.Data["MONGO_MAX_STALENESS"]
+					currentConfigMap.Data["MONGO_READ_PREFERENCE"] = newConfigMap.Data["MONGO_READ_PREFERENCE"]
+					currentConfigMap.Data["MONGO_CONNECT_TIMEOUT"] = newConfigMap.Data["MONGO_CONNECT_TIMEOUT"]
+					currentConfigMap.Data["MONGO_SELECTION_TIMEOUT"] = newConfigMap.Data["MONGO_SELECTION_TIMEOUT"]
+					currentConfigMap.Data["MONGO_WAIT_TIME"] = newConfigMap.Data["MONGO_WAIT_TIME"]
+					currentConfigMap.Data["MONGO_POOL_MIN_SIZE"] = newConfigMap.Data["MONGO_POOL_MIN_SIZE"]
+					currentConfigMap.Data["MONGO_POOL_MAX_SIZE"] = newConfigMap.Data["MONGO_POOL_MAX_SIZE"]
+					cmUpdateRequired = true
+				}
+				if cmUpdateRequired == true {
 					err = r.client.Update(context.TODO(), currentConfigMap)
 					if err != nil {
 						reqLogger.Error(err, "Failed to update an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "Configmap.Name", currentConfigMap.Name)

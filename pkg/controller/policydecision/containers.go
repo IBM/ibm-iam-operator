@@ -22,18 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)            // 10m
-var cpu20 = resource.NewMilliQuantity(20, resource.DecimalSI)            // 20m
-var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
-var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)          // 200m
-var cpu1000 = resource.NewMilliQuantity(1000, resource.DecimalSI)        // 1000m
-var memory32 = resource.NewQuantity(100*1024*1024, resource.BinarySI)    // 32Mi
-var memory100 = resource.NewQuantity(100*1024*1024, resource.BinarySI)   // 100Mi
-var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI)   // 128Mi
-var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI)   // 256Mi
-var memory512 = resource.NewQuantity(512*1024*1024, resource.BinarySI)   // 512Mi
-var memory2560 = resource.NewQuantity(2560*1024*1024, resource.BinarySI) // 2560Mi
-
 func buildInitContainers(mongoDBImage string, resources *corev1.ResourceRequirements) []corev1.Container {
 	return []corev1.Container{
 		{

@@ -18,27 +18,10 @@ package pap
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)            // 10m
-var cpu20 = resource.NewMilliQuantity(20, resource.DecimalSI)            // 20m
-var cpu50 = resource.NewMilliQuantity(50, resource.DecimalSI)            // 50m
-var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
-var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)          // 200m
-var cpu1000 = resource.NewMilliQuantity(1000, resource.DecimalSI)        // 1000m
-var memory20 = resource.NewQuantity(20*1024*1024, resource.BinarySI)     // 20Mi
-var memory32 = resource.NewQuantity(32*1024*1024, resource.BinarySI)     // 32Mi
-var memory100 = resource.NewQuantity(100*1024*1024, resource.BinarySI)   // 100Mi
-var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI)   // 128Mi
-var memory200 = resource.NewQuantity(200*1024*1024, resource.BinarySI)   // 200Mi
-var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI)   // 256Mi
-var memory512 = resource.NewQuantity(512*1024*1024, resource.BinarySI)   // 512Mi
-var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024Mi
-var memory2560 = resource.NewQuantity(2560*1024*1024, resource.BinarySI) // 2560Mi
-
-func buildAuditContainer(auditImage string, journalPath string) corev1.Container {
+func buildAuditContainer(auditImage string, journalPath string, resources *corev1.ResourceRequirements) corev1.Container {
 
 	return corev1.Container{
 		Name:            "icp-audit-service",
@@ -83,19 +66,12 @@ func buildAuditContainer(auditImage string, journalPath string) corev1.Container
 				Drop: []corev1.Capability{"ALL"},
 			},
 		},
-		Resources: corev1.ResourceRequirements{
-			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu200,
-				corev1.ResourceMemory: *memory200},
-			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu20,
-				corev1.ResourceMemory: *memory20},
-		},
+		Resources: *resources,
 	}
 
 }
 
-func buildPapContainer(papImage string) corev1.Container {
+func buildPapContainer(papImage string, resources *corev1.ResourceRequirements) corev1.Container {
 
 	return corev1.Container{
 		Name:            "auth-pap",
@@ -110,14 +86,7 @@ func buildPapContainer(papImage string) corev1.Container {
 				Drop: []corev1.Capability{"ALL"},
 			},
 		},
-		Resources: corev1.ResourceRequirements{
-			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu1000,
-				corev1.ResourceMemory: *memory1024},
-			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu50,
-				corev1.ResourceMemory: *memory200},
-		},
+		Resources: *resources,
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      "mongodb-ca-cert",
@@ -333,10 +302,10 @@ func buildPapContainer(papImage string) corev1.Container {
 
 }
 
-func buildContainers(auditImage string, papImage string, journalPath string) []corev1.Container {
+func buildContainers(auditImage string, papImage string, journalPath string, auditResources *corev1.ResourceRequirements, papResources *corev1.ResourceRequirements) []corev1.Container {
 
-	auditContainer := buildAuditContainer(auditImage, journalPath)
-	papContainer := buildPapContainer(papImage)
+	auditContainer := buildAuditContainer(auditImage, journalPath, auditResources)
+	papContainer := buildPapContainer(papImage, papResources)
 
 	return []corev1.Container{auditContainer, papContainer}
 }

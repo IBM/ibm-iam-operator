@@ -609,6 +609,8 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + shatag.GetImageRef("AUDIT_TAG_OR_SHA")
 	replicas := instance.Spec.Replicas
 	journalPath := instance.Spec.AuditService.JournalPath
+	auditResources := instance.Spec.AuditService.Resources
+	papResources := instance.Spec.Resources
 
 	papDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -676,7 +678,7 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 						},
 					},
 					Volumes:    buildPapVolumes(journalPath),
-					Containers: buildContainers(auditImage, papImage, journalPath),
+					Containers: buildContainers(auditImage, papImage, journalPath, auditResources, papResources),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &user,
 					},

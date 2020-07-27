@@ -25,12 +25,11 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-        "reflect"
+     "reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -42,14 +41,6 @@ import (
 )
 
 var log = logf.Log.WithName("controller_securityonboarding")
-var cpu20 = resource.NewMilliQuantity(20, resource.DecimalSI)            // 20m
-var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
-var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)          // 200m
-var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI)   // 256Mi
-var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI)   // 128Mi
-var memory64 = resource.NewQuantity(64*1024*1024, resource.BinarySI)     // 64Mi
-var memory512 = resource.NewQuantity(512*1024*1024, resource.BinarySI)   // 512Mi
-var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024Mi
 var trueVar bool = true
 var falseVar bool = false
 var serviceAccountName string = "ibm-iam-operand-restricted"
@@ -387,14 +378,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu200,
-					corev1.ResourceMemory: *memory256},
-				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
-			},
+			Resources: *instance.Spec.InitAuthService.Resources,
 		},
 	}
 	tmpVolumes := []corev1.Volume{}
@@ -488,14 +472,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 						Drop: []corev1.Capability{"ALL"},
 					},
 				},
-				Resources: corev1.ResourceRequirements{
-					Limits: map[corev1.ResourceName]resource.Quantity{
-						corev1.ResourceCPU:    *cpu200,
-						corev1.ResourceMemory: *memory512},
-					Requests: map[corev1.ResourceName]resource.Quantity{
-						corev1.ResourceCPU:    *cpu20,
-						corev1.ResourceMemory: *memory64},
-				},
+				Resources: *instance.Spec.Resources,
 				Env: []corev1.EnvVar{
 					{
 						Name: "ICP_API_KEY",
@@ -586,14 +563,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu200,
-					corev1.ResourceMemory: *memory256},
-				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
-			},
+			Resources: *instance.Spec.InitAuthService.Resources,
 		},
 		{
 			Name:            "init-identity-provider",
@@ -615,14 +585,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu200,
-					corev1.ResourceMemory: *memory256},
-				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
-			},
+			Resources: *instance.Spec.InitIdentityProvider.Resources,
 		},
 		{
 			Name:            "init-identity-manager",
@@ -644,14 +607,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu200,
-					corev1.ResourceMemory: *memory256},
-				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
-			},
+			Resources: *instance.Spec.InitIdentityManager.Resources,
 		},
 		{
 			Name:            "init-token-service",
@@ -667,14 +623,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu200,
-					corev1.ResourceMemory: *memory256},
-				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
-			},
+			Resources: *instance.Spec.InitTokenService.Resources,
 		},
 		{
 			Name:            "init-pap",
@@ -696,14 +645,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu200,
-					corev1.ResourceMemory: *memory256},
-				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
-			},
+			Resources: *instance.Spec.InitPAP.Resources,
 		},
 	}
 	var mode1, mode2, mode3, mode4 int32 = 420, 420, 420, 420
@@ -993,14 +935,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 						Drop: []corev1.Capability{"ALL"},
 					},
 				},
-				Resources: corev1.ResourceRequirements{
-					Limits: map[corev1.ResourceName]resource.Quantity{
-						corev1.ResourceCPU:    *cpu200,
-						corev1.ResourceMemory: *memory1024},
-					Requests: map[corev1.ResourceName]resource.Quantity{
-						corev1.ResourceCPU:    *cpu20,
-						corev1.ResourceMemory: *memory64},
-				},
+				Resources: *instance.Spec.IAMOnboarding.Resources,
 				VolumeMounts: []corev1.VolumeMount{
 					{
 						Name:      "mongodb-ca-cert",

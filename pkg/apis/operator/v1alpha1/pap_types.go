@@ -34,6 +34,7 @@ type PapSpec struct {
 	Replicas        int32            `json:"replicas"`
 	PapService      PapServiceSpec   `json:"papService"`
 	AuditService    AuditServiceSpec `json:"auditService"`
+	Resources       *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // PapServiceSpec defined the desired state of PapService Container
@@ -41,7 +42,6 @@ type PapServiceSpec struct {
 	ImageRegistry string `json:"imageRegistry"`
 	ImageName     string `json:"imageName"`
 	ImageTag      string `json:"imageTag"`
-	Resources       *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // PapStatus defines the observed state of Pap

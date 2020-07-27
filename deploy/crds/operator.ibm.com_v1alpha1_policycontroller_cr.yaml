@@ -11,3 +11,10 @@ spec:
   imageRegistry: "quay.io/opencloudio/iam-policy-controller"
   imageTagPostfix: "3.3.2"
   replicas: 1
+  resources:
+    limits:
+      cpu: 200m
+      memory: 384Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi

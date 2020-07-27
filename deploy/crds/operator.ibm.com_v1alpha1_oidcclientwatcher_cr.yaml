@@ -12,3 +12,10 @@ spec:
   imageRegistry: "quay.io/opencloudio/icp-oidcclient-watcher"
   imageTagPostfix: "3.3.2"
   replicas: 1
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 10m
+      memory: 16Mi

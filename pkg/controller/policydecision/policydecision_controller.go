@@ -519,6 +519,9 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + shatag.GetImageRef("AUDIT_TAG_OR_SHA")
 	replicas := instance.Spec.Replicas
 	journalPath := instance.Spec.AuditService.JournalPath
+	auditResources := instance.Spec.AuditService.Resources
+	initMongoDBResources := instance.Spec.InitMongodb.Resources
+	pdpResources := instance.Spec.Resources
 
 	pdpDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -586,8 +589,8 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 						},
 					},
 					Volumes:        buildPdpVolumes(journalPath),
-					Containers:     buildContainers(auditImage, pdpImage, journalPath),
-					InitContainers: buildInitContainers(mongoDBImage),
+					Containers:     buildContainers(auditImage, pdpImage, journalPath, auditResources, pdpResources),
+					InitContainers: buildInitContainers(mongoDBImage, initMongoDBResources),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &user,
 					},

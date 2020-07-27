@@ -17,6 +17,7 @@
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -31,6 +32,7 @@ type OIDCClientWatcherSpec struct {
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
 	OperatorVersion string `json:"operatorVersion,omitempty"`
 	Replicas        int32  `json:"replicas"`
+	Resources       *corev1.ResourceRequirements `json:"resources,omitempty"`
 	ImageRegistry   string `json:"imageRegistry,omitempty"`
 	ImageTagPostfix string `json:"imageTagPostfix,omitempty"`
 }

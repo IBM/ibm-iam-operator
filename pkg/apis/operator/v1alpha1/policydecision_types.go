@@ -17,6 +17,7 @@
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -36,6 +37,7 @@ type PolicyDecisionSpec struct {
 	ImageTag        string           `json:"imageTag"`
 	AuditService    AuditServiceSpec `json:"auditService"`
 	InitMongodb     InitMongodbSpec  `json:"initMongodb"`
+	Resources       *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // PolicyDecisionStatus defines the observed state of PolicyDecision

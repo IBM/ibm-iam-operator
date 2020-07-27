@@ -17,6 +17,7 @@
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -32,6 +33,7 @@ type SecretWatcherSpec struct {
 	Replicas        int32  `json:"replicas"`
 	ImageRegistry   string `json:"imageRegistry,omitempty"`
 	ImageTagPostfix string `json:"imageTagPostfix,omitempty"`
+	Resources       *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // SecretWatcherStatus defines the observed state of SecretWatcher

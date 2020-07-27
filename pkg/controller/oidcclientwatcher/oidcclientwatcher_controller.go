@@ -26,7 +26,6 @@ import (
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	gorun "runtime"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -47,10 +46,6 @@ var trueVar bool = true
 var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
-var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)          // 10m
-var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
-var memory16 = resource.NewQuantity(16*1024*1024, resource.BinarySI)   // 16Mi
-var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI) // 256Mi
 var serviceAccountName string = "ibm-iam-operand-restricted"
 
 var log = logf.Log.WithName("controller_oidcclientwatcher")
@@ -463,6 +458,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 	reqLogger := log.WithValues("deploymentForOIDCClientWatcher", "Entry", "instance.Name", instance.Name)
 	image := instance.Spec.ImageRegistry + shatag.GetImageRef("CLIENT_WATCHER_TAG_OR_SHA")
 	replicas := instance.Spec.Replicas
+	resources := instance.Spec.Resources
 
 	ocwDep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -540,14 +536,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 							Name:            "oidcclient-watcher",
 							Image:           image,
 							ImagePullPolicy: corev1.PullAlways,
-							Resources: corev1.ResourceRequirements{
-								Limits: map[corev1.ResourceName]resource.Quantity{
-									corev1.ResourceCPU:    *cpu200,
-									corev1.ResourceMemory: *memory256},
-								Requests: map[corev1.ResourceName]resource.Quantity{
-									corev1.ResourceCPU:    *cpu10,
-									corev1.ResourceMemory: *memory16},
-							},
+							Resources: *resources,
 							Env: []corev1.EnvVar{
 								{
 									Name: "CLUSTER_NAME",

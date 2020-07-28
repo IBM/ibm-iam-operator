@@ -494,7 +494,7 @@ rules:
   - list
   - patch
   - update
-  - watc
+  - watch
 - apiGroups:
   - '*'
   resources:

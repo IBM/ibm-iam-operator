@@ -610,7 +610,7 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 	replicas := instance.Spec.Replicas
 	journalPath := instance.Spec.AuditService.JournalPath
 	auditResources := instance.Spec.AuditService.Resources
-	papResources := instance.Spec.Resources
+	papResources := instance.Spec.PapService.Resources
 
 	papDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{

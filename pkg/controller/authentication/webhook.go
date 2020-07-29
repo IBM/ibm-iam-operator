@@ -35,6 +35,7 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 	var err error
 	webhook := "namespace-admission-config"
 
+	//Check Dependencies
 	caCertSecretName := "cs-ca-certificate-secret"
 	caCertSecret := &corev1.Secret{}
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: caCertSecretName, Namespace: instance.Namespace}, caCertSecret)

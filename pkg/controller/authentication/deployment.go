@@ -45,7 +45,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 			reqLogger.Error(err, "The configmap ", consoleConfigMapName ," is not created yet")
 			return err
 		} else {
-			reqLogger.Error(err, "Failed to get ConfigMap",  consoleConfigMap)
+			reqLogger.Error(err, "Failed to get ConfigMap",  consoleConfigMapName)
 			return err
 		}
 	}

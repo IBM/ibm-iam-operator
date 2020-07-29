@@ -40,7 +40,6 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	var newConfigMap *corev1.ConfigMap
 
 	// Checking Dependencies
-
 	consoleConfigMapName := "management-ingress-info"
 	consoleConfigMap := &corev1.ConfigMap{}
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: consoleConfigMapName, Namespace: instance.Namespace}, consoleConfigMap)
@@ -49,7 +48,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 			reqLogger.Error(err, "The configmap ", consoleConfigMapName ," is not created yet")
 			return err
 		} else {
-			reqLogger.Error(err, "Failed to get ConfigMap",  consoleConfigMap)
+			reqLogger.Error(err, "Failed to get ConfigMap",  consoleConfigMapName)
 			return err
 		}
 	}
@@ -63,7 +62,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 			reqLogger.Error(err, "The configmap ", proxyConfigMapName ," is not created yet")
 			return err
 		} else {
-			reqLogger.Error(err, "Failed to get ConfigMap",  proxyConfigMap)
+			reqLogger.Error(err, "Failed to get ConfigMap",  proxyConfigMapName)
 			return err
 		}
 	}

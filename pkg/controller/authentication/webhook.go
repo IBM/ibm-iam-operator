@@ -19,8 +19,8 @@ package authentication
 import (
 	"context"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
-	"io/ioutil"
 	reg "k8s.io/api/admissionregistration/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,10 +35,24 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 	var err error
 	webhook := "namespace-admission-config"
 
+	caCertSecretName := "cs-ca-certificate-secret"
+	caCertSecret := &corev1.Secret{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: caCertSecretName, Namespace: instance.Namespace}, caCertSecret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Error(err, "The secret ", caCertSecretName ," is not created yet")
+			return err
+		} else {
+			reqLogger.Error(err, "Failed to get secret",  caCertSecret)
+			return err
+		}
+	}
+	caCertData := caCertSecret.Data["ca.crt"]
+
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: webhook, Namespace: ""}, currentWebhook)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new Webhook
-		newWebhook := generateWebhookObject(instance, r.scheme, webhook)
+		newWebhook := generateWebhookObject(instance, r.scheme, webhook, caCertData)
 		reqLogger.Info("Creating a new Webhook", "Webhook.Namespace", instance.Namespace, "Webhook.Name", webhook)
 		err = r.client.Create(context.TODO(), newWebhook)
 		if err != nil {
@@ -56,11 +70,10 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 
 }
 
-func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, webhook string) *reg.MutatingWebhookConfiguration {
+func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, webhook string, certData []byte) *reg.MutatingWebhookConfiguration {
 
 	servicePath := "/identity/api/v1/users/validateandmutate"
 	failurePolicy := reg.Ignore
-	certData, _ := ioutil.ReadFile("/certs/ca.crt")
 	newWebhook := &reg.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: webhook,

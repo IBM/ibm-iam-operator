@@ -43,11 +43,11 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 			reqLogger.Error(err, "The secret ", caCertSecretName ," is not created yet")
 			return err
 		} else {
-			reqLogger.Error(err, "Failed to get secret",  caCertSecret)
+			reqLogger.Error(err, "Failed to get secret",  caCertSecretName)
 			return err
 		}
 	}
-	caCertData := caCertSecret.Data["ca.crt"]
+	caCertData := caCertSecret.Data["tls.crt"]
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: webhook, Namespace: ""}, currentWebhook)
 	if err != nil && errors.IsNotFound(err) {

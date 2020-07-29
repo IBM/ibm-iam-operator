@@ -12,7 +12,7 @@ spec:
   auditService: 
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-audit-service"
-    imageTag: "3.4.1"
+    imageTag: "3.4.2"
     journalPath: "/run/systemd/journal"
     resources:
       limits:
@@ -24,7 +24,7 @@ spec:
   authService:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
-    imageTag: "3.3.4"
+    imageTag: "3.3.7"
     ldapsCACert: "platform-auth-ldaps-ca-cert"
     routerCertSecret: "route-tls-secret"
     resources:
@@ -37,7 +37,7 @@ spec:
   clientRegistration:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
-    imageTag: "3.3.4"
+    imageTag: "3.3.7"
     resources:
       limits:
         cpu: 1000m
@@ -48,7 +48,7 @@ spec:
   identityManager:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-identity-manager"
-    imageTag: "3.3.4"
+    imageTag: "3.3.6"
     masterNodesList: "10.0.0.1"
     resources:
       limits:
@@ -60,7 +60,7 @@ spec:
   identityProvider:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-identity-provider"
-    imageTag: "3.3.4"
+    imageTag: "3.3.6"
     resources:
       limits:
         cpu: 1000m
@@ -71,7 +71,7 @@ spec:
   initMongodb:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
-    imageTag: "3.3.4"
+    imageTag: "3.3.7"
     resources:
       limits:
         cpu: 100m

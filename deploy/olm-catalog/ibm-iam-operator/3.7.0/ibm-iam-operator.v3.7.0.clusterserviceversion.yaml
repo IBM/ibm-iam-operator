@@ -17,7 +17,7 @@ metadata:
           },
           "spec": {
             "imageRegistry": "quay.io/opencloudio/icp-oidcclient-watcher",
-            "imageTagPostfix": "3.3.2",
+            "imageTagPostfix": "3.3.3",
             "operatorVersion": "0.14.1",
             "replicas": 1,
             "resources": {
@@ -47,7 +47,7 @@ metadata:
             "auditService": {
               "imageName": "icp-audit-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.4.1",
+              "imageTag": "3.4.2",
               "journalPath": "/run/systemd/journal",
               "resources": {
                 "limits": {
@@ -62,11 +62,11 @@ metadata:
             },
             "imageName": "iam-policy-decision",
             "imageRegistry": "quay.io/opencloudio",
-            "imageTag": "3.3.3",
+            "imageTag": "3.3.4",
             "initMongodb": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.4",
+              "imageTag": "3.3.7",
               "resources": {
                 "limits": {
                   "cpu": "100m",
@@ -107,7 +107,7 @@ metadata:
             "auditService": {
               "imageName": "icp-audit-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.4.1",
+              "imageTag": "3.4.2",
               "journalPath": "/run/systemd/journal",
               "resources": {
                 "limits": {
@@ -123,7 +123,7 @@ metadata:
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.4",
+              "imageTag": "3.3.7",
               "ldapsCACert": "platform-auth-ldaps-ca-cert",
               "resources": {
                 "limits": {
@@ -140,7 +140,7 @@ metadata:
             "clientRegistration": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.4",
+              "imageTag": "3.3.7",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -178,7 +178,7 @@ metadata:
             "identityManager": {
               "imageName": "icp-identity-manager",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.4",
+              "imageTag": "3.3.6",
               "masterNodesList": "10.0.0.1",
               "resources": {
                 "limits": {
@@ -194,7 +194,7 @@ metadata:
             "identityProvider": {
               "imageName": "icp-identity-provider",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.4",
+              "imageTag": "3.3.6",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -209,7 +209,7 @@ metadata:
             "initMongodb": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.4",
+              "imageTag": "3.3.7",
               "resources": {
                 "limits": {
                   "cpu": "100m",
@@ -240,7 +240,7 @@ metadata:
             "auditService": {
               "imageName": "icp-audit-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.4.1",
+              "imageTag": "3.4.2",
               "journalPath": "/run/systemd/journal",
               "resources": {
                 "limits": {
@@ -257,7 +257,7 @@ metadata:
             "papService": {
               "imageName": "iam-policy-administration",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.3",
+              "imageTag": "3.3.4",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -343,7 +343,7 @@ metadata:
             "iamOnboarding": {
               "imageName": "icp-iam-onboarding",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.2",
+              "imageTag": "3.3.3",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -357,14 +357,14 @@ metadata:
             },
             "imageName": "icp-iam-onboarding",
             "imageRegistry": "quay.io/opencloudio",
-            "imageTag": "3.3.2",
+            "imageTag": "3.3.3",
             "impersonation": {
               "enableImpersonation": false
             },
             "initAuthService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.4",
+              "imageTag": "3.3.7",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -379,7 +379,7 @@ metadata:
             "initIdentityManager": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.4",
+              "imageTag": "3.3.7",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -394,7 +394,7 @@ metadata:
             "initIdentityProvider": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.4",
+              "imageTag": "3.3.7",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -409,7 +409,7 @@ metadata:
             "initPAPSpec": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.4",
+              "imageTag": "3.3.7",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -424,7 +424,7 @@ metadata:
             "initTokenService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.4",
+              "imageTag": "3.3.7",
               "resources": {
                 "limits": {
                   "cpu": "200m",

@@ -11,7 +11,7 @@ spec:
   auditService:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-audit-service"
-    imageTag: "3.4.1"
+    imageTag: "3.4.2"
     journalPath: "/run/systemd/journal"
     resources:
       limits:
@@ -22,7 +22,7 @@ spec:
         memory: 100Mi
   imageRegistry: "quay.io/opencloudio"
   imageName: "iam-policy-decision"
-  imageTag: "3.3.3"
+  imageTag: "3.3.4"
   resources:
     limits:
       cpu: 200m
@@ -33,7 +33,7 @@ spec:
   initMongodb:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
-    imageTag: "3.3.4"
+    imageTag: "3.3.7"
     resources:
       limits:
         cpu: 100m

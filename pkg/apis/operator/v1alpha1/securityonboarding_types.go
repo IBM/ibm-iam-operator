@@ -17,6 +17,7 @@
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -33,6 +34,7 @@ type SecurityOnboardingSpec struct {
 	ImageRegistry        string                   `json:"imageRegistry"`
 	ImageName            string                   `json:"imageName"`
 	ImageTag             string                   `json:"imageTag"`
+	Resources            *corev1.ResourceRequirements `json:"resources,omitempty"`
 	IAMOnboarding        IAMOnboardingSpec        `json:"iamOnboarding"`
 	InitAuthService      InitAuthServiceSpec      `json:"initAuthService"`
 	InitIdentityProvider InitIdentityProviderSpec `json:"initIdentityProvider"`
@@ -46,36 +48,42 @@ type IAMOnboardingSpec struct {
 	ImageRegistry string `json:"imageRegistry"`
 	ImageName     string `json:"imageName"`
 	ImageTag      string `json:"imageTag"`
+	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type InitAuthServiceSpec struct {
 	ImageRegistry string `json:"imageRegistry"`
 	ImageName     string `json:"imageName"`
 	ImageTag      string `json:"imageTag"`
+	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type InitIdentityProviderSpec struct {
 	ImageRegistry string `json:"imageRegistry"`
 	ImageName     string `json:"imageName"`
 	ImageTag      string `json:"imageTag"`
+	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type InitIdentityManagerSpec struct {
 	ImageRegistry string `json:"imageRegistry"`
 	ImageName     string `json:"imageName"`
 	ImageTag      string `json:"imageTag"`
+	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type InitTokenServiceSpec struct {
 	ImageRegistry string `json:"imageRegistry"`
 	ImageName     string `json:"imageName"`
 	ImageTag      string `json:"imageTag"`
+	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type InitPAPSpec struct {
 	ImageRegistry string `json:"imageRegistry"`
 	ImageName     string `json:"imageName"`
 	ImageTag      string `json:"imageTag"`
+	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type ImpersonationSpec struct {

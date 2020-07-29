@@ -17,6 +17,7 @@
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -33,6 +34,7 @@ type PolicyControllerSpec struct {
 	Replicas        int32  `json:"replicas"`
 	ImageRegistry   string `json:"imageRegistry,omitempty"`
 	ImageTagPostfix string `json:"imageTagPostfix,omitempty"`
+	Resources       *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // PolicyControllerStatus defines the observed state of PolicyController

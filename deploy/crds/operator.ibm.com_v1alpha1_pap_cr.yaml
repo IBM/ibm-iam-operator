@@ -11,11 +11,25 @@ spec:
   auditService:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-audit-service"
-    imageTag: "3.4.1"
+    imageTag: "3.4.2"
     journalPath: "/run/systemd/journal"
+    resources:
+      limits:
+        cpu: 200m
+        memory: 200Mi
+      requests:
+        cpu: 20m
+        memory: 20Mi
   papService:
     imageRegistry: "quay.io/opencloudio"
     imageName: "iam-policy-administration"
-    imageTag: "3.3.3"
+    imageTag: "3.3.4"
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 50m
+        memory: 200Mi
   operatorVersion: "3.5.0"
   replicas: 1

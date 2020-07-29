@@ -19,13 +19,12 @@ package authentication
 import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"os"
 	"strconv"
 )
 
-func buildInitContainers(mongoDBImage string) []corev1.Container {
+func buildInitContainers(mongoDBImage string, resources *corev1.ResourceRequirements) []corev1.Container {
 	return []corev1.Container{
 		{
 			Name:            "init-mongodb",
@@ -45,19 +44,12 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
-				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
-			},
+			Resources: *resources,
 		},
 	}
 }
 
-func buildAuditContainer(auditImage string, journalPath string) corev1.Container {
+func buildAuditContainer(auditImage string, journalPath string, resources *corev1.ResourceRequirements) corev1.Container {
 
 	return corev1.Container{
 		Name:            "icp-audit-service",
@@ -102,19 +94,14 @@ func buildAuditContainer(auditImage string, journalPath string) corev1.Container
 				Drop: []corev1.Capability{"ALL"},
 			},
 		},
-		Resources: corev1.ResourceRequirements{
-			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu100,
-				corev1.ResourceMemory: *memory128},
-			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu10,
-				corev1.ResourceMemory: *memory32},
-		},
+		Resources: *resources,
 	}
 
 }
 
 func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authServiceImage string) corev1.Container {
+
+	resources := instance.Spec.AuthService.Resources
 
 	envVars := []corev1.EnvVar{
 		{
@@ -298,14 +285,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 				Drop: []corev1.Capability{"ALL"},
 			},
 		},
-		Resources: corev1.ResourceRequirements{
-			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu1000,
-				corev1.ResourceMemory: *memory1024},
-			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu100,
-				corev1.ResourceMemory: *memory350},
-		},
+		Resources: *resources,
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      "auth-key",
@@ -372,6 +352,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string) corev1.Container {
 	
 	icpConsoleURL := os.Getenv("ICP_CONSOLE_URL")
+	resources := instance.Spec.IdentityProvider.Resources
 	envVars := []corev1.EnvVar{
 		{
 			Name:  "MONGO_DB_NAME",
@@ -637,14 +618,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 				Drop: []corev1.Capability{"ALL"},
 			},
 		},
-		Resources: corev1.ResourceRequirements{
-			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu1000,
-				corev1.ResourceMemory: *memory1024},
-			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu50,
-				corev1.ResourceMemory: *memory150},
-		},
+		Resources: *resources,
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      "auth-key",
@@ -698,6 +672,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 	
 	//@posriniv - find a better solution
 	replicaCount := int(instance.Spec.Replicas)
+	resources := instance.Spec.IdentityManager.Resources
 	masterNodesList := ""
 	baseIp := "10.0.0."
 	for i := 1; i <= replicaCount; i++{
@@ -960,14 +935,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 				Drop: []corev1.Capability{"ALL"},
 			},
 		},
-		Resources: corev1.ResourceRequirements{
-			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu1000,
-				corev1.ResourceMemory: *memory1024},
-			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu50,
-				corev1.ResourceMemory: *memory150},
-		},
+		Resources: *resources,
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      "cluster-ca",
@@ -1019,7 +987,8 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 
 func buildContainers(instance *operatorv1alpha1.Authentication, auditImage string, authServiceImage string, identityProviderImage string, identityManagerImage string, journalPath string) []corev1.Container {
 
-	auditContainer := buildAuditContainer(auditImage, journalPath)
+    auditResources := instance.Spec.AuditService.Resources
+	auditContainer := buildAuditContainer(auditImage, journalPath,auditResources)
 	authServiceContainer := buildAuthServiceContainer(instance, authServiceImage)
 	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage)
 	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage)

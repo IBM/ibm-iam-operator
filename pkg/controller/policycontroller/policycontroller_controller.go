@@ -28,7 +28,6 @@ import (
 	gorun "runtime"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -48,10 +47,6 @@ var trueVar bool = true
 var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
-var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)        // 100m
-var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
-var memory384 = resource.NewQuantity(384*1024*1024, resource.BinarySI) // 384Mi
-var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI) // 128Mi
 var serviceAccountName string = "ibm-iam-operand-restricted"
 
 var log = logf.Log.WithName("controller_policycontroller")
@@ -473,6 +468,7 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 	reqLogger := log.WithValues("deploymentForPolicyController", "Entry", "instance.Name", instance.Name)
 	image := instance.Spec.ImageRegistry + shatag.GetImageRef("POLICY_CONTROLLER_TAG_OR_SHA")
 	replicas := instance.Spec.Replicas
+	resources := instance.Spec.Resources
 
 	iamPolicyDep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -584,14 +580,7 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 									Drop: []corev1.Capability{"ALL"},
 								},
 							},
-							Resources: corev1.ResourceRequirements{
-								Limits: map[corev1.ResourceName]resource.Quantity{
-									corev1.ResourceCPU:    *cpu200,
-									corev1.ResourceMemory: *memory384},
-								Requests: map[corev1.ResourceName]resource.Quantity{
-									corev1.ResourceCPU:    *cpu100,
-									corev1.ResourceMemory: *memory128},
-							},
+							Resources: *resources,
 						},
 					},
 				},

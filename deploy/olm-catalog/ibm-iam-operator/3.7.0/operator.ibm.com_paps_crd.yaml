@@ -1,20 +1,20 @@
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: policydecisions.operator.ibm.com
+  name: paps.operator.ibm.com
 spec:
   group: operator.ibm.com
   names:
-    kind: PolicyDecision
-    listKind: PolicyDecisionList
-    plural: policydecisions
-    singular: policydecision
+    kind: Pap
+    listKind: PapList
+    plural: paps
+    singular: pap
   scope: Namespaced
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
-      description: PolicyDecision is the Schema for the policydecisions API
+      description: Pap is the Schema for the paps API
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -29,7 +29,7 @@ spec:
         metadata:
           type: object
         spec:
-          description: PolicyDecisionSpec defines the desired state of PolicyDecision
+          description: PapSpec defines the desired state of Pap
           properties:
             auditService:
               properties:
@@ -66,13 +66,15 @@ spec:
               - imageTag
               - journalPath
               type: object
-            imageName:
+            operatorVersion:
+              description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+                Important: Run "operator-sdk generate k8s" to regenerate code after
+                modifying this file Add custom validation using kubebuilder tags:
+                https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html'
               type: string
-            imageRegistry:
-              type: string
-            imageTag:
-              type: string
-            initMongodb:
+            papService:
+              description: PapServiceSpec defined the desired state of PapService
+                Container
               properties:
                 imageName:
                   type: string
@@ -81,22 +83,21 @@ spec:
                 imageTag:
                   type: string
                 resources:
-                  description: ResourceRequirements describes the compute resource
-                    requirements.
+                  description: ResourceRequirements describes the compute resource requirements.
                   properties:
                     limits:
                       additionalProperties:
                         type: string
-                      description: 'Limits describes the maximum amount of compute
-                        resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                      description: 'Limits describes the maximum amount of compute resources
+                        allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                       type: object
                     requests:
                       additionalProperties:
                         type: string
-                      description: 'Requests describes the minimum amount of compute
-                        resources required. If Requests is omitted for a container,
-                        it defaults to Limits if that is explicitly specified, otherwise
-                        to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                      description: 'Requests describes the minimum amount of compute resources
+                        required. If Requests is omitted for a container, it defaults
+                        to Limits if that is explicitly specified, otherwise to an implementation-defined
+                        value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                       type: object
                   type: object
               required:
@@ -104,44 +105,17 @@ spec:
               - imageRegistry
               - imageTag
               type: object
-            operatorVersion:
-              description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-                Important: Run "operator-sdk generate k8s" to regenerate code after
-                modifying this file Add custom validation using kubebuilder tags:
-                https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html'
-              type: string
             replicas:
               format: int32
               type: integer
-            resources:
-              description: ResourceRequirements describes the compute resource requirements.
-              properties:
-                limits:
-                  additionalProperties:
-                    type: string
-                  description: 'Limits describes the maximum amount of compute resources
-                    allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
-                  type: object
-                requests:
-                  additionalProperties:
-                    type: string
-                  description: 'Requests describes the minimum amount of compute resources
-                    required. If Requests is omitted for a container, it defaults
-                    to Limits if that is explicitly specified, otherwise to an implementation-defined
-                    value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
-                  type: object
-              type: object
           required:
           - auditService
-          - imageName
-          - imageRegistry
-          - imageTag
-          - initMongodb
           - operatorVersion
+          - papService
           - replicas
           type: object
         status:
-          description: PolicyDecisionStatus defines the observed state of PolicyDecision
+          description: PapStatus defines the observed state of Pap
           properties:
             nodes:
               description: 'INSERT ADDITIONAL STATUS FIELD - define observed state

@@ -18,23 +18,10 @@ package policydecision
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)            // 10m
-var cpu20 = resource.NewMilliQuantity(20, resource.DecimalSI)            // 20m
-var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
-var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)          // 200m
-var cpu1000 = resource.NewMilliQuantity(1000, resource.DecimalSI)        // 1000m
-var memory32 = resource.NewQuantity(100*1024*1024, resource.BinarySI)    // 32Mi
-var memory100 = resource.NewQuantity(100*1024*1024, resource.BinarySI)   // 100Mi
-var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI)   // 128Mi
-var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI)   // 256Mi
-var memory512 = resource.NewQuantity(512*1024*1024, resource.BinarySI)   // 512Mi
-var memory2560 = resource.NewQuantity(2560*1024*1024, resource.BinarySI) // 2560Mi
-
-func buildInitContainers(mongoDBImage string) []corev1.Container {
+func buildInitContainers(mongoDBImage string, resources *corev1.ResourceRequirements) []corev1.Container {
 	return []corev1.Container{
 		{
 			Name:            "init-mongodb",
@@ -54,19 +41,12 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
-				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
-			},
+			Resources: *resources,
 		},
 	}
 }
 
-func buildAuditContainer(auditImage string, journalPath string) corev1.Container {
+func buildAuditContainer(auditImage string, journalPath string, resources *corev1.ResourceRequirements) corev1.Container {
 
 	return corev1.Container{
 		Name:            "icp-audit-service",
@@ -111,19 +91,12 @@ func buildAuditContainer(auditImage string, journalPath string) corev1.Container
 				Drop: []corev1.Capability{"ALL"},
 			},
 		},
-		Resources: corev1.ResourceRequirements{
-			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu200,
-				corev1.ResourceMemory: *memory256},
-			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu10,
-				corev1.ResourceMemory: *memory32},
-		},
+		Resources: *resources,
 	}
 
 }
 
-func buildPdpContainer(pdpImage string) corev1.Container {
+func buildPdpContainer(pdpImage string, resources *corev1.ResourceRequirements) corev1.Container {
 
 	return corev1.Container{
 		Name:            "auth-pdp",
@@ -138,14 +111,7 @@ func buildPdpContainer(pdpImage string) corev1.Container {
 				Drop: []corev1.Capability{"ALL"},
 			},
 		},
-		Resources: corev1.ResourceRequirements{
-			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu200,
-				corev1.ResourceMemory: *memory256},
-			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu20,
-				corev1.ResourceMemory: *memory32},
-		},
+		Resources: *resources,
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      "mongodb-ca-cert",
@@ -313,10 +279,10 @@ func buildPdpContainer(pdpImage string) corev1.Container {
 
 }
 
-func buildContainers(auditImage string, pdpImage string, journalPath string) []corev1.Container {
+func buildContainers(auditImage string, pdpImage string, journalPath string, auditResources *corev1.ResourceRequirements, pdpResources *corev1.ResourceRequirements) []corev1.Container {
 
-	auditContainer := buildAuditContainer(auditImage, journalPath)
-	pdpContainer := buildPdpContainer(pdpImage)
+	auditContainer := buildAuditContainer(auditImage, journalPath, auditResources)
+	pdpContainer := buildPdpContainer(pdpImage, pdpResources)
 
 	return []corev1.Container{auditContainer, pdpContainer}
 }

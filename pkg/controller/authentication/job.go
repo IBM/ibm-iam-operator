@@ -23,7 +23,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -60,6 +59,7 @@ func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentic
 func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, jobName string) *batchv1.Job {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	image := instance.Spec.ClientRegistration.ImageRegistry + "/" + instance.Spec.ClientRegistration.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA")
+	resources := instance.Spec.ClientRegistration.Resources
 
 	newJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -101,7 +101,7 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 						},
 					},
 					Volumes:    buildVolumes(),
-					Containers: buildContainer(jobName, image),
+					Containers: buildContainer(jobName, image, resources),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &user,
 					},
@@ -147,7 +147,7 @@ func buildVolumes() []corev1.Volume {
 	}
 }
 
-func buildContainer(jobName string, image string) []corev1.Container {
+func buildContainer(jobName string, image string, resources *corev1.ResourceRequirements) []corev1.Container {
 	return []corev1.Container{
 		{
 			Name:            jobName,
@@ -162,14 +162,7 @@ func buildContainer(jobName string, image string) []corev1.Container {
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu1000,
-					corev1.ResourceMemory: *memory1024},
-				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
-			},
+			Resources: *resources,
 			VolumeMounts: []corev1.VolumeMount{
 				{
 					Name:      "registration-script",

@@ -66,7 +66,12 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 			return err
 		}
 	}
-	icpProxyURL := proxyConfigMap.Data["proxy_address"]
+	icpProxyURL,ok := proxyConfigMap.Data["proxy_address"]
+	if !ok {
+		reqLogger.Error("The configmap",  proxyConfigMapName, "doesn't contain proxy address")
+		*requeueResult = true
+		return nil
+	}
 
 	// Creation the configmaps
 

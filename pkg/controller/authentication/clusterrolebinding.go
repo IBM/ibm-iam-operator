@@ -96,6 +96,19 @@ func generateCRBData(defaultAdminUser string, oidcIssuerURL string) map[string]C
 			},
 			RoleName: "cluster-admin",
 		},
+		"cloudpak-switchers-binding": CRBData{
+			Subject: []SubjectData{
+				{
+					Name: oidcIssuerURL + "#" + defaultAdminUser,
+					Kind: "User",
+				},
+				{
+					Name: defaultAdminUser,
+					Kind: "User",
+				},
+			},
+			RoleName: "cloudpak-switchers",
+		},
 	}
 
 }

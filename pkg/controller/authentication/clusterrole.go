@@ -185,6 +185,17 @@ func generateCRData() map[string]CRData {
 			MatchLabels: nil,
 			Rules:       getPolicyRules(adminVerbs),
 		},
+		"cloudpak-switchers": CRData{
+			Labels:      nil,
+			MatchLabels: nil,
+			Rules: []rbacv1.PolicyRule{
+				{
+					APIGroups: []string{"operators.ibm.com"},
+					Resources: []string{"cloudpakswitchers"},
+					Verbs:     viewerVerbs,
+				},
+			},
+		},
 	}
 }
 

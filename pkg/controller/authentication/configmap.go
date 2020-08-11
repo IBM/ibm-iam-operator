@@ -18,6 +18,15 @@ package authentication
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"strconv"
+	"strings"
+
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -25,15 +34,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"strconv"
-	"strings"
 )
 
 func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentConfigMap *corev1.ConfigMap, requeueResult *bool) error {
 
 	configMapList := []string{"platform-auth-idp", "registration-script", "oauth-client-map", "registration-json"}
 
-	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{authIdpConfigMap, registrationScriptConfigMap }
+	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{authIdpConfigMap, registrationScriptConfigMap}
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
@@ -45,13 +52,13 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: consoleConfigMapName, Namespace: instance.Namespace}, consoleConfigMap)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			reqLogger.Error(err, "The configmap ", consoleConfigMapName ," is not created yet")
-			return err
-		} else {
-			reqLogger.Error(err, "Failed to get ConfigMap",  consoleConfigMapName)
+			reqLogger.Error(err, "The configmap ", consoleConfigMapName, " is not created yet")
 			return err
 		}
+		reqLogger.Error(err, "Failed to get ConfigMap", consoleConfigMapName)
+		return err
 	}
+
 	icpConsoleURL := consoleConfigMap.Data["MANAGEMENT_INGRESS_ROUTE_HOST"]
 
 	proxyConfigMapName := "ibmcloud-cluster-info"
@@ -59,26 +66,58 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: proxyConfigMapName, Namespace: instance.Namespace}, proxyConfigMap)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			reqLogger.Error(err, "The configmap ", proxyConfigMapName ," is not created yet")
-			return err
-		} else {
-			reqLogger.Error(err, "Failed to get ConfigMap",  proxyConfigMapName)
+			reqLogger.Error(err, "The configmap ", proxyConfigMapName, " is not created yet")
 			return err
 		}
+		reqLogger.Error(err, "Failed to get ConfigMap", proxyConfigMapName)
+		return err
 	}
-	icpProxyURL,ok := proxyConfigMap.Data["proxy_address"]
+	icpProxyURL, ok := proxyConfigMap.Data["proxy_address"]
 	if !ok {
-		reqLogger.Error(nil, "The configmap",  proxyConfigMapName, "doesn't contain proxy address")
+		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain proxy address")
 		*requeueResult = true
 		return nil
 	}
 
-	// Creation the configmaps
+	wellknownURL := "https://kubernetes.default:443/.well-known/oauth-authorization-server"
+	tokenFile := "/var/run/secrets/kubernetes.io/serviceaccount/token"
+	caCert, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+	if err != nil {
+		reqLogger.Error(err, "Failed to read ca cert", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+	content, err := ioutil.ReadFile(tokenFile)
+	if err != nil {
+		reqLogger.Error(err, "Failed to read default token", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+	}
+	token := string(content)
+	transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: caCertPool}}
+	req, _ := http.NewRequest("GET", wellknownURL, nil)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	client := &http.Client{Transport: transport}
+	response, err := client.Do(req)
 
+	if err != nil {
+		reqLogger.Error(err, "Failed to get OpenShift server URL", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+	}
+	var issuer string
+	if response.Status == "200 OK" {
+		defer response.Body.Close()
+		body, _ := ioutil.ReadAll(response.Body)
+		var result map[string]interface{}
+		err = json.Unmarshal(body, &result)
+		if err != nil {
+			reqLogger.Error(err, "Failed to unmarshal", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+		}
+		issuer = result["issuer"].(string)
+	} else {
+		reqLogger.Error(err, "Response status is not ok:"+response.Status, "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+	}
+	// Creation the configmaps
 	for index, configMap := range configMapList {
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: instance.Namespace}, currentConfigMap)
 		if err != nil {
-
 			if errors.IsNotFound(err) {
 				// Define a new ConfigMap
 				if configMapList[index] == "registration-json" {
@@ -87,6 +126,12 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					newConfigMap = oauthClientConfigMap(instance, icpConsoleURL, icpProxyURL, r.scheme)
 				} else {
 					newConfigMap = functionList[index](instance, r.scheme)
+					if configMapList[index] == "platform-auth-idp" {
+						reqLogger.Info("Set platform-auth-idp Configmap roks settings", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+						newConfigMap.Data["ROKS_ENABLED"] = "true"
+						newConfigMap.Data["ROKS_URL"] = issuer
+						newConfigMap.Data["ROKS_USER_PREFIX"] = ""
+					}
 				}
 				reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
 				err = r.client.Create(context.TODO(), newConfigMap)
@@ -104,13 +149,13 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 			// @posriniv - find a more efficient solution
 			if configMapList[index] == "platform-auth-idp" {
 				cmUpdateRequired := false
-				if _,keyExists := currentConfigMap.Data["LDAP_RECURSIVE_SEARCH"]; !keyExists{
+				if _, keyExists := currentConfigMap.Data["LDAP_RECURSIVE_SEARCH"]; !keyExists {
 					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.scheme)
 					currentConfigMap.Data["LDAP_RECURSIVE_SEARCH"] = newConfigMap.Data["LDAP_RECURSIVE_SEARCH"]
 					cmUpdateRequired = true
 				}
-				if _,keyExists := currentConfigMap.Data["MONGO_READ_TIMEOUT"]; !keyExists{
+				if _, keyExists := currentConfigMap.Data["MONGO_READ_TIMEOUT"]; !keyExists {
 					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.scheme)
 					currentConfigMap.Data["MONGO_READ_TIMEOUT"] = newConfigMap.Data["MONGO_READ_TIMEOUT"]
@@ -123,7 +168,16 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["MONGO_POOL_MAX_SIZE"] = newConfigMap.Data["MONGO_POOL_MAX_SIZE"]
 					cmUpdateRequired = true
 				}
-				if cmUpdateRequired == true {
+				if configMapList[index] == "platform-auth-idp" {
+					if currentConfigMap.Data["ROKS_ENABLED"] == "false" {
+						reqLogger.Info("Update an platform-auth-idp Configmap roks settings", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+						currentConfigMap.Data["ROKS_ENABLED"] = "true"
+						currentConfigMap.Data["ROKS_URL"] = issuer
+						currentConfigMap.Data["ROKS_USER_PREFIX"] = ""
+					}
+					cmUpdateRequired = true
+				}
+				if cmUpdateRequired {
 					err = r.client.Update(context.TODO(), currentConfigMap)
 					if err != nil {
 						reqLogger.Error(err, "Failed to update an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "Configmap.Name", currentConfigMap.Name)
@@ -131,7 +185,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					}
 				}
 			}
-		}	
+		}
 
 	}
 
@@ -207,13 +261,13 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"IBMID_PROFILE_FIELDS":               "displayName,name,emails",
 			"SAML_NAMEID_FORMAT":                 "unspecified",
 			"MONGO_READ_TIMEOUT":                 "40000",
-			"MONGO_READ_PREFERENCE":             "primaryPreferred",
-			"MONGO_CONNECT_TIMEOUT":             "30000",
-			"MONGO_SELECTION_TIMEOUT":           "30000",
-			"MONGO_WAIT_TIME":                   "20000",
-			"MONGO_POOL_MIN_SIZE":               "5",
-			"MONGO_POOL_MAX_SIZE":               "15",
-			"MONGO_MAX_STALENESS":               "90",
+			"MONGO_READ_PREFERENCE":              "primaryPreferred",
+			"MONGO_CONNECT_TIMEOUT":              "30000",
+			"MONGO_SELECTION_TIMEOUT":            "30000",
+			"MONGO_WAIT_TIME":                    "20000",
+			"MONGO_POOL_MIN_SIZE":                "5",
+			"MONGO_POOL_MAX_SIZE":                "15",
+			"MONGO_MAX_STALENESS":                "90",
 		},
 	}
 
@@ -287,10 +341,10 @@ func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, icpConsoleU
 			Labels:    map[string]string{"app": "auth-idp"},
 		},
 		Data: map[string]string{
-			"MASTER_IP": icpConsoleURL,
-			"PROXY_IP": icpProxyURL,
+			"MASTER_IP":         icpConsoleURL,
+			"PROXY_IP":          icpProxyURL,
 			"CLUSTER_CA_DOMAIN": icpConsoleURL,
-			"CLUSTER_NAME": instance.Spec.Config.ClusterName,
+			"CLUSTER_NAME":      instance.Spec.Config.ClusterName,
 		},
 	}
 

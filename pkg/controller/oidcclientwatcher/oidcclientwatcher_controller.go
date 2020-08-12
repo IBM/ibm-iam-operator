@@ -18,19 +18,18 @@ package oidcclientwatcher
 
 import (
 	"context"
-	"reflect"
-	gorun "runtime"
-
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	gorun "runtime"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -486,6 +485,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
 						"productName":                        "IBM Cloud Platform Common Services",
 						"productID":                          "068a62892a1e4db39641342e592daa25",
+						"productVersion":                     "3.4.0",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
 					},
@@ -493,8 +493,8 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 				Spec: corev1.PodSpec{
 					TerminationGracePeriodSeconds: &seconds60,
 					ServiceAccountName:            serviceAccountName,
-					HostIPC:                       false,
-					HostPID:                       false,
+					HostIPC: false,
+					HostPID: false,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
@@ -536,7 +536,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 							Name:            "oidcclient-watcher",
 							Image:           image,
 							ImagePullPolicy: corev1.PullAlways,
-							Resources:       *resources,
+							Resources: *resources,
 							Env: []corev1.EnvVar{
 								{
 									Name: "CLUSTER_NAME",

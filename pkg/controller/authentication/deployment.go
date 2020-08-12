@@ -18,17 +18,16 @@ package authentication
 
 import (
 	"context"
-	"reflect"
-	gorun "runtime"
-
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	gorun "runtime"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -36,17 +35,17 @@ import (
 func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Authentication, currentDeployment *appsv1.Deployment, requeueResult *bool) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-
+	
 	// Check for the presence of dependencies
 	consoleConfigMapName := "management-ingress-info"
 	consoleConfigMap := &corev1.ConfigMap{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: consoleConfigMapName, Namespace: instance.Namespace}, consoleConfigMap)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			reqLogger.Error(err, "The configmap ", consoleConfigMapName, " is not created yet")
+			reqLogger.Error(err, "The configmap ", consoleConfigMapName ," is not created yet")
 			return err
 		} else {
-			reqLogger.Error(err, "Failed to get ConfigMap", consoleConfigMapName)
+			reqLogger.Error(err, "Failed to get ConfigMap",  consoleConfigMapName)
 			return err
 		}
 	}
@@ -54,7 +53,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 
 	// Check if this Deployment already exists
 	deployment := "auth-idp"
-
+	
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: deployment, Namespace: instance.Namespace}, currentDeployment)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -158,6 +157,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
 						"productName":                        "IBM Cloud Platform Common Services",
 						"productID":                          "068a62892a1e4db39641342e592daa25",
+						"productVersion":                     "3.4.0",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
 					},

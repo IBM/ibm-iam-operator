@@ -127,10 +127,14 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 				} else {
 					newConfigMap = functionList[index](instance, r.scheme)
 					if configMapList[index] == "platform-auth-idp" {
-						reqLogger.Info("Set platform-auth-idp Configmap roks settings", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-						newConfigMap.Data["ROKS_ENABLED"] = "true"
-						newConfigMap.Data["ROKS_URL"] = issuer
-						newConfigMap.Data["ROKS_USER_PREFIX"] = ""
+						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL == "https://roks.domain.name:443" {
+							reqLogger.Info("Set platform-auth-idp Configmap roks settings", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+							newConfigMap.Data["ROKS_ENABLED"] = "true"
+							newConfigMap.Data["ROKS_URL"] = issuer
+							newConfigMap.Data["ROKS_USER_PREFIX"] = ""
+						} else {
+							reqLogger.Info("Honor end user's setting", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+						}
 					}
 				}
 				reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
@@ -166,15 +170,6 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["MONGO_WAIT_TIME"] = newConfigMap.Data["MONGO_WAIT_TIME"]
 					currentConfigMap.Data["MONGO_POOL_MIN_SIZE"] = newConfigMap.Data["MONGO_POOL_MIN_SIZE"]
 					currentConfigMap.Data["MONGO_POOL_MAX_SIZE"] = newConfigMap.Data["MONGO_POOL_MAX_SIZE"]
-					cmUpdateRequired = true
-				}
-				if configMapList[index] == "platform-auth-idp" {
-					if currentConfigMap.Data["ROKS_ENABLED"] == "false" {
-						reqLogger.Info("Update an platform-auth-idp Configmap roks settings", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-						currentConfigMap.Data["ROKS_ENABLED"] = "true"
-						currentConfigMap.Data["ROKS_URL"] = issuer
-						currentConfigMap.Data["ROKS_USER_PREFIX"] = ""
-					}
 					cmUpdateRequired = true
 				}
 				if cmUpdateRequired {

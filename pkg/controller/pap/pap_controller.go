@@ -20,12 +20,13 @@ import (
 	"context"
 	"reflect"
 
+	gorun "runtime"
+
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	gorun "runtime"
 	net "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,7 +63,6 @@ type IamPapCertificateValues struct {
 type ConfigValues struct {
 	ClusterCAIssuer string
 }
-
 
 // IcpAuditValues defines the values of icp-audit container
 type IcpAuditValues struct {
@@ -127,8 +127,6 @@ var iamPapCertificateValues = IamPapCertificateValues{
 var configvalues = ConfigValues{
 	ClusterCAIssuer: "cs-ca-clusterissuer",
 }
-
-
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -639,7 +637,6 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
 						"productName":                        "IBM Cloud Platform Common Services",
 						"productID":                          "068a62892a1e4db39641342e592daa25",
-						"productVersion":                     "3.4.0",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
 					},

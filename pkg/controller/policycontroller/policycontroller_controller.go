@@ -20,13 +20,14 @@ import (
 	"context"
 	"reflect"
 
+	gorun "runtime"
+
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	gorun "runtime"
-	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -494,17 +495,16 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 					Annotations: map[string]string{
 						"productName":                        "IBM Cloud Platform Common Services",
 						"productID":                          "068a62892a1e4db39641342e592daa25",
-						"productVersion":                     "3.4.0",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
 					},
 				},
 				Spec: corev1.PodSpec{
 					TerminationGracePeriodSeconds: &seconds60,
-					ServiceAccountName: serviceAccountName,
-					HostNetwork:        false,
-					HostIPC:            false,
-					HostPID:            false,
+					ServiceAccountName:            serviceAccountName,
+					HostNetwork:                   false,
+					HostIPC:                       false,
+					HostPID:                       false,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{

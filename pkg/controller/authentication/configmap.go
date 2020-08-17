@@ -359,7 +359,7 @@ func readROKSURL(instance *operatorv1alpha1.Authentication) (string, error) {
 		defer response.Body.Close()
 		body, err1 := ioutil.ReadAll(response.Body)
 		if err1 != nil {
-			reqLogger.Error(err, "Failed to unmarshal", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+			reqLogger.Error(err, "Failed to readAll", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
 			return "", err1
 		}
 		var result map[string]interface{}

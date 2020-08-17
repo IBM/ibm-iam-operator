@@ -63,12 +63,6 @@ spec:
               - imageRegistry
               - imageTag
               type: object
-            imageName:
-              type: string
-            imageRegistry:
-              type: string
-            imageTag:
-              type: string
             impersonation:
               properties:
                 enableImpersonation:
@@ -245,29 +239,40 @@ spec:
             replicas:
               format: int32
               type: integer
-            resources:
-              description: ResourceRequirements describes the compute resource requirements.
+            securityOnboardingJob:
               properties:
-                limits:
-                  additionalProperties:
-                    type: string
-                  description: 'Limits describes the maximum amount of compute resources
-                    allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                imageName:
+                  type: string
+                imageRegistry:
+                  type: string
+                imageTag:
+                  type: string
+                resources:
+                  description: ResourceRequirements describes the compute resource
+                    requirements.
+                  properties:
+                    limits:
+                      additionalProperties:
+                        type: string
+                      description: 'Limits describes the maximum amount of compute
+                        resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                      type: object
+                    requests:
+                      additionalProperties:
+                        type: string
+                      description: 'Requests describes the minimum amount of compute
+                        resources required. If Requests is omitted for a container,
+                        it defaults to Limits if that is explicitly specified, otherwise
+                        to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                      type: object
                   type: object
-                requests:
-                  additionalProperties:
-                    type: string
-                  description: 'Requests describes the minimum amount of compute resources
-                    required. If Requests is omitted for a container, it defaults
-                    to Limits if that is explicitly specified, otherwise to an implementation-defined
-                    value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
-                  type: object
+              required:
+              - imageName
+              - imageRegistry
+              - imageTag
               type: object
           required:
           - iamOnboarding
-          - imageName
-          - imageRegistry
-          - imageTag
           - impersonation
           - initAuthService
           - initIdentityManager
@@ -276,6 +281,7 @@ spec:
           - initTokenService
           - operatorVersion
           - replicas
+          - securityOnboardingJob
           type: object
         status:
           description: SecurityOnboardingStatus defines the observed state of SecurityOnboarding

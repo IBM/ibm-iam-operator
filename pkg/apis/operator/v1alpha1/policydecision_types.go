@@ -32,11 +32,16 @@ type PolicyDecisionSpec struct {
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
 	OperatorVersion string           `json:"operatorVersion"`
 	Replicas        int32            `json:"replicas"`
-	ImageRegistry   string           `json:"imageRegistry"`
-	ImageName       string           `json:"imageName"`
-	ImageTag        string           `json:"imageTag"`
 	AuditService    AuditServiceSpec `json:"auditService"`
 	InitMongodb     InitMongodbSpec  `json:"initMongodb"`
+	PDPService      PDPServiceSpec   `json:"pdpService"`
+}
+
+// PDPServiceSpec defines the desired state of PDP service
+type PDPServiceSpec struct {
+	ImageRegistry   string           			 `json:"imageRegistry"`
+	ImageName       string                       `json:"imageName"`
+	ImageTag        string                       `json:"imageTag"`
 	Resources       *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 

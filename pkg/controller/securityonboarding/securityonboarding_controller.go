@@ -460,7 +460,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 		Containers: []corev1.Container{
 			{
 				Name:            "security-onboarding",
-				Image:           instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + shatag.GetImageRef("IAM_ONBOARDING_TAG_OR_SHA"),
+				Image:           instance.Spec.SecurityOnboardingJob.ImageRegistry + "/" + instance.Spec.SecurityOnboardingJob.ImageName + shatag.GetImageRef("IAM_ONBOARDING_TAG_OR_SHA"),
 				ImagePullPolicy: corev1.PullPolicy("Always"),
 				Command:         []string{"python", "/app/scripts/onboard-script.py"},
 				SecurityContext: &corev1.SecurityContext{
@@ -472,7 +472,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 						Drop: []corev1.Capability{"ALL"},
 					},
 				},
-				Resources: *instance.Spec.Resources,
+				Resources: *instance.Spec.SecurityOnboardingJob.Resources,
 				Env: []corev1.EnvVar{
 					{
 						Name: "ICP_API_KEY",

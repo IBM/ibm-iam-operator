@@ -10,7 +10,7 @@ spec:
   # Add fields here
   operatorVersion: "0.14.1"
   replicas: 1
-  SecurityOnboardingJob:
+  securityOnboardingJob:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-iam-onboarding"
     imageTag: "3.3.3"

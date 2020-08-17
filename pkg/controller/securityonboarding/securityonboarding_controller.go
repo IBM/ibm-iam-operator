@@ -21,15 +21,16 @@ import (
 	"fmt"
 	"strings"
 
+	"reflect"
+
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-     "reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -44,7 +45,6 @@ var log = logf.Log.WithName("controller_securityonboarding")
 var trueVar bool = true
 var falseVar bool = false
 var serviceAccountName string = "ibm-iam-operand-restricted"
-
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -156,40 +156,40 @@ func (r *ReconcileSecurityOnboarding) Reconcile(request reconcile.Request) (reco
 	}
 
 	reqLogger.Info("Complete - handleConfigMap")
-        // Update the SecurityOnboarding status with the pod names
-        // List the pods for this SecurityOnboarding's job
-        jobList := &batchv1.JobList{}
-        listOpts := []client.ListOption{
-                client.InNamespace(instance.Namespace),
-                client.MatchingLabels(map[string]string{"app": "security-onboarding"}),
-        }
-        reqLogger.Info("Complete - got job list")
-        if err = r.client.List(context.TODO(), jobList, listOpts...); err != nil {
-                reqLogger.Error(err, "Failed to list jobs", "SecurityOnboarding.Namespace", instance.Namespace, "SecurityOnboarding.Name", instance.Name)
-                return reconcile.Result{}, err
-        }
-        jobNames := getJobNames(jobList.Items)
-        // Update status.Nodes if needed
-        if !reflect.DeepEqual(jobNames, instance.Status.PodNames) {
-                instance.Status.PodNames =  jobNames
-                err := r.client.Status().Update(context.TODO(), instance)
-                if err != nil {
-                        reqLogger.Error(err, "Failed to update SecurityOnboarding status")
-                        return reconcile.Result{}, err
-                }
-        }
+	// Update the SecurityOnboarding status with the pod names
+	// List the pods for this SecurityOnboarding's job
+	jobList := &batchv1.JobList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(instance.Namespace),
+		client.MatchingLabels(map[string]string{"app": "security-onboarding"}),
+	}
+	reqLogger.Info("Complete - got job list")
+	if err = r.client.List(context.TODO(), jobList, listOpts...); err != nil {
+		reqLogger.Error(err, "Failed to list jobs", "SecurityOnboarding.Namespace", instance.Namespace, "SecurityOnboarding.Name", instance.Name)
+		return reconcile.Result{}, err
+	}
+	jobNames := getJobNames(jobList.Items)
+	// Update status.Nodes if needed
+	if !reflect.DeepEqual(jobNames, instance.Status.PodNames) {
+		instance.Status.PodNames = jobNames
+		err := r.client.Status().Update(context.TODO(), instance)
+		if err != nil {
+			reqLogger.Error(err, "Failed to update SecurityOnboarding status")
+			return reconcile.Result{}, err
+		}
+	}
 	return reconcile.Result{}, nil
 }
 
 // getJobNames returns the pod names of the array of pods passed in
 func getJobNames(jobs []batchv1.Job) []string {
-        reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
-        var jobNames []string
-        for _, job := range jobs {
-                jobNames = append(jobNames, job.Name)
-                reqLogger.Info("CS??? pod name=" + job.Name)
-        }
-        return jobNames
+	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
+	var jobNames []string
+	for _, job := range jobs {
+		jobNames = append(jobNames, job.Name)
+		reqLogger.Info("CS??? pod name=" + job.Name)
+	}
+	return jobNames
 }
 
 func (r *ReconcileSecurityOnboarding) handleConfigMap(instance *operatorv1alpha1.SecurityOnboarding) (reconcile.Result, error) {
@@ -523,7 +523,6 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
 						"productName":                        "IBM Cloud Platform Common Services",
 						"productID":                          "068a62892a1e4db39641342e592daa25",
-						"productVersion":                     "3.4.0",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
 					},
@@ -987,7 +986,6 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
 						"productName":                        "IBM Cloud Platform Common Services",
 						"productID":                          "068a62892a1e4db39641342e592daa25",
-						"productVersion":                     "3.4.0",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
 					},

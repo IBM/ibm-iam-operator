@@ -79,41 +79,42 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 		return nil
 	}
 
-	wellknownURL := "https://kubernetes.default:443/.well-known/oauth-authorization-server"
-	tokenFile := "/var/run/secrets/kubernetes.io/serviceaccount/token"
-	caCert, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
-	if err != nil {
-		reqLogger.Error(err, "Failed to read ca cert", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
-	}
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
-	content, err := ioutil.ReadFile(tokenFile)
-	if err != nil {
-		reqLogger.Error(err, "Failed to read default token", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
-	}
-	token := string(content)
-	transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: caCertPool}}
-	req, _ := http.NewRequest("GET", wellknownURL, nil)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	client := &http.Client{Transport: transport}
-	response, err := client.Do(req)
-
-	if err != nil {
-		reqLogger.Error(err, "Failed to get OpenShift server URL", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
-	}
-	var issuer string
-	if response.Status == "200 OK" {
-		defer response.Body.Close()
-		body, _ := ioutil.ReadAll(response.Body)
-		var result map[string]interface{}
-		err = json.Unmarshal(body, &result)
+	/*
+		wellknownURL := "https://kubernetes.default:443/.well-known/oauth-authorization-server"
+		tokenFile := "/var/run/secrets/kubernetes.io/serviceaccount/token"
+		caCert, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
 		if err != nil {
-			reqLogger.Error(err, "Failed to unmarshal", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+			reqLogger.Error(err, "Failed to read ca cert", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
 		}
-		issuer = result["issuer"].(string)
-	} else {
-		reqLogger.Error(err, "Response status is not ok:"+response.Status, "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
-	}
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCert)
+		content, err := ioutil.ReadFile(tokenFile)
+		if err != nil {
+			reqLogger.Error(err, "Failed to read default token", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+		}
+		token := string(content)
+		transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: caCertPool}}
+		req, _ := http.NewRequest("GET", wellknownURL, nil)
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+		client := &http.Client{Transport: transport}
+		response, err := client.Do(req)
+
+		if err != nil {
+			reqLogger.Error(err, "Failed to get OpenShift server URL", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+		}
+		var issuer string
+		if response.Status == "200 OK" {
+			defer response.Body.Close()
+			body, _ := ioutil.ReadAll(response.Body)
+			var result map[string]interface{}
+			err = json.Unmarshal(body, &result)
+			if err != nil {
+				reqLogger.Error(err, "Failed to unmarshal", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+			}
+			issuer = result["issuer"].(string)
+		} else {
+			reqLogger.Error(err, "Response status is not ok:"+response.Status, "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+		} */
 	// Creation the configmaps
 	for index, configMap := range configMapList {
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: instance.Namespace}, currentConfigMap)
@@ -128,7 +129,12 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					newConfigMap = functionList[index](instance, r.scheme)
 					if configMapList[index] == "platform-auth-idp" {
 						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL == "https://roks.domain.name:443" {
-							reqLogger.Info("Set platform-auth-idp Configmap roks settings", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+							reqLogger.Info("Create platform-auth-idp Configmap roks settings", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+							issuer, err := readROKSURL(instance)
+							if err != nil {
+								reqLogger.Error(err, "Failed to get issuer URL", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
+								return err
+							}
 							newConfigMap.Data["ROKS_ENABLED"] = "true"
 							newConfigMap.Data["ROKS_URL"] = issuer
 							newConfigMap.Data["ROKS_USER_PREFIX"] = ""
@@ -351,4 +357,57 @@ func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, icpConsoleU
 	}
 	return newConfigMap
 
+}
+
+func readROKSURL(instance *operatorv1alpha1.Authentication) (string, error) {
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	wellknownURL := "https://kubernetes.default:443/.well-known/oauth-authorization-server"
+	tokenFile := "/var/run/secrets/kubernetes.io/serviceaccount/token"
+	caCert, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+	if err != nil {
+		reqLogger.Error(err, "Failed to read ca cert", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+		return "", err
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+	content, err := ioutil.ReadFile(tokenFile)
+	if err != nil {
+		reqLogger.Error(err, "Failed to read default token", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+		return "", err
+	}
+	token := string(content)
+	transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: caCertPool}}
+	req, err := http.NewRequest("GET", wellknownURL, nil)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get well known URL", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+		return "", err
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	client := &http.Client{Transport: transport}
+	response, err := client.Do(req)
+
+	if err != nil {
+		reqLogger.Error(err, "Failed to get OpenShift server URL", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+		return "", err
+	}
+	var issuer string
+	if response.Status == "200 OK" {
+		defer response.Body.Close()
+		body, err1 := ioutil.ReadAll(response.Body)
+		if err1 != nil {
+			reqLogger.Error(err, "Failed to unmarshal", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+			return "", err1
+		}
+		var result map[string]interface{}
+		err = json.Unmarshal(body, &result)
+		if err != nil {
+			reqLogger.Error(err, "Failed to unmarshal", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+			return "", err
+		}
+		issuer = result["issuer"].(string)
+	} else {
+		reqLogger.Error(err, "Response status is not ok:"+response.Status, "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+		return "", err
+	}
+	return issuer, nil
 }

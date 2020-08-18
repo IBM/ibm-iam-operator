@@ -94,7 +94,7 @@ spec:
     installType: "fresh"
     isOpenshiftEnv: true
     openshiftPort: 443
-    roksEnabled: false
+    roksEnabled: true
     nonceEnabled: true
     roksURL: "https://roks.domain.name:443"
     roksUserPrefix: "IAM#"

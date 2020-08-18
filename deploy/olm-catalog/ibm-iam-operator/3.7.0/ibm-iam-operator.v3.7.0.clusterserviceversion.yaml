@@ -1092,7 +1092,7 @@ spec:
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
       - description: A list defines the catalog information for pdp service.
-        displayName: PdpService
+        displayName: pdpService
         path: pdpService
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
@@ -1334,7 +1334,7 @@ spec:
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
       - description: A list defines the catalog information for securityonboarding job.
-        displayName: SecurityOnboardingJob
+        displayName: securityOnboardingJob
         path: securityOnboardingJob
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'

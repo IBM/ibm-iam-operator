@@ -60,9 +60,6 @@ metadata:
                 }
               }
             },
-            "imageName": "iam-policy-decision",
-            "imageRegistry": "quay.io/opencloudio",
-            "imageTag": "3.3.4",
             "initMongodb": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
@@ -79,17 +76,22 @@ metadata:
               }
             },
             "operatorVersion": "0.14.1",
-            "replicas": 1,
-            "resources": {
-              "limits": {
-                "cpu": "200m",
-                "memory": "256Mi"
-              },
-              "requests": {
-                "cpu": "20m",
-                "memory": "100Mi"
+            "pdpService": {
+              "imageName": "iam-policy-decision",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.4",
+              "resources": {
+                "limits": {
+                  "cpu": "200m",
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "20m",
+                  "memory": "100Mi"
+                }
               }
-            }
+            },
+            "replicas": 1
           }
         },
         {
@@ -340,6 +342,21 @@ metadata:
             "name": "example-securityonboarding"
           },
           "spec": {
+            "securityOnboardingJob": {
+              "imageName": "icp-iam-onboarding",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.3",
+              "resources": {
+                "limits": {
+                  "cpu": "200m",
+                  "memory": "512Mi"
+                },
+                "requests": {
+                  "cpu": "20m",
+                  "memory": "64Mi"
+                }
+              }
+            },
             "iamOnboarding": {
               "imageName": "icp-iam-onboarding",
               "imageRegistry": "quay.io/opencloudio",
@@ -355,9 +372,6 @@ metadata:
                 }
               }
             },
-            "imageName": "icp-iam-onboarding",
-            "imageRegistry": "quay.io/opencloudio",
-            "imageTag": "3.3.3",
             "impersonation": {
               "enableImpersonation": false
             },
@@ -437,17 +451,7 @@ metadata:
               }
             },
             "operatorVersion": "0.14.1",
-            "replicas": 1,
-            "resources": {
-              "limits": {
-                "cpu": "200m",
-                "memory": "512Mi"
-              },
-              "requests": {
-                "cpu": "20m",
-                "memory": "64Mi"
-              }
-            }
+            "replicas": 1
           }
         },
         {

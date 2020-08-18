@@ -1091,19 +1091,9 @@ spec:
         path: operators
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
-      - description: A list defines the catalog information for image registry.
-        displayName: imageRegistry
-        path: imageRegistry
-        x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:text'
-      - description: A list defines the catalog information for image tag.
-        displayName: imageTag
-        path: imageTag
-        x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:text'
-      - description: A list defines the catalog information for resources.
-        displayName: Resources
-        path: resources
+      - description: A list defines the catalog information for pdp service.
+        displayName: PdpService
+        path: pdpService
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
       - description: A list defines the catalog information for init mongodb.
@@ -1124,11 +1114,6 @@ spec:
       - description: A list defines the catalog information for audit service.
         displayName: auditService
         path: auditService
-        x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:text'
-      - description: A list defines the catalog information for image name.
-        displayName: imageName
-        path: imageName
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
       statusDescriptors:
@@ -1328,11 +1313,6 @@ spec:
         path: operators
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
-      - description: A list defines the catalog information for image name.
-        displayName: imageName
-        path: imageName
-        x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:text'
       - description: A list defines the catalog information for impersonation.
         displayName: impersonation
         path: impersonation
@@ -1353,19 +1333,9 @@ spec:
         path: iamOnboarding
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
-      - description: A list defines the catalog information for image registry.
-        displayName: imageRegistry
-        path: imageRegistry
-        x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:text'
-      - description: A list defines the catalog information for image tag.
-        displayName: imageTag
-        path: imageTag
-        x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:text'
-      - description: A list defines the catalog information for resources.
-        displayName: Resources
-        path: resources
+      - description: A list defines the catalog information for securityonboarding job.
+        displayName: SecurityOnboardingJob
+        path: securityOnboardingJob
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
       - description: A list defines the catalog information for init auth service.

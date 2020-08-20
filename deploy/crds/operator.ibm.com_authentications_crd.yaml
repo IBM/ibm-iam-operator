@@ -165,6 +165,12 @@ spec:
                   type: boolean
                 nonceEnabled:
                   type: boolean
+                claimsSupported:
+                  type: string
+                scopeClaim:
+                  type: string
+                claimsMap:
+                  type: string  
                 oidcIssuerURL:
                   type: string
                 openshiftPort:
@@ -196,6 +202,9 @@ spec:
               - installType
               - isOpenshiftEnv
               - nonceEnabled
+              - claimsSupported:
+              - claimsMap
+              - scopeClaim
               - oidcIssuerURL
               - openshiftPort
               - roksEnabled

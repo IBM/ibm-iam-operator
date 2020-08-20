@@ -109,7 +109,7 @@ type ConfigSpec struct {
 	ROKSUserPrefix              string `json:"roksUserPrefix"`
 	EnableImpersonation         bool   `json:"enableImpersonation"`
 	ClaimsSupported             string `json:"claimsSupported"`
-	ClaimMap                    string `json:"claimsMap"`
+	ClaimsMap                    string `json:"claimsMap"`
 	ScopeClaim                string `json:"scopeClaim"`
 	OIDCIssuerURL               string `json:"oidcIssuerURL"`
 }

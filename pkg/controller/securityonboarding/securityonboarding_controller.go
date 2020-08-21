@@ -195,7 +195,7 @@ func getJobNames(jobs []batchv1.Job) []string {
 func (r *ReconcileSecurityOnboarding) handleConfigMap(instance *operatorv1alpha1.SecurityOnboarding) (reconcile.Result, error) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	m := []string{"ElasticSearch", "HelmApi", "HelmRepo", "Kms", "MgmtRepo", "Monitoring", "TillerService", "Tiller_Serviceid_Policies", "Onboard_Script"}
+	m := []string{"ElasticSearch", "HelmApi", "HelmRepo", "Kms", "Monitoring", "TillerService", "Tiller_Serviceid_Policies", "Onboard_Script"}
 
 	foundErr := false
 	for _, ele := range m {
@@ -293,8 +293,6 @@ func getAccessPolicy(label string) (error, string) {
 		return nil, operatorv1alpha1.HelmRepo
 	} else if label == "Kms" {
 		return nil, operatorv1alpha1.Kms
-	} else if label == "MgmtRepo" {
-		return nil, operatorv1alpha1.MgmtRepo
 	} else if label == "Monitoring" {
 		return nil, operatorv1alpha1.Monitoring
 	} else if label == "TillerService" {
@@ -361,7 +359,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	//Create all the Volumes
-	strVolName := []string{"onboard-script", "elasticsearch-json", "monitoring-json", "helmapi-json", "helmrepo-json", "mgmtrepo-json",
+	strVolName := []string{"onboard-script", "elasticsearch-json", "monitoring-json", "helmapi-json", "helmrepo-json",
 		"tillerservice-json", "tiller-serviceid-policies", "kms-json"}
 	tmpInitContainers := []corev1.Container{
 		{
@@ -427,7 +425,6 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 		"monitoring-json":           "/app/monitoring",
 		"helmapi-json":              "/app/helmapi",
 		"helmrepo-json":             "/app/helmrepo",
-		"mgmtrepo-json":             "/app/mgmtrepo",
 		"tillerservice-json":        "/app/tillerservice",
 		"tiller-serviceid-policies": "/app/tiller_serviceid_policies",
 		"cluster-ca":                "/app/cluster-ca",

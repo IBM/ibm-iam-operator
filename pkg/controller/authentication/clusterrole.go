@@ -191,7 +191,7 @@ func generateCRData() map[string]CRData {
 			Rules: []rbacv1.PolicyRule{
 				{
 					APIGroups: []string{"operators.ibm.com"},
-					Resources: []string{"switcheritems"},
+					Resources: []string{"cloudpakswitchers"},
 					Verbs:     viewerVerbs,
 				},
 			},

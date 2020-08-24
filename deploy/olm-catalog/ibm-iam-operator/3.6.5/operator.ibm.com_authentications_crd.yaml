@@ -119,6 +119,8 @@ spec:
                   type: boolean
                 nonceEnabled:
                   type: boolean
+                basicUser:
+                  type: string 
                 roksURL:
                   type: string
                 roksUserPrefix:

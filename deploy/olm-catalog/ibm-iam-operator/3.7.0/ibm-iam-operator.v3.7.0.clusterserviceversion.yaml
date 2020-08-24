@@ -518,7 +518,7 @@ metadata:
     capabilities: Basic Install
     categories: Security
     certified: "false"
-    containerImage: quay.io/opencloudio/ibm-iam-operator@sha256:81a8b536c06a8f3186c4cbff6a27806f7afc9467b07280d458fe6c595b396310
+    containerImage: quay.io/opencloudio/ibm-iam-operator:latest
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
       the lifecycle of IAM services. With this operator, you can simply deploy and
       upgrade the IAM services
@@ -1990,15 +1990,15 @@ spec:
                 - name: AUTH_SERVICE_TAG_OR_SHA
                   value: sha256:eddc597bc212d87b4909c1b826f7d8a8142d3150b9764ae097dc88b48faf008f
                 - name: IDENTITY_PROVIDER_TAG_OR_SHA
-                  value: sha256:d4aad62d8707ae9568a03ef19b385c3427a5da0eed78bd0c6499adf14f0804d6
+                  value: sha256:ada2aa228aa37935fd14eaeff9876b08da27625fdd8c09d19b40bcca2eb9de68
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
-                  value: sha256:88572bec19fddd731f970879281ebaf50891a3df15764ef214fd85fc61f485bb
+                  value: sha256:d1dc813d3505847e055ce98eb0915859ab009e973043fb3589d0e24fc2a31f70
                 - name: POLICY_ADMINISTRATION_TAG_OR_SHA
-                  value: sha256:470fd0df32a5c9a2d79a19186d63234c92de0962e4f73afa3c84135cd0de8a84
+                  value: sha256:d64a26bee539090eb42b89abe4caba3e42eb0b7eba2cb7f9ce3a1c94642240b4
                 - name: POLICY_DECISION_TAG_OR_SHA
                   value: sha256:1f50fd868ede1353adc5be0049ffe90c732c331134168f4b1c8e5584cafb543c
                 - name: SECRET_WATCHER_TAG_OR_SHA
-                  value: sha256:bfe42fc0463da7d30e5b83f8a5767314d991eb66c3e7a03532e20502d3c13190
+                  value: sha256:a5fb379da4456801e9f02cf828e23c2558e0c27af23f56cc77fe11383381f60f
                 - name: CLIENT_WATCHER_TAG_OR_SHA
                   value: sha256:be5ecfa577a47ec962e54166353b2d248b13625b367618c71cd58285ba47bd35
                 - name: POLICY_CONTROLLER_TAG_OR_SHA

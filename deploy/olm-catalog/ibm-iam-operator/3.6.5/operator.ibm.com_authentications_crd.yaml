@@ -119,7 +119,7 @@ spec:
                   type: boolean
                 nonceEnabled:
                   type: boolean
-                basicUser:
+                bootstrapUserId:
                   type: string 
                 roksURL:
                   type: string

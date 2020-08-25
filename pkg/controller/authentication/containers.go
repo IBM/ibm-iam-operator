@@ -121,6 +121,8 @@ func buildAuditContainer(auditImage string, journalPath string, resources *corev
 func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authServiceImage string) corev1.Container {
 
 	resources := instance.Spec.AuthService.Resources
+	memoryQuantity := resources.Requests[corev1.ResourceMemory]
+	memory := memoryQuantity.String()
 
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
@@ -137,6 +139,10 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 		{
 			Name:  "MONGO_DB_NAME",
 			Value: "platform-db",
+		},
+		{
+			Name: "MEMORY",
+			Value: memory,
 		},
 		{
 			Name:  "MONGO_COLLECTION",

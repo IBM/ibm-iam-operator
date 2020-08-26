@@ -29,6 +29,7 @@ import (
 	net "k8s.io/api/networking/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"math/rand"
@@ -53,6 +54,11 @@ var authServicePort int32 = 9443
 var identityProviderPort int32 = 4300
 var identityManagerPort int32 = 4500
 var serviceAccountName string = "ibm-iam-operand-privileged"
+
+
+var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
+var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI)   // 128Mi
+
 
 var rule = `^([a-z0-9]){32,}$`
 var wlpClientID = generateRandomString(rule)

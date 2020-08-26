@@ -178,6 +178,7 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"NODE_ENV":                    "production",
 			"AUDIT_ENABLED_IDPROVIDER":    "false",
 			"AUDIT_ENABLED_IDMGMT":        "false",
+			"BOOTSTRAP_USERID":            instance.Spec.Config.BootstrapUserId,
 			"AUDIT_DETAIL":                "false",
 			"LOG_LEVEL_IDPROVIDER":        "info",
 			"LOG_LEVEL_AUTHSVC":           "info",

@@ -20,10 +20,11 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"strconv"
 )
 
-func buildInitContainers(mongoDBImage string, resources *corev1.ResourceRequirements) []corev1.Container {
+func buildInitContainers(mongoDBImage string) []corev1.Container {
 	return []corev1.Container{
 		{
 			Name:            "init-mongodb",
@@ -43,7 +44,14 @@ func buildInitContainers(mongoDBImage string, resources *corev1.ResourceRequirem
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: *resources,
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
 		},
 	}
 }
@@ -889,7 +897,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 	}
 
 	idpEnvVarList := []string{"NODE_ENV", "LOG_LEVEL_IDMGMT", "LOG_LEVEL_MW", "IBMID_PROFILE_URL", "IBMID_PROFILE_CLIENT_ID", "IBMID_PROFILE_FIELDS", "AUDIT_DETAIL",
-		"ROKS_ENABLED", "ROKS_USER_PREFIX", "IDENTITY_AUTH_DIRECTORY_URL", "OIDC_ISSUER_URL", "CLUSTER_NAME", "HTTP_ONLY", "LDAP_SEARCH_SIZE_LIMIT", "LDAP_SEARCH_TIME_LIMIT",
+		"ROKS_ENABLED", "ROKS_USER_PREFIX", "IDENTITY_AUTH_DIRECTORY_URL", "BOOTSTRAP_USERID", "OIDC_ISSUER_URL", "CLUSTER_NAME", "HTTP_ONLY", "LDAP_SEARCH_SIZE_LIMIT", "LDAP_SEARCH_TIME_LIMIT",
 		"LDAP_SEARCH_CN_ATTR_ONLY", "LDAP_SEARCH_ID_ATTR_ONLY", "LDAP_SEARCH_EXCLUDE_WILDCARD_CHARS", "IGNORE_LDAP_FILTERS_VALIDATION", "MASTER_HOST"}
 
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)

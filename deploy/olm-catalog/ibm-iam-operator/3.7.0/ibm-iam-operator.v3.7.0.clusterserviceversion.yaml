@@ -60,6 +60,9 @@ metadata:
                 }
               }
             },
+            "imageName": "iam-policy-decision",
+            "imageRegistry": "quay.io/opencloudio",
+            "imageTag": "3.3.4",
             "initMongodb": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
@@ -76,22 +79,17 @@ metadata:
               }
             },
             "operatorVersion": "0.14.1",
-            "pdpService": {
-              "imageName": "iam-policy-decision",
-              "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.4",
-              "resources": {
-                "limits": {
-                  "cpu": "200m",
-                  "memory": "256Mi"
-                },
-                "requests": {
-                  "cpu": "20m",
-                  "memory": "100Mi"
-                }
+            "replicas": 1,
+            "resources": {
+              "limits": {
+                "cpu": "200m",
+                "memory": "256Mi"
+              },
+              "requests": {
+                "cpu": "20m",
+                "memory": "100Mi"
               }
-            },
-            "replicas": 1
+            }
           }
         },
         {
@@ -346,21 +344,6 @@ metadata:
             "name": "example-securityonboarding"
           },
           "spec": {
-            "securityOnboardingJob": {
-              "imageName": "icp-iam-onboarding",
-              "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.3",
-              "resources": {
-                "limits": {
-                  "cpu": "200m",
-                  "memory": "512Mi"
-                },
-                "requests": {
-                  "cpu": "20m",
-                  "memory": "64Mi"
-                }
-              }
-            },
             "iamOnboarding": {
               "imageName": "icp-iam-onboarding",
               "imageRegistry": "quay.io/opencloudio",
@@ -376,6 +359,9 @@ metadata:
                 }
               }
             },
+            "imageName": "icp-iam-onboarding",
+            "imageRegistry": "quay.io/opencloudio",
+            "imageTag": "3.3.3",
             "impersonation": {
               "enableImpersonation": false
             },
@@ -455,7 +441,17 @@ metadata:
               }
             },
             "operatorVersion": "0.14.1",
-            "replicas": 1
+            "replicas": 1,
+            "resources": {
+              "limits": {
+                "cpu": "200m",
+                "memory": "512Mi"
+              },
+              "requests": {
+                "cpu": "20m",
+                "memory": "64Mi"
+              }
+            }
           }
         },
         {
@@ -522,7 +518,7 @@ metadata:
     capabilities: Basic Install
     categories: Security
     certified: "false"
-    containerImage: quay.io/opencloudio/ibm-iam-operator@sha256:81a8b536c06a8f3186c4cbff6a27806f7afc9467b07280d458fe6c595b396310
+    containerImage: quay.io/opencloudio/ibm-iam-operator:latest
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
       the lifecycle of IAM services. With this operator, you can simply deploy and
       upgrade the IAM services
@@ -1095,9 +1091,19 @@ spec:
         path: operators
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
-      - description: A list defines the catalog information for pdp service.
-        displayName: pdpService
-        path: pdpService
+      - description: A list defines the catalog information for image registry.
+        displayName: imageRegistry
+        path: imageRegistry
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image tag.
+        displayName: imageTag
+        path: imageTag
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for resources.
+        displayName: Resources
+        path: resources
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
       - description: A list defines the catalog information for init mongodb.
@@ -1118,6 +1124,11 @@ spec:
       - description: A list defines the catalog information for audit service.
         displayName: auditService
         path: auditService
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image name.
+        displayName: imageName
+        path: imageName
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
       statusDescriptors:
@@ -1317,6 +1328,11 @@ spec:
         path: operators
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image name.
+        displayName: imageName
+        path: imageName
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
       - description: A list defines the catalog information for impersonation.
         displayName: impersonation
         path: impersonation
@@ -1337,9 +1353,19 @@ spec:
         path: iamOnboarding
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
-      - description: A list defines the catalog information for securityonboarding job.
-        displayName: securityOnboardingJob
-        path: securityOnboardingJob
+      - description: A list defines the catalog information for image registry.
+        displayName: imageRegistry
+        path: imageRegistry
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image tag.
+        displayName: imageTag
+        path: imageTag
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for resources.
+        displayName: Resources
+        path: resources
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
       - description: A list defines the catalog information for init auth service.
@@ -1992,25 +2018,25 @@ spec:
                 - ibm-iam-operator
                 env:
                 - name: AUTH_SERVICE_TAG_OR_SHA
-                  value: sha256:a5020f5ce596d4def3060031cb7f6a6d44fd591fb1253e3ad0b8c9ed1152bc9a
+                  value: sha256:eddc597bc212d87b4909c1b826f7d8a8142d3150b9764ae097dc88b48faf008f
                 - name: IDENTITY_PROVIDER_TAG_OR_SHA
-                  value: sha256:42c863d654f52278695814e95ff703897f6a972d38552a5733a651cb94b03033
+                  value: sha256:ada2aa228aa37935fd14eaeff9876b08da27625fdd8c09d19b40bcca2eb9de68
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
-                  value: sha256:0ec0dd6a69d2811d55267397d5d5bdb64b23aaa824ee0ffde596334e97982537
+                  value: sha256:d1dc813d3505847e055ce98eb0915859ab009e973043fb3589d0e24fc2a31f70
                 - name: POLICY_ADMINISTRATION_TAG_OR_SHA
-                  value: sha256:470fd0df32a5c9a2d79a19186d63234c92de0962e4f73afa3c84135cd0de8a84
+                  value: sha256:d64a26bee539090eb42b89abe4caba3e42eb0b7eba2cb7f9ce3a1c94642240b4
                 - name: POLICY_DECISION_TAG_OR_SHA
-                  value: sha256:2deab004a3f92253c20e67cbb79f46d76321d7c5e9b30ceab58b840139205afe
+                  value: sha256:1f50fd868ede1353adc5be0049ffe90c732c331134168f4b1c8e5584cafb543c
                 - name: SECRET_WATCHER_TAG_OR_SHA
-                  value: sha256:bfe42fc0463da7d30e5b83f8a5767314d991eb66c3e7a03532e20502d3c13190
+                  value: sha256:a5fb379da4456801e9f02cf828e23c2558e0c27af23f56cc77fe11383381f60f
                 - name: CLIENT_WATCHER_TAG_OR_SHA
-                  value: sha256:0c49e27b3d4f32001e568a62abdfaecdb41f10194cf5a9ccf87ebfbdd2808fd4
+                  value: sha256:be5ecfa577a47ec962e54166353b2d248b13625b367618c71cd58285ba47bd35
                 - name: POLICY_CONTROLLER_TAG_OR_SHA
-                  value: sha256:2d3029b7efc0f6dd841d61e0d454d0cdfca539aff01b57d462f11891dac32b2f
+                  value: sha256:47545b9aec9c8ecba544acc2b8994f1c2d364ccd24c65e785f2f1f5d2a612aa5
                 - name: IAM_ONBOARDING_TAG_OR_SHA
-                  value: sha256:f8efc1d236be029376eb73ff57270695b94b33cceed8aee57f7fb5edc8c488e6
+                  value: sha256:ace677ea8b55fa8ef18eba83d2de849fe8b4e1776b8b183d58f657b900070f7c
                 - name: AUDIT_TAG_OR_SHA
-                  value: sha256:24a220374c39652f8b031637d852995bfaec5be2601f9e4c41eb1925531f466d
+                  value: sha256:a649814564039ee923cb503720e9c5e87c20b3c340f06c48660490aeaed04d5a
                 - name: WATCH_NAMESPACE
                   valueFrom:
                     fieldRef:

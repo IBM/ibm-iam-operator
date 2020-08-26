@@ -793,94 +793,7 @@ var Kms = `{
       ]
     }
 `
-var MgmtRepo = `{
-      "displayName": {
-        "default": "mgmtrepo-repos"
-      },
-      "actions": [{
-          "id": "GET /mgmt-repo/charts/index.yaml",
-          "displayName": {
-            "default": "mgmtrepo.repos.get.indexyaml"
-          },
-          "roles": [
-            "crn:v1:icp:private:iam::::role:ClusterAdministrator"
-          ]
-        },
-        {
-          "id": "GET /mgmt-repo/requiredAssets",
-          "displayName": {
-            "default": "mgmtrepo.charts.get.requiredassets"
-          },
-          "roles": [
-            "crn:v1:icp:private:iam::::role:ClusterAdministrator"
-          ]
-        },
-        {
-          "id": "PUT /mgmt-repo/charts",
-          "displayName": {
-            "default": "mgmtrepo.repos.put.updatecreatechart"
-          },
-          "roles": [
-            "crn:v1:icp:private:iam::::role:ClusterAdministrator"
-          ]
-        },
-        {
-          "id": "DELETE /mgmt-repo/charts",
-          "displayName": {
-            "default": "mgmtrepo.repos.delete.allorsingularchart"
-          },
-          "roles": [
-            "crn:v1:icp:private:iam::::role:ClusterAdministrator"
-          ]
-        },
-        {
-          "id": "GET /mgmt-repo/api/v1/charts/index.yaml",
-          "displayName": {
-            "default": "mgmtrepo.repos.v1.get.indexyaml"
-          },
-          "roles": [
-            "crn:v1:icp:private:iam::::role:ClusterAdministrator"
-          ]
-        },
-        {
-          "id": "GET /mgmt-repo/api/v1/requiredAssets",
-          "displayName": {
-            "default": "mgmtrepo.charts.v1.get.requiredassets"
-          },
-          "roles": [
-            "crn:v1:icp:private:iam::::role:ClusterAdministrator"
-          ]
-        },
-        {
-          "id": "PUT /mgmt-repo/api/v1/charts",
-          "displayName": {
-            "default": "mgmtrepo.repos.v1.put.updatecreatechart"
-          },
-          "roles": [
-            "crn:v1:icp:private:iam::::role:ClusterAdministrator"
-          ]
-        },
-        {
-          "id": "DELETE /mgmt-repo/api/v1/charts",
-          "displayName": {
-            "default": "mgmtrepo.repos.v1.delete.allorsingularchart"
-          },
-          "roles": [
-            "crn:v1:icp:private:iam::::role:ClusterAdministrator"
-          ]
-        }
-      ],
-      "enabled": true,
-      "supportedAttributes": [{
-        "key": "string"
-      }],
-      "supportedRoles": [
-        {
-          "id": "crn:v1:icp:private:iam::::role:ClusterAdministrator"
-        }
-      ]
-    }
-`
+
 var Monitoring = `{
       "displayName": {
         "default": "service-monitoring"
@@ -1161,7 +1074,6 @@ def main():
         {'serviceName': 'service-monitoring-service', 'filePath': '/app/monitoring/action_role_monitoring.json'},
         {'serviceName': 'helmapi-service', 'filePath': '/app/helmapi/action_role_helmapi.json'},
         {'serviceName': 'helmrepo-service', 'filePath': '/app/helmrepo/action_role_helmrepo.json'},
-        {'serviceName': 'mgmtrepo-service', 'filePath': '/app/mgmtrepo/action_role_mgmtrepo.json'},
         {'serviceName': 'tiller-service', 'filePath': '/app/tillerservice/action_role_tillerservice.json'},
         {'serviceName': 'kms', 'filePath': '/app/kms/action_role_kms.json'}]
     for service in serviceList:

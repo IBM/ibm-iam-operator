@@ -18,10 +18,14 @@ package policydecision
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func buildInitContainers(mongoDBImage string, resources *corev1.ResourceRequirements) []corev1.Container {
+var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
+var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI)   // 128Mi
+
+func buildInitContainers(mongoDBImage string) []corev1.Container {
 	return []corev1.Container{
 		{
 			Name:            "init-mongodb",
@@ -41,7 +45,14 @@ func buildInitContainers(mongoDBImage string, resources *corev1.ResourceRequirem
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: *resources,
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
 		},
 	}
 }

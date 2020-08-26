@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -42,6 +43,10 @@ import (
 )
 
 var log = logf.Log.WithName("controller_securityonboarding")
+var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
+var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)          // 200m
+var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI)   // 256Mi
+var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI)   // 128Mi
 var trueVar bool = true
 var falseVar bool = false
 var serviceAccountName string = "ibm-iam-operand-restricted"
@@ -195,7 +200,7 @@ func getJobNames(jobs []batchv1.Job) []string {
 func (r *ReconcileSecurityOnboarding) handleConfigMap(instance *operatorv1alpha1.SecurityOnboarding) (reconcile.Result, error) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	m := []string{"ElasticSearch", "HelmApi", "HelmRepo", "Kms", "MgmtRepo", "Monitoring", "TillerService", "Tiller_Serviceid_Policies", "Onboard_Script"}
+	m := []string{"ElasticSearch", "HelmApi", "HelmRepo", "Kms", "Monitoring", "TillerService", "Tiller_Serviceid_Policies", "Onboard_Script"}
 
 	foundErr := false
 	for _, ele := range m {
@@ -293,8 +298,6 @@ func getAccessPolicy(label string) (error, string) {
 		return nil, operatorv1alpha1.HelmRepo
 	} else if label == "Kms" {
 		return nil, operatorv1alpha1.Kms
-	} else if label == "MgmtRepo" {
-		return nil, operatorv1alpha1.MgmtRepo
 	} else if label == "Monitoring" {
 		return nil, operatorv1alpha1.Monitoring
 	} else if label == "TillerService" {
@@ -361,7 +364,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	//Create all the Volumes
-	strVolName := []string{"onboard-script", "elasticsearch-json", "monitoring-json", "helmapi-json", "helmrepo-json", "mgmtrepo-json",
+	strVolName := []string{"onboard-script", "elasticsearch-json", "monitoring-json", "helmapi-json", "helmrepo-json",
 		"tillerservice-json", "tiller-serviceid-policies", "kms-json"}
 	tmpInitContainers := []corev1.Container{
 		{
@@ -378,7 +381,14 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: *instance.Spec.InitAuthService.Resources,
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
 		},
 	}
 	tmpVolumes := []corev1.Volume{}
@@ -427,7 +437,6 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 		"monitoring-json":           "/app/monitoring",
 		"helmapi-json":              "/app/helmapi",
 		"helmrepo-json":             "/app/helmrepo",
-		"mgmtrepo-json":             "/app/mgmtrepo",
 		"tillerservice-json":        "/app/tillerservice",
 		"tiller-serviceid-policies": "/app/tiller_serviceid_policies",
 		"cluster-ca":                "/app/cluster-ca",
@@ -460,7 +469,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 		Containers: []corev1.Container{
 			{
 				Name:            "security-onboarding",
-				Image:           instance.Spec.SecurityOnboardingJob.ImageRegistry + "/" + instance.Spec.SecurityOnboardingJob.ImageName + shatag.GetImageRef("IAM_ONBOARDING_TAG_OR_SHA"),
+				Image:           instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + shatag.GetImageRef("IAM_ONBOARDING_TAG_OR_SHA"),
 				ImagePullPolicy: corev1.PullPolicy("Always"),
 				Command:         []string{"python", "/app/scripts/onboard-script.py"},
 				SecurityContext: &corev1.SecurityContext{
@@ -472,7 +481,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 						Drop: []corev1.Capability{"ALL"},
 					},
 				},
-				Resources: *instance.Spec.SecurityOnboardingJob.Resources,
+				Resources: *instance.Spec.Resources,
 				Env: []corev1.EnvVar{
 					{
 						Name: "ICP_API_KEY",
@@ -562,7 +571,14 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: *instance.Spec.InitAuthService.Resources,
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
 		},
 		{
 			Name:            "init-identity-provider",
@@ -584,7 +600,14 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: *instance.Spec.InitIdentityProvider.Resources,
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
 		},
 		{
 			Name:            "init-identity-manager",
@@ -606,7 +629,14 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: *instance.Spec.InitIdentityManager.Resources,
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
 		},
 		{
 			Name:            "init-token-service",
@@ -622,7 +652,14 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: *instance.Spec.InitTokenService.Resources,
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
 		},
 		{
 			Name:            "init-pap",
@@ -644,7 +681,14 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: *instance.Spec.InitPAP.Resources,
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
 		},
 	}
 	var mode1, mode2, mode3, mode4 int32 = 420, 420, 420, 420

@@ -129,7 +129,6 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 	journalPath := instance.Spec.AuditService.JournalPath
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
-	mongoInitResources := instance.Spec.InitMongodb.Resources
 
 	idpDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -197,7 +196,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 					},
 					Volumes:        buildIdpVolumes(journalPath, ldapCACert, routerCertSecret),
 					Containers:     buildContainers(instance, auditImage, authServiceImage, identityProviderImage, identityManagerImage, journalPath, icpConsoleURL),
-					InitContainers: buildInitContainers(mongoDBImage, mongoInitResources),
+					InitContainers: buildInitContainers(mongoDBImage),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &user,
 					},

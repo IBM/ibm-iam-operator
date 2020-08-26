@@ -105,13 +105,13 @@ type ConfigSpec struct {
 	FIPSEnabled                 bool   `json:"fipsEnabled"`
 	ROKSEnabled                 bool   `json:"roksEnabled"`
 	NONCEEnabled                bool   `json:"nonceEnabled"`
-	BootstrapUserId             string `json:"bootstrapUserId"`
+	bootstrapUserId             string `json:"bootstrapUserId"`
 	ROKSURL                     string `json:"roksURL"`
 	ROKSUserPrefix              string `json:"roksUserPrefix"`
 	EnableImpersonation         bool   `json:"enableImpersonation"`
-	ClaimsSupported             string `json:"claimsSupported"`
-	ClaimsMap                    string `json:"claimsMap"`
-	ScopeClaim                string `json:"scopeClaim"`
+	claimsSupported             string `json:"claimsSupported"`
+	claimsMap                    string `json:"claimsMap"`
+	scopeClaim                string `json:"scopeClaim"`
 	OIDCIssuerURL               string `json:"oidcIssuerURL"`
 }
 

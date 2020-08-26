@@ -285,6 +285,7 @@ spec:
               - imageName
               - imageRegistry
               - imageTag
+              - scopeClaim
               type: object
             initMongodb:
               properties:
@@ -332,7 +333,6 @@ spec:
           - authService
           - clientRegistration
           - config
-          - scopeClaim
           - identityManager
           - identityProvider
           - initMongodb

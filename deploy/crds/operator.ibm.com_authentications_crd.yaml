@@ -204,9 +204,6 @@ spec:
               - installType
               - isOpenshiftEnv
               - nonceEnabled
-              - claimsSupported
-              - claimsMap
-              - scopeClaim
               - bootstrapUserId
               - oidcIssuerURL
               - openshiftPort

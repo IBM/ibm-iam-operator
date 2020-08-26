@@ -171,8 +171,6 @@ spec:
                   type: string
                 claimsMap:
                   type: string
-                bootstrapUserId:
-                  type: string
                 oidcIssuerURL:
                   type: string
                 openshiftPort:
@@ -204,7 +202,9 @@ spec:
               - installType
               - isOpenshiftEnv
               - nonceEnabled
-              - bootstrapUserId
+              - claimsSupported
+              - claimsMap
+              - scopeClaim
               - oidcIssuerURL
               - openshiftPort
               - roksEnabled
@@ -220,6 +220,8 @@ spec:
                   type: string
                 imageRegistry:
                   type: string
+                bootstrapUserId:
+                  type: string  
                 imageTag:
                   type: string
                 masterNodesList:
@@ -246,6 +248,7 @@ spec:
               required:
               - imageName
               - imageRegistry
+              - bootstrapUserId
               - imageTag
               - masterNodesList
               type: object
@@ -257,6 +260,8 @@ spec:
                   type: string
                 imageTag:
                   type: string
+                scopeClaim:
+                  type: string  
                 resources:
                   description: ResourceRequirements describes the compute resource
                     requirements.
@@ -327,6 +332,7 @@ spec:
           - authService
           - clientRegistration
           - config
+          - scopeClaim
           - identityManager
           - identityProvider
           - initMongodb

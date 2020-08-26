@@ -521,7 +521,6 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 	replicas := instance.Spec.Replicas
 	journalPath := instance.Spec.AuditService.JournalPath
 	auditResources := instance.Spec.AuditService.Resources
-	initMongoDBResources := instance.Spec.InitMongodb.Resources
 	pdpResources := instance.Spec.Resources
 
 	pdpDeployment := &appsv1.Deployment{
@@ -590,7 +589,7 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 					},
 					Volumes:        buildPdpVolumes(journalPath),
 					Containers:     buildContainers(auditImage, pdpImage, journalPath, auditResources, pdpResources),
-					InitContainers: buildInitContainers(mongoDBImage, initMongoDBResources),
+					InitContainers: buildInitContainers(mongoDBImage),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &user,
 					},

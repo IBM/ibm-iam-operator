@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -42,6 +43,10 @@ import (
 )
 
 var log = logf.Log.WithName("controller_securityonboarding")
+var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
+var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)          // 200m
+var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI)   // 256Mi
+var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI)   // 128Mi
 var trueVar bool = true
 var falseVar bool = false
 var serviceAccountName string = "ibm-iam-operand-restricted"
@@ -376,7 +381,14 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: *instance.Spec.InitAuthService.Resources,
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
 		},
 	}
 	tmpVolumes := []corev1.Volume{}
@@ -559,7 +571,14 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: *instance.Spec.InitAuthService.Resources,
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
 		},
 		{
 			Name:            "init-identity-provider",
@@ -581,7 +600,14 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: *instance.Spec.InitIdentityProvider.Resources,
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
 		},
 		{
 			Name:            "init-identity-manager",
@@ -603,7 +629,14 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: *instance.Spec.InitIdentityManager.Resources,
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
 		},
 		{
 			Name:            "init-token-service",
@@ -619,7 +652,14 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: *instance.Spec.InitTokenService.Resources,
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
 		},
 		{
 			Name:            "init-pap",
@@ -641,7 +681,14 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: *instance.Spec.InitPAP.Resources,
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
 		},
 	}
 	var mode1, mode2, mode3, mode4 int32 = 420, 420, 420, 420

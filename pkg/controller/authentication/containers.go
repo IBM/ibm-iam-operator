@@ -20,10 +20,11 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"strconv"
 )
 
-func buildInitContainers(mongoDBImage string, resources *corev1.ResourceRequirements) []corev1.Container {
+func buildInitContainers(mongoDBImage string) []corev1.Container {
 	return []corev1.Container{
 		{
 			Name:            "init-mongodb",
@@ -43,7 +44,14 @@ func buildInitContainers(mongoDBImage string, resources *corev1.ResourceRequirem
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: *resources,
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
 		},
 	}
 }

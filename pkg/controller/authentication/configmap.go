@@ -203,6 +203,7 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"CLAIMS_SUPPORTED": 		      instance.Spec.Config.ClaimsSupported,
 			"CLAIMS_MAP":                         instance.Spec.Config.ClaimsMap,
 			"SCOPE_CLAIM":                        instance.Spec.Config.ScopeClaim,
+			"BOOTSTRAP_USERID":                   instance.Spec.Config.BootstrapUserId,
 			"LIBERTY_TOKEN_LENGTH":               "1024",
 			"OS_TOKEN_LENGTH":                    "45",
 			"LIBERTY_DEBUG_ENABLED":              "false",

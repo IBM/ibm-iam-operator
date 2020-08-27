@@ -165,6 +165,14 @@ spec:
                   type: boolean
                 nonceEnabled:
                   type: boolean
+                claimsSupported:
+                  type: string
+                bootstrapUserId:
+                  type: string
+                scopeClaim:
+                  type: string
+                claimsMap:
+                  type: string
                 oidcIssuerURL:
                   type: string
                 openshiftPort:
@@ -196,6 +204,10 @@ spec:
               - installType
               - isOpenshiftEnv
               - nonceEnabled
+              - scopeClaim
+              - bootstrapUserId
+              - claimsSupported
+              - claimsMap
               - oidcIssuerURL
               - openshiftPort
               - roksEnabled
@@ -210,7 +222,7 @@ spec:
                 imageName:
                   type: string
                 imageRegistry:
-                  type: string
+                  type: string 
                 imageTag:
                   type: string
                 masterNodesList:

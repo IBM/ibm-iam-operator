@@ -129,6 +129,15 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["LDAP_RECURSIVE_SEARCH"] = newConfigMap.Data["LDAP_RECURSIVE_SEARCH"]
 					cmUpdateRequired = true
 				}
+				if _, keyExists := currentConfigMap.Data["CLAIMS_SUPPORTED"]; !keyExists {
+					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					newConfigMap = functionList[index](instance, r.scheme)
+					currentConfigMap.Data["CLAIMS_SUPPORTED"] = newConfigMap.Data["CLAIMS_SUPPORTED"]
+					currentConfigMap.Data["CLAIMS_MAP"] = newConfigMap.Data["CLAIMS_MAP"]
+					currentConfigMap.Data["SCOPE_CLAIM"] = newConfigMap.Data["SCOPE_CLAIM"]
+					currentConfigMap.Data["BOOTSTRAP_USERID"] = newConfigMap.Data["BOOTSTRAP_USERID"]
+					cmUpdateRequired = true
+				}
 				if _, keyExists := currentConfigMap.Data["MONGO_READ_TIMEOUT"]; !keyExists {
 					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.scheme)
@@ -200,6 +209,10 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"ROKS_ENABLED":                       strconv.FormatBool(instance.Spec.Config.ROKSEnabled),
 			"ROKS_URL":                           instance.Spec.Config.ROKSURL,
 			"ROKS_USER_PREFIX":                   instance.Spec.Config.ROKSUserPrefix,
+			"CLAIMS_SUPPORTED": 		      instance.Spec.Config.ClaimsSupported,
+			"CLAIMS_MAP":                         instance.Spec.Config.ClaimsMap,
+			"SCOPE_CLAIM":                        instance.Spec.Config.ScopeClaim,
+			"BOOTSTRAP_USERID":                   instance.Spec.Config.BootstrapUserId,
 			"LIBERTY_TOKEN_LENGTH":               "1024",
 			"OS_TOKEN_LENGTH":                    "45",
 			"LIBERTY_DEBUG_ENABLED":              "false",

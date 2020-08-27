@@ -167,6 +167,8 @@ spec:
                   type: boolean
                 claimsSupported:
                   type: string
+                bootstrapUserId:
+                  type: string
                 scopeClaim:
                   type: string
                 claimsMap:
@@ -203,6 +205,7 @@ spec:
               - isOpenshiftEnv
               - nonceEnabled
               - scopeClaim
+              - bootstrapUserId
               - claimsSupported
               - claimsMap
               - oidcIssuerURL
@@ -258,8 +261,6 @@ spec:
                 imageRegistry:
                   type: string
                 imageTag:
-                  type: string
-                scopeClaim:
                   type: string  
                 resources:
                   description: ResourceRequirements describes the compute resource
@@ -283,7 +284,6 @@ spec:
               required:
               - imageName
               - imageRegistry
-              - scopeClaim
               - imageTag
               type: object
             initMongodb:

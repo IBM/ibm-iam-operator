@@ -165,8 +165,6 @@ spec:
                   type: boolean
                 nonceEnabled:
                   type: boolean
-                bootstrapUserId:
-                  type: string
                 oidcIssuerURL:
                   type: string
                 openshiftPort:
@@ -198,7 +196,6 @@ spec:
               - installType
               - isOpenshiftEnv
               - nonceEnabled
-              - bootstrapUserId
               - oidcIssuerURL
               - openshiftPort
               - roksEnabled

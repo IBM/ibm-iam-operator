@@ -186,7 +186,7 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"IDTOKEN_LIFETIME":            "12h",
 			"JOURNAL_PATH":                instance.Spec.AuditService.JournalPath,
 			"SESSION_TIMEOUT":             "43200",
-			"OIDC_ISSUER_URL":             instance.Spec.Config.OIDCIssuerURL,
+			"OIDC_ISSUER_URL":             instance.Spec.Config.ClusterCADomain+"/idprovider/v1/auth",
 			"logrotate-conf": "\n # rotate log files weekly\ndaily\n\n# use the syslog group by" +
 				" default, since this is the owning group # of /var/log/syslog.\n#su root syslog\n\n#" +
 				" keep 4 weeks worth of backlogs\nrotate 4\n\n# create new (empty) log files after" +

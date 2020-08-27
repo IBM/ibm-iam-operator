@@ -24,6 +24,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -61,6 +62,16 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	image := instance.Spec.ClientRegistration.ImageRegistry + "/" + instance.Spec.ClientRegistration.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA")
 	resources := instance.Spec.ClientRegistration.Resources
+	if resources == nil {
+		resources = &corev1.ResourceRequirements{
+			Limits: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu1000,
+				corev1.ResourceMemory: *memory1024},
+			Requests: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu100,
+				corev1.ResourceMemory: *memory128},
+		}
+	}
 
 	newJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{

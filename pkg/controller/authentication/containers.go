@@ -58,6 +58,18 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 
 func buildAuditContainer(auditImage string, journalPath string, resources *corev1.ResourceRequirements) corev1.Container {
 
+	if resources == nil{
+
+		resources = &corev1.ResourceRequirements{
+			Limits: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu100,
+				corev1.ResourceMemory: *memory128},
+			Requests: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu10,
+				corev1.ResourceMemory: *memory32},
+		}
+	}
+
 	return corev1.Container{
 		Name:            "icp-audit-service",
 		Image:           auditImage,
@@ -109,6 +121,17 @@ func buildAuditContainer(auditImage string, journalPath string, resources *corev
 func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authServiceImage string) corev1.Container {
 
 	resources := instance.Spec.AuthService.Resources
+
+	if resources == nil {
+		resources = &corev1.ResourceRequirements{
+			Limits: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu1000,
+				corev1.ResourceMemory: *memory1024},
+			Requests: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu100,
+				corev1.ResourceMemory: *memory350},
+		}
+	}
 
 	envVars := []corev1.EnvVar{
 		{
@@ -361,6 +384,16 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string) corev1.Container {
 	
 	resources := instance.Spec.IdentityProvider.Resources
+	if resources == nil {
+		resources = &corev1.ResourceRequirements{
+			Limits: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu1000,
+				corev1.ResourceMemory: *memory1024},
+			Requests: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu50,
+				corev1.ResourceMemory: *memory150},
+		}
+	}
 	envVars := []corev1.EnvVar{
 		{
 			Name:  "MONGO_DB_NAME",
@@ -681,6 +714,16 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 	//@posriniv - find a better solution
 	replicaCount := int(instance.Spec.Replicas)
 	resources := instance.Spec.IdentityManager.Resources
+	if resources == nil {
+		resources = &corev1.ResourceRequirements{
+			Limits: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu1000,
+				corev1.ResourceMemory: *memory1024},
+			Requests: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu50,
+				corev1.ResourceMemory: *memory150},
+		}
+	}
 	masterNodesList := ""
 	baseIp := "10.0.0."
 	for i := 1; i <= replicaCount; i++{

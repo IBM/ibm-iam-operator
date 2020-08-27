@@ -202,9 +202,6 @@ spec:
               - installType
               - isOpenshiftEnv
               - nonceEnabled
-              - claimsSupported
-              - claimsMap
-              - scopeClaim
               - oidcIssuerURL
               - openshiftPort
               - roksEnabled
@@ -248,7 +245,6 @@ spec:
               required:
               - imageName
               - imageRegistry
-              - bootstrapUserId
               - imageTag
               - masterNodesList
               type: object

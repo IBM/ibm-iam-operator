@@ -261,7 +261,7 @@ spec:
                 imageRegistry:
                   type: string
                 imageTag:
-                  type: string  
+                  type: string
                 resources:
                   description: ResourceRequirements describes the compute resource
                     requirements.

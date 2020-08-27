@@ -26,6 +26,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -46,6 +47,10 @@ var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
 var serviceAccountName string = "ibm-iam-operand-restricted"
+var cpu50 = resource.NewMilliQuantity(50, resource.DecimalSI)          // 50m
+var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
+var memory64 = resource.NewQuantity(64*1024*1024, resource.BinarySI)   // 64Mi
+var memory512 = resource.NewQuantity(512*1024*1024, resource.BinarySI) // 512Mi
 
 var log = logf.Log.WithName("controller_secretwatcher")
 
@@ -209,6 +214,17 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 	image := instance.Spec.ImageRegistry + shatag.GetImageRef("SECRET_WATCHER_TAG_OR_SHA")
 	replicas := instance.Spec.Replicas
 	resources := instance.Spec.Resources
+
+	if resources == nil {
+		resources = &corev1.ResourceRequirements{
+			Limits: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu200,
+				corev1.ResourceMemory: *memory512},
+			Requests: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu50,
+				corev1.ResourceMemory: *memory64},
+		}
+	}
 
 	swDep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{

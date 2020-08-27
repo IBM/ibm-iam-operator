@@ -22,8 +22,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)            // 10m
+var cpu20 = resource.NewMilliQuantity(20, resource.DecimalSI)            // 20m
 var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
+var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)          // 200m
+var memory32 = resource.NewQuantity(100*1024*1024, resource.BinarySI)    // 32Mi
 var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI)   // 128Mi
+var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI)   // 256Mi
 
 func buildInitContainers(mongoDBImage string) []corev1.Container {
 	return []corev1.Container{
@@ -58,6 +63,17 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 }
 
 func buildAuditContainer(auditImage string, journalPath string, resources *corev1.ResourceRequirements) corev1.Container {
+
+	if resources == nil {
+		resources = &corev1.ResourceRequirements{
+			Limits: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu200,
+				corev1.ResourceMemory: *memory256},
+			Requests: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu10,
+				corev1.ResourceMemory: *memory32},
+		}
+	}
 
 	return corev1.Container{
 		Name:            "icp-audit-service",
@@ -108,6 +124,17 @@ func buildAuditContainer(auditImage string, journalPath string, resources *corev
 }
 
 func buildPdpContainer(pdpImage string, resources *corev1.ResourceRequirements) corev1.Container {
+
+	if resources == nil {
+		resources = &corev1.ResourceRequirements{
+			Limits: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu200,
+				corev1.ResourceMemory: *memory256},
+			Requests: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceCPU:    *cpu20,
+				corev1.ResourceMemory: *memory32},
+		}
+	}
 
 	return corev1.Container{
 		Name:            "auth-pdp",

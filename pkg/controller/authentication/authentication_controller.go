@@ -56,8 +56,15 @@ var identityManagerPort int32 = 4500
 var serviceAccountName string = "ibm-iam-operand-privileged"
 
 
+var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)            // 10m
+var cpu50 = resource.NewMilliQuantity(50, resource.DecimalSI)            // 50m
 var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
+var cpu1000 = resource.NewMilliQuantity(1000, resource.DecimalSI)        // 1000m
+var memory32 = resource.NewQuantity(100*1024*1024, resource.BinarySI)    // 32Mi
 var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI)   // 128Mi
+var memory150 = resource.NewQuantity(150*1024*1024, resource.BinarySI)   // 128Mi
+var memory350 = resource.NewQuantity(350*1024*1024, resource.BinarySI)   // 350Mi
+var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024Mi
 
 
 var rule = `^([a-z0-9]){32,}$`

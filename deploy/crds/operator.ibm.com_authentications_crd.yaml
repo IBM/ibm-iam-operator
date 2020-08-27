@@ -202,6 +202,9 @@ spec:
               - installType
               - isOpenshiftEnv
               - nonceEnabled
+              - scopeClaim
+              - claimsSupported
+              - claimsMap
               - oidcIssuerURL
               - openshiftPort
               - roksEnabled
@@ -280,8 +283,8 @@ spec:
               required:
               - imageName
               - imageRegistry
-              - imageTag
               - scopeClaim
+              - imageTag
               type: object
             initMongodb:
               properties:

@@ -20,6 +20,7 @@ import (
 	"context"
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	sccv1 "github.com/openshift/api/security/v1"
 	userv1 "github.com/openshift/api/user/v1"
 	regen "github.com/zach-klippenstein/goregen"
 	reg "k8s.io/api/admissionregistration/v1beta1"
@@ -301,6 +302,13 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 
 	currentWebhook := &reg.MutatingWebhookConfiguration{}
 	err = r.handleWebhook(instance, currentWebhook, &requeueResult)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// Check if this SCC already exists and create it if it doesn't
+	currentScc := &sccv1.SecurityContextConstraints{}
+	err = r.handleSCC(instance, currentScc, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
 	}

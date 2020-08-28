@@ -18,12 +18,27 @@ package apis
 
 import (
 	"github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	sccv1 "github.com/openshift/api/security/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/scheme"
+)
+
+var (
+	// SchemeGroupVersion is group version used to register these objects
+	SCCSchemeGroupVersion   = schema.GroupVersion{Group: "security.openshift.io", Version: "v1"}
+
+	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
+	SCCSchemeBuilder   = &scheme.Builder{GroupVersion: SCCSchemeGroupVersion}
 )
 
 func init() {
+	SCCSchemeBuilder.Register(&sccv1.SecurityContextConstraints{})
+	SCCSchemeBuilder.Register(&sccv1.SecurityContextConstraintsList{})
+
 	// Register the types with the Scheme so the components can map objects to GroupVersionKinds and back
 	AddToSchemes = append(AddToSchemes, v1alpha1.SchemeBuilder.AddToScheme)
 	AddToSchemes = append(AddToSchemes, v1alpha1.CRDSchemeBuilder.AddToScheme)
 	AddToSchemes = append(AddToSchemes, v1alpha1.CertificateSchemeBuilder.AddToScheme)
 	AddToSchemes = append(AddToSchemes, v1alpha1.UserBuilder.AddToScheme)
+	AddToSchemes = append(AddToSchemes, SCCSchemeBuilder.AddToScheme)
 }

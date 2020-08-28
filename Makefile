@@ -117,6 +117,7 @@ uninstall: ## Uninstall all that all performed in the $ make install
 ##@ Development
 
 check: lint-all ## Check all files lint error
+	CSV_VERSION=$(CSV_VERSION) ./common/scripts/lint-csv.sh
 
 code-dev: ## Run the default dev commands which are the go tidy, fmt, vet then execute the $ make code-gen
 	@echo Running the common required commands for developments purposes

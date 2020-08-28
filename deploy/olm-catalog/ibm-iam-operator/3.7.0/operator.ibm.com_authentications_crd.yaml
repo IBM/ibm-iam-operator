@@ -203,11 +203,7 @@ spec:
               - icpPort
               - installType
               - isOpenshiftEnv
-              - nonceEnabled
-              - scopeClaim
-              - bootstrapUserId
-              - claimsSupported
-              - claimsMap  
+              - nonceEnabled 
               - oidcIssuerURL
               - openshiftPort
               - roksEnabled

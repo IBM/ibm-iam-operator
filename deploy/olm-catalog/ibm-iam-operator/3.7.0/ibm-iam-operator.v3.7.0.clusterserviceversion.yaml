@@ -2018,11 +2018,11 @@ spec:
                 - ibm-iam-operator
                 env:
                 - name: AUTH_SERVICE_TAG_OR_SHA
-                  value: sha256:eddc597bc212d87b4909c1b826f7d8a8142d3150b9764ae097dc88b48faf008f
+                  value: sha256:dabcc4639bbb531acd6a42382a999e8c32b29c707e54d7e3a0b630059d6157a1
                 - name: IDENTITY_PROVIDER_TAG_OR_SHA
-                  value: sha256:ada2aa228aa37935fd14eaeff9876b08da27625fdd8c09d19b40bcca2eb9de68
+                  value: sha256:c17f769b9d4f29983f1fd512fc791d528221f724c127a7b498ce21c84020b468
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
-                  value: sha256:d1dc813d3505847e055ce98eb0915859ab009e973043fb3589d0e24fc2a31f70
+                  value: sha256:6262c9327b42c94f066f6942ad5f2ab0a69a3064f9d261ecde60323aaf670aeb
                 - name: POLICY_ADMINISTRATION_TAG_OR_SHA
                   value: sha256:d64a26bee539090eb42b89abe4caba3e42eb0b7eba2cb7f9ce3a1c94642240b4
                 - name: POLICY_DECISION_TAG_OR_SHA

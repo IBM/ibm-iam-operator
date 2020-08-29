@@ -131,7 +131,8 @@ func main() {
 	}
 
 	// Add the Metrics Service
-	addMetrics(ctx, cfg, namespace)
+	// Disable metrics for now to avoid continuous 'failed to list' logs
+	//addMetrics(ctx, cfg, namespace)
 
 	log.Info("Starting the Cmd.")
 

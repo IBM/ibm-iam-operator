@@ -410,10 +410,17 @@ func removeCRB(client client.Client, crbName string) error {
 		log.V(1).Info("Error getting cluster role binding", crbName, err)
 		return nil
 	} else if err == nil {
+		if crbName == "oidc-admin-binding"{
+			clusterRoleBinding.ObjectMeta.Finalizers = []string{}
+			if err = client.Update(context.Background(), clusterRoleBinding); err != nil {
+				log.V(1).Info("Error updating cluster role binding", "name", crbName, "error message", err)
+				return err
+			}
+		}
 		if err = client.Delete(context.Background(), clusterRoleBinding); err != nil {
 			log.V(1).Info("Error deleting cluster role binding", "name", crbName, "error message", err)
 			return err
-		}
+		} 
 	} else {
 		return err
 	}

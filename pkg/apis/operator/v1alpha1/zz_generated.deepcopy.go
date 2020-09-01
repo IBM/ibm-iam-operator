@@ -483,6 +483,7 @@ func (in *OIDCClientWatcherSpec) DeepCopyInto(out *OIDCClientWatcherSpec) {
 		*out = new(v1.ResourceRequirements)
 		(*in).DeepCopyInto(*out)
 	}
+	in.InitIdentityManager.DeepCopyInto(&out.InitIdentityManager)
 	return
 }
 

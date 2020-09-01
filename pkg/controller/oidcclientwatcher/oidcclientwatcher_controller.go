@@ -49,8 +49,10 @@ var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
 var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)          // 10m
+var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
 var memory16 = resource.NewQuantity(16*1024*1024, resource.BinarySI)   // 16Mi
+var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI)   // 128Mi
 var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI) // 256Mi
 var serviceAccountName string = "ibm-iam-operand-restricted"
 
@@ -543,6 +545,31 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 							Name: "tmp",
 							VolumeSource: corev1.VolumeSource{
 								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+					InitContainers: []corev1.Container{
+						{
+							Name:            "init-identity-manager",
+							Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-management:4500 | grep '200 OK'; do sleep 3; done;"},
+							Image:           instance.Spec.InitIdentityManager.ImageRegistry + "/" + instance.Spec.InitIdentityManager.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA"),
+							ImagePullPolicy: corev1.PullPolicy("Always"),
+							SecurityContext: &corev1.SecurityContext{
+								Privileged:               &falseVar,
+								RunAsNonRoot:             &trueVar,
+								ReadOnlyRootFilesystem:   &trueVar,
+								AllowPrivilegeEscalation: &falseVar,
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+							},
+							Resources: corev1.ResourceRequirements{
+								Limits: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceCPU:    *cpu200,
+									corev1.ResourceMemory: *memory256},
+								Requests: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceCPU:    *cpu100,
+									corev1.ResourceMemory: *memory128},
 							},
 						},
 					},

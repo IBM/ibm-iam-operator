@@ -30,11 +30,12 @@ type OIDCClientWatcherSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
-	OperatorVersion string `json:"operatorVersion,omitempty"`
-	Replicas        int32  `json:"replicas"`
-	Resources       *corev1.ResourceRequirements `json:"resources,omitempty"`
-	ImageRegistry   string `json:"imageRegistry,omitempty"`
-	ImageTagPostfix string `json:"imageTagPostfix,omitempty"`
+	OperatorVersion      string `json:"operatorVersion,omitempty"`
+	Replicas             int32  `json:"replicas"`
+	Resources            *corev1.ResourceRequirements `json:"resources,omitempty"`
+	ImageRegistry        string `json:"imageRegistry,omitempty"`
+	ImageTagPostfix      string `json:"imageTagPostfix,omitempty"`
+	InitIdentityManager  InitIdentityManagerSpec  `json:"initIdentityManager"`
 }
 
 // OIDCClientWatcherStatus defines the observed state of OIDCClientWatcher

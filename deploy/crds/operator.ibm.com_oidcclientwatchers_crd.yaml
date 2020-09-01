@@ -95,7 +95,6 @@ spec:
                   type: object
               type: object
           required:
-          - initIdentityManager
           - replicas
           type: object
         status:

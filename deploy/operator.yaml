@@ -44,11 +44,11 @@ spec:
           imagePullPolicy: Always
           env:
             - name: AUTH_SERVICE_TAG_OR_SHA
-              value: "sha256:ec9d000675aef112bdb86ddf77ff0d60a163305b5d1e32e321b737271a434a3e"
+              value: "sha256:1c6b50f7a6cd83719d780a89c67dd29d0c805a5cf63de385e66dfb6c0421ed27"
             - name: IDENTITY_PROVIDER_TAG_OR_SHA
-              value: "sha256:6bab3fbbcb2bfd66fd2c8a5a99eef9247da737fa26a9386e742abe0d993ed163"
+              value: "sha256:e01360dbe79c5903ece1892651b000e793e9f6feb18d21d71263a1c9febf157a"
             - name: IDENTITY_MANAGER_TAG_OR_SHA
-              value: "sha256:6262c9327b42c94f066f6942ad5f2ab0a69a3064f9d261ecde60323aaf670aeb"
+              value: "sha256:eb80ede7f05ce9003bd295afe08afc73c487f5d8d8b8605cc906c87b6d4c1831"
             - name: POLICY_ADMINISTRATION_TAG_OR_SHA
               value: "sha256:d64a26bee539090eb42b89abe4caba3e42eb0b7eba2cb7f9ce3a1c94642240b4"
             - name: POLICY_DECISION_TAG_OR_SHA

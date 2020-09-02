@@ -478,6 +478,22 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 		}
 	}
 
+	initContainerImageRegistry := "quay.io/opencloudio"
+	initContainerImageName := "icp-platform-auth"
+	initContainerResources := &corev1.ResourceRequirements{
+		Limits: map[corev1.ResourceName]resource.Quantity{
+			corev1.ResourceCPU:    *cpu200,
+			corev1.ResourceMemory: *memory256},
+		Requests: map[corev1.ResourceName]resource.Quantity{
+			corev1.ResourceCPU:    *cpu100,
+			corev1.ResourceMemory: *memory128},
+	}
+	if (instance.Spec.OidcInitIdentityManager != operatorv1alpha1.OidcInitIdentityManagerSpec{}) {
+		initContainerImageRegistry = instance.Spec.OidcInitIdentityManager.ImageRegistry
+		initContainerImageName = instance.Spec.OidcInitIdentityManager.ImageName
+		initContainerResources = instance.Spec.OidcInitIdentityManager.Resources
+	}
+
 	ocwDep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      oidcClientWatcherDeploymentName,
@@ -552,7 +568,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 						{
 							Name:            "init-identity-manager",
 							Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-management:4500 | grep '200 OK'; do sleep 3; done;"},
-							Image:           instance.Spec.OidcInitIdentityManager.ImageRegistry + "/" + instance.Spec.OidcInitIdentityManager.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA"),
+							Image:           initContainerImageRegistry + "/" + initContainerImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA"),
 							ImagePullPolicy: corev1.PullPolicy("Always"),
 							SecurityContext: &corev1.SecurityContext{
 								Privileged:               &falseVar,
@@ -563,14 +579,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 									Drop: []corev1.Capability{"ALL"},
 								},
 							},
-							Resources: corev1.ResourceRequirements{
-								Limits: map[corev1.ResourceName]resource.Quantity{
-									corev1.ResourceCPU:    *cpu200,
-									corev1.ResourceMemory: *memory256},
-								Requests: map[corev1.ResourceName]resource.Quantity{
-									corev1.ResourceCPU:    *cpu100,
-									corev1.ResourceMemory: *memory128},
-							},
+							Resources: *initContainerResources,
 						},
 					},
 					Containers: []corev1.Container{

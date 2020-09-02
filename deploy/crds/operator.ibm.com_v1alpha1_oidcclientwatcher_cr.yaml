@@ -29,4 +29,4 @@ spec:
         memory: 256Mi
       requests:
         cpu: 100m
-        memory: 128M
+        memory: 128Mi

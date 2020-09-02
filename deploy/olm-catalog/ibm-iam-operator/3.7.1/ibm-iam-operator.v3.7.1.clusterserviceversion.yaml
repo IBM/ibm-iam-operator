@@ -2025,13 +2025,13 @@ spec:
                 - ibm-iam-operator
                 env:
                 - name: AUTH_SERVICE_TAG_OR_SHA
-                  value: sha256:1c6b50f7a6cd83719d780a89c67dd29d0c805a5cf63de385e66dfb6c0421ed27
+                  value: sha256:b55566fc3236f70a33d7286916d725b2fee833e1524833ca1a39b6b9c8eaf045
                 - name: IDENTITY_PROVIDER_TAG_OR_SHA
-                  value: sha256:e01360dbe79c5903ece1892651b000e793e9f6feb18d21d71263a1c9febf157a
+                  value: sha256:bb68a0e1004068fecf2ea56ae38e14b28a5baacd7c82f5a5f47f20abd4669549
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
-                  value: sha256:eb80ede7f05ce9003bd295afe08afc73c487f5d8d8b8605cc906c87b6d4c1831
+                  value: sha256:0e773cfc0083b4d6c76f35908962dd9ecf24e3a81951f7ee524c5a00fe06127c
                 - name: POLICY_ADMINISTRATION_TAG_OR_SHA
-                  value: sha256:d64a26bee539090eb42b89abe4caba3e42eb0b7eba2cb7f9ce3a1c94642240b4
+                  value: sha256:41c462f8197dfcd2b2f4619ff4c18925aa9c5eecc9bc590ab2182688057100c6
                 - name: POLICY_DECISION_TAG_OR_SHA
                   value: sha256:1f50fd868ede1353adc5be0049ffe90c732c331134168f4b1c8e5584cafb543c
                 - name: SECRET_WATCHER_TAG_OR_SHA
@@ -2041,7 +2041,7 @@ spec:
                 - name: POLICY_CONTROLLER_TAG_OR_SHA
                   value: sha256:47545b9aec9c8ecba544acc2b8994f1c2d364ccd24c65e785f2f1f5d2a612aa5
                 - name: IAM_ONBOARDING_TAG_OR_SHA
-                  value: sha256:ace677ea8b55fa8ef18eba83d2de849fe8b4e1776b8b183d58f657b900070f7c
+                  value: sha256:9c22743e703478d66d56b5fd74b05f56d620fdf404b7c6a25e24935e64351a64
                 - name: AUDIT_TAG_OR_SHA
                   value: sha256:3cfb9f3cc99379758f73f1cd2e6ad4dd4bc61e13cc55d7c34b0d0e280cb47421
                 - name: WATCH_NAMESPACE

@@ -552,7 +552,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 						{
 							Name:            "init-identity-manager",
 							Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-management:4500 | grep '200 OK'; do sleep 3; done;"},
-							Image:           instance.Spec.InitIdentityManager.ImageRegistry + "/" + instance.Spec.InitIdentityManager.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA"),
+							Image:           instance.Spec.OidcInitIdentityManager.ImageRegistry + "/" + instance.Spec.OidcInitIdentityManager.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA"),
 							ImagePullPolicy: corev1.PullPolicy("Always"),
 							SecurityContext: &corev1.SecurityContext{
 								Privileged:               &falseVar,

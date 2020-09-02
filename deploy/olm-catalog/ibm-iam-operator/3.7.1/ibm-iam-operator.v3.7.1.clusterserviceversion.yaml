@@ -29,6 +29,21 @@ metadata:
                 "cpu": "10m",
                 "memory": "16Mi"
               }
+            },
+            "oidcInitIdentityManager": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.7",
+              "resources": {
+                "limits": {
+                  "cpu": "200m",
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "128M"
+                }
+              }
             }
           }
         },

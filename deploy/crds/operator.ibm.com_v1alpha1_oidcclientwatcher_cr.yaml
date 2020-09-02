@@ -19,7 +19,7 @@ spec:
     requests:
       cpu: 10m
       memory: 16Mi
-  initIdentityManager:
+  oidcInitIdentityManager:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
     imageTag: "3.3.7"

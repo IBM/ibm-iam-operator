@@ -19,6 +19,7 @@ package oidcclientwatcher
 import (
 	"context"
 	"reflect"
+	"path"
 	gorun "runtime"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
@@ -478,7 +479,8 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 		}
 	}
 
-	initContainerImageRegistry := "quay.io/opencloudio"
+	// Get imageRegistry value from OIDCClientWatcher-->imageRegistry, should be like "quay.io/opencloudio"
+	initContainerImageRegistry := path.Dir(instance.Spec.ImageRegistry)
 	initContainerImageName := "icp-platform-auth"
 	initContainerResources := &corev1.ResourceRequirements{
 		Limits: map[corev1.ResourceName]resource.Quantity{

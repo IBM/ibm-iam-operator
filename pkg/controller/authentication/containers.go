@@ -148,9 +148,6 @@ func convertToLibertyFormat(memory string) string{
 func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authServiceImage string) corev1.Container {
 
 	resources := instance.Spec.AuthService.Resources
-	memoryQuantity := resources.Requests[corev1.ResourceMemory]
-	memory := memoryQuantity.String()
-	libertyMemory := convertToLibertyFormat(memory)
 
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
@@ -162,6 +159,10 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 				corev1.ResourceMemory: *memory350},
 		}
 	}
+	
+	memoryQuantity := resources.Requests[corev1.ResourceMemory]
+	memory := memoryQuantity.String()
+	libertyMemory := convertToLibertyFormat(memory)
 
 	envVars := []corev1.EnvVar{
 		{

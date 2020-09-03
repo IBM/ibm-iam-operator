@@ -100,7 +100,7 @@ spec:
     claimsMap: "name=\"givenName\" family_name=\"givenName\" given_name=\"givenName\" preferred_username=\"givenName\"
     display_name=\"displayName\""
     scopeClaim: "profile=\"name,family_name,display_name,given_name,preferred_username\""
-    bootstrapUserId: ""
+    bootstrapUserId: "kubeadmin"
     roksURL: "https://roks.domain.name:443"
     roksUserPrefix: "IAM#"
     wlpClientID: "4444be3a738841016ab76d71b650e836"

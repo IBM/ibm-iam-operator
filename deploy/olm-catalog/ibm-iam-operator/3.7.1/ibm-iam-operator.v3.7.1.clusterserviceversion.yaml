@@ -1482,6 +1482,90 @@ spec:
           - ""
           resources:
           - namespaces
+          # platform-identity-manager needs to access the following namespaced resource in cluster scope
+          - pods
+          - services
+          - services/finalizers
+          - endpoints
+          - persistentvolumeclaims
+          - events
+          - configmaps
+          - secret
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterrolebindings
+          - clusterroles
+          # platform-identity-manager needs to access the namespaced resource in cluster scope
+          - rolebindings
+          - roles
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - servicecatalog.k8s.io
+          resources:
+          # platform-identity-manager needs to access the namespaced resource in cluster scope
+          - bindings
+          - clusterservicebrokers
+          - clusterserviceclasses
+          - clusterserviceplans
+          - instances
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - oauth.openshift.io
+          resources:
+          - oauthaccesstokens
+          - oauthauthorizetokens
+          - oauthclientauthorizations
+          - oauthclients
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - authorization.openshift.io
+          resources:
+          - "*"
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - user.openshift.io
+          resources:
+          - users
+          - useridentitymappings
+          - groups
+          - identities
           verbs:
           - create
           - delete
@@ -1496,6 +1580,47 @@ spec:
           - ""
           resources:
           - namespaces
+          # oidcclient-watcher and iam-policy-controller need to access the namespaced resource in cluster scope
+          - pods
+          - services
+          - services/finalizers
+          - endpoints
+          - persistentvolumeclaims
+          - events
+          - configmaps
+          - secrets
+          - secrets/finalizers
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          # iam-policy-controller needs to access the namespaced resource in cluster scope
+          - clusterrolebindings
+          - clusterroles
+          - rolebindings
+          - roles
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - oauth.openshift.io
+          resources:
+          - oauthaccesstokens
+          - oauthauthorizetokens
+          - oauthclientauthorizations
+          - oauthclients
           verbs:
           - create
           - delete
@@ -1507,7 +1632,10 @@ spec:
         - apiGroups:
           - user.openshift.io
           resources:
-          - '*'
+          - users
+          - useridentitymappings
+          - groups
+          - identities
           verbs:
           - create
           - delete
@@ -1518,21 +1646,6 @@ spec:
           - watch
         serviceAccountName: ibm-iam-operand-restricted
       - rules:
-        - apiGroups:
-          - '*'
-          resources:
-          - '*'
-          verbs:
-          - '*'
-        - apiGroups:
-          - rbac.authorization.k8s.io
-          resources:
-          - clusterrolebindings
-          - clusterroles
-          verbs:
-          - create
-          - delete
-          - list
         - apiGroups:
           - apiextensions.k8s.io
           resources:
@@ -1545,6 +1658,39 @@ spec:
           - patch
           - update
           - watch
+        # if we remove the follow section, then we will encounter errors:
+        # 1. "clusterroles.rbac.authorization.k8s.io \"icp-oidc-client-admin-aggregate\" is forbidden: user \"system:serviceaccount:ibm-common-services:ibm-iam-operator\" (groups=[\"system:serviceaccounts\" \"system:serviceaccounts:ibm-common-services\" \"system:authenticated\"]) is attempting to grant RBAC permissions not currently held
+        # 2. "clusterroles.rbac.authorization.k8s.io \"icp:admin\" is forbidden: must have cluster-admin privileges to use the aggregationRule"
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - '*'
+          verbs:
+          - '*'
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterrolebindings
+          - clusterroles
+          - rolebindings
+          - roles
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - security.openshift.io
+          resources:
+          - securitycontextconstraints
+          verbs:
+          - create
+          - list
+          - watch
+          - use
         - apiGroups:
           - admissionregistration.k8s.io
           resources:
@@ -1559,29 +1705,18 @@ spec:
           - patch
           - delete
         - apiGroups:
-          - user.openshift.io
-          resources:
-          - '*'
-          verbs:
-          - create
-          - get
-          - list
-          - patch
-          - update
-          - watch
-          - delete
-        - apiGroups:
           - certmanager.k8s.io
           resources:
           - clusterissuers
           verbs:
           - use
-        # operator will create clusterrole for these resources
         - apiGroups:
-          - grc-mcmpolicy.ibm.com
+          - user.openshift.io
           resources:
-          - Iampolicies
-          - namespaces
+          - users
+          - useridentitymappings
+          - groups
+          - identities
           verbs:
           - create
           - get
@@ -1591,186 +1726,24 @@ spec:
           - watch
           - delete
         - apiGroups:
-          - oidc.security.ibm.com
+          - ""
           resources:
-          - clients
+          - pods
+          - services
+          - services/finalizers
+          - endpoints
+          - persistentvolumeclaims
+          - events
+          - configmaps
+          - secrets
           verbs:
           - create
+          - delete
           - get
           - list
           - patch
           - update
           - watch
-          - delete
-        # operator need these resource to create clusterrole in controller_authentication
-        # - apiGroups:
-        #   - ''
-        #   resources:
-        #   - namespaces
-        #   - namespaces/status
-        #   verbs:
-        #   - get
-        #   - list
-        #   - watch
-        # - apiGroups:
-        #   - ''
-        #   resources:
-        #   - bindings
-        #   - events
-        #   - limitranges
-        #   - pods/log
-        #   - pods/status
-        #   - replicationcontrollers/status
-        #   - resourcequotas
-        #   - resourcequotas/status
-        #   verbs:
-        #   - get
-        #   - list
-        #   - watch
-        # - apiGroups:
-        #   - ''
-        #   resources:
-        #   - configmaps
-        #   - endpoints
-        #   - persistentvolumeclaims
-        #   - pods
-        #   - pods/attach
-        #   - pods/exec
-        #   - pods/portforward
-        #   - pods/proxy
-        #   - replicationcontrollers
-        #   - replicationcontrollers/scale
-        #   - secrets
-        #   - services
-        #   - services/proxy
-        #   verbs:
-        #   - get
-        #   - list
-        #   - patch
-        #   - update
-        #   - watch
-        #   - create
-        # - apiGroups:
-        #   - ''
-        #   resources:
-        #   - serviceaccounts
-        #   verbs:
-        #   - get
-        #   - list
-        #   - patch
-        #   - update
-        #   - watch
-        #   - create
-        #   - impersonate
-        # - apiGroups:
-        #   - apps
-        #   resources:
-        #   - daemonsets
-        #   - deployments
-        #   - deployments/rollback
-        #   - deployments/scale
-        #   - replicasets
-        #   - replicasets/scale
-        #   - statefulsets
-        #   verbs:
-        #   - get
-        #   - list
-        #   - patch
-        #   - update
-        #   - watch
-        #   - create
-        # - apiGroups:
-        #   - autoscaling
-        #   resources:
-        #   - horizontalpodautoscalers
-        #   verbs:
-        #   - get
-        #   - list
-        #   - patch
-        #   - update
-        #   - watch
-        #   - create
-        # - apiGroups:
-        #   - batch
-        #   resources:
-        #   - cronjobs
-        #   - jobs
-        #   verbs:
-        #   - get
-        #   - list
-        #   - patch
-        #   - update
-        #   - watch
-        #   - create
-        # - apiGroups:
-        #   - extensions
-        #   resources:
-        #   - daemonsets
-        #   - deployments
-        #   - deployments/rollback
-        #   - deployments/scale
-        #   - ingresses
-        #   - networkpolicies
-        #   - replicasets
-        #   - replicasets/scale
-        #   - replicationcontrollers/scale
-        #   verbs:
-        #   - get
-        #   - list
-        #   - patch
-        #   - update
-        #   - watch
-        #   - create
-        # - apiGroups:
-        #   - icp.ibm.com
-        #   resources:
-        #   - images
-        #   verbs:
-        #   - get
-        #   - list
-        #   - patch
-        #   - update
-        #   - watch
-        #   - create
-        # - apiGroups:
-        #   - networking.k8s.io
-        #   resources:
-        #   - networkpolicies
-        #   verbs:
-        #   - get
-        #   - list
-        #   - patch
-        #   - update
-        #   - watch
-        #   - create
-        # - apiGroups:
-        #   - securityenforcement.admission.cloud.ibm.com
-        #   resources:
-        #   - imagepolicies
-        #   verbs:
-        #   - get
-        #   - list
-        #   - patch
-        #   - update
-        #   - watch
-        #   - create
-        # - apiGroups:
-        #   - servicecatalog.k8s.io
-        #   resources:
-        #   - servicebindings
-        #   - servicebindings/status
-        #   - servicebrokers
-        #   - serviceclasses
-        #   - serviceinstances
-        #   - serviceinstances/status
-        #   - serviceplans
-        #   verbs:
-        #   - get
-        #   - list
-        #   - patch
-        #   - update
-        #   - watch
-        #   - create
         serviceAccountName: ibm-iam-operator
       deployments:
       - name: ibm-iam-operator
@@ -1858,66 +1831,13 @@ spec:
       permissions:
       - rules:
         - apiGroups:
-          - ""
-          resources:
-          - pods
-          - services
-          - services/finalizers
-          - endpoints
-          - persistentvolumeclaims
-          - events
-          - configmaps
-          - secrets
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
           - apps
           resources:
           - deployments
+          - deployments/finalizers
           - daemonsets
           - replicasets
           - statefulsets
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - iam.policies.ibm.com
-          resources:
-          - '*'
-          verbs:
-          - '*'
-        - apiGroups:
-          - oidc.security.ibm.com
-          resources:
-          - clients
-          verbs:
-          - create
-          - get
-          - list
-          - patch
-          - update
-          - watch
-          - delete
-        - apiGroups:
-          - operator.ibm.com
-          resources:
-          - policydecisions
-          - oidcclientwatchers
-          - authentications
-          - policycontrollers
-          - paps
-          - securityonboardings
           verbs:
           - create
           - delete
@@ -1929,28 +1849,10 @@ spec:
         serviceAccountName: ibm-iam-operand-privileged
       - rules:
         - apiGroups:
-          - ""
-          resources:
-          - pods
-          - services
-          - services/finalizers
-          - endpoints
-          - persistentvolumeclaims
-          - events
-          - configmaps
-          - secrets
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
           - apps
           resources:
           - deployments
+          - deployments/finalizers
           - daemonsets
           - replicasets
           - statefulsets
@@ -1963,14 +1865,17 @@ spec:
           - update
           - watch
         - apiGroups:
-          - iam.policies.ibm.com
+          - monitoring.coreos.com
           resources:
-          - '*'
+          # oidcclient-watcher needs this
+          - servicemonitors
           verbs:
-          - '*'
+          - get
+          - create
         - apiGroups:
           - oidc.security.ibm.com
           resources:
+          # oidcclient-watcher needs this
           - clients
           verbs:
           - create
@@ -1981,14 +1886,11 @@ spec:
           - watch
           - delete
         - apiGroups:
-          - operator.ibm.com
+          - iam.policies.ibm.com
           resources:
-          - policydecisions
-          - oidcclientwatchers
-          - authentications
-          - policycontrollers
-          - paps
-          - securityonboardings
+          # iam-policy-controller needs this
+          - iampolicies
+          - iampolicies/status
           verbs:
           - create
           - delete
@@ -1999,33 +1901,6 @@ spec:
           - watch
         serviceAccountName: ibm-iam-operand-restricted
       - rules:
-        - apiGroups:
-          - rbac.authorization.k8s.io
-          resources:
-          - roles
-          - rolebindings
-          verbs:
-          - create
-          - delete
-        - apiGroups:
-          - ""
-          resources:
-          - pods
-          - services
-          - services/finalizers
-          - endpoints
-          - persistentvolumeclaims
-          - events
-          - configmaps
-          - secrets
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
         - apiGroups:
           - apps
           resources:
@@ -2050,9 +1925,48 @@ spec:
           verbs:
           - update
         - apiGroups:
-          - batch
+          - monitoring.coreos.com
           resources:
-          - jobs
+          - servicemonitors
+          verbs:
+          - get
+          - create
+        - apiGroups:
+          - operator.ibm.com
+          resources:
+          - authentications
+          - authentications/finalizers
+          - authentications/status
+          - oidcclientwatchers
+          - oidcclientwatchers/finalizers
+          - oidcclientwatchers/status
+          - paps
+          - paps/finalizers
+          - paps/status
+          - policycontrollers
+          - policycontrollers/finalizers
+          - policycontrollers/status
+          - policydecisions
+          - policydecisions/finalizers
+          - policydecisions/status
+          - secretwatchers
+          - secretwatchers/finalizers
+          - secretwatchers/status
+          - securityonboardings
+          - securityonboardings/finalizers
+          - securityonboardings/status
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - certmanager.k8s.io
+          resources:
+          - certificates
           verbs:
           - create
           - delete
@@ -2074,31 +1988,9 @@ spec:
           - update
           - watch
         - apiGroups:
-          - monitoring.coreos.com
+          - batch
           resources:
-          - servicemonitors
-          verbs:
-          - get
-          - create
-        - apiGroups:
-          - certmanager.k8s.io
-          resources:
-          - certificates
-          verbs:
-          - create
-          - get
-          - list
-          - watch
-        - apiGroups:
-          - iam.policies.ibm.com
-          resources:
-          - '*'
-          verbs:
-          - '*'
-        - apiGroups:
-          - operator.ibm.com
-          resources:
-          - "*"
+          - jobs
           verbs:
           - create
           - delete

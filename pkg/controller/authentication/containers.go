@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"strconv"
+	"strings"
 )
 
 func buildInitContainers(mongoDBImage string) []corev1.Container {
@@ -118,9 +119,38 @@ func buildAuditContainer(auditImage string, journalPath string, resources *corev
 
 }
 
+// This function divides the memory request of auth-service container in MB by 2 
+// and returns it to liberty in the format that it accepts
+func convertToLibertyFormat(memory string) string{
+
+	libertyMemory := ""
+
+	if strings.HasSuffix(memory, "Gi") {
+		memString := strings.TrimSuffix(memory,"Gi")
+		memVal,_ := strconv.Atoi(memString)
+		memVal *= 1024 // Converting to MB
+		memVal -= 150 // Reducing the memory consumed by node process
+		memVal /= 2 // Allocate 50% of the remaning memory for java heap
+		libertyMemory = strconv.Itoa(memVal) + "m"
+
+	} else if strings.HasSuffix(memory,"Mi"){
+		memString := strings.TrimSuffix(memory,"Mi")
+		memVal,_ := strconv.Atoi(memString)
+		memVal -= 150 //Reducing the memory consumed by node process
+		memVal /= 2  // Allocate 50% of the remaning memory for jave heap
+		libertyMemory = strconv.Itoa(memVal) + "m"
+	} 
+
+	return libertyMemory
+
+}
+
 func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authServiceImage string) corev1.Container {
 
 	resources := instance.Spec.AuthService.Resources
+	memoryQuantity := resources.Requests[corev1.ResourceMemory]
+	memory := memoryQuantity.String()
+	libertyMemory := convertToLibertyFormat(memory)
 
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
@@ -137,6 +167,10 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 		{
 			Name:  "MONGO_DB_NAME",
 			Value: "platform-db",
+		},
+		{
+			Name: "MEMORY",
+			Value: libertyMemory,
 		},
 		{
 			Name:  "MONGO_COLLECTION",

@@ -136,6 +136,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["CLAIMS_MAP"] = newConfigMap.Data["CLAIMS_MAP"]
 					currentConfigMap.Data["SCOPE_CLAIM"] = newConfigMap.Data["SCOPE_CLAIM"]
 					currentConfigMap.Data["BOOTSTRAP_USERID"] = newConfigMap.Data["BOOTSTRAP_USERID"]
+					currentConfigMap.Data["PROVIDER_ISSUER_URL"] = newConfigMap.Data["PROVIDER_ISSUER_URL"]
 					cmUpdateRequired = true
 				}
 				if _, keyExists := currentConfigMap.Data["MONGO_READ_TIMEOUT"]; !keyExists {
@@ -213,6 +214,7 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"CLAIMS_MAP":                         instance.Spec.Config.ClaimsMap,
 			"SCOPE_CLAIM":                        instance.Spec.Config.ScopeClaim,
 			"BOOTSTRAP_USERID":                   instance.Spec.Config.BootstrapUserId,
+			"PROVIDER_ISSUER_URL":                instance.Spec.Config.ProviderIssuerURL,
 			"LIBERTY_TOKEN_LENGTH":               "1024",
 			"OS_TOKEN_LENGTH":                    "45",
 			"LIBERTY_DEBUG_ENABLED":              "false",

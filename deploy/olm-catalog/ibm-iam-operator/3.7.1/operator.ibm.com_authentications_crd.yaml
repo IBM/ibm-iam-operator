@@ -167,6 +167,8 @@ spec:
                   type: boolean
                 claimsSupported:
                   type: string
+                providerIssuerURL:
+                  type: string  
                 bootstrapUserId:
                   type: string
                 scopeClaim:

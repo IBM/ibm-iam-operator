@@ -169,6 +169,8 @@ spec:
                   type: string
                 bootstrapUserId:
                   type: string
+                providerIssuerURL:
+                  type: string  
                 scopeClaim:
                   type: string
                 claimsMap:

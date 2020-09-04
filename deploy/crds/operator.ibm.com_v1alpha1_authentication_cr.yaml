@@ -101,6 +101,7 @@ spec:
     display_name=\"displayName\""
     scopeClaim: "profile=\"name,family_name,display_name,given_name,preferred_username\""
     bootstrapUserId: "kubeadmin"
+    providerIssuerURL: ""
     roksURL: "https://roks.domain.name:443"
     roksUserPrefix: "IAM#"
     wlpClientID: "4444be3a738841016ab76d71b650e836"

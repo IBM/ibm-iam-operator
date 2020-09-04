@@ -19,6 +19,7 @@ package oidcclientwatcher
 import (
 	"context"
 	"reflect"
+	"path"
 	gorun "runtime"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
@@ -49,8 +50,10 @@ var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
 var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)          // 10m
+var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
 var memory16 = resource.NewQuantity(16*1024*1024, resource.BinarySI)   // 16Mi
+var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI)   // 128Mi
 var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI) // 256Mi
 var serviceAccountName string = "ibm-iam-operand-restricted"
 
@@ -476,6 +479,23 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 		}
 	}
 
+	// Get imageRegistry value from OIDCClientWatcher-->imageRegistry, should be like "quay.io/opencloudio"
+	initContainerImageRegistry := path.Dir(instance.Spec.ImageRegistry)
+	initContainerImageName := "icp-platform-auth"
+	initContainerResources := &corev1.ResourceRequirements{
+		Limits: map[corev1.ResourceName]resource.Quantity{
+			corev1.ResourceCPU:    *cpu200,
+			corev1.ResourceMemory: *memory256},
+		Requests: map[corev1.ResourceName]resource.Quantity{
+			corev1.ResourceCPU:    *cpu100,
+			corev1.ResourceMemory: *memory128},
+	}
+	if (instance.Spec.OidcInitIdentityManager != operatorv1alpha1.OidcInitIdentityManagerSpec{}) {
+		initContainerImageRegistry = instance.Spec.OidcInitIdentityManager.ImageRegistry
+		initContainerImageName = instance.Spec.OidcInitIdentityManager.ImageName
+		initContainerResources = instance.Spec.OidcInitIdentityManager.Resources
+	}
+
 	ocwDep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      oidcClientWatcherDeploymentName,
@@ -544,6 +564,24 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 							VolumeSource: corev1.VolumeSource{
 								EmptyDir: &corev1.EmptyDirVolumeSource{},
 							},
+						},
+					},
+					InitContainers: []corev1.Container{
+						{
+							Name:            "init-identity-manager",
+							Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-management:4500 | grep '200 OK'; do sleep 3; done;"},
+							Image:           initContainerImageRegistry + "/" + initContainerImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA"),
+							ImagePullPolicy: corev1.PullPolicy("Always"),
+							SecurityContext: &corev1.SecurityContext{
+								Privileged:               &falseVar,
+								RunAsNonRoot:             &trueVar,
+								ReadOnlyRootFilesystem:   &trueVar,
+								AllowPrivilegeEscalation: &falseVar,
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+							},
+							Resources: *initContainerResources,
 						},
 					},
 					Containers: []corev1.Container{

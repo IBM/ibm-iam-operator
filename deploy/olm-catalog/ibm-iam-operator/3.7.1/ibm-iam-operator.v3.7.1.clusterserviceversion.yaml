@@ -1658,15 +1658,6 @@ spec:
           - patch
           - update
           - watch
-        # if we remove the follow section, then we will encounter errors:
-        # 1. "clusterroles.rbac.authorization.k8s.io \"icp-oidc-client-admin-aggregate\" is forbidden: user \"system:serviceaccount:ibm-common-services:ibm-iam-operator\" (groups=[\"system:serviceaccounts\" \"system:serviceaccounts:ibm-common-services\" \"system:authenticated\"]) is attempting to grant RBAC permissions not currently held
-        # 2. "clusterroles.rbac.authorization.k8s.io \"icp:admin\" is forbidden: must have cluster-admin privileges to use the aggregationRule"
-        - apiGroups:
-          - rbac.authorization.k8s.io
-          resources:
-          - '*'
-          verbs:
-          - '*'
         - apiGroups:
           - rbac.authorization.k8s.io
           resources:
@@ -1682,6 +1673,9 @@ spec:
           - patch
           - update
           - watch
+          # allow permission escalation so that iam operator can create icp clusterroles and clusterrolebindings
+          - bind
+          - escalate
         - apiGroups:
           - security.openshift.io
           resources:

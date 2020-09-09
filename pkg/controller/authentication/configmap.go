@@ -92,7 +92,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 				} else {
 					newConfigMap = functionList[index](instance, r.scheme)
 					if configMapList[index] == "platform-auth-idp" {
-						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL == "https://roks.domain.name:443" {
+						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL == "https://roks.domain.name:443" { //we enable it by default
 							reqLogger.Info("Create platform-auth-idp Configmap roks settings", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 							issuer, err := readROKSURL(instance)
 							if err != nil {
@@ -101,9 +101,18 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 							}
 							newConfigMap.Data["ROKS_ENABLED"] = "true"
 							newConfigMap.Data["ROKS_URL"] = issuer
-							newConfigMap.Data["ROKS_USER_PREFIX"] = ""
+							if instance.Spec.Config.ROKSUserPrefix == "changeme" { //we change it to empty prefix, that's the new default in 3.5
+								newConfigMap.Data["ROKS_USER_PREFIX"] = ""
+							} else { // user specifies prefix but does not specify roksEnabled and roksURL we take the user provided prefix
+								newConfigMap.Data["ROKS_USER_PREFIX"] = instance.Spec.Config.ROKSUserPrefix
+							}
 						} else {
 							reqLogger.Info("Honor end user's setting", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+						}
+					} else {
+						//user specifies roksEnabled and roksURL, but not roksPrefix, then we set prefix to IAM# (consistent with previous release behavior)
+						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL != "https://roks.domain.name:443" && instance.Spec.Config.ROKSUserPrefix == "changeme" {
+							newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
 						}
 					}
 				}
@@ -215,7 +224,7 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"ROKS_ENABLED":                       strconv.FormatBool(instance.Spec.Config.ROKSEnabled),
 			"ROKS_URL":                           instance.Spec.Config.ROKSURL,
 			"ROKS_USER_PREFIX":                   instance.Spec.Config.ROKSUserPrefix,
-			"CLAIMS_SUPPORTED": 		      instance.Spec.Config.ClaimsSupported,
+			"CLAIMS_SUPPORTED":                   instance.Spec.Config.ClaimsSupported,
 			"CLAIMS_MAP":                         instance.Spec.Config.ClaimsMap,
 			"SCOPE_CLAIM":                        instance.Spec.Config.ScopeClaim,
 			"BOOTSTRAP_USERID":                   instance.Spec.Config.BootstrapUserId,

@@ -108,11 +108,10 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 							}
 						} else {
 							reqLogger.Info("Honor end user's setting", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-						}
-					} else {
-						//user specifies roksEnabled and roksURL, but not roksPrefix, then we set prefix to IAM# (consistent with previous release behavior)
-						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL != "https://roks.domain.name:443" && instance.Spec.Config.ROKSUserPrefix == "changeme" {
-							newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
+							//if user does not specify the prefix, we set it to IAM# to be consistent with previous release
+							if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL != "https://roks.domain.name:443" && instance.Spec.Config.ROKSUserPrefix == "changeme" {
+								newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
+							}
 						}
 					}
 				}

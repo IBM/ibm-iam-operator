@@ -727,6 +727,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 					Scheme: "HTTPS",
 				},
 			},
+			TimeoutSeconds:      10,
 		},
 		LivenessProbe: &corev1.Probe{
 			Handler: corev1.Handler{
@@ -738,6 +739,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 					Scheme: "HTTPS",
 				},
 			},
+			TimeoutSeconds:      10,
 		},
 		Env: envVars,
 	}
@@ -1054,6 +1056,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 					Scheme: "HTTPS",
 				},
 			},
+			TimeoutSeconds:      10,
 		},
 		LivenessProbe: &corev1.Probe{
 			Handler: corev1.Handler{
@@ -1065,6 +1068,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 					Scheme: "HTTPS",
 				},
 			},
+			TimeoutSeconds:      10,
 		},
 		Env: envVars,
 	}

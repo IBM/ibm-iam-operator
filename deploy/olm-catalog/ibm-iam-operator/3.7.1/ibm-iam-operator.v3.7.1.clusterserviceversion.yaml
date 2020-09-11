@@ -2043,9 +2043,9 @@ spec:
                 - name: AUTH_SERVICE_TAG_OR_SHA
                   value: sha256:1b11ea425a9daf84ba5e2170d0068bdbc0f679f438c49cdb9bab3e52e33da927
                 - name: IDENTITY_PROVIDER_TAG_OR_SHA
-                  value: sha256:5266f42291db7c54127920000aaa331b818c6e79a0b6c2f74d16563512b6bf8d
+                  value: sha256:927a7a81db1226a7396bb422b3b4bea46d2ca7b74ed93ce2aaae4c7dffc564bd
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
-                  value: sha256:b2be65925a660929c4680ea5a74999176261d15a30bd8a3b93ac6b3a173708ad
+                  value: sha256:d78df044b0da7c75af10d0270cfe6f6c9e213d17c23c85f02d3cb340c18b8a73
                 - name: POLICY_ADMINISTRATION_TAG_OR_SHA
                   value: sha256:9a386a423f37c4b91a55f3c564867a2422e923437a7642475e588b9d7c79a339
                 - name: POLICY_DECISION_TAG_OR_SHA

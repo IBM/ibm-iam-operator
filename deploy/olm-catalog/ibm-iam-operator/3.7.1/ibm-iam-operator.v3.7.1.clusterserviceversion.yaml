@@ -2053,7 +2053,7 @@ spec:
                 - name: SECRET_WATCHER_TAG_OR_SHA
                   value: sha256:a5fb379da4456801e9f02cf828e23c2558e0c27af23f56cc77fe11383381f60f
                 - name: CLIENT_WATCHER_TAG_OR_SHA
-                  value: sha256:be5ecfa577a47ec962e54166353b2d248b13625b367618c71cd58285ba47bd35
+                  value: sha256:db14a703d2b7f5bf1f975b8f429d070f4881b8e62aaedcdb5ae4cafdae2a81a4
                 - name: POLICY_CONTROLLER_TAG_OR_SHA
                   value: sha256:47545b9aec9c8ecba544acc2b8994f1c2d364ccd24c65e785f2f1f5d2a612aa5
                 - name: IAM_ONBOARDING_TAG_OR_SHA

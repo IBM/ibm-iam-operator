@@ -1673,10 +1673,13 @@ spec:
           - patch
           - update
           - watch
-          # allow permission escalation so that iam operator can create icp clusterroles and clusterrolebindings
+          # allow permission escalation so that iam operator can create icp clusterroles and clusterrolebindings(TBD)
+          # otherwise we need to add all permissions for the operator created clusterroles and roles to serviceaccount 'ibm-iam-operator'
           - bind
           - escalate
         - apiGroups:
+          # add permissions of SCC to create and bind it to operand deployments(auth-idp, auth-pap, auth-pdp) 
+          # to override operand pods starting failuer due to permission of access 'hostPath' volume and "spc_t" SeLinuxOptions
           - security.openshift.io
           resources:
           - securitycontextconstraints
@@ -1804,7 +1807,7 @@ spec:
                       fieldPath: metadata.name
                 - name: OPERATOR_NAME
                   value: ibm-iam-operator
-                image: quay.io/morvencao/ibm-iam-operator:latest
+                image: quay.io/morvencao/ibm-iam-operator:latest # we also updated operator code, so need to rebuild and test with our own image.
                 imagePullPolicy: Always
                 name: ibm-iam-operator
                 resources:

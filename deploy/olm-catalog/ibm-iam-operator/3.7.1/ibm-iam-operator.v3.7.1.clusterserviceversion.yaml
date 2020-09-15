@@ -2047,7 +2047,7 @@ spec:
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
                   value: sha256:40bd5d2ab9a9baf2dd4498de0d46486151815463322bc2e0034e2f3c536de196
                 - name: POLICY_ADMINISTRATION_TAG_OR_SHA
-                  value: sha256:af7196762bdeba790cc52816b7464b1ff9a39e66814e20e47001121b61336c53
+                  value: sha256:9a386a423f37c4b91a55f3c564867a2422e923437a7642475e588b9d7c79a339
                 - name: POLICY_DECISION_TAG_OR_SHA
                   value: sha256:1f50fd868ede1353adc5be0049ffe90c732c331134168f4b1c8e5584cafb543c
                 - name: SECRET_WATCHER_TAG_OR_SHA

@@ -44,13 +44,13 @@ spec:
           imagePullPolicy: Always
           env:
             - name: AUTH_SERVICE_TAG_OR_SHA
-              value: "sha256:1b11ea425a9daf84ba5e2170d0068bdbc0f679f438c49cdb9bab3e52e33da927"
+              value: "sha256:3f1d706c5f17fdf675ea7f05dd1a6d68f6e08f4aa39de615bfa1715262538f48"
             - name: IDENTITY_PROVIDER_TAG_OR_SHA
-              value: "sha256:9e3e7fc4eb6d6d7b8e7e32ee92e9c595ec7dbbd0f6255faa58461ef74cb6852e"
+              value: "sha256:4903929c116da07ce888756ad2186d60feac95f177ca13fa97d35d56a4e2cc6f"
             - name: IDENTITY_MANAGER_TAG_OR_SHA
-              value: "sha256:40bd5d2ab9a9baf2dd4498de0d46486151815463322bc2e0034e2f3c536de196"
+              value: "sha256:dfb8d95b46893cb79a2e47939c4f7b05205023776ce5e9f539f2f580a4cd1d7c"
             - name: POLICY_ADMINISTRATION_TAG_OR_SHA
-              value: "sha256:9a386a423f37c4b91a55f3c564867a2422e923437a7642475e588b9d7c79a339"
+              value: "sha256:b1f3acb422156db97dd9abb3b9481f2709c2d18b672851b3561d30908ad70688"
             - name: POLICY_DECISION_TAG_OR_SHA
               value: "sha256:1f50fd868ede1353adc5be0049ffe90c732c331134168f4b1c8e5584cafb543c"
             - name: SECRET_WATCHER_TAG_OR_SHA
@@ -60,7 +60,7 @@ spec:
             - name: POLICY_CONTROLLER_TAG_OR_SHA
               value: "sha256:47545b9aec9c8ecba544acc2b8994f1c2d364ccd24c65e785f2f1f5d2a612aa5"
             - name: IAM_ONBOARDING_TAG_OR_SHA
-              value: "sha256:9c22743e703478d66d56b5fd74b05f56d620fdf404b7c6a25e24935e64351a64"
+              value: "sha256:6ccde401df3ae3f1d6972228f3f5ebb75a188af09110e76361eb3b33e65839dd"
             - name: AUDIT_TAG_OR_SHA
               value: "sha256:3cfb9f3cc99379758f73f1cd2e6ad4dd4bc61e13cc55d7c34b0d0e280cb47421"
             - name: WATCH_NAMESPACE

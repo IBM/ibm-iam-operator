@@ -18,8 +18,10 @@ package authentication
 
 import (
 	"context"
+	"os"
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -80,11 +82,20 @@ func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.A
 
 func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, certificateName string) *certmgr.Certificate {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	namespace, err := k8sutil.GetWatchNamespace()
+	if err != nil {
+		reqLogger.Error(err, "Failed to get watch namespace")
+		os.Exit(1)
+	}
+	issuerKind := certmgr.IssuerKind
+	if len(namespace) == 0 {
+		issuerKind = certmgr.ClusterIssuerKind
+	}
 	certSpec := certmgr.CertificateSpec{
 		SecretName: certificateData[certificateName]["secretName"],
 		IssuerRef: certmgr.ObjectReference{
 			Name: "cs-ca-clusterissuer",
-			Kind: certmgr.ClusterIssuerKind,
+			Kind: issuerKind,
 		},
 		CommonName: certificateData[certificateName]["cn"],
 		DNSNames:   []string{certificateData[certificateName]["cn"]},
@@ -105,7 +116,7 @@ func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme
 	}
 
 	// Set Authentication instance as the owner and controller of the Certificate
-	err := controllerutil.SetControllerReference(instance, newCertificate, scheme)
+	err = controllerutil.SetControllerReference(instance, newCertificate, scheme)
 	if err != nil {
 		reqLogger.Error(err, "Failed to set owner for Certificate")
 		return nil

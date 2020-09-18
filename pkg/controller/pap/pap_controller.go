@@ -18,6 +18,7 @@ package pap
 
 import (
 	"context"
+	"os"
 	"reflect"
 
 	gorun "runtime"
@@ -25,6 +26,7 @@ import (
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
+	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1beta1"
@@ -462,6 +464,15 @@ func getPodNames(pods []corev1.Pod) []string {
 func (r *ReconcilePap) certificateForPap(instance *operatorv1alpha1.Pap) *certmgr.Certificate {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	namespace, err := k8sutil.GetWatchNamespace()
+	if err != nil {
+		reqLogger.Error(err, "Failed to get watch namespace")
+		os.Exit(1)
+	}
+	issuerKind := certmgr.IssuerKind
+	if len(namespace) == 0 {
+		issuerKind = certmgr.ClusterIssuerKind
+	}
 	papCertificate := &certmgr.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      iamPapCertificateValues.Name,
@@ -472,7 +483,7 @@ func (r *ReconcilePap) certificateForPap(instance *operatorv1alpha1.Pap) *certmg
 			SecretName: iamPapCertificateValues.SecretName,
 			IssuerRef: certmgr.ObjectReference{
 				Name: configvalues.ClusterCAIssuer,
-				Kind: certmgr.ClusterIssuerKind,
+				Kind: issuerKind,
 			},
 			CommonName: iamPapCertificateValues.CN,
 			DNSNames:   []string{iamPapCertificateValues.CN},
@@ -480,7 +491,7 @@ func (r *ReconcilePap) certificateForPap(instance *operatorv1alpha1.Pap) *certmg
 	}
 
 	// Set Pap instance as the owner and controller of the Certificate
-	err := controllerutil.SetControllerReference(instance, papCertificate, r.scheme)
+	err = controllerutil.SetControllerReference(instance, papCertificate, r.scheme)
 	if err != nil {
 		reqLogger.Error(err, "Failed to set owner for Certificate")
 		return nil

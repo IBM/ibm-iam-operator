@@ -18,12 +18,14 @@ package policydecision
 
 import (
 	"context"
+	"os"
 	"reflect"
 	gorun "runtime"
 
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
+	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1beta1"
@@ -374,6 +376,15 @@ func getPodNames(pods []corev1.Pod) []string {
 func (r *ReconcilePolicyDecision) certificateForPolicyDecision(instance *operatorv1alpha1.PolicyDecision) *certmgr.Certificate {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	namespace, err := k8sutil.GetWatchNamespace()
+	if err != nil {
+		reqLogger.Error(err, "Failed to get watch namespace")
+		os.Exit(1)
+	}
+	issuerKind := certmgr.IssuerKind
+	if len(namespace) == 0 {
+		issuerKind = certmgr.ClusterIssuerKind
+	}
 	pdpCertificate := &certmgr.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "auth-pdp-cert",
@@ -384,7 +395,7 @@ func (r *ReconcilePolicyDecision) certificateForPolicyDecision(instance *operato
 			SecretName: "auth-pdp-secret",
 			IssuerRef: certmgr.ObjectReference{
 				Name: "cs-ca-clusterissuer",
-				Kind: certmgr.ClusterIssuerKind,
+				Kind: issuerKind,
 			},
 			CommonName: "iam-pdp",
 			DNSNames:   []string{"iam-pdp"},
@@ -392,7 +403,7 @@ func (r *ReconcilePolicyDecision) certificateForPolicyDecision(instance *operato
 	}
 
 	// Set PolicyDecision instance as the owner and controller of the Certificate
-	err := controllerutil.SetControllerReference(instance, pdpCertificate, r.scheme)
+	err = controllerutil.SetControllerReference(instance, pdpCertificate, r.scheme)
 	if err != nil {
 		reqLogger.Error(err, "Failed to set owner for Certificate")
 		return nil

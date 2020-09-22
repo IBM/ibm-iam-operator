@@ -1685,6 +1685,7 @@ spec:
           - securitycontextconstraints
           verbs:
           - create
+          - delete
           - list
           - watch
           - use

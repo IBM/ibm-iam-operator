@@ -369,6 +369,12 @@ func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1al
 		return err
 	}
 
+	// remove SCC
+
+	if err := removeSCC(r.client, instance.Name); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -461,6 +467,23 @@ func removeWebhook(client client.Client, webhookName string) error {
 	} else if err == nil {
 		if err = client.Delete(context.Background(), webhook); err != nil {
 			log.V(1).Info("Error deleting webhook", "name", webhookName, "error message", err)
+			return err
+		}
+	} else {
+		return err
+	}
+	return nil
+}
+
+func removeSCC(client client.Client, sccName string) error {
+	// Delete SCC
+	scc := &sccv1.SecurityContextConstraints{}
+	if err := client.Get(context.Background(), types.NamespacedName{Name: sccName, Namespace: ""}, scc); err != nil && errors.IsNotFound(err) {
+		log.V(1).Info("Error getting SCC", sccName, err)
+		return nil
+	} else if err == nil {
+		if err = client.Delete(context.Background(), scc); err != nil {
+			log.V(1).Info("Error deleting SCC", "name", sccName, "error message", err)
 			return err
 		}
 	} else {

@@ -2043,23 +2043,23 @@ spec:
                 - ibm-iam-operator
                 env:
                 - name: AUTH_SERVICE_TAG_OR_SHA
-                  value: sha256:3f1d706c5f17fdf675ea7f05dd1a6d68f6e08f4aa39de615bfa1715262538f48
+                  value: sha256:acdb61d4674b5f3ae276ef9f7208d5ac33a7bbcba8194a429a43273f143fb9b5
                 - name: IDENTITY_PROVIDER_TAG_OR_SHA
-                  value: sha256:4903929c116da07ce888756ad2186d60feac95f177ca13fa97d35d56a4e2cc6f
+                  value: sha256:eaee2588d3bae4207e69ae9bbdafba5c5f5e8d04bfa39b78777798004587d988
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
-                  value: sha256:9db431b7c185726b76440b0e9ccfc6a7be6c24d830ca8e0179c2de4fd4f59738
+                  value: sha256:078e74b28f58eaa74cc679f94bf6307b1c5f52ae52c8ede7901f9d30e127a9e8
                 - name: POLICY_ADMINISTRATION_TAG_OR_SHA
-                  value: sha256:b1f3acb422156db97dd9abb3b9481f2709c2d18b672851b3561d30908ad70688
+                  value: sha256:f61ac066951f215dc4afd922660af9b3e52071c2fcd321659fa10bb28de71b56
                 - name: POLICY_DECISION_TAG_OR_SHA
-                  value: sha256:1f50fd868ede1353adc5be0049ffe90c732c331134168f4b1c8e5584cafb543c
+                  value: sha256:dea8a4508142c0a59f9ae12ef770988af34b3f03f1d0fdea9df305125f828f7d
                 - name: SECRET_WATCHER_TAG_OR_SHA
-                  value: sha256:a5fb379da4456801e9f02cf828e23c2558e0c27af23f56cc77fe11383381f60f
+                  value: sha256:ab4b3affbc35debe5d4c80549f9594fbb633cff03a8852d1851d6edd708cca8b
                 - name: CLIENT_WATCHER_TAG_OR_SHA
-                  value: sha256:db14a703d2b7f5bf1f975b8f429d070f4881b8e62aaedcdb5ae4cafdae2a81a4
+                  value: sha256:884d5962fd7920453b91d5f7883ca063695d71e12bd6ccc8bf41c4b8fbaa3b21
                 - name: POLICY_CONTROLLER_TAG_OR_SHA
-                  value: sha256:47545b9aec9c8ecba544acc2b8994f1c2d364ccd24c65e785f2f1f5d2a612aa5
+                  value: sha256:1dc66d59887dc6730f7b39e61d228592c8b585376ebfdc3642aec37bba0193f5
                 - name: IAM_ONBOARDING_TAG_OR_SHA
-                  value: sha256:6ccde401df3ae3f1d6972228f3f5ebb75a188af09110e76361eb3b33e65839dd
+                  value: sha256:2557ef65f807d62769e264f7360bf40ae5cdaa4b2e6bea8f479cfcec7e8c52a8
                 - name: AUDIT_TAG_OR_SHA
                   value: sha256:3cfb9f3cc99379758f73f1cd2e6ad4dd4bc61e13cc55d7c34b0d0e280cb47421
                 - name: WATCH_NAMESPACE

@@ -18,8 +18,8 @@ package oidcclientwatcher
 
 import (
 	"context"
-	"reflect"
 	"path"
+	"reflect"
 	gorun "runtime"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
@@ -50,10 +50,10 @@ var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
 var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)          // 10m
-var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
+var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)        // 100m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
 var memory16 = resource.NewQuantity(16*1024*1024, resource.BinarySI)   // 16Mi
-var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI)   // 128Mi
+var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI) // 128Mi
 var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI) // 256Mi
 var serviceAccountName string = "ibm-iam-operand-restricted"
 

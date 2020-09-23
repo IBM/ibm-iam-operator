@@ -29,60 +29,60 @@ type SecurityOnboardingSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
-	OperatorVersion      string                   `json:"operatorVersion"`
-	Replicas             int32                    `json:"replicas"`
-	ImageRegistry        string                   `json:"imageRegistry"`
-	ImageName            string                   `json:"imageName"`
-	ImageTag             string                   `json:"imageTag"`
+	OperatorVersion      string                       `json:"operatorVersion"`
+	Replicas             int32                        `json:"replicas"`
+	ImageRegistry        string                       `json:"imageRegistry"`
+	ImageName            string                       `json:"imageName"`
+	ImageTag             string                       `json:"imageTag"`
 	Resources            *corev1.ResourceRequirements `json:"resources,omitempty"`
-	IAMOnboarding        IAMOnboardingSpec        `json:"iamOnboarding"`
-	InitAuthService      InitAuthServiceSpec      `json:"initAuthService"`
-	InitIdentityProvider InitIdentityProviderSpec `json:"initIdentityProvider"`
-	InitIdentityManager  InitIdentityManagerSpec  `json:"initIdentityManager"`
-	InitTokenService     InitTokenServiceSpec     `json:"initTokenService"`
-	InitPAP              InitPAPSpec              `json:"initPAPSpec"`
-	Config               ImpersonationSpec        `json:"impersonation"`
+	IAMOnboarding        IAMOnboardingSpec            `json:"iamOnboarding"`
+	InitAuthService      InitAuthServiceSpec          `json:"initAuthService"`
+	InitIdentityProvider InitIdentityProviderSpec     `json:"initIdentityProvider"`
+	InitIdentityManager  InitIdentityManagerSpec      `json:"initIdentityManager"`
+	InitTokenService     InitTokenServiceSpec         `json:"initTokenService"`
+	InitPAP              InitPAPSpec                  `json:"initPAPSpec"`
+	Config               ImpersonationSpec            `json:"impersonation"`
 }
 
 type IAMOnboardingSpec struct {
-	ImageRegistry string `json:"imageRegistry"`
-	ImageName     string `json:"imageName"`
-	ImageTag      string `json:"imageTag"`
+	ImageRegistry string                       `json:"imageRegistry"`
+	ImageName     string                       `json:"imageName"`
+	ImageTag      string                       `json:"imageTag"`
 	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type InitAuthServiceSpec struct {
-	ImageRegistry string `json:"imageRegistry"`
-	ImageName     string `json:"imageName"`
-	ImageTag      string `json:"imageTag"`
+	ImageRegistry string                       `json:"imageRegistry"`
+	ImageName     string                       `json:"imageName"`
+	ImageTag      string                       `json:"imageTag"`
 	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type InitIdentityProviderSpec struct {
-	ImageRegistry string `json:"imageRegistry"`
-	ImageName     string `json:"imageName"`
-	ImageTag      string `json:"imageTag"`
+	ImageRegistry string                       `json:"imageRegistry"`
+	ImageName     string                       `json:"imageName"`
+	ImageTag      string                       `json:"imageTag"`
 	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type InitIdentityManagerSpec struct {
-	ImageRegistry string `json:"imageRegistry"`
-	ImageName     string `json:"imageName"`
-	ImageTag      string `json:"imageTag"`
+	ImageRegistry string                       `json:"imageRegistry"`
+	ImageName     string                       `json:"imageName"`
+	ImageTag      string                       `json:"imageTag"`
 	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type InitTokenServiceSpec struct {
-	ImageRegistry string `json:"imageRegistry"`
-	ImageName     string `json:"imageName"`
-	ImageTag      string `json:"imageTag"`
+	ImageRegistry string                       `json:"imageRegistry"`
+	ImageName     string                       `json:"imageName"`
+	ImageTag      string                       `json:"imageTag"`
 	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type InitPAPSpec struct {
-	ImageRegistry string `json:"imageRegistry"`
-	ImageName     string `json:"imageName"`
-	ImageTag      string `json:"imageTag"`
+	ImageRegistry string                       `json:"imageRegistry"`
+	ImageName     string                       `json:"imageName"`
+	ImageTag      string                       `json:"imageTag"`
 	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 

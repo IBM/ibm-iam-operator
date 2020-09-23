@@ -19,8 +19,8 @@ package authentication
 import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"strconv"
 	"strings"
 )
@@ -59,7 +59,7 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 
 func buildAuditContainer(auditImage string, journalPath string, resources *corev1.ResourceRequirements) corev1.Container {
 
-	if resources == nil{
+	if resources == nil {
 
 		resources = &corev1.ResourceRequirements{
 			Limits: map[corev1.ResourceName]resource.Quantity{
@@ -119,27 +119,27 @@ func buildAuditContainer(auditImage string, journalPath string, resources *corev
 
 }
 
-// This function divides the memory request of auth-service container in MB by 2 
+// This function divides the memory request of auth-service container in MB by 2
 // and returns it to liberty in the format that it accepts
-func convertToLibertyFormat(memory string) string{
+func convertToLibertyFormat(memory string) string {
 
 	libertyMemory := ""
 
 	if strings.HasSuffix(memory, "Gi") {
-		memString := strings.TrimSuffix(memory,"Gi")
-		memVal,_ := strconv.Atoi(memString)
+		memString := strings.TrimSuffix(memory, "Gi")
+		memVal, _ := strconv.Atoi(memString)
 		memVal *= 1024 // Converting to MB
-		memVal -= 150 // Reducing the memory consumed by node process
-		memVal /= 2 // Allocate 50% of the remaning memory for java heap
+		memVal -= 150  // Reducing the memory consumed by node process
+		memVal /= 2    // Allocate 50% of the remaning memory for java heap
 		libertyMemory = strconv.Itoa(memVal) + "m"
 
-	} else if strings.HasSuffix(memory,"Mi"){
-		memString := strings.TrimSuffix(memory,"Mi")
-		memVal,_ := strconv.Atoi(memString)
+	} else if strings.HasSuffix(memory, "Mi") {
+		memString := strings.TrimSuffix(memory, "Mi")
+		memVal, _ := strconv.Atoi(memString)
 		memVal -= 150 //Reducing the memory consumed by node process
-		memVal /= 2  // Allocate 50% of the remaning memory for jave heap
+		memVal /= 2   // Allocate 50% of the remaning memory for jave heap
 		libertyMemory = strconv.Itoa(memVal) + "m"
-	} 
+	}
 
 	return libertyMemory
 
@@ -159,7 +159,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 				corev1.ResourceMemory: *memory350},
 		}
 	}
-	
+
 	memoryQuantity := resources.Requests[corev1.ResourceMemory]
 	memory := memoryQuantity.String()
 	libertyMemory := convertToLibertyFormat(memory)
@@ -170,7 +170,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			Value: "platform-db",
 		},
 		{
-			Name: "MEMORY",
+			Name:  "MEMORY",
 			Value: libertyMemory,
 		},
 		{
@@ -312,7 +312,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 	idpEnvVarList := []string{"NODE_ENV", "MASTER_HOST", "IDENTITY_PROVIDER_URL", "HTTP_ONLY", "SESSION_TIMEOUT", "LDAP_RECURSIVE_SEARCH", "LDAP_ATTR_CACHE_SIZE", "LDAP_ATTR_CACHE_TIMEOUT", "LDAP_ATTR_CACHE_ENABLED", "LDAP_ATTR_CACHE_SIZELIMIT",
 		"LDAP_SEARCH_CACHE_SIZE", "LDAP_SEARCH_CACHE_TIMEOUT", "IDENTITY_PROVIDER_URL", "IDENTITY_MGMT_URL", "LDAP_SEARCH_CACHE_ENABLED", "LDAP_SEARCH_CACHE_SIZELIMIT", "IDTOKEN_LIFETIME", "IBMID_CLIENT_ID", "IBMID_CLIENT_ISSUER",
 		"SAML_NAMEID_FORMAT", "FIPS_ENABLED", "LOGJAM_DHKEYSIZE_2048_BITS_ENABLED", "LOG_LEVEL_AUTHSVC", "LIBERTY_DEBUG_ENABLED", "NONCE_ENABLED", "CLAIMS_SUPPORTED", "CLAIMS_MAP", "SCOPE_CLAIM", "OIDC_ISSUER_URL",
-	"MONGO_READ_TIMEOUT", "MONGO_MAX_STALENESS", "MONGO_READ_PREFERENCE", "MONGO_CONNECT_TIMEOUT", "MONGO_SELECTION_TIMEOUT", "MONGO_WAIT_TIME", "MONGO_POOL_MIN_SIZE", "MONGO_POOL_MAX_SIZE"}
+		"MONGO_READ_TIMEOUT", "MONGO_MAX_STALENESS", "MONGO_READ_PREFERENCE", "MONGO_CONNECT_TIMEOUT", "MONGO_SELECTION_TIMEOUT", "MONGO_WAIT_TIME", "MONGO_POOL_MIN_SIZE", "MONGO_POOL_MAX_SIZE"}
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
 
 	envVars = append(envVars, idpEnvVars...)
@@ -417,7 +417,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 }
 
 func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string) corev1.Container {
-	
+
 	resources := instance.Spec.IdentityProvider.Resources
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
@@ -727,7 +727,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 					Scheme: "HTTPS",
 				},
 			},
-			TimeoutSeconds:      10,
+			TimeoutSeconds: 10,
 		},
 		LivenessProbe: &corev1.Probe{
 			Handler: corev1.Handler{
@@ -739,7 +739,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 					Scheme: "HTTPS",
 				},
 			},
-			TimeoutSeconds:      10,
+			TimeoutSeconds: 10,
 		},
 		Env: envVars,
 	}
@@ -747,7 +747,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 }
 
 func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string) corev1.Container {
-	
+
 	//@posriniv - find a better solution
 	replicaCount := int(instance.Spec.Replicas)
 	resources := instance.Spec.IdentityManager.Resources
@@ -763,9 +763,9 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 	}
 	masterNodesList := ""
 	baseIp := "10.0.0."
-	for i := 1; i <= replicaCount; i++{
+	for i := 1; i <= replicaCount; i++ {
 		masterNodesList += baseIp + strconv.Itoa(i)
-		if i != replicaCount{
+		if i != replicaCount {
 			masterNodesList += " "
 		}
 	}
@@ -1056,7 +1056,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 					Scheme: "HTTPS",
 				},
 			},
-			TimeoutSeconds:      10,
+			TimeoutSeconds: 10,
 		},
 		LivenessProbe: &corev1.Probe{
 			Handler: corev1.Handler{
@@ -1068,7 +1068,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 					Scheme: "HTTPS",
 				},
 			},
-			TimeoutSeconds:      10,
+			TimeoutSeconds: 10,
 		},
 		Env: envVars,
 	}
@@ -1077,8 +1077,8 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 
 func buildContainers(instance *operatorv1alpha1.Authentication, auditImage string, authServiceImage string, identityProviderImage string, identityManagerImage string, journalPath string, icpConsoleURL string) []corev1.Container {
 
-    auditResources := instance.Spec.AuditService.Resources
-	auditContainer := buildAuditContainer(auditImage, journalPath,auditResources)
+	auditResources := instance.Spec.AuditService.Resources
+	auditContainer := buildAuditContainer(auditImage, journalPath, auditResources)
 	authServiceContainer := buildAuthServiceContainer(instance, authServiceImage)
 	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL)
 	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage)

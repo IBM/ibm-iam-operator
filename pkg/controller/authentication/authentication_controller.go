@@ -55,7 +55,6 @@ var identityProviderPort int32 = 4300
 var identityManagerPort int32 = 4500
 var serviceAccountName string = "ibm-iam-operand-privileged"
 
-
 var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)            // 10m
 var cpu50 = resource.NewMilliQuantity(50, resource.DecimalSI)            // 50m
 var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
@@ -66,11 +65,9 @@ var memory150 = resource.NewQuantity(150*1024*1024, resource.BinarySI)   // 128M
 var memory350 = resource.NewQuantity(350*1024*1024, resource.BinarySI)   // 350Mi
 var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024Mi
 
-
 var rule = `^([a-z0-9]){32,}$`
 var wlpClientID = generateRandomString(rule)
 var wlpClientSecret = generateRandomString(rule)
-
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -410,7 +407,7 @@ func removeCRB(client client.Client, crbName string) error {
 		log.V(1).Info("Error getting cluster role binding", crbName, err)
 		return nil
 	} else if err == nil {
-		if crbName == "oidc-admin-binding"{
+		if crbName == "oidc-admin-binding" {
 			clusterRoleBinding.ObjectMeta.Finalizers = []string{}
 			if err = client.Update(context.Background(), clusterRoleBinding); err != nil {
 				log.V(1).Info("Error updating cluster role binding", "name", crbName, "error message", err)
@@ -420,7 +417,7 @@ func removeCRB(client client.Client, crbName string) error {
 		if err = client.Delete(context.Background(), clusterRoleBinding); err != nil {
 			log.V(1).Info("Error deleting cluster role binding", "name", crbName, "error message", err)
 			return err
-		} 
+		}
 	} else {
 		return err
 	}

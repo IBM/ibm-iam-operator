@@ -80,7 +80,7 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 			Name: webhook,
 		},
 		Webhooks: []reg.MutatingWebhook{
-			reg.MutatingWebhook{
+			{
 				Name:          "iam.hooks.securityenforcement.admission.cloud.ibm.com",
 				FailurePolicy: &failurePolicy,
 				ClientConfig: reg.WebhookClientConfig{
@@ -93,7 +93,7 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 				},
 				NamespaceSelector: &metav1.LabelSelector{
 					MatchExpressions: []metav1.LabelSelectorRequirement{
-						metav1.LabelSelectorRequirement{
+						{
 							Key:      "icp",
 							Values:   []string{"system"},
 							Operator: metav1.LabelSelectorOpNotIn,
@@ -101,7 +101,7 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 					},
 				},
 				Rules: []reg.RuleWithOperations{
-					reg.RuleWithOperations{
+					{
 						Rule: reg.Rule{
 							APIGroups:   []string{"*"},
 							APIVersions: []string{"*"},

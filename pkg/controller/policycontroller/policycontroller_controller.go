@@ -420,24 +420,24 @@ func (r *ReconcilePolicyController) custResourceDefinitionForPolicyController(in
 			Validation: &extv1.CustomResourceValidation{
 				OpenAPIV3Schema: &extv1.JSONSchemaProps{
 					Properties: map[string]extv1.JSONSchemaProps{
-						"labelSelector": extv1.JSONSchemaProps{
+						"labelSelector": {
 							Description: `selecting a list of namespaces where the policy applies`,
 							Type:        "object",
 						},
-						"maxClusterRoleBindingUsers": extv1.JSONSchemaProps{
+						"maxClusterRoleBindingUsers": {
 							Description: `selecting a list of namespaces where the policy applies`,
 							Type:        "integer",
 							Format:      "int64",
 						},
-						"maxRoleBindingViolationsPerNamespace": extv1.JSONSchemaProps{
+						"maxRoleBindingViolationsPerNamespace": {
 							Type:   "integer",
 							Format: "int64",
 						},
-						"namespaceSelector": extv1.JSONSchemaProps{
+						"namespaceSelector": {
 							Description: `enforce, inform`,
 							Type:        "string",
 						},
-						"remediationAction": extv1.JSONSchemaProps{
+						"remediationAction": {
 							Type: "string",
 						},
 					},

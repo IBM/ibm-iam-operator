@@ -333,14 +333,14 @@ func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1al
 	webhook := "namespace-admission-config"
 
 	// Remove Cluster Role
-	for crName, _ := range crMap {
+	for crName := range crMap {
 		if err := removeCR(r.client, crName); err != nil {
 			return err
 		}
 	}
 
 	// Remove Cluster Role Binding
-	for crbName, _ := range crbMap {
+	for crbName := range crbMap {
 		if err := removeCRB(r.client, crbName); err != nil {
 			return err
 		}

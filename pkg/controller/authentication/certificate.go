@@ -31,15 +31,15 @@ var certificateData map[string]map[string]string
 
 func generateCertificateData(instance *operatorv1alpha1.Authentication) {
 	certificateData = map[string]map[string]string{
-		"platform-auth-cert": map[string]string{
+		"platform-auth-cert": {
 			"secretName": "platform-auth-secret",
 			"cn":         "platform-auth-service",
 		},
-		"identity-provider-cert": map[string]string{
+		"identity-provider-cert": {
 			"secretName": "identity-provider-secret",
 			"cn":         "platform-identity-provider",
 		},
-		"platform-identity-management": map[string]string{
+		"platform-identity-management": {
 			"secretName":   "platform-identity-management",
 			"cn":           "platform-identity-management",
 			"completeName": "platform-identity-management.ibm-common-services.svc",
@@ -54,7 +54,7 @@ func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.A
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 
-	for certificate, _ := range certificateData {
+	for certificate := range certificateData {
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: certificate, Namespace: instance.Namespace}, currentCertificate)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new Certificate

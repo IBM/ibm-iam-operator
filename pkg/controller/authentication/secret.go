@@ -36,24 +36,24 @@ var wlpClientRegistrationSecret = generateRandomString(rule2)
 func generateSecretData(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string) map[string]map[string][]byte {
 
 	secretData := map[string]map[string][]byte{
-		"platform-auth-ldaps-ca-cert": map[string][]byte{
+		"platform-auth-ldaps-ca-cert": {
 			"certificate": []byte(""),
 		},
-		"platform-auth-idp-credentials": map[string][]byte{
+		"platform-auth-idp-credentials": {
 			"admin_username": []byte(instance.Spec.Config.DefaultAdminUser),
 			"admin_password": []byte(adminPassword),
 		},
-		"platform-auth-idp-encryption": map[string][]byte{
+		"platform-auth-idp-encryption": {
 			"ENCRYPTION_KEY": []byte(encryptionKey),
 			"algorithm":      []byte("aes256"),
 			"inputEncoding":  []byte("utf8"),
 			"outputEncoding": []byte("hex"),
 		},
-		"oauth-client-secret": map[string][]byte{
+		"oauth-client-secret": {
 			"WLP_CLIENT_REGISTRATION_SECRET": []byte(wlpClientRegistrationSecret),
 			"DEFAULT_ADMIN_USER":             []byte(instance.Spec.Config.DefaultAdminUser),
 		},
-		"platform-oidc-credentials": map[string][]byte{
+		"platform-oidc-credentials": {
 			"WLP_CLIENT_ID":                     []byte(wlpClientID),
 			"WLP_CLIENT_SECRET":                 []byte(wlpClientSecret),
 			"WLP_SCOPE":                         []byte("openid+profile+email"),
@@ -62,10 +62,10 @@ func generateSecretData(instance *operatorv1alpha1.Authentication, wlpClientID s
 			"IBMID_PROFILE_CLIENT_SECRET":       []byte("C1bR0rO7kE0cE3xM2tV1gI0mG1cH3jK4dD7iQ8rW6pF1aF4mQ5"),
 		},
 		//@posriniv - verify once again - This is a dummy cert which has to be replaced by the user
-		"platform-auth-ibmid-jwk": map[string][]byte{
+		"platform-auth-ibmid-jwk": {
 			"cert": []byte(""),
 		},
-		"platform-auth-ibmid-ssl-chain": map[string][]byte{
+		"platform-auth-ibmid-ssl-chain": {
 			"cert": []byte(""),
 		},
 	}
@@ -79,7 +79,7 @@ func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authen
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 
-	for secret, _ := range secretData {
+	for secret := range secretData {
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: secret, Namespace: instance.Namespace}, currentSecret)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new Secret

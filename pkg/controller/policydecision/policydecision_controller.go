@@ -575,6 +575,25 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 								},
 							},
 						},
+						PodAntiAffinity: &corev1.PodAntiAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+								corev1.WeightedPodAffinityTerm{
+									Weight: 100,
+									PodAffinityTerm: corev1.PodAffinityTerm{
+										TopologyKey: "kubernetes.io/hostname",
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												metav1.LabelSelectorRequirement{
+													Key: "app",
+													Operator: metav1.LabelSelectorOpIn,
+													Values: []string{"auth-pdp"},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
 					},
 					Tolerations: []corev1.Toleration{
 						{

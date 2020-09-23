@@ -17,8 +17,8 @@
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	userv1 "github.com/openshift/api/user/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -42,48 +42,48 @@ type AuthenticationSpec struct {
 }
 
 type AuditServiceSpec struct {
-	ImageRegistry string `json:"imageRegistry"`
-	ImageName     string `json:"imageName"`
-	ImageTag      string `json:"imageTag"`
-	JournalPath   string `json:"journalPath"`
+	ImageRegistry string                       `json:"imageRegistry"`
+	ImageName     string                       `json:"imageName"`
+	ImageTag      string                       `json:"imageTag"`
+	JournalPath   string                       `json:"journalPath"`
 	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type AuthServiceSpec struct {
-	ImageRegistry    string `json:"imageRegistry"`
-	ImageName        string `json:"imageName"`
-	ImageTag         string `json:"imageTag"`
-	RouterCertSecret string `json:"routerCertSecret"`
+	ImageRegistry    string                       `json:"imageRegistry"`
+	ImageName        string                       `json:"imageName"`
+	ImageTag         string                       `json:"imageTag"`
+	RouterCertSecret string                       `json:"routerCertSecret"`
 	Resources        *corev1.ResourceRequirements `json:"resources,omitempty"`
-	LdapsCACert      string `json:"ldapsCACert"`
+	LdapsCACert      string                       `json:"ldapsCACert"`
 }
 
 type IdentityProviderSpec struct {
-	ImageRegistry string `json:"imageRegistry"`
-	ImageName     string `json:"imageName"`
-	ImageTag      string `json:"imageTag"`
+	ImageRegistry string                       `json:"imageRegistry"`
+	ImageName     string                       `json:"imageName"`
+	ImageTag      string                       `json:"imageTag"`
 	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type IdentityManagerSpec struct {
-	ImageRegistry   string `json:"imageRegistry"`
-	ImageName       string `json:"imageName"`
-	ImageTag        string `json:"imageTag"`
-	MasterNodesList string `json:"masterNodesList"`
+	ImageRegistry   string                       `json:"imageRegistry"`
+	ImageName       string                       `json:"imageName"`
+	ImageTag        string                       `json:"imageTag"`
+	MasterNodesList string                       `json:"masterNodesList"`
 	Resources       *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type InitMongodbSpec struct {
-	ImageRegistry string `json:"imageRegistry"`
-	ImageName     string `json:"imageName"`
-	ImageTag      string `json:"imageTag"`
+	ImageRegistry string                       `json:"imageRegistry"`
+	ImageName     string                       `json:"imageName"`
+	ImageTag      string                       `json:"imageTag"`
 	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type ClientRegistrationSpec struct {
-	ImageRegistry string `json:"imageRegistry"`
-	ImageName     string `json:"imageName"`
-	ImageTag      string `json:"imageTag"`
+	ImageRegistry string                       `json:"imageRegistry"`
+	ImageName     string                       `json:"imageName"`
+	ImageTag      string                       `json:"imageTag"`
 	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 

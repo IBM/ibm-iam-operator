@@ -17,8 +17,8 @@
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -38,9 +38,9 @@ type PapSpec struct {
 
 // PapServiceSpec defined the desired state of PapService Container
 type PapServiceSpec struct {
-	ImageRegistry string `json:"imageRegistry"`
-	ImageName     string `json:"imageName"`
-	ImageTag      string `json:"imageTag"`
+	ImageRegistry string                       `json:"imageRegistry"`
+	ImageName     string                       `json:"imageName"`
+	ImageTag      string                       `json:"imageTag"`
 	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 

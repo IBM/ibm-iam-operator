@@ -33,7 +33,6 @@ var adminPassword = generateRandomString(rule2)
 var encryptionKey = generateRandomString(rule2)
 var wlpClientRegistrationSecret = generateRandomString(rule2)
 
-
 func generateSecretData(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string) map[string]map[string][]byte {
 
 	secretData := map[string]map[string][]byte{
@@ -52,7 +51,7 @@ func generateSecretData(instance *operatorv1alpha1.Authentication, wlpClientID s
 		},
 		"oauth-client-secret": map[string][]byte{
 			"WLP_CLIENT_REGISTRATION_SECRET": []byte(wlpClientRegistrationSecret),
-			"DEFAULT_ADMIN_USER": []byte(instance.Spec.Config.DefaultAdminUser),
+			"DEFAULT_ADMIN_USER":             []byte(instance.Spec.Config.DefaultAdminUser),
 		},
 		"platform-oidc-credentials": map[string][]byte{
 			"WLP_CLIENT_ID":                     []byte(wlpClientID),

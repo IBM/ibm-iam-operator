@@ -21,9 +21,7 @@ import (
 	"strings"
 )
 
-
-
-func GetImageRef(envVar string ) string{
+func GetImageRef(envVar string) string {
 
 	var imageSuffix string
 	imageTagOrSHA := os.Getenv(envVar)
@@ -35,4 +33,3 @@ func GetImageRef(envVar string ) string{
 
 	return imageSuffix
 }
- 

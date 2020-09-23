@@ -1,6 +1,9 @@
-[![Go Report Card](https://goreportcard.com/badge/github.com/IBM/ibm-iam-operator)](https://goreportcard.com/report/github.com/IBM/ibm-iam-operator)
+
 
 # ibm-iam-operator
+
+**[![Go Report Card](https://goreportcard.com/badge/github.com/IBM/ibm-iam-operator)](https://goreportcard.com/report/github.com/IBM/ibm-iam-operator)**
+
 
 The `ibm-iam-operator` installs the IBM Cloud Platform Common Services Identity and access management (IAM) service.
 

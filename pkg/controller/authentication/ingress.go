@@ -761,7 +761,7 @@ func platformOidcIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var xframeDomain string
 	if (instance.Spec.Config.XFrameDomain != "") {
-		xframeDomain = strings.Join([]string{"'ALLOW-FROM", instance.Spec.Config.XFrameDomain}, " ")
+		xframeDomain = strings.Join([]string{"'ALLOW-FROM ", instance.Spec.Config.XFrameDomain, "'"}, "")		
 	} else {
 		xframeDomain = "'SAMEORIGIN'"
 	}	

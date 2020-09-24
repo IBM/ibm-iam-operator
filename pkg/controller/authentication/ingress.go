@@ -778,7 +778,7 @@ func platformOidcIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 				   add_header 'Access-Control-Allow-Origin' 'https://127.0.0.1';
 				   add_header 'Access-Control-Allow-Credentials' 'false' always;
 				   add_header 'Access-Control-Allow-Methods' 'GET, POST, HEAD' always;
-				   add_header 'X-Frame-Options' `xframeDomain` always;
+				   add_header 'X-Frame-Options' ` +xframeDomain+ ` always;
 				   add_header 'X-Content-Type-Options' 'nosniff' always;
 				   add_header 'X-XSS-Protection' '1' always;
 				   add_header 'Access-Control-Allow-Headers' 'Accept,Authorization,Cache-Control,Content-Type,DNT,If-Modified-Since,Keep-Alive,Origin,User-Agent,X-Requested-With' always;

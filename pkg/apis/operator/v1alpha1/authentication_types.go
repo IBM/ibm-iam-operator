@@ -105,7 +105,6 @@ type ConfigSpec struct {
 	FIPSEnabled                 bool   `json:"fipsEnabled"`
 	ROKSEnabled                 bool   `json:"roksEnabled"`
 	NONCEEnabled                bool   `json:"nonceEnabled"`
-	XFrameDomain                string `json:"xframeDomain"`
 	ROKSURL                     string `json:"roksURL"`
 	ROKSUserPrefix              string `json:"roksUserPrefix"`
 	EnableImpersonation         bool   `json:"enableImpersonation"`

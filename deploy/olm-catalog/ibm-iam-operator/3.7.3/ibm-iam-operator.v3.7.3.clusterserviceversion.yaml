@@ -180,7 +180,6 @@ metadata:
               "icpPort": 8443,
               "installType": "fresh",
               "isOpenshiftEnv": true,
-              "xframeDomain": "",
               "nonceEnabled": true,
               "bootstrapUserId": "kubeadmin",
               "providerIssuerURL": "",

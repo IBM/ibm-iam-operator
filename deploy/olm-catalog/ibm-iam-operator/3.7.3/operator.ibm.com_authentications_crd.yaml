@@ -165,6 +165,8 @@ spec:
                   type: boolean
                 nonceEnabled:
                   type: boolean
+                xframeDomain:
+                  type: string  
                 claimsSupported:
                   type: string
                 providerIssuerURL:

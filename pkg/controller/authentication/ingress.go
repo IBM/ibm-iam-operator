@@ -18,6 +18,7 @@ package authentication
 
 import (
 	"context"
+	"strings"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	net "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -758,6 +759,12 @@ func platformOidcBlockIngress(instance *operatorv1alpha1.Authentication, scheme 
 func platformOidcIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	var xframeDomain string
+	if (instance.Spec.Config.XFrameDomain != "") {
+		xframeDomain = strings.Join([]string{"'ALLOW-FROM ", instance.Spec.Config.XFrameDomain, "'"}, "")		
+	} else {
+		xframeDomain = "'SAMEORIGIN'"
+	}	
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-oidc",
@@ -771,7 +778,7 @@ func platformOidcIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 				   add_header 'Access-Control-Allow-Origin' 'https://127.0.0.1';
 				   add_header 'Access-Control-Allow-Credentials' 'false' always;
 				   add_header 'Access-Control-Allow-Methods' 'GET, POST, HEAD' always;
-				   add_header 'X-Frame-Options' 'SAMEORIGIN' always;
+				   add_header 'X-Frame-Options' ` +xframeDomain+ ` always;
 				   add_header 'X-Content-Type-Options' 'nosniff' always;
 				   add_header 'X-XSS-Protection' '1' always;
 				   add_header 'Access-Control-Allow-Headers' 'Accept,Authorization,Cache-Control,Content-Type,DNT,If-Modified-Since,Keep-Alive,Origin,User-Agent,X-Requested-With' always;

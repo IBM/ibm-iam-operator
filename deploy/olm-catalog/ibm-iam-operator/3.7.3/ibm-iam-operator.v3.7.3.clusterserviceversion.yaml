@@ -2053,7 +2053,7 @@ spec:
                 - name: POLICY_DECISION_TAG_OR_SHA
                   value: sha256:dea8a4508142c0a59f9ae12ef770988af34b3f03f1d0fdea9df305125f828f7d
                 - name: SECRET_WATCHER_TAG_OR_SHA
-                  value: sha256:c28e71a04ebec6187a97a2b6e01f224d5a0031d1e46357ab76657c9492955a98
+                  value: sha256:6aef70d8e1f9cc52d4bd85ae0b79cc4854ba135b4932c8516f7bb07266fe0bff
                 - name: CLIENT_WATCHER_TAG_OR_SHA
                   value: sha256:884d5962fd7920453b91d5f7883ca063695d71e12bd6ccc8bf41c4b8fbaa3b21
                 - name: POLICY_CONTROLLER_TAG_OR_SHA

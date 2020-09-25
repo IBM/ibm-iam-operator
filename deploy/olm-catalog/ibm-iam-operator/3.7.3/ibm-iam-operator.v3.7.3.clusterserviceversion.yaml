@@ -2045,15 +2045,15 @@ spec:
                 - name: AUTH_SERVICE_TAG_OR_SHA
                   value: sha256:acdb61d4674b5f3ae276ef9f7208d5ac33a7bbcba8194a429a43273f143fb9b5
                 - name: IDENTITY_PROVIDER_TAG_OR_SHA
-                  value: sha256:eaee2588d3bae4207e69ae9bbdafba5c5f5e8d04bfa39b78777798004587d988
+                  value: sha256:288b8d01c5eb27c675aa4a6ce2827d1646be8569ab3a694cb669a4936823a46d
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
-                  value: sha256:078e74b28f58eaa74cc679f94bf6307b1c5f52ae52c8ede7901f9d30e127a9e8
+                  value: sha256:2c29055654d4e9c043d69b3e1160cbfea40efaf278b34f503399bc47599b018e
                 - name: POLICY_ADMINISTRATION_TAG_OR_SHA
                   value: sha256:f61ac066951f215dc4afd922660af9b3e52071c2fcd321659fa10bb28de71b56
                 - name: POLICY_DECISION_TAG_OR_SHA
                   value: sha256:dea8a4508142c0a59f9ae12ef770988af34b3f03f1d0fdea9df305125f828f7d
                 - name: SECRET_WATCHER_TAG_OR_SHA
-                  value: sha256:ab4b3affbc35debe5d4c80549f9594fbb633cff03a8852d1851d6edd708cca8b
+                  value: sha256:c28e71a04ebec6187a97a2b6e01f224d5a0031d1e46357ab76657c9492955a98
                 - name: CLIENT_WATCHER_TAG_OR_SHA
                   value: sha256:884d5962fd7920453b91d5f7883ca063695d71e12bd6ccc8bf41c4b8fbaa3b21
                 - name: POLICY_CONTROLLER_TAG_OR_SHA

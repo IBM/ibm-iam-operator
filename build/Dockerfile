@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal@sha256:9ee638018440bf04525e4d2f07990f0cc9958f1ab04a4bd0284ac7f86aaeac45
+FROM registry.access.redhat.com/ubi8/ubi-minimal@sha256:0d25acdc532aed9dd8dd370d0a150c518c64477e0b652293507ffac4ab066537
 
 LABEL org.label-schema.vendor="IBM" \
     org.label-schema.name="ibm-iam-operator" \

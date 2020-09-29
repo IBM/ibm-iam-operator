@@ -181,6 +181,7 @@ metadata:
               "installType": "fresh",
               "isOpenshiftEnv": true,
               "nonceEnabled": true,
+              "xframeDomain": "",
               "bootstrapUserId": "kubeadmin",
               "providerIssuerURL": "",
               "claimsSupported": "name,family_name,display_name,given_name,preferred_username",

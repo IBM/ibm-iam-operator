@@ -239,7 +239,7 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"SCOPE_CLAIM":                        instance.Spec.Config.ScopeClaim,
 			"BOOTSTRAP_USERID":                   instance.Spec.Config.BootstrapUserId,
 			"PROVIDER_ISSUER_URL":                instance.Spec.Config.ProviderIssuerURL,
-			"PREFERRED_LOGIN    ":                instance.Spec.Config.PreferredLogin,
+			"PREFERRED_LOGIN":                    instance.Spec.Config.PreferredLogin,
 			"LIBERTY_TOKEN_LENGTH":               "1024",
 			"OS_TOKEN_LENGTH":                    "45",
 			"LIBERTY_DEBUG_ENABLED":              "false",

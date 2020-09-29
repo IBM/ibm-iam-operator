@@ -166,6 +166,8 @@ spec:
                 nonceEnabled:
                   type: boolean
                 xframeDomain:
+                  type: string
+                preferredLogin:
                   type: string  
                 claimsSupported:
                   type: string

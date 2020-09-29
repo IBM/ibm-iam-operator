@@ -810,13 +810,6 @@ func platformOidcIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 			},
 		},
 	}
-	if ingressUpdateRequired {
-		err = r.client.Update(context.TODO(), newIngress)
-		if err != nil {
-			reqLogger.Error(err, "Failed to update an existing Ingress", "Ingress.Namespace", newIngress.Namespace, "Ingress.Name", newIngress.Name)
-			return err
-		}
-	}
 
 	// Set Authentication instance as the owner and controller of the Ingress
 	err := controllerutil.SetControllerReference(instance, newIngress, scheme)

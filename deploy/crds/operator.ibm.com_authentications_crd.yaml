@@ -163,6 +163,8 @@ spec:
                   type: string
                 isOpenshiftEnv:
                   type: boolean
+                xframeDomain:
+                  type: string
                 nonceEnabled:
                   type: boolean
                 claimsSupported:

@@ -480,9 +480,9 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 	}
 
 	// Get imageRegistry value from OIDCClientWatcher-->imageRegistry, should be like "quay.io/opencloudio"
-	initContainerImageRegistry := path.Dir(instance.Spec.ImageRegistry)
-	initContainerImageName := "icp-platform-auth"
-	initContainerResources := &corev1.ResourceRequirements{
+	initIdMgrContainerImageRegistry := path.Dir(instance.Spec.ImageRegistry)
+	initIdMgrContainerImageName := "icp-platform-auth"
+	initIdMgrContainerResources := &corev1.ResourceRequirements{
 		Limits: map[corev1.ResourceName]resource.Quantity{
 			corev1.ResourceCPU:    *cpu200,
 			corev1.ResourceMemory: *memory256},
@@ -491,9 +491,43 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 			corev1.ResourceMemory: *memory128},
 	}
 	if (instance.Spec.OidcInitIdentityManager != operatorv1alpha1.OidcInitIdentityManagerSpec{}) {
-		initContainerImageRegistry = instance.Spec.OidcInitIdentityManager.ImageRegistry
-		initContainerImageName = instance.Spec.OidcInitIdentityManager.ImageName
-		initContainerResources = instance.Spec.OidcInitIdentityManager.Resources
+		initIdMgrContainerImageRegistry = instance.Spec.OidcInitIdentityManager.ImageRegistry
+		initIdMgrContainerImageName = instance.Spec.OidcInitIdentityManager.ImageName
+		initIdMgrContainerResources = instance.Spec.OidcInitIdentityManager.Resources
+	}
+
+	// Get imageRegistry value from OIDCClientWatcher-->imageRegistry, should be like "quay.io/opencloudio"
+	initAuthSvcContainerImageRegistry := path.Dir(instance.Spec.ImageRegistry)
+	initAuthSvcContainerImageName := "icp-platform-auth"
+	initAuthSvcContainerResources := &corev1.ResourceRequirements{
+		Limits: map[corev1.ResourceName]resource.Quantity{
+			corev1.ResourceCPU:    *cpu200,
+			corev1.ResourceMemory: *memory256},
+		Requests: map[corev1.ResourceName]resource.Quantity{
+			corev1.ResourceCPU:    *cpu100,
+			corev1.ResourceMemory: *memory128},
+	}
+	if (instance.Spec.OidcInitAuthService != operatorv1alpha1.OidcInitAuthServiceSpec{}) {
+		initAuthSvcContainerImageRegistry = instance.Spec.OidcInitAuthService.ImageRegistry
+		initAuthSvcContainerImageName = instance.Spec.OidcInitAuthService.ImageName
+		initAuthSvcContainerResources = instance.Spec.OidcInitAuthService.Resources
+	}
+
+	// Get imageRegistry value from OIDCClientWatcher-->imageRegistry, should be like "quay.io/opencloudio"
+	initIdProviderContainerImageRegistry := path.Dir(instance.Spec.ImageRegistry)
+	initIdProviderContainerImageName := "icp-platform-auth"
+	initIdProviderContainerResources := &corev1.ResourceRequirements{
+		Limits: map[corev1.ResourceName]resource.Quantity{
+			corev1.ResourceCPU:    *cpu200,
+			corev1.ResourceMemory: *memory256},
+		Requests: map[corev1.ResourceName]resource.Quantity{
+			corev1.ResourceCPU:    *cpu100,
+			corev1.ResourceMemory: *memory128},
+	}
+	if (instance.Spec.OidcInitIdentityProvider != operatorv1alpha1.OidcInitIdentityProviderSpec{}) {
+		initIdProviderContainerImageRegistry = instance.Spec.OidcInitIdentityProvider.ImageRegistry
+		initIdProviderContainerImageName = instance.Spec.OidcInitIdentityProvider.ImageName
+		initIdProviderContainerResources = instance.Spec.OidcInitIdentityProvider.Resources
 	}
 
 	ocwDep := &appsv1.Deployment{
@@ -587,9 +621,9 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 					},
 					InitContainers: []corev1.Container{
 						{
-							Name:            "init-identity-manager",
-							Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-management:4500 | grep '200 OK'; do sleep 3; done;"},
-							Image:           initContainerImageRegistry + "/" + initContainerImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA"),
+							Name:            "init-auth-service",
+							Command:         []string{"sh", "-c", "sleep 75; until curl -k -i -fsS https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration | grep '200 OK'; do sleep 3; done;"},
+							Image:           initAuthSvcContainerImageRegistry + "/" + initAuthSvcContainerImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA"),
 							ImagePullPolicy: corev1.PullPolicy("Always"),
 							SecurityContext: &corev1.SecurityContext{
 								Privileged:               &falseVar,
@@ -600,7 +634,39 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 									Drop: []corev1.Capability{"ALL"},
 								},
 							},
-							Resources: *initContainerResources,
+							Resources: *initAuthSvcContainerResources,
+						},
+						{
+							Name:            "init-identity-provider",
+							Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-provider:4300 | grep '200 OK'; do sleep 3; done;"},
+							Image:           initIdProviderContainerImageRegistry + "/" + initIdProviderContainerImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA"),
+							ImagePullPolicy: corev1.PullPolicy("Always"),
+							SecurityContext: &corev1.SecurityContext{
+								Privileged:               &falseVar,
+								RunAsNonRoot:             &trueVar,
+								ReadOnlyRootFilesystem:   &trueVar,
+								AllowPrivilegeEscalation: &falseVar,
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+							},
+							Resources: *initIdProviderContainerResources,
+						},
+						{
+							Name:            "init-identity-manager",
+							Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-management:4500 | grep '200 OK'; do sleep 3; done;"},
+							Image:           initIdMgrContainerImageRegistry + "/" + initIdMgrContainerImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA"),
+							ImagePullPolicy: corev1.PullPolicy("Always"),
+							SecurityContext: &corev1.SecurityContext{
+								Privileged:               &falseVar,
+								RunAsNonRoot:             &trueVar,
+								ReadOnlyRootFilesystem:   &trueVar,
+								AllowPrivilegeEscalation: &falseVar,
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+							},
+							Resources: *initIdMgrContainerResources,
 						},
 					},
 					Containers: []corev1.Container{

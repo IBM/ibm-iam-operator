@@ -164,11 +164,44 @@ rules:
   - update
   - patch
   - delete
+# Investigate further whether we can avoid the creation of clusteroles and clusterrolbeindings
 - apiGroups:
-  - rbac.authorization.k8s.io/v1
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterroles
+  resourceNames:
+  - icp:edit
+  - icp:operate
+  - icp:view
+  - icp:admin
+  - icp:teamadmin
+  - icp:accountadmin
+  - icp-clustercrd-admin-aggregate
+  - icp-clusterservicestatus-reader
+  - icp-operate-aggregate
+  - icp-view-aggregate
+  - icp-edit-aggregate
+  - icp-admin-aggregate
+  - cloudpak-switchers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
   resources:
   - clusterrolebindings
-  - clusterroles
+  resourcesNames:
+  - icp:default:accountadmin
+  - icp:default:member
+  - icp:default:teamadmin
+  - icp::editors
+  - icp::operators
+  - oidc-admin-binding
   verbs:
   - create
   - delete
@@ -177,18 +210,6 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - oidc.security.ibm.com
-  resources:
-  - clients
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - update
-  - watch
-  - delete
 - apiGroups:
   - user.openshift.io
   resources:
@@ -202,42 +223,6 @@ rules:
   - update
   - watch
   - delete
-# The following rules need further investigation
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - '*'
-  verbs:
-  - '*'
-- apiGroups:
-  - iam.policies.ibm.com
-  resources:
-  - '*'
-  verbs:
-  - '*'
-- apiGroups:
-  - certmanager.k8s.io
-  resources:
-  - '*'
-  verbs:
-  - '*'
-- apiGroups:
-  - operator.ibm.com
-  resources:
-  - policydecisions
-  - oidcclientwatchers
-  - authentications
-  - policycontrollers
-  - paps
-  - securityonboardings
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1

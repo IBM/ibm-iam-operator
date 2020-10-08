@@ -141,6 +141,9 @@ rules:
   - apiextensions.k8s.io
   resources:
   - customresourcedefinitions
+  resourceNames:
+  - iampolicies.iam.policies.ibm.com
+  - clients.oidc.security.ibm.com
   #needed in oidcclient-watcher for creating the CRD clients.oidc.security.ibm.com
   #needed in iam-policy-controller for creating the CRD iampolicies.iam.policies.ibm.com
   verbs:
@@ -155,6 +158,8 @@ rules:
   - admissionregistration.k8s.io
   resources:
   - mutatingwebhookconfigurations
+  resourceNames:
+  - namespace-admission-config
   #iam.hooks.securityenforcement.admission.cloud.ibm.com used by oidcclient-watcher 
   verbs:
   - get

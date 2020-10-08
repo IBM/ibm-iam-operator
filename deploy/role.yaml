@@ -366,9 +366,7 @@ rules:
   resources:
   #secrets are needed only if we have to watch for secrets outside our namespace
   - secrets
-  - secrets/finalizers
-  #platform-identity-manager allocates a namespace to a particular user
-  #also used by oidcclientwatcher
+  #the namespaces are being watched by the oidcclientwatcher
   - namespaces
   verbs:
   - create
@@ -383,6 +381,7 @@ rules:
   - rbac.authorization.k8s.io
   resources:
   - clusterrolebindings
+  - rolebindings
   verbs:
   - create
   - delete
@@ -421,8 +420,6 @@ rules:
   - oauth.openshift.io
   resources:
   - oauthaccesstokens
-  - oauthauthorizetokens
-  - oauthclientauthorizations
   - oauthclients
   verbs:
   - create

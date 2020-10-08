@@ -376,6 +376,19 @@ rules:
   - patch
   - update
   - watch
+# used in identity manager
+- apiGroups:
+  - authorization.openshift.io
+  resources:
+  - clusterrolebindings
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 # Used by oidcclient-watcher
 - apiGroups:
   - rbac.authorization.k8s.io
@@ -407,6 +420,8 @@ rules:
   - user.openshift.io
   resources:
   - users
+  - groups
+  - identities
   verbs:
   - create
   - get

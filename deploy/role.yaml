@@ -170,18 +170,9 @@ rules:
   resources:
   - clusterroles
   resourceNames:
-  - icp:edit
-  - icp:operate
-  - icp:view
-  - icp:admin
   - icp:teamadmin
   - icp:accountadmin
-  - icp-clustercrd-admin-aggregate
   - icp-clusterservicestatus-reader
-  - icp-operate-aggregate
-  - icp-view-aggregate
-  - icp-edit-aggregate
-  - icp-admin-aggregate
   - cloudpak-switchers
   verbs:
   - create
@@ -202,6 +193,7 @@ rules:
   - icp::editors
   - icp::operators
   - oidc-admin-binding
+  - cloudpak-switchers-binding
   verbs:
   - create
   - delete

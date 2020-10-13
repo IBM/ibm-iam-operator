@@ -60,9 +60,9 @@ metadata:
           },
           "spec": {
             "auditService": {
-              "imageName": "icp-audit-service",
+              "imageName": "audit-sidecar-syslog",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.4.2",
+              "imageTag": "1.0.2",
               "journalPath": "/run/systemd/journal",
               "resources": {
                 "limits": {
@@ -120,9 +120,9 @@ metadata:
           },
           "spec": {
             "auditService": {
-              "imageName": "icp-audit-service",
+              "imageName": "audit-syslog-service ",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.4.2",
+              "imageTag": "1.0.2",
               "journalPath": "/run/systemd/journal",
               "resources": {
                 "limits": {
@@ -260,9 +260,9 @@ metadata:
           },
           "spec": {
             "auditService": {
-              "imageName": "icp-audit-service",
+              "imageName": "audit-syslog-service ",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.4.2",
+              "imageTag": "1.0.2",
               "journalPath": "/run/systemd/journal",
               "resources": {
                 "limits": {
@@ -2064,7 +2064,7 @@ spec:
                 - name: IAM_ONBOARDING_TAG_OR_SHA
                   value: sha256:2557ef65f807d62769e264f7360bf40ae5cdaa4b2e6bea8f479cfcec7e8c52a8
                 - name: AUDIT_TAG_OR_SHA
-                  value: sha256:3cfb9f3cc99379758f73f1cd2e6ad4dd4bc61e13cc55d7c34b0d0e280cb47421
+                  value: sha256:ae0e15af1ef59f43fc2fe02f1127c4655d33a44e578a436ee1b1e955902f6180
                 - name: WATCH_NAMESPACE
                   valueFrom:
                     fieldRef:

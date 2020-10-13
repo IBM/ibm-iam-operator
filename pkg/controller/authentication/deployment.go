@@ -301,6 +301,14 @@ func buildIdpVolumes(journalPath string, ldapCACert string, routerCertSecret str
 			},
 		},
 		{
+			Name: "audit-server-certs",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "audit-server-certs",
+					Optional: true,
+			},    
+		},
+		{
 			Name: "auth-key",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{

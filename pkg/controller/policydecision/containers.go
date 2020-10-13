@@ -76,7 +76,7 @@ func buildAuditContainer(auditImage string, journalPath string, resources *corev
 	}
 
 	return corev1.Container{
-		Name:            "icp-audit-service",
+		Name:            "audit-sidecar-syslog",
 		Image:           auditImage,
 		ImagePullPolicy: corev1.PullAlways,
 		Env: []corev1.EnvVar{
@@ -98,6 +98,10 @@ func buildAuditContainer(auditImage string, journalPath string, resources *corev
 				Name:      "logrotate",
 				MountPath: "/etc/logrotate.d/audit",
 				SubPath:   "audit",
+			},
+			{	
+				Name: 		 "audit-server-certs",
+      	MountPath: "etc/audit-tls",
 			},
 			{
 				Name:      "logrotate-conf",

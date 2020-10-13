@@ -30,7 +30,7 @@ var memory20 = resource.NewQuantity(20*1024*1024, resource.BinarySI)     // 20Mi
 var memory200 = resource.NewQuantity(200*1024*1024, resource.BinarySI)   // 200Mi
 var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024Mi
 
-func buildAuditContainer(auditImage string, journalPath string, resources *corev1.ResourceRequirements) corev1.Container {
+func buildAuditContainer(auditImage string, syslogTlsPath string, resources *corev1.ResourceRequirements) corev1.Container {
 
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
@@ -44,13 +44,24 @@ func buildAuditContainer(auditImage string, journalPath string, resources *corev
 	}
 
 	return corev1.Container{
-		Name:            "audit-sidecar-syslog",
+		Name:            "icp-audit-service",
 		Image:           auditImage,
 		ImagePullPolicy: corev1.PullAlways,
 		Env: []corev1.EnvVar{
 			{
 				Name:  "AUDIT_DIR",
 				Value: "/var/log/audit",
+			},
+			{
+				Name: "AUDIT_URL",
+				ValueFrom: &corev1.EnvVarSource{
+					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "audit-logging-fluentd-ds-http-ingesturl",
+						},
+						Key: "AuditLoggingSyslogIngestURL",
+					},
+		},
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
@@ -59,17 +70,13 @@ func buildAuditContainer(auditImage string, journalPath string, resources *corev
 				MountPath: "/var/log/audit",
 			},
 			{
-				Name:      "journal",
-				MountPath: journalPath,
+				Name:      "audit-server-certs",
+				MountPath: syslogTlsPath,
 			},
 			{
 				Name:      "logrotate",
 				MountPath: "/etc/logrotate.d/audit",
 				SubPath:   "audit",
-			},
-			{	
-				Name: 		 "audit-server-certs",
-      	MountPath: "etc/audit-tls",
 			},
 			{
 				Name:      "logrotate-conf",
@@ -137,7 +144,7 @@ func buildPapContainer(papImage string, resources *corev1.ResourceRequirements) 
 			},
 			{
 				Name:      "shared",
-				MountPath: "/app/audit",
+				MountPath: "/var/log/audit",
 			},
 			{
 				Name:      "mongodb-client-cert",
@@ -337,9 +344,9 @@ func buildPapContainer(papImage string, resources *corev1.ResourceRequirements) 
 
 }
 
-func buildContainers(auditImage string, papImage string, journalPath string, auditResources *corev1.ResourceRequirements, papResources *corev1.ResourceRequirements) []corev1.Container {
+func buildContainers(auditImage string, papImage string, syslogTlsPath string, auditResources *corev1.ResourceRequirements, papResources *corev1.ResourceRequirements) []corev1.Container {
 
-	auditContainer := buildAuditContainer(auditImage, journalPath, auditResources)
+	auditContainer := buildAuditContainer(auditImage, syslogTlsPath, auditResources)
 	papContainer := buildPapContainer(papImage, papResources)
 
 	return []corev1.Container{auditContainer, papContainer}

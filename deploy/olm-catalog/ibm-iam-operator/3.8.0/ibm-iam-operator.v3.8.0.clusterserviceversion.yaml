@@ -60,10 +60,10 @@ metadata:
           },
           "spec": {
             "auditService": {
-              "imageName": "audit-sidecar-syslog",
+              "imageName": "audit-syslog-service",
               "imageRegistry": "quay.io/opencloudio",
               "imageTag": "1.0.2",
-              "journalPath": "/run/systemd/journal",
+              "syslogTlsPath": "etc/audit-tls",
               "resources": {
                 "limits": {
                   "cpu": "200m",

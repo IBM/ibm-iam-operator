@@ -1,4 +1,3 @@
-//
 // Copyright 2020 IBM Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -57,7 +56,7 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 	}
 }
 
-func buildAuditContainer(auditImage string, journalPath string, resources *corev1.ResourceRequirements) corev1.Container {
+func buildAuditContainer(auditImage string, syslogTlsPath string, resources *corev1.ResourceRequirements) corev1.Container {
 
 	if resources == nil {
 
@@ -72,13 +71,24 @@ func buildAuditContainer(auditImage string, journalPath string, resources *corev
 	}
 
 	return corev1.Container{
-		Name:            "audit-sidecar-syslog",
+		Name:            "icp-audit-service",
 		Image:           auditImage,
 		ImagePullPolicy: corev1.PullAlways,
 		Env: []corev1.EnvVar{
 			{
 				Name:  "AUDIT_DIR",
 				Value: "/var/log/audit",
+			},
+			{
+				Name: "AUDIT_URL",
+				ValueFrom: &corev1.EnvVarSource{
+					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "audit-logging-fluentd-ds-http-ingesturl",
+						},
+						Key: "AuditLoggingSyslogIngestURL",
+					},
+				},
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
@@ -87,17 +97,13 @@ func buildAuditContainer(auditImage string, journalPath string, resources *corev
 				MountPath: "/var/log/audit",
 			},
 			{
-				Name:      "journal",
-				MountPath: journalPath,
+				Name:      "audit-server-certs",
+				MountPath: syslogTlsPath,
 			},
 			{
 				Name:      "logrotate",
 				MountPath: "/etc/logrotate.d/audit",
 				SubPath:   "audit",
-			},
-			{	
-				Name: 		 "audit-server-certs",
-      	MountPath: "etc/audit-tls",
 			},
 			{
 				Name:      "logrotate-conf",
@@ -1079,10 +1085,10 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 
 }
 
-func buildContainers(instance *operatorv1alpha1.Authentication, auditImage string, authServiceImage string, identityProviderImage string, identityManagerImage string, journalPath string, icpConsoleURL string) []corev1.Container {
+func buildContainers(instance *operatorv1alpha1.Authentication, auditImage string, authServiceImage string, identityProviderImage string, identityManagerImage string, syslogTlsPath string, icpConsoleURL string) []corev1.Container {
 
 	auditResources := instance.Spec.AuditService.Resources
-	auditContainer := buildAuditContainer(auditImage, journalPath, auditResources)
+	auditContainer := buildAuditContainer(auditImage, syslogTlsPath, auditResources)
 	authServiceContainer := buildAuthServiceContainer(instance, authServiceImage)
 	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL)
 	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage)

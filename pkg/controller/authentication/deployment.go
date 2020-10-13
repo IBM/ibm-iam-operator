@@ -126,7 +126,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 	mongoDBImage := instance.Spec.InitMongodb.ImageRegistry + "/" + instance.Spec.InitMongodb.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA")
 	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + shatag.GetImageRef("AUDIT_TAG_OR_SHA")
 	replicas := instance.Spec.Replicas
-	journalPath := instance.Spec.AuditService.JournalPath
+	syslogTlsPath := instance.Spec.AuditService.SyslogTlsPath
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
 
@@ -213,8 +213,8 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 							Operator: corev1.TolerationOpExists,
 						},
 					},
-					Volumes:        buildIdpVolumes(journalPath, ldapCACert, routerCertSecret),
-					Containers:     buildContainers(instance, auditImage, authServiceImage, identityProviderImage, identityManagerImage, journalPath, icpConsoleURL),
+					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret),
+					Containers:     buildContainers(instance, auditImage, authServiceImage, identityProviderImage, identityManagerImage, syslogTlsPath, icpConsoleURL),
 					InitContainers: buildInitContainers(mongoDBImage),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &user,
@@ -232,13 +232,15 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 	return idpDeployment
 }
 
-func buildIdpVolumes(journalPath string, ldapCACert string, routerCertSecret string) []corev1.Volume {
+func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume {
+	var TrueVar = true
 	return []corev1.Volume{
 		{
-			Name: "journal",
+			Name: "audit-server-certs",
 			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: journalPath,
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "audit-server-certs",
+					Optional: &TrueVar,
 				},
 			},
 		},
@@ -299,14 +301,6 @@ func buildIdpVolumes(journalPath string, ldapCACert string, routerCertSecret str
 					DefaultMode: &partialAccess,
 				},
 			},
-		},
-		{
-			Name: "audit-server-certs",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: "audit-server-certs",
-					Optional: true,
-			},    
 		},
 		{
 			Name: "auth-key",

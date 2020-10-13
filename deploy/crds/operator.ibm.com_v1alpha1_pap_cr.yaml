@@ -10,9 +10,9 @@ spec:
   # Add fields here
   auditService:
     imageRegistry: "quay.io/opencloudio"
-    imageName: "icp-audit-service"
-    imageTag: "3.4.2"
-    journalPath: "/run/systemd/journal"
+    imageName: "audit-syslog-service"
+    imageTag: "1.0.2"
+    syslogTlsPath: "etc/audit-tls"
     resources:
       limits:
         cpu: 200m

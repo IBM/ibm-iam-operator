@@ -76,13 +76,24 @@ func buildAuditContainer(auditImage string, journalPath string, resources *corev
 	}
 
 	return corev1.Container{
-		Name:            "audit-sidecar-syslog",
+		Name:            "icp-audit-service",
 		Image:           auditImage,
 		ImagePullPolicy: corev1.PullAlways,
 		Env: []corev1.EnvVar{
 			{
 				Name:  "AUDIT_DIR",
 				Value: "/var/log/audit",
+			},
+			{
+				Name: "AUDIT_URL",
+				ValueFrom: &corev1.EnvVarSource{
+					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "audit-logging-fluentd-ds-http-ingesturl",
+						},
+						Key: "AuditLoggingSyslogIngestURL",
+					},
+				},
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{

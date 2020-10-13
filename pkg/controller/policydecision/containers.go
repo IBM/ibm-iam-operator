@@ -62,7 +62,7 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 	}
 }
 
-func buildAuditContainer(auditImage string, journalPath string, resources *corev1.ResourceRequirements) corev1.Container {
+func buildAuditContainer(auditImage string, syslogTlsPath string, resources *corev1.ResourceRequirements) corev1.Container {
 
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
@@ -102,17 +102,13 @@ func buildAuditContainer(auditImage string, journalPath string, resources *corev
 				MountPath: "/var/log/audit",
 			},
 			{
-				Name:      "journal",
-				MountPath: journalPath,
+				Name:      "audit-server-certs",
+				MountPath: syslogTlsPath,
 			},
 			{
 				Name:      "logrotate",
 				MountPath: "/etc/logrotate.d/audit",
 				SubPath:   "audit",
-			},
-			{	
-				Name: 		 "audit-server-certs",
-      	MountPath: "etc/audit-tls",
 			},
 			{
 				Name:      "logrotate-conf",

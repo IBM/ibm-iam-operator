@@ -713,7 +713,6 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 }
 
 func buildPapVolumes() []corev1.Volume {
-	var TrueVar = true
 	return []corev1.Volume{
 		{
 			Name: "mongodb-ca-cert",
@@ -755,7 +754,7 @@ func buildPapVolumes() []corev1.Volume {
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "audit-server-certs",
-					Optional: &TrueVar,
+					Optional: &trueVar,
 				},
 			},
 		},

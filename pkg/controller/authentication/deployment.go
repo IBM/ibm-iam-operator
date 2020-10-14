@@ -233,14 +233,13 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 }
 
 func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume {
-	var TrueVar = true
 	return []corev1.Volume{
 		{
 			Name: "audit-server-certs",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "audit-server-certs",
-					Optional: &TrueVar,
+					Optional: &trueVar,
 				},
 			},
 		},

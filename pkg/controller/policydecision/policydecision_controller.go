@@ -627,7 +627,6 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 }
 
 func buildPdpVolumes() []corev1.Volume {
-	var TrueVar = true
 	return []corev1.Volume{
 		{
 			Name: "mongodb-ca-cert",
@@ -686,7 +685,7 @@ func buildPdpVolumes() []corev1.Volume {
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "audit-server-certs",
-					Optional: &TrueVar,
+					Optional: &trueVar,
 				},
 			},
 		},

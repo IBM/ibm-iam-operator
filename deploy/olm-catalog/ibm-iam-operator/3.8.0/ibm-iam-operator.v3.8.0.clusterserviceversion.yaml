@@ -120,7 +120,7 @@ metadata:
           },
           "spec": {
             "auditService": {
-              "imageName": "audit-syslog-service ",
+              "imageName": "audit-syslog-service",
               "imageRegistry": "quay.io/opencloudio",
               "imageTag": "1.0.2",
               "journalPath": "/run/systemd/journal",
@@ -260,7 +260,7 @@ metadata:
           },
           "spec": {
             "auditService": {
-              "imageName": "audit-syslog-service ",
+              "imageName": "audit-syslog-service",
               "imageRegistry": "quay.io/opencloudio",
               "imageTag": "1.0.2",
               "journalPath": "/run/systemd/journal",

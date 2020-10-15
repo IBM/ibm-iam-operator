@@ -84,9 +84,10 @@ func buildAuditContainer(auditImage string, syslogTlsPath string, resources *cor
 				ValueFrom: &corev1.EnvVarSource{
 					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "audit-logging-fluentd-ds-http-ingesturl",
+							Name: "audit-logging-fluentd-ds-http-ingesturl",							
 						},
 						Key: "AuditLoggingSyslogIngestURL",
+						Optional: &trueVar,
 					},
 				},
 			},

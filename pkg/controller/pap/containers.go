@@ -60,6 +60,7 @@ func buildAuditContainer(auditImage string, syslogTlsPath string, resources *cor
 							Name: "audit-logging-fluentd-ds-http-ingesturl",
 						},
 						Key: "AuditLoggingSyslogIngestURL",
+						Optional: &trueVar,
 					},
 		},
 			},

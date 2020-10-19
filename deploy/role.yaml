@@ -141,9 +141,6 @@ rules:
   - apiextensions.k8s.io
   resources:
   - customresourcedefinitions
-  resourceNames:
-  - iampolicies.iam.policies.ibm.com
-  - clients.oidc.security.ibm.com
   #needed in oidcclient-watcher for creating the CRD clients.oidc.security.ibm.com
   #needed in iam-policy-controller for creating the CRD iampolicies.iam.policies.ibm.com
   verbs:
@@ -158,8 +155,6 @@ rules:
   - admissionregistration.k8s.io
   resources:
   - mutatingwebhookconfigurations
-  resourceNames:
-  - namespace-admission-config
   #iam.hooks.securityenforcement.admission.cloud.ibm.com used by oidcclient-watcher 
   verbs:
   - get
@@ -169,17 +164,19 @@ rules:
   - update
   - patch
   - delete
+- apiGroups:
+  - certmanager.k8s.io
+  resources:
+  - clusterissuers
+  verbs:
+  - use
 # Investigate further whether we can avoid the creation of clusteroles and clusterrolbeindings
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - clusterroles
-  resourceNames:
-  - icp:teamadmin
-  - icp:accountadmin
-  - icp-clusterservicestatus-reader
-  - cloudpak-switchers
   verbs:
+  - '*'
   - create
   - delete
   - get
@@ -191,15 +188,8 @@ rules:
   - rbac.authorization.k8s.io
   resources:
   - clusterrolebindings
-  resourcesNames:
-  - icp:default:accountadmin
-  - icp:default:member
-  - icp:default:teamadmin
-  - icp::editors
-  - icp::operators
-  - oidc-admin-binding
-  - cloudpak-switchers-binding
   verbs:
+  - '*'
   - create
   - delete
   - get

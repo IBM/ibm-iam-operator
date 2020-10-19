@@ -38,7 +38,7 @@ spec:
       containers:
         - name: ibm-iam-operator
           # Replace this with the built image name
-          image: quay.io/opencloudio/ibm-iam-operator:latest
+          image: quay.io/opencloudio/ibm-iam-operator-amd64:posriniv-test
           command:
           - ibm-iam-operator
           imagePullPolicy: Always

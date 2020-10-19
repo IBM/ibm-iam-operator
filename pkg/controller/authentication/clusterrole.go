@@ -32,13 +32,7 @@ type CRData struct {
 }
 
 func generateCRData() map[string]CRData {
-	aggregationLabels := map[string]string{
-		"kubernetes.io/bootstrapping": "rbac-defaults",
-	}
-	aggregationRules := []rbacv1.PolicyRule{}
 	viewerVerbs := []string{"get", "list", "watch"}
-	editorVerbs := []string{"get", "list", "patch", "update", "watch"}
-	operatorVerbs := []string{"get", "list", "patch", "update", "watch", "create"}
 	adminVerbs := []string{"get", "list", "watch", "create", "delete", "deletecollection", "patch", "update"}
 
 	return map[string]CRData{

@@ -78,10 +78,6 @@ func buildAuditContainer(auditImage string, journalPath string, resources *corev
 			RunAsNonRoot:             &trueVar,
 			ReadOnlyRootFilesystem:   &trueVar,
 			AllowPrivilegeEscalation: &falseVar,
-			RunAsUser:                &user,
-			SELinuxOptions: &corev1.SELinuxOptions{
-				Type: "spc_t",
-			},
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
 			},

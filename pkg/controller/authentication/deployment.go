@@ -216,9 +216,6 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 					Volumes:        buildIdpVolumes(journalPath, ldapCACert, routerCertSecret),
 					Containers:     buildContainers(instance, auditImage, authServiceImage, identityProviderImage, identityManagerImage, journalPath, icpConsoleURL),
 					InitContainers: buildInitContainers(mongoDBImage),
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser: &user,
-					},
 				},
 			},
 		},

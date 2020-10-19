@@ -106,7 +106,6 @@ var trueVar bool = true
 var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
-var user int64 = 21000
 var serviceAccountName string = "ibm-iam-operand-restricted"
 
 //var port int32 = 39001
@@ -695,9 +694,6 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 					},
 					Volumes:    buildPapVolumes(journalPath),
 					Containers: buildContainers(auditImage, papImage, journalPath, auditResources, papResources),
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser: &user,
-					},
 				},
 			},
 		},

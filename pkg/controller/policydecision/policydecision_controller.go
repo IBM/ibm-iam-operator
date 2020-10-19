@@ -677,14 +677,6 @@ func buildPdpVolumes(journalPath string) []corev1.Volume {
 			},
 		},
 		{
-			Name: "journal",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: journalPath,
-				},
-			},
-		},
-		{
 			Name: "shared",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{},

@@ -232,14 +232,6 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 func buildIdpVolumes(journalPath string, ldapCACert string, routerCertSecret string) []corev1.Volume {
 	return []corev1.Volume{
 		{
-			Name: "journal",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: journalPath,
-				},
-			},
-		},
-		{
 			Name: "platform-identity-management",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{

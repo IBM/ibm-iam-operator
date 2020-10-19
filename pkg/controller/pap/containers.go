@@ -59,10 +59,6 @@ func buildAuditContainer(auditImage string, journalPath string, resources *corev
 				MountPath: "/app/audit",
 			},
 			{
-				Name:      "journal",
-				MountPath: journalPath,
-			},
-			{
 				Name:      "logrotate",
 				MountPath: "/etc/logrotate.d/audit",
 				SubPath:   "audit",

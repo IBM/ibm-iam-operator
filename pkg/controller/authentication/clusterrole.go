@@ -42,34 +42,6 @@ func generateCRData() map[string]CRData {
 	adminVerbs := []string{"get", "list", "watch", "create", "delete", "deletecollection", "patch", "update"}
 
 	return map[string]CRData{
-		"icp:edit": {
-			Labels: aggregationLabels,
-			Rules:  aggregationRules,
-			MatchLabels: map[string]string{
-				"rbac.icp.com/aggregate-to-icp-edit": "true",
-			},
-		},
-		"icp:operate": {
-			Labels: aggregationLabels,
-			Rules:  aggregationRules,
-			MatchLabels: map[string]string{
-				"rbac.icp.com/aggregate-to-icp-operate": "true",
-			},
-		},
-		"icp:view": {
-			Labels: aggregationLabels,
-			Rules:  aggregationRules,
-			MatchLabels: map[string]string{
-				"rbac.icp.com/aggregate-to-icp-view": "true",
-			},
-		},
-		"icp:admin": {
-			Labels: aggregationLabels,
-			Rules:  aggregationRules,
-			MatchLabels: map[string]string{
-				"rbac.icp.com/aggregate-to-icp-admin": "true",
-			},
-		},
 		"icp:teamadmin": {
 			Labels:      nil,
 			MatchLabels: nil,
@@ -152,38 +124,6 @@ func generateCRData() map[string]CRData {
 					Verbs:     viewerVerbs,
 				},
 			},
-		},
-		"icp-operate-aggregate": {
-			Labels: map[string]string{
-				"kubernetes.io/bootstrapping":           "rbac-defaults",
-				"rbac.icp.com/aggregate-to-icp-operate": "true",
-			},
-			MatchLabels: nil,
-			Rules:       getPolicyRules(operatorVerbs),
-		},
-		"icp-view-aggregate": {
-			Labels: map[string]string{
-				"kubernetes.io/bootstrapping":        "rbac-defaults",
-				"rbac.icp.com/aggregate-to-icp-view": "true",
-			},
-			MatchLabels: nil,
-			Rules:       getPolicyRules(viewerVerbs),
-		},
-		"icp-edit-aggregate": {
-			Labels: map[string]string{
-				"kubernetes.io/bootstrapping":        "rbac-defaults",
-				"rbac.icp.com/aggregate-to-icp-edit": "true",
-			},
-			MatchLabels: nil,
-			Rules:       getPolicyRules(editorVerbs),
-		},
-		"icp-admin-aggregate": {
-			Labels: map[string]string{
-				"kubernetes.io/bootstrapping":         "rbac-defaults",
-				"rbac.icp.com/aggregate-to-icp-admin": "true",
-			},
-			MatchLabels: nil,
-			Rules:       getPolicyRules(adminVerbs),
 		},
 		"cloudpak-switchers": {
 			Labels:      nil,

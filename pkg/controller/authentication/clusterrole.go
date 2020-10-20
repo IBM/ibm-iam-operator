@@ -85,27 +85,6 @@ func generateCRData() map[string]CRData {
 				},
 			},
 		},
-		"icp-clustercrd-admin-aggregate": {
-			Labels: map[string]string{
-				"app":                                 "auth-idp",
-				"kubernetes.io/bootstrapping":         "rbac-defaults",
-				"rbac.icp.com/aggregate-to-icp-admin": "true",
-				"rbac.authorization.k8s.io/aggregate-to-admin": "true",
-			},
-			MatchLabels: nil,
-			Rules: []rbacv1.PolicyRule{
-				{
-					APIGroups: []string{"*"},
-					Resources: []string{"clusters"},
-					Verbs:     adminVerbs,
-				},
-				{
-					APIGroups: []string{"app.ibm.com"},
-					Resources: []string{""},
-					Verbs:     adminVerbs,
-				},
-			},
-		},
 		"icp-clusterservicestatus-reader": {
 			Labels: map[string]string{
 				"app": "auth-idp",

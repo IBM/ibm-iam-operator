@@ -384,7 +384,9 @@ rules:
   - rbac.authorization.k8s.io
   resources:
   - clusterrolebindings
+  - clusterrolebindings/finalizers
   - rolebindings
+  - rolebindings/finalizers
   verbs:
   - create
   - delete
@@ -398,6 +400,7 @@ rules:
   - oidc.security.ibm.com
   resources:
   - clients
+  - clients/finalizers
   verbs:
   - create
   - delete

@@ -275,7 +275,7 @@ metadata:
                 }
               }
             },
-            "operatorVersion": "3.8.0",
+            "operatorVersion": "3.7.4",
             "papService": {
               "imageName": "iam-policy-administration",
               "imageRegistry": "quay.io/opencloudio",
@@ -540,7 +540,7 @@ metadata:
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
       the lifecycle of IAM services. With this operator, you can simply deploy and
       upgrade the IAM services
-    olm.skipRange: '>=3.5.0 <3.8.0'
+    olm.skipRange: '>=3.5.0 <3.7.4'
     repository: https://github.com/IBM/ibm-iam-operator
     support: IBM
   labels:
@@ -548,7 +548,7 @@ metadata:
     operatorframework.io/os.linux: supported 
     operatorframework.io/arch.amd64: supported
     operatorframework.io/arch.ppc64le: supported
-  name: ibm-iam-operator.v3.8.0
+  name: ibm-iam-operator.v3.7.4
   namespace: ibm-common-services
 spec:
   apiservicedefinitions: {}
@@ -1448,7 +1448,7 @@ spec:
         - Linux on IBM Z and LinuxONE
 
     ## Operator versions
-     - 3.8.0
+     - 3.7.4
      - 3.7.3
      - 3.7.2
      - 3.7.1
@@ -2050,7 +2050,7 @@ spec:
                 - name: IDENTITY_PROVIDER_TAG_OR_SHA
                   value: sha256:c236405be6cb45b396daa7ec8f480e08c6439d23d849e57dd60bd26a006a6296
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
-                  value: sha256:2c29055654d4e9c043d69b3e1160cbfea40efaf278b34f503399bc47599b018e
+                  value: sha256:33bc0009828331a8c7245a62dbb7b7bb458571728b4e339b9165c484f752ab5a
                 - name: POLICY_ADMINISTRATION_TAG_OR_SHA
                   value: sha256:f61ac066951f215dc4afd922660af9b3e52071c2fcd321659fa10bb28de71b56
                 - name: POLICY_DECISION_TAG_OR_SHA
@@ -2390,4 +2390,4 @@ spec:
   provider:
     name: IBM
   replaces: ibm-iam-operator.v3.7.3
-  version: 3.8.0
+  version: 3.7.4

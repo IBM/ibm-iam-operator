@@ -176,7 +176,6 @@ rules:
   resources:
   - clusterroles
   verbs:
-  - '*'
   - create
   - delete
   - get
@@ -184,12 +183,13 @@ rules:
   - patch
   - update
   - watch
+  - escalate
+  - bind
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - clusterrolebindings
   verbs:
-  - '*'
   - create
   - delete
   - get

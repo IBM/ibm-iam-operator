@@ -50,7 +50,7 @@ func buildAuditContainer(auditImage string, syslogTlsPath string, resources *cor
 		Env: []corev1.EnvVar{
 			{
 				Name:  "AUDIT_DIR",
-				Value: "/var/log/audit",
+				Value: "/app/audit",
 			},
 			{
 				Name: "AUDIT_URL",
@@ -68,7 +68,7 @@ func buildAuditContainer(auditImage string, syslogTlsPath string, resources *cor
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      "shared",
-				MountPath: "/var/log/audit",
+				MountPath: "/app/audit",
 			},
 			{
 				Name:      "audit-server-certs",
@@ -145,7 +145,7 @@ func buildPapContainer(papImage string, resources *corev1.ResourceRequirements) 
 			},
 			{
 				Name:      "shared",
-				MountPath: "/var/log/audit",
+				MountPath: "/app/audit",
 			},
 			{
 				Name:      "mongodb-client-cert",

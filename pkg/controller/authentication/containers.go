@@ -78,19 +78,7 @@ func buildAuditContainer(auditImage string, syslogTlsPath string, resources *cor
 			{
 				Name:  "AUDIT_DIR",
 				Value: "/var/log/audit",
-			},
-			{
-				Name: "AUDIT_URL",
-				ValueFrom: &corev1.EnvVarSource{
-					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "audit-logging-fluentd-ds-http-ingesturl",							
-						},
-						Key: "AuditLoggingSyslogIngestURL",
-						Optional: &trueVar,
-					},
-				},
-			},
+			},			
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
@@ -100,6 +88,10 @@ func buildAuditContainer(auditImage string, syslogTlsPath string, resources *cor
 			{
 				Name:      "audit-server-certs",
 				MountPath: syslogTlsPath,
+			},
+			{
+				Name:      "audit-ingest",
+				MountPath: "/etc/audit-ingest/",
 			},
 			{
 				Name:      "logrotate",

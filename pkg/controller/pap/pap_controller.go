@@ -758,6 +758,23 @@ func buildPapVolumes() []corev1.Volume {
 				},
 			},
 		},
+		{			
+			Name: "audit-ingest",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "audit-logging-fluentd-ds-http-ingesturl",
+					},
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "AuditLoggingSyslogIngestURL",
+							Path: "auditurl",
+						},
+					},
+					Optional: &trueVar,
+				},
+			},
+		},
 		{
 			Name: "shared",
 			VolumeSource: corev1.VolumeSource{

@@ -321,9 +321,9 @@ func buildPdpContainer(pdpImage string, resources *corev1.ResourceRequirements) 
 
 }
 
-func buildContainers(auditImage string, pdpImage string, journalPath string, auditResources *corev1.ResourceRequirements, pdpResources *corev1.ResourceRequirements) []corev1.Container {
+func buildContainers(auditImage string, syslogTlsPath string, pdpImage string,  auditResources *corev1.ResourceRequirements, pdpResources *corev1.ResourceRequirements) []corev1.Container {
 
-	auditContainer := buildAuditContainer(auditImage, journalPath, auditResources)
+	auditContainer := buildAuditContainer(auditImage, syslogTlsPath, auditResources)
 	pdpContainer := buildPdpContainer(pdpImage, pdpResources)
 
 	return []corev1.Container{auditContainer, pdpContainer}

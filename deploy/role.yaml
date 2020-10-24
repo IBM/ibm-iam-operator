@@ -137,20 +137,20 @@ metadata:
     app.kubernetes.io/managed-by: ibm-iam-operator
     app.kubernetes.io/name: ibm-iam-operator
 rules:
-- apiGroups:
-  - apiextensions.k8s.io
-  resources:
-  - customresourcedefinitions
+# - apiGroups:
+ # - apiextensions.k8s.io
+ # resources:
+  ## - customresourcedefinitions
   #needed in oidcclient-watcher for creating the CRD clients.oidc.security.ibm.com
   #needed in iam-policy-controller for creating the CRD iampolicies.iam.policies.ibm.com
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
+  ## verbs:
+  ## - create
+  ## - delete
+  ## - get
+  ## - list
+  ## - patch
+  ## - update
+  ## - watch
 - apiGroups:
   - admissionregistration.k8s.io
   resources:

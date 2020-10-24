@@ -178,11 +178,11 @@ func (r *ReconcileOIDCClientWatcher) Reconcile(request reconcile.Request) (recon
 		return recResult, err
 	}
 
-	currentCRD := &extv1.CustomResourceDefinition{}
-	recResult, err = r.handleCRD(instance, currentCRD)
-	if err != nil {
-		return recResult, err
-	}
+	//currentCRD := &extv1.CustomResourceDefinition{}
+	//recResult, err = r.handleCRD(instance, currentCRD)
+	//if err != nil {
+	//	return recResult, err
+	//}
 
 	currentClusterRole := &rbacv1.ClusterRole{}
 	recResult, err = r.handleClusterRole(instance, currentClusterRole)
@@ -555,9 +555,9 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 										LabelSelector: &metav1.LabelSelector{
 											MatchExpressions: []metav1.LabelSelectorRequirement{
 												metav1.LabelSelectorRequirement{
-													Key: "app",
+													Key:      "app",
 													Operator: metav1.LabelSelectorOpIn,
-													Values: []string{"oidcclient-watcher"},
+													Values:   []string{"oidcclient-watcher"},
 												},
 											},
 										},

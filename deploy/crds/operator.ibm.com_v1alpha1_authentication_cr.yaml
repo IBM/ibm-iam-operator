@@ -13,7 +13,7 @@ spec:
     imageRegistry: "quay.io/opencloudio"
     imageName: "audit-syslog-service"
     imageTag: "1.0.3"
-    syslogTlsPath: "etc/audit-tls"
+    syslogTlsPath: "/etc/audit-tls"
     resources:
       limits:
         cpu: 100m

@@ -361,20 +361,6 @@ func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1al
 	return nil
 }
 
-// Check if hosted on IBM Cloud
-func isPublicCloud(client client.Client, string namespace, string configMap) bool {
-	currentConfigMap = &corev1.ConfigMap{}
-	err := client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: namespace}, currentConfigMap)
-	if err != nil {
-		log.V(1).Info("Error getting configmap", configMap)
-		return false
-	} else if err == nil{
-		host := currentConfigMap.Data["cluster_kube_apiserver_host"]
-		strings.ContainsAny(host, "cloud.ibm,com")
-		return true
-	}
-}
-
 // Helper functions to check and remove string from a slice of strings.
 func containsString(slice []string, s string) bool {
 	for _, item := range slice {

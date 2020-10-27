@@ -18,6 +18,7 @@ package authentication
 
 import (
 	"context"
+
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -83,7 +84,7 @@ func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme
 	certSpec := certmgr.CertificateSpec{
 		SecretName: certificateData[certificateName]["secretName"],
 		IssuerRef: certmgr.ObjectReference{
-			Name: "cs-ca-clusterissuer",
+			Name: "cs-ca-issuer",
 			Kind: certmgr.ClusterIssuerKind,
 		},
 		CommonName: certificateData[certificateName]["cn"],

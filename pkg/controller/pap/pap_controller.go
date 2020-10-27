@@ -124,7 +124,7 @@ var iamPapCertificateValues = IamPapCertificateValues{
 }
 
 var configvalues = ConfigValues{
-	ClusterCAIssuer: "cs-ca-clusterissuer",
+	ClusterCAIssuer: "cs-ca-issuer",
 }
 
 /**

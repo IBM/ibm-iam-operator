@@ -18,6 +18,7 @@ package authentication
 
 import (
 	"context"
+
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -32,44 +33,10 @@ type CRData struct {
 }
 
 func generateCRData() map[string]CRData {
-	aggregationLabels := map[string]string{
-		"kubernetes.io/bootstrapping": "rbac-defaults",
-	}
-	aggregationRules := []rbacv1.PolicyRule{}
 	viewerVerbs := []string{"get", "list", "watch"}
-	editorVerbs := []string{"get", "list", "patch", "update", "watch"}
-	operatorVerbs := []string{"get", "list", "patch", "update", "watch", "create"}
 	adminVerbs := []string{"get", "list", "watch", "create", "delete", "deletecollection", "patch", "update"}
 
 	return map[string]CRData{
-		"icp:edit": {
-			Labels: aggregationLabels,
-			Rules:  aggregationRules,
-			MatchLabels: map[string]string{
-				"rbac.icp.com/aggregate-to-icp-edit": "true",
-			},
-		},
-		"icp:operate": {
-			Labels: aggregationLabels,
-			Rules:  aggregationRules,
-			MatchLabels: map[string]string{
-				"rbac.icp.com/aggregate-to-icp-operate": "true",
-			},
-		},
-		"icp:view": {
-			Labels: aggregationLabels,
-			Rules:  aggregationRules,
-			MatchLabels: map[string]string{
-				"rbac.icp.com/aggregate-to-icp-view": "true",
-			},
-		},
-		"icp:admin": {
-			Labels: aggregationLabels,
-			Rules:  aggregationRules,
-			MatchLabels: map[string]string{
-				"rbac.icp.com/aggregate-to-icp-admin": "true",
-			},
-		},
 		"icp:teamadmin": {
 			Labels:      nil,
 			MatchLabels: nil,
@@ -119,27 +86,6 @@ func generateCRData() map[string]CRData {
 				},
 			},
 		},
-		"icp-clustercrd-admin-aggregate": {
-			Labels: map[string]string{
-				"app":                                 "auth-idp",
-				"kubernetes.io/bootstrapping":         "rbac-defaults",
-				"rbac.icp.com/aggregate-to-icp-admin": "true",
-				"rbac.authorization.k8s.io/aggregate-to-admin": "true",
-			},
-			MatchLabels: nil,
-			Rules: []rbacv1.PolicyRule{
-				{
-					APIGroups: []string{"*"},
-					Resources: []string{"clusters"},
-					Verbs:     adminVerbs,
-				},
-				{
-					APIGroups: []string{"app.ibm.com"},
-					Resources: []string{""},
-					Verbs:     adminVerbs,
-				},
-			},
-		},
 		"icp-clusterservicestatus-reader": {
 			Labels: map[string]string{
 				"app": "auth-idp",
@@ -152,38 +98,6 @@ func generateCRData() map[string]CRData {
 					Verbs:     viewerVerbs,
 				},
 			},
-		},
-		"icp-operate-aggregate": {
-			Labels: map[string]string{
-				"kubernetes.io/bootstrapping":           "rbac-defaults",
-				"rbac.icp.com/aggregate-to-icp-operate": "true",
-			},
-			MatchLabels: nil,
-			Rules:       getPolicyRules(operatorVerbs),
-		},
-		"icp-view-aggregate": {
-			Labels: map[string]string{
-				"kubernetes.io/bootstrapping":        "rbac-defaults",
-				"rbac.icp.com/aggregate-to-icp-view": "true",
-			},
-			MatchLabels: nil,
-			Rules:       getPolicyRules(viewerVerbs),
-		},
-		"icp-edit-aggregate": {
-			Labels: map[string]string{
-				"kubernetes.io/bootstrapping":        "rbac-defaults",
-				"rbac.icp.com/aggregate-to-icp-edit": "true",
-			},
-			MatchLabels: nil,
-			Rules:       getPolicyRules(editorVerbs),
-		},
-		"icp-admin-aggregate": {
-			Labels: map[string]string{
-				"kubernetes.io/bootstrapping":         "rbac-defaults",
-				"rbac.icp.com/aggregate-to-icp-admin": "true",
-			},
-			MatchLabels: nil,
-			Rules:       getPolicyRules(adminVerbs),
 		},
 		"cloudpak-switchers": {
 			Labels:      nil,

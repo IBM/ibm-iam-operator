@@ -91,6 +91,7 @@ func buildAuditContainer(auditImage string, syslogTlsPath string, resources *cor
 				MountPath: "/var/log/audit",
 			},
 			{
+<<<<<<< HEAD
 				Name:      "audit-server-certs",
 				MountPath: syslogTlsPath,
 			},
@@ -99,6 +100,8 @@ func buildAuditContainer(auditImage string, syslogTlsPath string, resources *cor
 				MountPath: "/etc/audit-ingest/",
 			},
 			{
+=======
+>>>>>>> Update permissions
 				Name:      "logrotate",
 				MountPath: "/etc/logrotate.d/audit",
 				SubPath:   "audit",
@@ -114,10 +117,6 @@ func buildAuditContainer(auditImage string, syslogTlsPath string, resources *cor
 			RunAsNonRoot:             &trueVar,
 			ReadOnlyRootFilesystem:   &trueVar,
 			AllowPrivilegeEscalation: &falseVar,
-			RunAsUser:                &user,
-			SELinuxOptions: &corev1.SELinuxOptions{
-				Type: "spc_t",
-			},
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
 			},

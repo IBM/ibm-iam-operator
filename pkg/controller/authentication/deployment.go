@@ -191,9 +191,9 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 										LabelSelector: &metav1.LabelSelector{
 											MatchExpressions: []metav1.LabelSelectorRequirement{
 												metav1.LabelSelectorRequirement{
-													Key: "app",
+													Key:      "app",
 													Operator: metav1.LabelSelectorOpIn,
-													Values: []string{"auth-idp"},
+													Values:   []string{"auth-idp"},
 												},
 											},
 										},
@@ -216,9 +216,6 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret),
 					Containers:     buildContainers(instance, auditImage, authServiceImage, identityProviderImage, identityManagerImage, syslogTlsPath, icpConsoleURL),
 					InitContainers: buildInitContainers(mongoDBImage),
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser: &user,
-					},
 				},
 			},
 		},

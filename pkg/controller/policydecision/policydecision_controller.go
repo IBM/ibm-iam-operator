@@ -47,7 +47,6 @@ var trueVar bool = true
 var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
-var user int64 = 210000
 var port int32 = 7998
 var serviceAccountName string = "ibm-iam-operand-restricted"
 
@@ -584,9 +583,9 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 										LabelSelector: &metav1.LabelSelector{
 											MatchExpressions: []metav1.LabelSelectorRequirement{
 												metav1.LabelSelectorRequirement{
-													Key: "app",
+													Key:      "app",
 													Operator: metav1.LabelSelectorOpIn,
-													Values: []string{"auth-pdp"},
+													Values:   []string{"auth-pdp"},
 												},
 											},
 										},
@@ -609,9 +608,6 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 					Volumes:        buildPdpVolumes(),
 					Containers:     buildContainers(auditImage, pdpImage, syslogTlsPath, auditResources, pdpResources),
 					InitContainers: buildInitContainers(mongoDBImage),
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser: &user,
-					},
 				},
 			},
 		},

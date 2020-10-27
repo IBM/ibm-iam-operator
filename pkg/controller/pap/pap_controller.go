@@ -106,7 +106,6 @@ var trueVar bool = true
 var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
-var user int64 = 21000
 var serviceAccountName string = "ibm-iam-operand-restricted"
 
 //var port int32 = 39001
@@ -671,9 +670,9 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 										LabelSelector: &metav1.LabelSelector{
 											MatchExpressions: []metav1.LabelSelectorRequirement{
 												metav1.LabelSelectorRequirement{
-													Key: "app",
+													Key:      "app",
 													Operator: metav1.LabelSelectorOpIn,
-													Values: []string{"auth-pap"},
+													Values:   []string{"auth-pap"},
 												},
 											},
 										},
@@ -693,11 +692,16 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 							Operator: corev1.TolerationOpExists,
 						},
 					},
+<<<<<<< HEAD
 					Volumes:    buildPapVolumes(),
 					Containers: buildContainers(auditImage, papImage, syslogTlsPath, auditResources, papResources),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &user,
 					},
+=======
+					Volumes:    buildPapVolumes(journalPath),
+					Containers: buildContainers(auditImage, papImage, journalPath, auditResources, papResources),
+>>>>>>> Update permissions
 				},
 			},
 		},
@@ -750,6 +754,7 @@ func buildPapVolumes() []corev1.Volume {
 			},
 		},
 		{
+<<<<<<< HEAD
 			Name: "audit-server-certs",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
@@ -776,6 +781,8 @@ func buildPapVolumes() []corev1.Volume {
 			},
 		},
 		{
+=======
+>>>>>>> Update permissions
 			Name: "shared",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{},

@@ -60,10 +60,10 @@ metadata:
           },
           "spec": {
             "auditService": {
-              "imageName": "audit-syslog-service",
+              "imageName": "icp-audit-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "1.0.2",
-              "syslogTlsPath": "etc/audit-tls",
+              "imageTag": "3.4.2",
+              "syslogTlsPath": "/run/systemd/journal",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -120,9 +120,9 @@ metadata:
           },
           "spec": {
             "auditService": {
-              "imageName": "audit-syslog-service",
+              "imageName": "icp-audit-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "1.0.2",
+              "imageTag": "3.4.2",
               "journalPath": "/run/systemd/journal",
               "resources": {
                 "limits": {
@@ -260,9 +260,9 @@ metadata:
           },
           "spec": {
             "auditService": {
-              "imageName": "audit-syslog-service",
+              "imageName": "icp-audit-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "1.0.2",
+              "imageTag": "3.4.2",
               "journalPath": "/run/systemd/journal",
               "resources": {
                 "limits": {

@@ -114,9 +114,13 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 							}
 						}
 					} else {
+						isPublicCld := isPublicCloud(r.Client, instance.Namespace, "ibmcloud-cluster-info config")
 						//user specifies roksEnabled and roksURL, but not roksPrefix, then we set prefix to IAM# (consistent with previous release behavior)
 						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL != "https://roks.domain.name:443" && instance.Spec.Config.ROKSUserPrefix == "changeme" {
 							newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
+						}
+						if instance.Spec.Config.BootStrapUserId && instance.Spec.Config.BootStrapUserId != "kubeadmin" && isPublicCld) {
+							newConfigMap.Data["BOOTSTRAP_USERID] = ""
 						}
 					}
 				}
@@ -361,6 +365,19 @@ func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, icpConsoleU
 	}
 	return newConfigMap
 
+}
+
+// Check if hosted on IBM Cloud
+func isPublicCloud(client client.Client, string namespace, string configMap) bool {
+	currentConfigMap = &corev1.ConfigMap{}
+	err := client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: namespace}, currentConfigMap)
+	if err != nil {
+		log.V(1).Info("Error getting configmap", configMap)
+		return false
+	} else if err == nil {
+		host := currentConfigMap.Data["cluster_kube_apiserver_host"]
+		return strings.HasSuffix(host, "cloud.ibm.com")
+	}
 }
 
 func readROKSURL(instance *operatorv1alpha1.Authentication) (string, error) {

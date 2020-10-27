@@ -1598,12 +1598,6 @@ spec:
           - update
           - patch
           - delete
-        - apiGroups:
-          - certmanager.k8s.io
-          resources:
-          - clusterissuers
-          verbs:
-          - use
           # Investigate further whether we can avoid the creation of clusteroles and clusterrolbeindings
         - apiGroups:
           - rbac.authorization.k8s.io

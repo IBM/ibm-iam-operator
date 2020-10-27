@@ -17,12 +17,13 @@
 package authentication
 
 import (
+	"strconv"
+	"strings"
+
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"strconv"
-	"strings"
 )
 
 func buildInitContainers(mongoDBImage string) []corev1.Container {
@@ -87,10 +88,6 @@ func buildAuditContainer(auditImage string, journalPath string, resources *corev
 				MountPath: "/var/log/audit",
 			},
 			{
-				Name:      "journal",
-				MountPath: journalPath,
-			},
-			{
 				Name:      "logrotate",
 				MountPath: "/etc/logrotate.d/audit",
 				SubPath:   "audit",
@@ -106,10 +103,6 @@ func buildAuditContainer(auditImage string, journalPath string, resources *corev
 			RunAsNonRoot:             &trueVar,
 			ReadOnlyRootFilesystem:   &trueVar,
 			AllowPrivilegeEscalation: &falseVar,
-			RunAsUser:                &user,
-			SELinuxOptions: &corev1.SELinuxOptions{
-				Type: "spc_t",
-			},
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
 			},

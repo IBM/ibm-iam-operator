@@ -106,8 +106,7 @@ var trueVar bool = true
 var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
-var user int64 = 21000
-var serviceAccountName string = "ibm-iam-operand-privileged"
+var serviceAccountName string = "ibm-iam-operand-restricted"
 
 //var port int32 = 39001
 var iamPapServiceValues = IamPapServiceValues{
@@ -671,9 +670,9 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 										LabelSelector: &metav1.LabelSelector{
 											MatchExpressions: []metav1.LabelSelectorRequirement{
 												metav1.LabelSelectorRequirement{
-													Key: "app",
+													Key:      "app",
 													Operator: metav1.LabelSelectorOpIn,
-													Values: []string{"auth-pap"},
+													Values:   []string{"auth-pap"},
 												},
 											},
 										},
@@ -695,9 +694,6 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 					},
 					Volumes:    buildPapVolumes(journalPath),
 					Containers: buildContainers(auditImage, papImage, journalPath, auditResources, papResources),
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser: &user,
-					},
 				},
 			},
 		},
@@ -746,14 +742,6 @@ func buildPapVolumes(journalPath string) []corev1.Volume {
 							Path: "ca.crt",
 						},
 					},
-				},
-			},
-		},
-		{
-			Name: "journal",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: journalPath,
 				},
 			},
 		},

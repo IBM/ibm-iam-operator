@@ -18,6 +18,9 @@ package authentication
 
 import (
 	"context"
+	"math/rand"
+	"time"
+
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	userv1 "github.com/openshift/api/user/v1"
@@ -32,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"math/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -40,11 +42,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"time"
 )
 
 var log = logf.Log.WithName("controller_authentication")
-var user int64 = 1000552100
 var fullAccess int32 = 0777
 var trueVar bool = true
 var falseVar bool = false
@@ -53,7 +53,7 @@ var partialAccess int32 = 420
 var authServicePort int32 = 9443
 var identityProviderPort int32 = 4300
 var identityManagerPort int32 = 4500
-var serviceAccountName string = "ibm-iam-operand-privileged"
+var serviceAccountName string = "ibm-iam-operand-restricted"
 
 var cpu10 = resource.NewMilliQuantity(10, resource.DecimalSI)            // 10m
 var cpu50 = resource.NewMilliQuantity(50, resource.DecimalSI)            // 50m

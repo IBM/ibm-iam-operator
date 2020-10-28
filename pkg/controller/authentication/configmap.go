@@ -378,6 +378,7 @@ func isPublicCloud(client client.Client, namespace string , configMap string) bo
 		host := currentConfigMap.Data["cluster_kube_apiserver_host"]
 		return strings.HasSuffix(host, "cloud.ibm.com")
 	}
+	return false
 }
 
 func readROKSURL(instance *operatorv1alpha1.Authentication) (string, error) {

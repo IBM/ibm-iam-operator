@@ -114,12 +114,12 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 							}
 						}
 					} else {
-						isPublicCld := isPublicCloud(r.Client, instance.Namespace, "ibmcloud-cluster-info config")
+						isPublicCld := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info config")
 						//user specifies roksEnabled and roksURL, but not roksPrefix, then we set prefix to IAM# (consistent with previous release behavior)
 						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL != "https://roks.domain.name:443" && instance.Spec.Config.ROKSUserPrefix == "changeme" {
 							newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
 						}
-						if instance.Spec.Config.BootStrapUserId && instance.Spec.Config.BootStrapUserId == "kubeadmin" && isPublicCld {
+						if instance.Spec.Config.BootstrapUserId && instance.Spec.Config.BootstrapUserId == "kubeadmin" && isPublicCld {
 							newConfigMap.Data["BOOTSTRAP_USERID"] = ""
 						}
 					}
@@ -368,8 +368,8 @@ func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, icpConsoleU
 }
 
 // Check if hosted on IBM Cloud
-func isPublicCloud(client client.Client, string namespace, string configMap) bool {
-	currentConfigMap = &corev1.ConfigMap{}
+func isPublicCloud(client client.Client, namespace string , configMap string) bool {
+	currentConfigMap := &corev1.ConfigMap{}
 	err := client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: namespace}, currentConfigMap)
 	if err != nil {
 		log.V(1).Info("Error getting configmap", configMap)

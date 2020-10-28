@@ -120,7 +120,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 							newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
 						}
 						if instance.Spec.Config.BootStrapUserId && instance.Spec.Config.BootStrapUserId == "kubeadmin" && isPublicCld {
-							newConfigMap.Data["BOOTSTRAP_USERID] = ""
+							newConfigMap.Data["BOOTSTRAP_USERID"] = ""
 						}
 					}
 				}

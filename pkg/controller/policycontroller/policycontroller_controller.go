@@ -176,9 +176,9 @@ func (r *ReconcilePolicyController) Reconcile(request reconcile.Request) (reconc
 		return recResult, recErr
 	}
 
-	// If the CustomResourceDefinition does not exist, create it
-	iamPolControllerCRD := &extv1.CustomResourceDefinition{}
-	recResult, recErr = r.handleCRD(instance, iamPolControllerCRD)
+	// If the ClusterRole does not exist, create it
+	iamPolControllerClusterRole := &rbacv1.ClusterRole{}
+	recResult, recErr = r.handleClusterRole(instance, iamPolControllerClusterRole)
 	if recErr != nil {
 		return recResult, recErr
 	}

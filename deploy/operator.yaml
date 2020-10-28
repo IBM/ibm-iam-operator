@@ -38,7 +38,7 @@ spec:
       containers:
         - name: ibm-iam-operator
           # Replace this with the built image name
-          image: hyc-cloud-private-scratch-docker-local.artifactory.swg-devops.com/iam-operator:test
+          image: quay.io/opencloudio
           command:
           - ibm-iam-operator
           imagePullPolicy: Always

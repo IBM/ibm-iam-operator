@@ -471,7 +471,7 @@ func (r *ReconcilePap) certificateForPap(instance *operatorv1alpha1.Pap) *certmg
 			SecretName: iamPapCertificateValues.SecretName,
 			IssuerRef: certmgr.ObjectReference{
 				Name: configvalues.ClusterCAIssuer,
-				Kind: certmgr.ClusterIssuerKind,
+				Kind: certmgr.IssuerKind,
 			},
 			CommonName: iamPapCertificateValues.CN,
 			DNSNames:   []string{iamPapCertificateValues.CN},

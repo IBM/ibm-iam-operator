@@ -383,7 +383,7 @@ func (r *ReconcilePolicyDecision) certificateForPolicyDecision(instance *operato
 			SecretName: "auth-pdp-secret",
 			IssuerRef: certmgr.ObjectReference{
 				Name: "cs-ca-issuer",
-				Kind: certmgr.ClusterIssuerKind,
+				Kind: certmgr.IssuerKind,
 			},
 			CommonName: "iam-pdp",
 			DNSNames:   []string{"iam-pdp"},

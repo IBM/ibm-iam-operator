@@ -119,7 +119,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL != "https://roks.domain.name:443" && instance.Spec.Config.ROKSUserPrefix == "changeme" {
 							newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
 						}
-						if instance.Spec.Config.BootStrapUserId && instance.Spec.Config.BootStrapUserId != "kubeadmin" && isPublicCld) {
+						if instance.Spec.Config.BootStrapUserId && instance.Spec.Config.BootStrapUserId == "kubeadmin" && isPublicCld {
 							newConfigMap.Data["BOOTSTRAP_USERID] = ""
 						}
 					}

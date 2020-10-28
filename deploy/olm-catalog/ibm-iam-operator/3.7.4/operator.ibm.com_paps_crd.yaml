@@ -39,7 +39,7 @@ spec:
                   type: string
                 imageTag:
                   type: string
-                syslogTlsPath:
+                journalPath:
                   type: string
                 resources:
                   description: ResourceRequirements describes the compute resource
@@ -64,7 +64,7 @@ spec:
               - imageName
               - imageRegistry
               - imageTag
-              - syslogTlsPath
+              - journalPath
               type: object
             operatorVersion:
               description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster

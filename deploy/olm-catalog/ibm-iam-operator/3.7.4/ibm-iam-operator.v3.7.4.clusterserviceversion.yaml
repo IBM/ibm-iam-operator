@@ -63,7 +63,7 @@ metadata:
               "imageName": "icp-audit-service",
               "imageRegistry": "quay.io/opencloudio",
               "imageTag": "3.4.2",
-              "syslogTlsPath": "/run/systemd/journal",
+              "journalPath": "/run/systemd/journal",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -2064,7 +2064,7 @@ spec:
                 - name: IAM_ONBOARDING_TAG_OR_SHA
                   value: sha256:2557ef65f807d62769e264f7360bf40ae5cdaa4b2e6bea8f479cfcec7e8c52a8
                 - name: AUDIT_TAG_OR_SHA
-                  value: sha256:8ba519b21a386347990f0c57682aefaa3c3c97cf44d6fdba3d5d4b730c78dad5
+                  value: sha256:3cfb9f3cc99379758f73f1cd2e6ad4dd4bc61e13cc55d7c34b0d0e280cb47421
                 - name: WATCH_NAMESPACE
                   valueFrom:
                     fieldRef:

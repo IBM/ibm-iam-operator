@@ -1487,8 +1487,6 @@ spec:
         - apiGroups:
           - ""
           resources:
-          #secrets are needed only if we have to watch for secrets outside our namespace
-          - secrets
           #the namespaces are being watched by the oidcclientwatcher
           - namespaces
           verbs:
@@ -1518,8 +1516,6 @@ spec:
           resources:
           - clusterrolebindings
           - clusterrolebindings/finalizers
-          - rolebindings
-          - rolebindings/finalizers
           verbs:
           - create
           - delete
@@ -1528,19 +1524,6 @@ spec:
           - patch
           - update
           - watch
-        # used by oidcclient watcher
-        - apiGroups:
-          - oidc.security.ibm.com
-          resources:
-          - clients
-          - clients/finalizers
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
         # fetch users call is used in identity manager
         - apiGroups:
           - user.openshift.io
@@ -1569,20 +1552,7 @@ spec:
           - patch
           - update
           - watch
-          - delete
-        # this is used by iam poliy controller
-        - apiGroups:
-          - iam.policies.ibm.com
-          resources:
-          - iampolicies
-          verbs:
-          - create
-          - get
-          - list
-          - patch
-          - update
-          - watch
-          - delete                                                  
+          - delete                                                 
         serviceAccountName: ibm-iam-operand-restricted
       - rules:
         - apiGroups:
@@ -1758,6 +1728,43 @@ spec:
           - patch
           - update
           - watch
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - rolebindings
+          - rolebindings/finalizers
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - oidc.security.ibm.com
+          resources:
+          - clients
+          - clients/finalizers
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+        - apiGroups:
+          - iam.policies.ibm.com
+          resources:
+          - iampolicies
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+          - delete 
         serviceAccountName: ibm-iam-operand-restricted
       - rules:
         - apiGroups:

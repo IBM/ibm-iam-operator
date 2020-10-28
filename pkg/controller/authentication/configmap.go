@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -119,7 +120,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL != "https://roks.domain.name:443" && instance.Spec.Config.ROKSUserPrefix == "changeme" {
 							newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
 						}
-						if instance.Spec.Config.BootstrapUserId && instance.Spec.Config.BootstrapUserId == "kubeadmin" && isPublicCld {
+						if (instance.Spec.Config.BootstrapUserId && instance.Spec.Config.BootstrapUserId == "kubeadmin" && isPublicCld) {
 							newConfigMap.Data["BOOTSTRAP_USERID"] = ""
 						}
 					}

@@ -115,9 +115,9 @@ func buildAuditContainer(auditImage string, syslogTlsPath string, resources *cor
 			ReadOnlyRootFilesystem:   &trueVar,
 			AllowPrivilegeEscalation: &falseVar,
 			RunAsUser:                &user,
-			// SELinuxOptions: &corev1.SELinuxOptions{
-			// 	Type: "spc_t",
-			// },
+			SELinuxOptions: &corev1.SELinuxOptions{
+				Type: "spc_t",
+			},
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
 			},

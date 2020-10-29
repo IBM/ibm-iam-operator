@@ -106,7 +106,6 @@ var trueVar bool = true
 var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
-var user int64 = 21000
 var serviceAccountName string = "ibm-iam-operand-restricted"
 
 //var port int32 = 39001
@@ -125,7 +124,7 @@ var iamPapCertificateValues = IamPapCertificateValues{
 }
 
 var configvalues = ConfigValues{
-	ClusterCAIssuer: "cs-ca-clusterissuer",
+	ClusterCAIssuer: "cs-ca-issuer",
 }
 
 /**
@@ -472,7 +471,7 @@ func (r *ReconcilePap) certificateForPap(instance *operatorv1alpha1.Pap) *certmg
 			SecretName: iamPapCertificateValues.SecretName,
 			IssuerRef: certmgr.ObjectReference{
 				Name: configvalues.ClusterCAIssuer,
-				Kind: certmgr.ClusterIssuerKind,
+				Kind: certmgr.IssuerKind,
 			},
 			CommonName: iamPapCertificateValues.CN,
 			DNSNames:   []string{iamPapCertificateValues.CN},
@@ -671,9 +670,9 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 										LabelSelector: &metav1.LabelSelector{
 											MatchExpressions: []metav1.LabelSelectorRequirement{
 												metav1.LabelSelectorRequirement{
-													Key: "app",
+													Key:      "app",
 													Operator: metav1.LabelSelectorOpIn,
-													Values: []string{"auth-pap"},
+													Values:   []string{"auth-pap"},
 												},
 											},
 										},
@@ -695,9 +694,6 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 					},
 					Volumes:    buildPapVolumes(),
 					Containers: buildContainers(auditImage, papImage, syslogTlsPath, auditResources, papResources),
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser: &user,
-					},
 				},
 			},
 		},

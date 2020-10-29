@@ -176,13 +176,6 @@ func (r *ReconcilePolicyController) Reconcile(request reconcile.Request) (reconc
 		return recResult, recErr
 	}
 
-	// If the CustomResourceDefinition does not exist, create it
-	iamPolControllerCRD := &extv1.CustomResourceDefinition{}
-	recResult, recErr = r.handleCRD(instance, iamPolControllerCRD)
-	if recErr != nil {
-		return recResult, recErr
-	}
-
 	// If the ClusterRole does not exist, create it
 	iamPolControllerClusterRole := &rbacv1.ClusterRole{}
 	recResult, recErr = r.handleClusterRole(instance, iamPolControllerClusterRole)
@@ -546,9 +539,9 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 										LabelSelector: &metav1.LabelSelector{
 											MatchExpressions: []metav1.LabelSelectorRequirement{
 												metav1.LabelSelectorRequirement{
-													Key: "app",
+													Key:      "app",
 													Operator: metav1.LabelSelectorOpIn,
-													Values: []string{"iam-policy-controller"},
+													Values:   []string{"iam-policy-controller"},
 												},
 											},
 										},

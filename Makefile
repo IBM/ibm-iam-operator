@@ -63,56 +63,58 @@ install: ## Install all resources (CR/CRD's, RBCA and Operator)
 	- export DEPLOY_DIR=deploy/crds
 	- export WATCH_NAMESPACE=${NAMESPACE}
 	@echo ....... Creating namespace .......
-	- kubectl create namespace ${NAMESPACE}
+	- oc create namespace ${NAMESPACE}
 	@echo ....... Applying CRDS and Operator .......
-	- kubectl apply -f deploy/crds/operator.ibm.com_authentications_crd.yaml
-	- kubectl apply -f deploy/crds/operator.ibm.com_oidcclientwatchers_crd.yaml
-	- kubectl apply -f deploy/crds/operator.ibm.com_paps_crd.yaml
-	- kubectl apply -f deploy/crds/operator.ibm.com_policycontrollers_crd.yaml
-	- kubectl apply -f deploy/crds/operator.ibm.com_policydecisions_crd.yaml
-	- kubectl apply -f deploy/crds/operator.ibm.com_secretwatchers_crd.yaml
-	- kubectl apply -f deploy/crds/operator.ibm.com_securityonboardings_crd.yaml
+	- oc apply -f deploy/crds/operator.ibm.com_authentications_crd.yaml
+	- oc apply -f deploy/crds/operator.ibm.com_oidcclientwatchers_crd.yaml
+	- oc apply -f deploy/crds/operator.ibm.com_paps_crd.yaml
+	- oc apply -f deploy/crds/operator.ibm.com_policycontrollers_crd.yaml
+	- oc apply -f deploy/crds/operator.ibm.com_policydecisions_crd.yaml
+	- oc apply -f deploy/crds/operator.ibm.com_secretwatchers_crd.yaml
+	- oc apply -f deploy/crds/operator.ibm.com_securityonboardings_crd.yaml
+	- oc apply -f deploy/crds/iam.policies_v1alpha1_iampolicy.yaml
+	- oc apply -f deploy/crds/oidc_v1_client_crd.yaml
 	@echo ....... Applying RBAC .......
-	- kubectl apply -f deploy/service_account.yaml -n ${NAMESPACE}
-	- kubectl apply -f deploy/role.yaml -n ${NAMESPACE}
-	- kubectl apply -f deploy/role_binding.yaml -n ${NAMESPACE}
+	- oc apply -f deploy/service_account.yaml -n ${NAMESPACE}
+	- oc apply -f deploy/role.yaml -n ${NAMESPACE}
+	- oc apply -f deploy/role_binding.yaml -n ${NAMESPACE}
 	@echo ....... Applying Operator .......
-	- kubectl apply -f deploy/operator.yaml -n ${NAMESPACE}
+	- oc apply -f deploy/operator.yaml -n ${NAMESPACE}
 	@echo ....... Creating the Instance .......
-	- kubectl apply -f deploy/crds/operator.ibm.com_v1alpha1_authentication_cr.yaml -n ${NAMESPACE}
-	- kubectl apply -f deploy/crds/operator.ibm.com_v1alpha1_oidcclientwatcher_cr.yaml -n ${NAMESPACE}
-	- kubectl apply -f deploy/crds/operator.ibm.com_v1alpha1_pap_cr.yaml -n ${NAMESPACE}
-	- kubectl apply -f deploy/crds/operator.ibm.com_v1alpha1_policycontroller_cr.yaml -n ${NAMESPACE}
-	- kubectl apply -f deploy/crds/operator.ibm.com_v1alpha1_policydecision_cr.yaml -n ${NAMESPACE}
-	- kubectl apply -f deploy/crds/operator.ibm.com_v1alpha1_secretwatcher_cr.yaml -n ${NAMESPACE}
-	- kubectl apply -f deploy/crds/operator.ibm.com_v1alpha1_securityonboarding_cr.yaml -n ${NAMESPACE}
+	- oc apply -f deploy/crds/operator.ibm.com_v1alpha1_authentication_cr.yaml -n ${NAMESPACE}
+	- oc apply -f deploy/crds/operator.ibm.com_v1alpha1_oidcclientwatcher_cr.yaml -n ${NAMESPACE}
+	- oc apply -f deploy/crds/operator.ibm.com_v1alpha1_pap_cr.yaml -n ${NAMESPACE}
+	- oc apply -f deploy/crds/operator.ibm.com_v1alpha1_policycontroller_cr.yaml -n ${NAMESPACE}
+	- oc apply -f deploy/crds/operator.ibm.com_v1alpha1_policydecision_cr.yaml -n ${NAMESPACE}
+	- oc apply -f deploy/crds/operator.ibm.com_v1alpha1_secretwatcher_cr.yaml -n ${NAMESPACE}
+	- oc apply -f deploy/crds/operator.ibm.com_v1alpha1_securityonboarding_cr.yaml -n ${NAMESPACE}
 
 uninstall: ## Uninstall all that all performed in the $ make install
 	@echo ....... Uninstalling .......
 	@echo ....... Deleting CR .......
-	- kubectl delete -f deploy/crds/operator.ibm.com_v1alpha1_authentication_cr.yaml -n ${NAMESPACE}
-	- kubectl delete -f deploy/crds/operator.ibm.com_v1alpha1_oidcclientwatcher_cr.yaml -n ${NAMESPACE}
-	- kubectl delete -f deploy/crds/operator.ibm.com_v1alpha1_pap_cr.yaml -n ${NAMESPACE}
-	- kubectl delete -f deploy/crds/operator.ibm.com_v1alpha1_policycontroller_cr.yaml -n ${NAMESPACE}
-	- kubectl delete -f deploy/crds/operator.ibm.com_v1alpha1_policydecision_cr.yaml -n ${NAMESPACE}
-	- kubectl delete -f deploy/crds/operator.ibm.com_v1alpha1_secretwatcher_cr.yaml -n ${NAMESPACE}
-	- kubectl delete -f deploy/crds/operator.ibm.com_v1alpha1_securityonboarding_cr.yaml -n ${NAMESPACE}
+	- oc delete -f deploy/crds/operator.ibm.com_v1alpha1_authentication_cr.yaml -n ${NAMESPACE}
+	- oc delete -f deploy/crds/operator.ibm.com_v1alpha1_oidcclientwatcher_cr.yaml -n ${NAMESPACE}
+	- oc delete -f deploy/crds/operator.ibm.com_v1alpha1_pap_cr.yaml -n ${NAMESPACE}
+	- oc delete -f deploy/crds/operator.ibm.com_v1alpha1_policycontroller_cr.yaml -n ${NAMESPACE}
+	- oc delete -f deploy/crds/operator.ibm.com_v1alpha1_policydecision_cr.yaml -n ${NAMESPACE}
+	- oc delete -f deploy/crds/operator.ibm.com_v1alpha1_secretwatcher_cr.yaml -n ${NAMESPACE}
+	- oc delete -f deploy/crds/operator.ibm.com_v1alpha1_securityonboarding_cr.yaml -n ${NAMESPACE}
 	@echo ....... Deleting Operator .......
-	- kubectl delete -f deploy/operator.yaml -n ${NAMESPACE}
+	- oc delete -f deploy/operator.yaml -n ${NAMESPACE}
 	@echo ....... Deleting CRDs.......
-	- kubectl delete -f deploy/crds/operator.ibm.com_authentications_crd.yaml
-	- kubectl delete -f deploy/crds/operator.ibm.com_oidcclientwatchers_crd.yaml
-	- kubectl delete -f deploy/crds/operator.ibm.com_paps_crd.yaml
-	- kubectl delete -f deploy/crds/operator.ibm.com_policycontrollers_crd.yaml
-	- kubectl delete -f deploy/crds/operator.ibm.com_policydecisions_crd.yaml
-	- kubectl delete -f deploy/crds/operator.ibm.com_secretwatchers_crd.yaml
-	- kubectl delete -f deploy/crds/operator.ibm.com_securityonboardings_crd.yaml
+	- oc delete -f deploy/crds/operator.ibm.com_authentications_crd.yaml
+	- oc delete -f deploy/crds/operator.ibm.com_oidcclientwatchers_crd.yaml
+	- oc delete -f deploy/crds/operator.ibm.com_paps_crd.yaml
+	- oc delete -f deploy/crds/operator.ibm.com_policycontrollers_crd.yaml
+	- oc delete -f deploy/crds/operator.ibm.com_policydecisions_crd.yaml
+	- oc delete -f deploy/crds/operator.ibm.com_secretwatchers_crd.yaml
+	- oc delete -f deploy/crds/operator.ibm.com_securityonboardings_crd.yaml
 	@echo ....... Deleting Rules and Service Account .......
-	- kubectl delete -f deploy/role_binding.yaml -n ${NAMESPACE}
-	- kubectl delete -f deploy/service_account.yaml -n ${NAMESPACE}
-	- kubectl delete -f deploy/role.yaml -n ${NAMESPACE}
+	- oc delete -f deploy/role_binding.yaml -n ${NAMESPACE}
+	- oc delete -f deploy/service_account.yaml -n ${NAMESPACE}
+	- oc delete -f deploy/role.yaml -n ${NAMESPACE}
 	@echo ....... Deleting namespace ${NAMESPACE}.......
-	#- kubectl delete namespace ${NAMESPACE}
+	#- oc delete namespace ${NAMESPACE}
 
 ##@ Development
 

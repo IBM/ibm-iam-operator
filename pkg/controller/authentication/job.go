@@ -113,9 +113,6 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 					},
 					Volumes:    buildVolumes(),
 					Containers: buildContainer(jobName, image, resources),
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser: &user,
-					},
 				},
 			},
 		},

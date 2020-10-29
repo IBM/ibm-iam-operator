@@ -2083,7 +2083,7 @@ spec:
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
                   value: sha256:afe7d9bbe684d460f012b3d4be8e049ecd68f2c4efa7816d395dc4d857628e28
                 - name: POLICY_ADMINISTRATION_TAG_OR_SHA
-                  value: sha256:f61ac066951f215dc4afd922660af9b3e52071c2fcd321659fa10bb28de71b56
+                  value: sha256:4176c8fd463667f773d7db90b4a8b813f19871444da2c729467c142f968619e2
                 - name: POLICY_DECISION_TAG_OR_SHA
                   value: sha256:dea8a4508142c0a59f9ae12ef770988af34b3f03f1d0fdea9df305125f828f7d
                 - name: SECRET_WATCHER_TAG_OR_SHA
@@ -2093,7 +2093,7 @@ spec:
                 - name: POLICY_CONTROLLER_TAG_OR_SHA
                   value: sha256:1dc66d59887dc6730f7b39e61d228592c8b585376ebfdc3642aec37bba0193f5
                 - name: IAM_ONBOARDING_TAG_OR_SHA
-                  value: sha256:2557ef65f807d62769e264f7360bf40ae5cdaa4b2e6bea8f479cfcec7e8c52a8
+                  value: sha256:85359c5b7707dd2f2a9204268d280acfa5532ffb1cbb264bd88c27b256c49bb2
                 - name: AUDIT_TAG_OR_SHA
                   value: sha256:1466c23e64e2dddf68374c6997dec8bb1d3054d1a620e059ed5ff168887e95cc
                 - name: WATCH_NAMESPACE

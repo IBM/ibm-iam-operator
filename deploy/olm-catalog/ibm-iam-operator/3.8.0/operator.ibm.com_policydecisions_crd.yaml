@@ -39,7 +39,7 @@ spec:
                   type: string
                 imageTag:
                   type: string
-                journalPath:
+                syslogTlsPath:
                   type: string
                 resources:
                   description: ResourceRequirements describes the compute resource
@@ -64,7 +64,7 @@ spec:
               - imageName
               - imageRegistry
               - imageTag
-              - journalPath
+              - syslogTlsPath
               type: object
             imageName:
               type: string

@@ -11,9 +11,9 @@ spec:
   replicas: 1
   auditService: 
     imageRegistry: "quay.io/opencloudio"
-    imageName: "icp-audit-service"
-    imageTag: "3.4.2"
-    journalPath: "/run/systemd/journal"
+    imageName: "audit-syslog-service"
+    imageTag: "1.0.3"
+    syslogTlsPath: "/etc/audit-tls"
     resources:
       limits:
         cpu: 100m

@@ -30,7 +30,7 @@ var memory20 = resource.NewQuantity(20*1024*1024, resource.BinarySI)     // 20Mi
 var memory200 = resource.NewQuantity(200*1024*1024, resource.BinarySI)   // 200Mi
 var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024Mi
 
-func buildAuditContainer(auditImage string, journalPath string, resources *corev1.ResourceRequirements) corev1.Container {
+func buildAuditContainer(auditImage string, syslogTlsPath string, resources *corev1.ResourceRequirements) corev1.Container {
 
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
@@ -59,8 +59,12 @@ func buildAuditContainer(auditImage string, journalPath string, resources *corev
 				MountPath: "/app/audit",
 			},
 			{
-				Name:      "journal",
-				MountPath: journalPath,
+				Name:      "audit-server-certs",
+				MountPath: syslogTlsPath,
+			},
+			{
+				Name:      "audit-ingest",
+				MountPath: "/etc/audit-ingest/",
 			},
 			{
 				Name:      "logrotate",
@@ -333,9 +337,9 @@ func buildPapContainer(papImage string, resources *corev1.ResourceRequirements) 
 
 }
 
-func buildContainers(auditImage string, papImage string, journalPath string, auditResources *corev1.ResourceRequirements, papResources *corev1.ResourceRequirements) []corev1.Container {
+func buildContainers(auditImage string, papImage string, syslogTlsPath string, auditResources *corev1.ResourceRequirements, papResources *corev1.ResourceRequirements) []corev1.Container {
 
-	auditContainer := buildAuditContainer(auditImage, journalPath, auditResources)
+	auditContainer := buildAuditContainer(auditImage, syslogTlsPath, auditResources)
 	papContainer := buildPapContainer(papImage, papResources)
 
 	return []corev1.Container{auditContainer, papContainer}

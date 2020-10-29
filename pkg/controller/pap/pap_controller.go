@@ -96,7 +96,7 @@ type IcpAuditValues struct {
 		}
 	}
 	Config struct {
-		JournalPath string
+		SyslogTlsPath string
 	}
 }
 
@@ -107,7 +107,7 @@ var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
 var user int64 = 21000
-var serviceAccountName string = "ibm-iam-operand-privileged"
+var serviceAccountName string = "ibm-iam-operand-restricted"
 
 //var port int32 = 39001
 var iamPapServiceValues = IamPapServiceValues{
@@ -533,7 +533,7 @@ func (r *ReconcilePap) configMapForPap(instance *operatorv1alpha1.Pap) *corev1.C
 		Data: map[string]string{
 			"AUDIT_ENABLED": "false",
 			"AUDIT_DETAIL":  "false",
-			"JOURNAL_PATH":  instance.Spec.AuditService.JournalPath,
+			"SYSLOG_TLS_PATH":  instance.Spec.AuditService.SyslogTlsPath,
 			"logrotate-conf": "\n # rotate log files weekly\ndaily\n\n# use the syslog group by " +
 				"default, since this is the owning group # of /var/log/syslog.\n#su root syslog\n\n# " +
 				"keep 4 weeks worth of backlogs\nrotate 4\n\n# create new (empty) log files after " +
@@ -606,7 +606,7 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 	papImage := instance.Spec.PapService.ImageRegistry + "/" + instance.Spec.PapService.ImageName + shatag.GetImageRef("POLICY_ADMINISTRATION_TAG_OR_SHA")
 	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + shatag.GetImageRef("AUDIT_TAG_OR_SHA")
 	replicas := instance.Spec.Replicas
-	journalPath := instance.Spec.AuditService.JournalPath
+	syslogTlsPath := instance.Spec.AuditService.SyslogTlsPath
 	auditResources := instance.Spec.AuditService.Resources
 	papResources := instance.Spec.PapService.Resources
 
@@ -693,8 +693,8 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 							Operator: corev1.TolerationOpExists,
 						},
 					},
-					Volumes:    buildPapVolumes(journalPath),
-					Containers: buildContainers(auditImage, papImage, journalPath, auditResources, papResources),
+					Volumes:    buildPapVolumes(),
+					Containers: buildContainers(auditImage, papImage, syslogTlsPath, auditResources, papResources),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &user,
 					},
@@ -712,7 +712,7 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 
 }
 
-func buildPapVolumes(journalPath string) []corev1.Volume {
+func buildPapVolumes() []corev1.Volume {
 	return []corev1.Volume{
 		{
 			Name: "mongodb-ca-cert",
@@ -750,10 +750,28 @@ func buildPapVolumes(journalPath string) []corev1.Volume {
 			},
 		},
 		{
-			Name: "journal",
+			Name: "audit-server-certs",
 			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: journalPath,
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "audit-server-certs",
+					Optional: &trueVar,
+				},
+			},
+		},
+		{			
+			Name: "audit-ingest",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "audit-logging-fluentd-ds-http-ingesturl",
+					},
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "AuditLoggingSyslogIngestURL",
+							Path: "auditurl",
+						},
+					},
+					Optional: &trueVar,
 				},
 			},
 		},

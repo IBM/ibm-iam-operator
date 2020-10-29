@@ -62,7 +62,7 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 	}
 }
 
-func buildAuditContainer(auditImage string, journalPath string, resources *corev1.ResourceRequirements) corev1.Container {
+func buildAuditContainer(auditImage string, syslogTlsPath string, resources *corev1.ResourceRequirements) corev1.Container {
 
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
@@ -91,8 +91,12 @@ func buildAuditContainer(auditImage string, journalPath string, resources *corev
 				MountPath: "/var/log/audit",
 			},
 			{
-				Name:      "journal",
-				MountPath: journalPath,
+				Name:      "audit-server-certs",
+				MountPath: syslogTlsPath,
+			},
+			{
+				Name:      "audit-ingest",
+				MountPath: "/etc/audit-ingest/",
 			},
 			{
 				Name:      "logrotate",
@@ -317,9 +321,9 @@ func buildPdpContainer(pdpImage string, resources *corev1.ResourceRequirements) 
 
 }
 
-func buildContainers(auditImage string, pdpImage string, journalPath string, auditResources *corev1.ResourceRequirements, pdpResources *corev1.ResourceRequirements) []corev1.Container {
+func buildContainers(auditImage string, pdpImage string, syslogTlsPath string, auditResources *corev1.ResourceRequirements, pdpResources *corev1.ResourceRequirements) []corev1.Container {
 
-	auditContainer := buildAuditContainer(auditImage, journalPath, auditResources)
+	auditContainer := buildAuditContainer(auditImage, syslogTlsPath, auditResources)
 	pdpContainer := buildPdpContainer(pdpImage, pdpResources)
 
 	return []corev1.Container{auditContainer, pdpContainer}

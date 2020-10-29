@@ -218,7 +218,7 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"LOG_LEVEL_IDMGMT":            "info",
 			"LOG_LEVEL_MW":                "info",
 			"IDTOKEN_LIFETIME":            "12h",
-			"JOURNAL_PATH":                instance.Spec.AuditService.JournalPath,
+			"SYSLOG_TLS_PATH":             instance.Spec.AuditService.SyslogTlsPath,
 			"SESSION_TIMEOUT":             "43200",
 			"OIDC_ISSUER_URL":             instance.Spec.Config.OIDCIssuerURL,
 			"logrotate-conf": "\n # rotate log files weekly\ndaily\n\n# use the syslog group by" +

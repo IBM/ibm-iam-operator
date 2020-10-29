@@ -47,9 +47,9 @@ var trueVar bool = true
 var falseVar bool = false
 var defaultMode int32 = 420
 var seconds60 int64 = 60
-var user int64 = 1000552100
+var user int64 = 210000
 var port int32 = 7998
-var serviceAccountName string = "ibm-iam-operand-privileged"
+var serviceAccountName string = "ibm-iam-operand-restricted"
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -445,7 +445,7 @@ func (r *ReconcilePolicyDecision) configMapForPolicyDecision(instance *operatorv
 		Data: map[string]string{
 			"AUDIT_ENABLED":  "false",
 			"AUDIT_LOG_PATH": "/var/log/audit",
-			"JOURNAL_PATH":   instance.Spec.AuditService.JournalPath,
+			"SYSLOG_TLS_PATH":   instance.Spec.AuditService.SyslogTlsPath,
 			"logrotate-conf": `\n # rotate log files weekly\ndaily\n\n# use the syslog group by
 								default, since this is the owning group # of /var/log/syslog.\n#su root syslog\n\n#
 								keep 4 weeks worth of backlogs\nrotate 4\n\n# create new (empty) log files after
@@ -519,7 +519,7 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 	mongoDBImage := instance.Spec.InitMongodb.ImageRegistry + "/" + instance.Spec.InitMongodb.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA")
 	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + shatag.GetImageRef("AUDIT_TAG_OR_SHA")
 	replicas := instance.Spec.Replicas
-	journalPath := instance.Spec.AuditService.JournalPath
+	syslogTlsPath := instance.Spec.AuditService.SyslogTlsPath
 	auditResources := instance.Spec.AuditService.Resources
 	pdpResources := instance.Spec.Resources
 
@@ -606,8 +606,8 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 							Operator: corev1.TolerationOpExists,
 						},
 					},
-					Volumes:        buildPdpVolumes(journalPath),
-					Containers:     buildContainers(auditImage, pdpImage, journalPath, auditResources, pdpResources),
+					Volumes:        buildPdpVolumes(),
+					Containers:     buildContainers(auditImage, pdpImage, syslogTlsPath, auditResources, pdpResources),
 					InitContainers: buildInitContainers(mongoDBImage),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &user,
@@ -626,7 +626,7 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 
 }
 
-func buildPdpVolumes(journalPath string) []corev1.Volume {
+func buildPdpVolumes() []corev1.Volume {
 	return []corev1.Volume{
 		{
 			Name: "mongodb-ca-cert",
@@ -681,10 +681,28 @@ func buildPdpVolumes(journalPath string) []corev1.Volume {
 			},
 		},
 		{
-			Name: "journal",
+			Name: "audit-server-certs",
 			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: journalPath,
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "audit-server-certs",
+					Optional: &trueVar,
+				},
+			},
+		},
+		{			
+			Name: "audit-ingest",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "audit-logging-fluentd-ds-http-ingesturl",
+					},
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "AuditLoggingSyslogIngestURL",
+							Path: "auditurl",
+						},
+					},
+					Optional: &trueVar,
 				},
 			},
 		},

@@ -62,7 +62,7 @@ spec:
             - name: IAM_ONBOARDING_TAG_OR_SHA
               value: "sha256:2557ef65f807d62769e264f7360bf40ae5cdaa4b2e6bea8f479cfcec7e8c52a8"
             - name: AUDIT_TAG_OR_SHA
-              value: "sha256:3cfb9f3cc99379758f73f1cd2e6ad4dd4bc61e13cc55d7c34b0d0e280cb47421"
+              value: "sha256:1466c23e64e2dddf68374c6997dec8bb1d3054d1a620e059ed5ff168887e95cc"
             - name: WATCH_NAMESPACE
               valueFrom:
                 fieldRef:

@@ -692,16 +692,11 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 							Operator: corev1.TolerationOpExists,
 						},
 					},
-<<<<<<< HEAD
 					Volumes:    buildPapVolumes(),
 					Containers: buildContainers(auditImage, papImage, syslogTlsPath, auditResources, papResources),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser: &user,
 					},
-=======
-					Volumes:    buildPapVolumes(journalPath),
-					Containers: buildContainers(auditImage, papImage, journalPath, auditResources, papResources),
->>>>>>> Update permissions
 				},
 			},
 		},
@@ -754,7 +749,6 @@ func buildPapVolumes() []corev1.Volume {
 			},
 		},
 		{
-<<<<<<< HEAD
 			Name: "audit-server-certs",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
@@ -781,8 +775,6 @@ func buildPapVolumes() []corev1.Volume {
 			},
 		},
 		{
-=======
->>>>>>> Update permissions
 			Name: "shared",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{},

@@ -694,9 +694,6 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 					},
 					Volumes:    buildPapVolumes(),
 					Containers: buildContainers(auditImage, papImage, syslogTlsPath, auditResources, papResources),
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser: &user,
-					},
 				},
 			},
 		},

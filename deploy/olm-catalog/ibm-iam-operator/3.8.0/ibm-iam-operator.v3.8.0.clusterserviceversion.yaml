@@ -30,6 +30,36 @@ metadata:
                 "memory": "16Mi"
               }
             },
+            "oidcInitAuthService": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.7",
+              "resources": {
+                "limits": {
+                  "cpu": "200m",
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "128M"
+                }
+              }
+            },
+            "oidcInitIdentityProvider": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.3.7",
+              "resources": {
+                "limits": {
+                  "cpu": "200m",
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "128M"
+                }
+              }
+            },
             "oidcInitIdentityManager": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",

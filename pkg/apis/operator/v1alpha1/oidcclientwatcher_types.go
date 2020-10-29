@@ -30,12 +30,28 @@ type OIDCClientWatcherSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
-	OperatorVersion         string                       `json:"operatorVersion,omitempty"`
-	Replicas                int32                        `json:"replicas"`
-	Resources               *corev1.ResourceRequirements `json:"resources,omitempty"`
-	ImageRegistry           string                       `json:"imageRegistry,omitempty"`
-	ImageTagPostfix         string                       `json:"imageTagPostfix,omitempty"`
-	OidcInitIdentityManager OidcInitIdentityManagerSpec  `json:"oidcInitIdentityManager,omitempty"`
+	OperatorVersion          string                       `json:"operatorVersion,omitempty"`
+	Replicas                 int32                        `json:"replicas"`
+	Resources                *corev1.ResourceRequirements `json:"resources,omitempty"`
+	ImageRegistry            string                       `json:"imageRegistry,omitempty"`
+	ImageTagPostfix          string                       `json:"imageTagPostfix,omitempty"`
+	OidcInitAuthService      OidcInitAuthServiceSpec      `json:"oidcInitAuthService,omitempty"`
+	OidcInitIdentityProvider OidcInitIdentityProviderSpec `json:"oidcInitIdentityProvider,omitempty"`
+	OidcInitIdentityManager  OidcInitIdentityManagerSpec  `json:"oidcInitIdentityManager,omitempty"`
+}
+
+type OidcInitAuthServiceSpec struct {
+	ImageRegistry string `json:"imageRegistry,omitempty"`
+	ImageName     string `json:"imageName,omitempty"`
+	ImageTag      string `json:"imageTag,omitempty"`
+	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type OidcInitIdentityProviderSpec struct {
+	ImageRegistry string `json:"imageRegistry,omitempty"`
+	ImageName     string `json:"imageName,omitempty"`
+	ImageTag      string `json:"imageTag,omitempty"`
+	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type OidcInitIdentityManagerSpec struct {

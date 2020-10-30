@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -40,8 +41,8 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 
 	configMapList := []string{"platform-auth-idp", "registration-script", "oauth-client-map", "registration-json"}
 
-	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{authIdpConfigMap, registrationScriptConfigMap}
-
+	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{r.authIdpConfigMap, registrationScriptConfigMap}
+        isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 	var newConfigMap *corev1.ConfigMap
@@ -102,7 +103,11 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 							newConfigMap.Data["ROKS_ENABLED"] = "true"
 							newConfigMap.Data["ROKS_URL"] = issuer
 							if instance.Spec.Config.ROKSUserPrefix == "changeme" { //we change it to empty prefix, that's the new default in 3.5
+								if (isPublicCloud) {
+									newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
+						                } else {
 								newConfigMap.Data["ROKS_USER_PREFIX"] = ""
+							        }
 							} else { // user specifies prefix but does not specify roksEnabled and roksURL we take the user provided prefix
 								newConfigMap.Data["ROKS_USER_PREFIX"] = instance.Spec.Config.ROKSUserPrefix
 							}
@@ -192,8 +197,17 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 
 }
 
-func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
+func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
+	bootStrapUserId := instance.Spec.Config.BootstrapUserId
+	roksUserPrefix := instance.Spec.Config.ROKSUserPrefix
+	if (len(bootStrapUserId) > 0 && strings.EqualFold(bootStrapUserId, "kubeadmin") && isPublicCloud) {
+		bootStrapUserId = ""
+	}
+	if (isPublicCloud) {
+		roksUserPrefix = "IAM#"
+	}
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-auth-idp",
@@ -233,11 +247,11 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"NONCE_ENABLED":                      strconv.FormatBool(instance.Spec.Config.NONCEEnabled),
 			"ROKS_ENABLED":                       strconv.FormatBool(instance.Spec.Config.ROKSEnabled),
 			"ROKS_URL":                           instance.Spec.Config.ROKSURL,
-			"ROKS_USER_PREFIX":                   instance.Spec.Config.ROKSUserPrefix,
+			"ROKS_USER_PREFIX":                   roksUserPrefix,
 			"CLAIMS_SUPPORTED":                   instance.Spec.Config.ClaimsSupported,
 			"CLAIMS_MAP":                         instance.Spec.Config.ClaimsMap,
 			"SCOPE_CLAIM":                        instance.Spec.Config.ScopeClaim,
-			"BOOTSTRAP_USERID":                   instance.Spec.Config.BootstrapUserId,
+			"BOOTSTRAP_USERID":                   bootStrapUserId,
 			"PROVIDER_ISSUER_URL":                instance.Spec.Config.ProviderIssuerURL,
 			"PREFERRED_LOGIN":                    instance.Spec.Config.PreferredLogin,
 			"LIBERTY_TOKEN_LENGTH":               "1024",
@@ -361,6 +375,20 @@ func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, icpConsoleU
 	}
 	return newConfigMap
 
+}
+
+// Check if hosted on IBM Cloud
+func isPublicCloud(client client.Client, namespace string , configMap string) bool {
+	currentConfigMap := &corev1.ConfigMap{}
+	err := client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: namespace}, currentConfigMap)
+	if err != nil {
+		log.V(1).Info("Error getting configmap", configMap)
+		return false
+	} else if err == nil {
+		host := currentConfigMap.Data["cluster_kube_apiserver_host"]
+		return strings.HasSuffix(host, "cloud.ibm.com")
+	}
+	return false
 }
 
 func readROKSURL(instance *operatorv1alpha1.Authentication) (string, error) {

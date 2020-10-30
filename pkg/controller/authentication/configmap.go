@@ -42,7 +42,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	configMapList := []string{"platform-auth-idp", "registration-script", "oauth-client-map", "registration-json"}
 	isPublicCld := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info config")
 
-	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme, isPublicCld) *corev1.ConfigMap{authIdpConfigMap, registrationScriptConfigMap}
+	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{r.authIdpConfigMap, registrationScriptConfigMap}
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
@@ -194,7 +194,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 
 }
 
-func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, bool isPublicCloud) *corev1.ConfigMap {
+func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, bool isPublicCloud) *corev1.ConfigMap {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	bootStrapUserId := instance.Spec.Config.BootstrapUserId
 	roksUserPrefix := instance.Spec.Config.ROKSUserPrefix
@@ -322,7 +322,7 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 	return newConfigMap
 }
 
-func registrationScriptConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, bool isPublicCloud) *corev1.ConfigMap {
+func registrationScriptConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newConfigMap := &corev1.ConfigMap{

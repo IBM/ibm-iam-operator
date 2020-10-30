@@ -64,7 +64,6 @@ spec:
               - imageName
               - imageRegistry
               - imageTag
-              - syslogTlsPath
               type: object
             imageName:
               type: string

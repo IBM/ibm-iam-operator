@@ -119,6 +119,10 @@ func getPodNames(pods []corev1.Pod) []string {
 }
 
 func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string) *appsv1.Deployment {
+	// Update the audit image for upgrade scenarios
+	if instance.Spec.AuditService.ImageName != "audit-syslog-service" {
+		instance.Spec.AuditService.ImageName = "audit-syslog-service"
+	}
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	authServiceImage := instance.Spec.AuthService.ImageRegistry + "/" + instance.Spec.AuthService.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA")
 	identityProviderImage := instance.Spec.IdentityProvider.ImageRegistry + "/" + instance.Spec.IdentityProvider.ImageName + shatag.GetImageRef("IDENTITY_PROVIDER_TAG_OR_SHA")

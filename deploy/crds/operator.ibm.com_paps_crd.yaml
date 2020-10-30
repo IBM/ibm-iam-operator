@@ -64,7 +64,6 @@ spec:
               - imageName
               - imageRegistry
               - imageTag
-              - syslogTlsPath
               type: object
             operatorVersion:
               description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster

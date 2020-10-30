@@ -42,7 +42,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	configMapList := []string{"platform-auth-idp", "registration-script", "oauth-client-map", "registration-json"}
 
 	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{r.authIdpConfigMap, registrationScriptConfigMap}
-
+        isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 	var newConfigMap *corev1.ConfigMap
@@ -103,7 +103,11 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 							newConfigMap.Data["ROKS_ENABLED"] = "true"
 							newConfigMap.Data["ROKS_URL"] = issuer
 							if instance.Spec.Config.ROKSUserPrefix == "changeme" { //we change it to empty prefix, that's the new default in 3.5
+								if (isPublicCloud) {
+									newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
+						                } else {
 								newConfigMap.Data["ROKS_USER_PREFIX"] = ""
+							        }
 							} else { // user specifies prefix but does not specify roksEnabled and roksURL we take the user provided prefix
 								newConfigMap.Data["ROKS_USER_PREFIX"] = instance.Spec.Config.ROKSUserPrefix
 							}

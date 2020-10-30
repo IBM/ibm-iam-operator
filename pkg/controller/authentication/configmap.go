@@ -196,12 +196,12 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 
 func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, isPublicCloud bool) *corev1.ConfigMap {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	var string bootStrapUserId = instance.Spec.Config.BootstrapUserId
-	var string roksUserPrefix = instance.Spec.Config.ROKSUserPrefix
-	if (len(bootStrapUserId) > 0 && strings.EqualFold(bootStrapUserId, "kubeadmin") && isPublicCld) {
+	bootStrapUserId := instance.Spec.Config.BootstrapUserId
+	roksUserPrefix := instance.Spec.Config.ROKSUserPrefix
+	if (len(bootStrapUserId) > 0 && strings.EqualFold(bootStrapUserId, "kubeadmin") && isPublicCloud) {
 		bootStrapUserId = ""
 	}
-	if (isPublicCld) {
+	if (isPublicCloud) {
 		roksUserPrefix = "IAM#"
 	}
 	newConfigMap := &corev1.ConfigMap{

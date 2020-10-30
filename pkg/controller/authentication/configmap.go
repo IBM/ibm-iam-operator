@@ -195,7 +195,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 
 func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info config")
+	isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
 	bootStrapUserId := instance.Spec.Config.BootstrapUserId
 	roksUserPrefix := instance.Spec.Config.ROKSUserPrefix
 	if (len(bootStrapUserId) > 0 && strings.EqualFold(bootStrapUserId, "kubeadmin") && isPublicCloud) {

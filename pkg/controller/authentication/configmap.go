@@ -194,7 +194,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 
 }
 
-func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, isPublicCloud bool) *corev1.ConfigMap {
+func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, bool isPublicCloud) *corev1.ConfigMap {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	bootStrapUserId := instance.Spec.Config.BootstrapUserId
 	roksUserPrefix := instance.Spec.Config.ROKSUserPrefix
@@ -322,7 +322,7 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 	return newConfigMap
 }
 
-func registrationScriptConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, isPublicCloud bool) *corev1.ConfigMap {
+func registrationScriptConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, bool isPublicCloud) *corev1.ConfigMap {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newConfigMap := &corev1.ConfigMap{

@@ -513,6 +513,11 @@ func (r *ReconcilePolicyDecision) ingressForPolicyDecision(instance *operatorv1a
 
 func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operatorv1alpha1.PolicyDecision) *appsv1.Deployment {
 
+	// Update the audit image for upgrade scenarios
+	if instance.Spec.AuditService.ImageName != "audit-syslog-service" {
+		instance.Spec.AuditService.ImageName = "audit-syslog-service"
+	}
+
 	reqLogger := log.WithValues("deploymentForPolicyDecision", "Entry", "instance.Name", instance.Name)
 	pdpImage := instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + shatag.GetImageRef("POLICY_DECISION_TAG_OR_SHA")
 	mongoDBImage := instance.Spec.InitMongodb.ImageRegistry + "/" + instance.Spec.InitMongodb.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA")

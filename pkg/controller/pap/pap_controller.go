@@ -601,6 +601,11 @@ func (r *ReconcilePap) ingressForPap(instance *operatorv1alpha1.Pap) *net.Ingres
 
 func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.Deployment {
 
+	// Update the audit image for upgrade scenarios
+	if instance.Spec.AuditService.ImageName != "audit-syslog-service" {
+		instance.Spec.AuditService.ImageName = "audit-syslog-service"
+	}
+	
 	reqLogger := log.WithValues("deploymentForPap", "Entry", "instance.Name", instance.Name)
 	papImage := instance.Spec.PapService.ImageRegistry + "/" + instance.Spec.PapService.ImageName + shatag.GetImageRef("POLICY_ADMINISTRATION_TAG_OR_SHA")
 	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + shatag.GetImageRef("AUDIT_TAG_OR_SHA")

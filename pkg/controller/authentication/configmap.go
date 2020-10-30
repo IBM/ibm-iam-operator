@@ -40,7 +40,6 @@ import (
 func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentConfigMap *corev1.ConfigMap, requeueResult *bool) error {
 
 	configMapList := []string{"platform-auth-idp", "registration-script", "oauth-client-map", "registration-json"}
-	isPublicCld := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info config")
 
 	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{r.authIdpConfigMap, registrationScriptConfigMap}
 
@@ -194,8 +193,9 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 
 }
 
-func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, bool isPublicCloud) *corev1.ConfigMap {
+func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info config")
 	bootStrapUserId := instance.Spec.Config.BootstrapUserId
 	roksUserPrefix := instance.Spec.Config.ROKSUserPrefix
 	if (len(bootStrapUserId) > 0 && strings.EqualFold(bootStrapUserId, "kubeadmin") && isPublicCloud) {

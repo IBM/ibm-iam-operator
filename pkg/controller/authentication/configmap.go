@@ -40,8 +40,9 @@ import (
 func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentConfigMap *corev1.ConfigMap, requeueResult *bool) error {
 
 	configMapList := []string{"platform-auth-idp", "registration-script", "oauth-client-map", "registration-json"}
+	isPublicCld := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info config")
 
-	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{authIdpConfigMap, registrationScriptConfigMap}
+	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme, isPublicCld) *corev1.ConfigMap{authIdpConfigMap, registrationScriptConfigMap}
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
@@ -115,13 +116,9 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 							}
 						}
 					} else {
-						isPublicCld := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info config")
 						//user specifies roksEnabled and roksURL, but not roksPrefix, then we set prefix to IAM# (consistent with previous release behavior)
 						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL != "https://roks.domain.name:443" && instance.Spec.Config.ROKSUserPrefix == "changeme" {
 							newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
-						}
-						if (len(instance.Spec.Config.BootstrapUserId) > 0 && strings.EqualFold(instance.Spec.Config.BootstrapUserId,"kubeadmin") && isPublicCld) {
-							newConfigMap.Data["BOOTSTRAP_USERID"] = ""
 						}
 					}
 				}
@@ -197,8 +194,16 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 
 }
 
-func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
+func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, isPublicCloud bool) *corev1.ConfigMap {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	var string bootStrapUserId = instance.Spec.Config.BootstrapUserId
+	var string roksUserPrefix = instance.Spec.Config.ROKSUserPrefix
+	if (len(bootStrapUserId) > 0 && strings.EqualFold(bootStrapUserId, "kubeadmin") && isPublicCld) {
+		bootStrapUserId = ""
+	}
+	if (isPublicCld) {
+		roksUserPrefix = "IAM#"
+	}
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-auth-idp",
@@ -238,11 +243,11 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"NONCE_ENABLED":                      strconv.FormatBool(instance.Spec.Config.NONCEEnabled),
 			"ROKS_ENABLED":                       strconv.FormatBool(instance.Spec.Config.ROKSEnabled),
 			"ROKS_URL":                           instance.Spec.Config.ROKSURL,
-			"ROKS_USER_PREFIX":                   instance.Spec.Config.ROKSUserPrefix,
+			"ROKS_USER_PREFIX":                   roksUserPrefix,
 			"CLAIMS_SUPPORTED":                   instance.Spec.Config.ClaimsSupported,
 			"CLAIMS_MAP":                         instance.Spec.Config.ClaimsMap,
 			"SCOPE_CLAIM":                        instance.Spec.Config.ScopeClaim,
-			"BOOTSTRAP_USERID":                   instance.Spec.Config.BootstrapUserId,
+			"BOOTSTRAP_USERID":                   bootStrapUserId,
 			"PROVIDER_ISSUER_URL":                instance.Spec.Config.ProviderIssuerURL,
 			"PREFERRED_LOGIN":                    instance.Spec.Config.PreferredLogin,
 			"LIBERTY_TOKEN_LENGTH":               "1024",
@@ -317,7 +322,7 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 	return newConfigMap
 }
 
-func registrationScriptConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
+func registrationScriptConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, isPublicCloud bool) *corev1.ConfigMap {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newConfigMap := &corev1.ConfigMap{

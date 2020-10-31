@@ -241,7 +241,7 @@ func authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime
 			"PROVIDER_ISSUER_URL":                instance.Spec.Config.ProviderIssuerURL,
 			"PREFERRED_LOGIN":                    instance.Spec.Config.PreferredLogin,
 			"LIBERTY_TOKEN_LENGTH":               "1024",
-			"OS_TOKEN_LENGTH":                    "45",
+			"OS_TOKEN_LENGTH":                    "51",
 			"LIBERTY_DEBUG_ENABLED":              "false",
 			"LOGJAM_DHKEYSIZE_2048_BITS_ENABLED": "true",
 			"LDAP_RECURSIVE_SEARCH":              "true",

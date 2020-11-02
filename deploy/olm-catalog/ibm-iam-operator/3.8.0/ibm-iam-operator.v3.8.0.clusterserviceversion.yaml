@@ -1688,6 +1688,7 @@ spec:
                 app.kubernetes.io/managed-by: ibm-iam-operator
                 app.kubernetes.io/name: ibm-iam-operator
                 name: ibm-iam-operator
+                intent: projected
             spec:
               affinity:
                 nodeAffinity:
@@ -1726,8 +1727,9 @@ spec:
                   value: sha256:1466c23e64e2dddf68374c6997dec8bb1d3054d1a620e059ed5ff168887e95cc
                 - name: WATCH_NAMESPACE
                   valueFrom:
-                    fieldRef:
-                      fieldPath: metadata.annotations['olm.targetNamespaces']
+                    configMapKeyRef:
+                      name: namespace-scope
+                      key: namespaces
                 - name: POD_NAME
                   valueFrom:
                     fieldRef:

@@ -176,10 +176,13 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["MONGO_POOL_MAX_SIZE"] = newConfigMap.Data["MONGO_POOL_MAX_SIZE"]
 					cmUpdateRequired = true
 				}
-				if _, keyExists := currentConfigMap.Data["OS_TOKEN_LENGTH"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				if _, keyExists := currentConfigMap.Data["OS_TOKEN_LENGTH"]; keyExists {
+					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)	
 					newConfigMap = functionList[index](instance, r.scheme)
-					currentConfigMap.Data["OS_TOKEN_LENGTH"] = newConfigMap.Data["OS_TOKEN_LENGTH"]
+					if currentConfigMap.Data["OS_TOKEN_LENGTH"] == "45" {
+						reqLogger.Info("Updating OS token length", "New length is ", newConfigMap.Data["OS_TOKEN_LENGTH"])
+						currentConfigMap.Data["OS_TOKEN_LENGTH"] = newConfigMap.Data["OS_TOKEN_LENGTH"]
+					}		
 					cmUpdateRequired = true
 				}
 				if cmUpdateRequired {

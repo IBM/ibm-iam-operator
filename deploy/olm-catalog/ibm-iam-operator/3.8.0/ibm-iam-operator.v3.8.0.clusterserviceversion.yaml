@@ -1518,7 +1518,7 @@ spec:
           - ""
           resources:
           #secrets are needed only if we have to watch for secrets outside our namespace
-          - secrets
+          #- secrets
           #the namespaces are being watched by the oidcclientwatcher
           - namespaces
           verbs:

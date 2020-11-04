@@ -544,6 +544,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 					Labels: map[string]string{
 						"app":                        "oidcclient-watcher",
 						"app.kubernetes.io/instance": "oidcclient-watcher",
+						"intent":                     "projected",
 					},
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
@@ -762,6 +763,17 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 										FieldRef: &corev1.ObjectFieldSelector{
 											APIVersion: "v1",
 											FieldPath:  "metadata.name",
+										},
+									},
+								},
+								{
+									Name: "NAMESPACES",
+									ValueFrom: &corev1.EnvVarSource{
+										ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: "namespace-scope",
+											},
+											Key: "namespaces",
 										},
 									},
 								},

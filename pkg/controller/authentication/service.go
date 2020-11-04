@@ -229,7 +229,7 @@ func (r *ReconcileAuthentication) identityProviderService(instance *operatorv1al
 func (r *ReconcileAuthentication) iamTokenService(instance *operatorv1alpha1.Authentication) *corev1.Service {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	var managementIngressPort int32 = 443
+	var managementIngressPort int32 = 8443
 	var redirectPort int32 = 10443
 	iamTokenService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{

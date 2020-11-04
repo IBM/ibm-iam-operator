@@ -544,6 +544,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 					Labels: map[string]string{
 						"app":                        "oidcclient-watcher",
 						"app.kubernetes.io/instance": "oidcclient-watcher",
+						"intent":                     "projected",
 					},
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",

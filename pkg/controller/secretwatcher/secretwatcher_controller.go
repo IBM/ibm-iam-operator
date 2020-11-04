@@ -463,7 +463,9 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 //CS??? need separate func for each image to set "instanceName"???
 func labelsForSecretWatcherPod(instanceName string, deploymentName string) map[string]string {
 	return map[string]string{"app": deploymentName, "component": "secret-watcher", "secretwatcher_cr": instanceName,
-		"app.kubernetes.io/name": deploymentName, "app.kubernetes.io/component": "secret-watcher", "app.kubernetes.io/instance": "secret-watcher", "release": "secret-watcher"}
+		"app.kubernetes.io/name": deploymentName, "app.kubernetes.io/component": "secret-watcher",
+		"app.kubernetes.io/instance": "secret-watcher", "release": "secret-watcher",
+		"intent": "projected"}
 }
 
 //CS??? need separate func for each image to set "app"???

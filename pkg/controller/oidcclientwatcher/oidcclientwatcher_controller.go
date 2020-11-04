@@ -765,17 +765,6 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 										},
 									},
 								},
-								{
-									Name: "NAMESPACES",
-									ValueFrom: &corev1.EnvVarSource{
-										ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-											LocalObjectReference: corev1.LocalObjectReference{
-												Name: "namespace-scope",
-											},
-											Key: "NAMESPACES",
-										},
-									},
-								},
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{

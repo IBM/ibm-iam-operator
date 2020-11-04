@@ -278,9 +278,9 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 										LabelSelector: &metav1.LabelSelector{
 											MatchExpressions: []metav1.LabelSelectorRequirement{
 												metav1.LabelSelectorRequirement{
-													Key:      "app",
+													Key: "app",
 													Operator: metav1.LabelSelectorOpIn,
-													Values:   []string{"secret-watcher"},
+													Values: []string{"secret-watcher"},
 												},
 											},
 										},
@@ -392,17 +392,6 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 								{
 									Name:  "IAM_TOKEN_SERVICE_URL",
 									Value: "https://platform-auth-service:9443",
-								},
-								{
-									Name: "NAMESPACES",
-									ValueFrom: &corev1.EnvVarSource{
-										ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-											LocalObjectReference: corev1.LocalObjectReference{
-												Name: "namespace-scope",
-											},
-											Key: "NAMESPACES",
-										},
-									},
 								},
 							},
 							Resources: *resources,

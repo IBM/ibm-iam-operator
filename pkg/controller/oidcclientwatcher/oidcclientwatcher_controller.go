@@ -773,7 +773,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 											LocalObjectReference: corev1.LocalObjectReference{
 												Name: "namespace-scope",
 											},
-											Key: "NAMESPACES",
+											Key: "namespaces",
 										},
 									},
 								},

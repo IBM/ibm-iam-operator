@@ -400,7 +400,7 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 											LocalObjectReference: corev1.LocalObjectReference{
 												Name: "namespace-scope",
 											},
-											Key: "NAMESPACES",
+											Key: "namespaces",
 										},
 									},
 								},

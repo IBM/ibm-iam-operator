@@ -25,6 +25,7 @@ import (
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
+	res "github.com/IBM/ibm-iam-operator/pkg/resources"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1beta1"
@@ -602,8 +603,8 @@ func (r *ReconcilePap) ingressForPap(instance *operatorv1alpha1.Pap) *net.Ingres
 func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.Deployment {
 
 	// Update the audit image for upgrade scenarios
-	if instance.Spec.AuditService.ImageName != "audit-syslog-service" {
-		instance.Spec.AuditService.ImageName = "audit-syslog-service"
+	if instance.Spec.AuditService.ImageName != res.AuditImageName {
+		instance.Spec.AuditService.ImageName = res.AuditImageName
 	}
 	
 	reqLogger := log.WithValues("deploymentForPap", "Entry", "instance.Name", instance.Name)

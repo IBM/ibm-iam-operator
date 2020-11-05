@@ -23,6 +23,7 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
+	res "github.com/IBM/ibm-iam-operator/pkg/resources"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -119,6 +120,11 @@ func getPodNames(pods []corev1.Pod) []string {
 }
 
 func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string) *appsv1.Deployment {
+	
+	// Update the audit image for upgrade scenarios
+	if instance.Spec.AuditService.ImageName != res.AuditImageName {
+		instance.Spec.AuditService.ImageName = res.AuditImageName
+	}
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	authServiceImage := instance.Spec.AuthService.ImageRegistry + "/" + instance.Spec.AuthService.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA")
 	identityProviderImage := instance.Spec.IdentityProvider.ImageRegistry + "/" + instance.Spec.IdentityProvider.ImageName + shatag.GetImageRef("IDENTITY_PROVIDER_TAG_OR_SHA")

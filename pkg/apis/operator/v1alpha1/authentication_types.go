@@ -45,7 +45,7 @@ type AuditServiceSpec struct {
 	ImageRegistry string                       `json:"imageRegistry"`
 	ImageName     string                       `json:"imageName"`
 	ImageTag      string                       `json:"imageTag"`
-	SyslogTlsPath string                       `json:"syslogTlsPath"`
+	SyslogTlsPath string                       `json:"syslogTlsPath,omitempty"`
 	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 

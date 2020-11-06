@@ -356,3 +356,16 @@ rules:
   - update
   - watch
   - delete
+# this is used by iam poliy controller
+- apiGroups:
+  - iam.policies.ibm.com
+  resources:
+  - iampolicies
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+  - delete

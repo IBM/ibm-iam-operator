@@ -39,6 +39,8 @@ spec:
                   type: string
                 imageTag:
                   type: string
+                syslogTlsPath:
+                  type: string
                 resources:
                   description: ResourceRequirements describes the compute resource
                     requirements.
@@ -62,6 +64,7 @@ spec:
               - imageName
               - imageRegistry
               - imageTag
+              - syslogTlsPath
               type: object
             authService:
               properties:

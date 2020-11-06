@@ -39,6 +39,8 @@ spec:
                   type: string
                 imageTag:
                   type: string
+                syslogTlsPath:
+                  type: string
                 resources:
                   description: ResourceRequirements describes the compute resource
                     requirements.
@@ -58,8 +60,6 @@ spec:
                         to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                       type: object
                   type: object
-                syslogTlsPath:
-                  type: string
               required:
               - imageName
               - imageRegistry
@@ -139,12 +139,6 @@ spec:
               properties:
                 authUniqueHosts:
                   type: string
-                bootstrapUserId:
-                  type: string
-                claimsMap:
-                  type: string
-                claimsSupported:
-                  type: string
                 clusterCADomain:
                   type: string
                 clusterExternalAddress:
@@ -168,32 +162,38 @@ spec:
                   type: string
                 isOpenshiftEnv:
                   type: boolean
+                xframeDomain:
+                  type: string
+                preferredLogin:
+                  type: string  
                 nonceEnabled:
                   type: boolean
+                claimsSupported:
+                  type: string
+                bootstrapUserId:
+                  type: string
+                providerIssuerURL:
+                  type: string  
+                scopeClaim:
+                  type: string
+                claimsMap:
+                  type: string
                 oidcIssuerURL:
                   type: string
                 openshiftPort:
                   format: int32
                   type: integer
-                preferredLogin:
-                  type: string
-                providerIssuerURL:
-                  type: string
                 roksEnabled:
                   type: boolean
                 roksURL:
                   type: string
                 roksUserPrefix:
                   type: string
-                scopeClaim:
-                  type: string
                 wlpClientID:
                   type: string
                 wlpClientRegistrationSecret:
                   type: string
                 wlpClientSecret:
-                  type: string
-                xframeDomain:
                   type: string
               required:
               - authUniqueHosts
@@ -223,7 +223,7 @@ spec:
                 imageName:
                   type: string
                 imageRegistry:
-                  type: string
+                  type: string 
                 imageTag:
                   type: string
                 masterNodesList:

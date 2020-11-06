@@ -236,44 +236,12 @@ rules:
   - patch
   - update
   - watch
+# used by oidcclient watcher
 - apiGroups:
-  - monitoring.coreos.com
+  - oidc.security.ibm.com
   resources:
-  - servicemonitors
-  verbs:
-  - get
-  - create
-- apiGroups:
-  - apps
-  resourceNames:
-  - ibm-iam-operator
-  resources:
-  - deployments/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get
-- apiGroups:
-  - apps
-  resources:
-  - replicasets
-  - deployments
-  verbs:
-  - get
-- apiGroups:
-  - operator.ibm.com
-  resources:
-  - '*'
-  - policydecisions
-  - oidcclientwatchers
-  - authentications
-  - policycontrollers
-  - paps
-  - securityonboardings
+  - clients
+  - clients/finalizers
   verbs:
   - create
   - delete
@@ -283,10 +251,10 @@ rules:
   - update
   - watch
 - apiGroups:
-  - certmanager.k8s.io
+  - rbac.authorization.k8s.io
   resources:
-  - '*'
-  - certificates
+  - rolebindings
+  - rolebindings/finalizers
   verbs:
   - create
   - delete
@@ -295,31 +263,19 @@ rules:
   - patch
   - update
   - watch
+# this is used by iam poliy controller
 - apiGroups:
-  - networking.k8s.io
+  - iam.policies.ibm.com
   resources:
-  - '*'
-  - ingresses
+  - iampolicies
   verbs:
   - create
-  - delete
   - get
   - list
   - patch
   - update
   - watch
-- apiGroups:
-  - batch
-  resources:
-  - jobs
-  verbs:
-  - create
   - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -334,8 +290,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  #secrets are needed only if we have to watch for secrets outside our namespace
-  #- secrets
   #the namespaces are being watched by the oidcclientwatcher
   - namespaces
   verbs:
@@ -365,8 +319,6 @@ rules:
   resources:
   - clusterrolebindings
   - clusterrolebindings/finalizers
-  - rolebindings
-  - rolebindings/finalizers
   verbs:
   - create
   - delete
@@ -375,19 +327,6 @@ rules:
   - patch
   - update
   - watch
-# used by oidcclient watcher
-- apiGroups:
-  - oidc.security.ibm.com
-  resources:
-  - clients
-  - clients/finalizers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
 # fetch users call is used in identity manager
 - apiGroups:
   - user.openshift.io

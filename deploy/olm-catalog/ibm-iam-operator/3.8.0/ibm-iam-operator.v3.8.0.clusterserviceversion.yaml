@@ -1517,8 +1517,6 @@ spec:
         - apiGroups:
           - ""
           resources:
-          #secrets are needed only if we have to watch for secrets outside our namespace
-          #- secrets
           #the namespaces are being watched by the oidcclientwatcher
           - namespaces
           verbs:
@@ -1548,8 +1546,6 @@ spec:
           resources:
           - clusterrolebindings
           - clusterrolebindings/finalizers
-          - rolebindings
-          - rolebindings/finalizers
           verbs:
           - create
           - delete
@@ -1558,19 +1554,6 @@ spec:
           - patch
           - update
           - watch
-        # used by oidcclient watcher
-        - apiGroups:
-          - oidc.security.ibm.com
-          resources:
-          - clients
-          - clients/finalizers
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
         # fetch users call is used in identity manager
         - apiGroups:
           - user.openshift.io
@@ -1599,7 +1582,7 @@ spec:
           - patch
           - update
           - watch
-          - delete
+          - delete      
         # this is used by iam poliy controller
         - apiGroups:
           - iam.policies.ibm.com
@@ -1612,7 +1595,7 @@ spec:
           - patch
           - update
           - watch
-          - delete                                                  
+          - delete                                           
         serviceAccountName: ibm-iam-operand-restricted
       - rules:
         - apiGroups:
@@ -1707,17 +1690,17 @@ spec:
                 - name: AUTH_SERVICE_TAG_OR_SHA
                   value: sha256:3d351de82a708c3da1119fbd269cfcd91612f86369b73123171bd0f3d6676829
                 - name: IDENTITY_PROVIDER_TAG_OR_SHA
-                  value: sha256:3d70b72dc359f346e4cb9f8a63fefd6cc65af39fc432dd75ac5155e0c299ba33
+                  value: sha256:36363afe3a1af38f2ae5c73dc875a3c9b00dde4cc9d9242105644ab0458b5a99
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
-                  value: sha256:0624467e066f4a1e764801bc40f0cc0f72ad671671afe8c615cefb03b60f929c
+                  value: sha256:21d12cb2b92977cc2b9ea16286cad5f9f3fac2b0023c2d747674dd12f0e6e1d8
                 - name: POLICY_ADMINISTRATION_TAG_OR_SHA
                   value: sha256:4176c8fd463667f773d7db90b4a8b813f19871444da2c729467c142f968619e2
                 - name: POLICY_DECISION_TAG_OR_SHA
                   value: sha256:dea8a4508142c0a59f9ae12ef770988af34b3f03f1d0fdea9df305125f828f7d
                 - name: SECRET_WATCHER_TAG_OR_SHA
-                  value: sha256:8f37e80b556ba10d2c58027652c033e9cad98dd4f279dd47e43e371b061595fc
+                  value: sha256:e0ce33ccb120fa9e3eee60331c17b2324285f223fc905a3f64bafb0d929db4fb
                 - name: CLIENT_WATCHER_TAG_OR_SHA
-                  value: sha256:884d5962fd7920453b91d5f7883ca063695d71e12bd6ccc8bf41c4b8fbaa3b21
+                  value: sha256:78f6113d7a7c8972182066ff257faa461dd450820b3d9a87889ce48dd87fb4f2
                 - name: POLICY_CONTROLLER_TAG_OR_SHA
                   value: sha256:1dc66d59887dc6730f7b39e61d228592c8b585376ebfdc3642aec37bba0193f5
                 - name: IAM_ONBOARDING_TAG_OR_SHA
@@ -1788,6 +1771,46 @@ spec:
           - patch
           - update
           - watch
+        # used by oidcclient watcher
+        - apiGroups:
+          - oidc.security.ibm.com
+          resources:
+          - clients
+          - clients/finalizers
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - rolebindings
+          - rolebindings/finalizers
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        # this is used by iam poliy controller
+        - apiGroups:
+          - iam.policies.ibm.com
+          resources:
+          - iampolicies
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+          - delete
         serviceAccountName: ibm-iam-operand-restricted
       - rules:
         - apiGroups:

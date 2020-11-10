@@ -267,6 +267,8 @@ func createConfigMap(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcile
 		return currentConfigMap, fmt.Errorf("Config Map %v already exists.", val0)
 	}
 
+	accessPolicy = strings.ReplaceAll(accessPolicy,"NAMESPACE",instance.Namespace)
+
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      val0,

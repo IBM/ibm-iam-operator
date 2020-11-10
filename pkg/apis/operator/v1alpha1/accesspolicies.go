@@ -974,7 +974,7 @@ var TillerService = `{
 var Tiller_Serviceid_Policies = `{
       "resources": [
           {
-              "namespaceId": "ibm-common-services",
+              "namespaceId": "NAMESPACE",
               "serviceName": "tiller-service"
           }
       ],
@@ -1017,7 +1017,7 @@ def mapActionRoles(iam_service_name, filepath, accessToken):
                 time.sleep(2)
 def getServiceId(serviceName, accessToken):
     cluster_name = os.environ.get('CLUSTER_NAME')
-    url = 'https://platform-auth-service:9443/serviceids/?boundTo=crn%3Av1%3Aicp%3Aprivate%3Aiam%3A' + cluster_name + '%3An/ibm-common-services%3Acore%3Aservice%3A' + serviceName
+    url = 'https://platform-auth-service:9443/serviceids/?boundTo=crn%3Av1%3Aicp%3Aprivate%3Aiam%3A' + cluster_name + '%3An/NAMESPACE%3Acore%3Aservice%3A' + serviceName
     headersDef = {'Authorization': accessToken, 'Content-Type': 'application/json', 'Accept': 'application/json'}
     while True:
         r = requests.get(url, headers=headersDef, verify=False)
@@ -1036,7 +1036,7 @@ def mapServiceIdPolicies(serviceName, filepath, accessToken):
     serviceId = getServiceId(serviceName, accessToken)
     with open(filepath) as f:
         fdata = f.read()
-        url = 'https://iam-pap:39001/acms/v1/scopes/n%252Fibm-common-services/service_ids/' + serviceId + '/policies'
+        url = 'https://iam-pap:39001/acms/v1/scopes/n%252FNAMESPACE/service_ids/' + serviceId + '/policies'
         headersDef = {'Authorization': accessToken, 'Content-Type': 'application/json', 'Accept': 'application/json'}
         while True:
             r = requests.post(url, data=fdata, headers=headersDef, verify='/app/cluster-ca/ca.crt')

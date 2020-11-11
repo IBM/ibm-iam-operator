@@ -31,6 +31,7 @@ import (
 var certificateData map[string]map[string]string
 
 func generateCertificateData(instance *operatorv1alpha1.Authentication) {
+	completeName := "platform-identity-management." + instance.Namespace + ".svc"
 	certificateData = map[string]map[string]string{
 		"platform-auth-cert": {
 			"secretName": "platform-auth-secret",
@@ -43,7 +44,7 @@ func generateCertificateData(instance *operatorv1alpha1.Authentication) {
 		"platform-identity-management": {
 			"secretName":   "platform-identity-management",
 			"cn":           "platform-identity-management",
-			"completeName": "platform-identity-management.ibm-common-services.svc",
+			"completeName": completeName,
 		},
 	}
 }

@@ -386,7 +386,7 @@ func (r *ReconcileOIDCClientWatcher) crdForOIDCClientWatcher(instance *operatorv
 			Labels: map[string]string{
 				"app": "oidcclient-watcher",
 			},
-			Namespace: "ibm-common-services",
+			Namespace: instance.Namespace,
 		},
 		Spec: extv1.CustomResourceDefinitionSpec{
 			Scope:   "Namespaced",

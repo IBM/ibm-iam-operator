@@ -87,7 +87,7 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 					CABundle: certData,
 					Service: &reg.ServiceReference{
 						Name:      "platform-identity-management",
-						Namespace: "ibm-common-services",
+						Namespace: instance.Namespace,
 						Path:      &servicePath,
 					},
 				},

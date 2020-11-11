@@ -1777,7 +1777,6 @@ spec:
           resources:
           - clients
           - clients/finalizers
-          - clients/status
           verbs:
           - create
           - delete

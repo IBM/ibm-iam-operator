@@ -1692,15 +1692,15 @@ spec:
                 - name: IDENTITY_PROVIDER_TAG_OR_SHA
                   value: sha256:36363afe3a1af38f2ae5c73dc875a3c9b00dde4cc9d9242105644ab0458b5a99
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
-                  value: sha256:90035beb80bc4baea5d0f526cf3826542d5f73df7d6e23104a658a9fd367bb80
+                  value: sha256:66cbf3a90df2a5f66eef841c03896a6fe0e1bad2ad508fe0026efb33c75da44d
                 - name: POLICY_ADMINISTRATION_TAG_OR_SHA
-                  value: sha256:1fd0f2f296e4303347de0868a7c8b801d373970e80a7baf702c0f0836baebb66
+                  value: sha256:d65d7f86c399376a488bf831f599ff3805d533958f1b41b9a86b2be9815c8a8c
                 - name: POLICY_DECISION_TAG_OR_SHA
                   value: sha256:dea8a4508142c0a59f9ae12ef770988af34b3f03f1d0fdea9df305125f828f7d
                 - name: SECRET_WATCHER_TAG_OR_SHA
                   value: sha256:e0ce33ccb120fa9e3eee60331c17b2324285f223fc905a3f64bafb0d929db4fb
                 - name: CLIENT_WATCHER_TAG_OR_SHA
-                  value: sha256:e5facc3c3db8b01bc3797c341916441b2962866c6186a11ad7bf7b565b9dfdc0
+                  value: sha256:e54229b819c40915de792bdf4b15e0098c99b9f0a650385c339db54c64687845
                 - name: POLICY_CONTROLLER_TAG_OR_SHA
                   value: sha256:2576bd401bbd9be25009968700aac850081366b7b145f7724f588935da012d0e
                 - name: IAM_ONBOARDING_TAG_OR_SHA
@@ -1777,6 +1777,7 @@ spec:
           resources:
           - clients
           - clients/finalizers
+          - clients/status
           verbs:
           - create
           - delete

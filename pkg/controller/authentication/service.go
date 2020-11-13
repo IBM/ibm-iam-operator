@@ -98,7 +98,7 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 		return err
 	} else {
 		if currentService.Spec.Ports[0].TargetPort.IntVal == 443 {
-			currentService.Spec.Ports[0].TargetPort = intstr.FromString("https"),
+			currentService.Spec.Ports[0].TargetPort = intstr.FromString("https")
 			err = r.client.Update(context.TODO(), currentService)
 			if err != nil {
 				reqLogger.Error(err, "Failed to update an existing Service", "Service.Namespace", currentService.Namespace, "Service.Name", currentService.Name)

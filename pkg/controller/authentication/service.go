@@ -96,6 +96,17 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Service")
 		return err
+	} else {
+		if currentService.Spec.Ports[0].TargetPort.IntVal == 443 {
+			currentService.Spec.Ports[0].TargetPort = intstr.IntOrString{
+				StrVal: "https",
+			}
+			err = r.client.Update(context.TODO(), currentService)
+			if err != nil {
+				reqLogger.Error(err, "Failed to update an existing Service", "Service.Namespace", currentService.Namespace, "Service.Name", currentService.Name)
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -229,7 +240,6 @@ func (r *ReconcileAuthentication) identityProviderService(instance *operatorv1al
 func (r *ReconcileAuthentication) iamTokenService(instance *operatorv1alpha1.Authentication) *corev1.Service {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	var managementIngressPort int32 = 8443
 	var redirectPort int32 = 10443
 	iamTokenService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -244,7 +254,7 @@ func (r *ReconcileAuthentication) iamTokenService(instance *operatorv1alpha1.Aut
 					Port:     redirectPort,
 					Protocol: corev1.ProtocolTCP,
 					TargetPort: intstr.IntOrString{
-						IntVal: managementIngressPort,
+						StrVal: "https",
 					},
 				},
 			},

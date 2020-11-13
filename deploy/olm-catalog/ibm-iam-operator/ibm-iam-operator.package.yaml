@@ -3,7 +3,7 @@ channels:
   name: beta
 - currentCSV: ibm-iam-operator.v3.8.1
   name: dev
-- currentCSV: ibm-iam-operator.v3.7.4
+- currentCSV: ibm-iam-operator.v3.7.5
   name: stable-v1
 defaultChannel: stable-v1
 packageName: ibm-iam-operator

@@ -253,9 +253,7 @@ func (r *ReconcileAuthentication) iamTokenService(instance *operatorv1alpha1.Aut
 					Name:     "p10443",
 					Port:     redirectPort,
 					Protocol: corev1.ProtocolTCP,
-					TargetPort: intstr.IntOrString{
-						StrVal: "https",
-					},
+					TargetPort: intstr.FromString("https"),
 				},
 			},
 			Selector: map[string]string{

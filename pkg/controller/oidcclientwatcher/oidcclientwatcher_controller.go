@@ -27,7 +27,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -223,27 +222,6 @@ func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha
 	return reconcile.Result{Requeue: true}, nil
 }
 
-func (r *ReconcileOIDCClientWatcher) handleCRD(instance *operatorv1alpha1.OIDCClientWatcher, currentCRD *extv1.CustomResourceDefinition) (reconcile.Result, error) {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "clients.oidc.security.ibm.com", Namespace: ""}, currentCRD)
-	if err != nil && errors.IsNotFound(err) {
-		// Define CRD
-		newCRD := r.crdForOIDCClientWatcher(instance)
-		reqLogger.Info("Creating a new CRD", "CRD.Namespace", instance.Namespace, "CRD.Name", "clients.oidc.security.ibm.com")
-		err = r.client.Create(context.TODO(), newCRD)
-		if err != nil {
-			reqLogger.Error(err, "Failed to create new CRD", "CRD.Namespace", instance.Namespace, "CRD.Name", "clients.oidc.security.ibm.com")
-			return reconcile.Result{}, err
-		}
-		// new CRD created successfully - return
-		return reconcile.Result{}, nil
-	} else if err != nil {
-		reqLogger.Error(err, "Failed to get CRD")
-		return reconcile.Result{}, err
-	}
-	return reconcile.Result{}, nil
-}
-
 func (r *ReconcileOIDCClientWatcher) handleDeployment(instance *operatorv1alpha1.OIDCClientWatcher, currentDeployment *appsv1.Deployment) (reconcile.Result, error) {
 
 	// Check if this Deployment already exists
@@ -372,88 +350,6 @@ func (r *ReconcileOIDCClientWatcher) operatorClusterRoleForOIDCClientWatcher(ins
 		return nil
 	}*/
 	return operatorClusterRole
-}
-
-func (r *ReconcileOIDCClientWatcher) crdForOIDCClientWatcher(instance *operatorv1alpha1.OIDCClientWatcher) *extv1.CustomResourceDefinition {
-	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	newCRD := &extv1.CustomResourceDefinition{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "CustomResourceDefinition",
-			APIVersion: "apiextensions.k8s.io/v1beta1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "clients.oidc.security.ibm.com",
-			Labels: map[string]string{
-				"app": "oidcclient-watcher",
-			},
-			Namespace: instance.Namespace,
-		},
-		Spec: extv1.CustomResourceDefinitionSpec{
-			Scope:   "Namespaced",
-			Group:   "oidc.security.ibm.com",
-			Version: "v1",
-			Names: extv1.CustomResourceDefinitionNames{
-				Kind:       "Client",
-				Singular:   "client",
-				Plural:     "clients",
-				ShortNames: []string{"or"},
-			},
-			Validation: &extv1.CustomResourceValidation{
-				OpenAPIV3Schema: &extv1.JSONSchemaProps{
-					Properties: map[string]extv1.JSONSchemaProps{
-						"apiVersion": {
-							Description: `APIVersion defines the versioned schema of this representation
-							of an object. Servers should convert recognized schemas to the latest
-							internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources`,
-							Type: "string",
-						},
-						"kind": {
-							Description: `Kind is a string value representing the REST resource this
-							object represents. Servers may infer this from the endpoint the client
-							submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds`,
-							Type: "string",
-						},
-						"metadata": {
-							Type: "object",
-						},
-						"spec": {
-							Type: "object",
-						},
-						"status": {
-							Type: "object",
-						},
-					},
-				},
-			},
-			AdditionalPrinterColumns: []extv1.CustomResourceColumnDefinition{
-				{
-					Name:     "Secret",
-					Type:     "string",
-					JSONPath: ".spec.secret",
-				},
-				{
-					Name:     "Ready",
-					Type:     "string",
-					JSONPath: `.status.conditions[?(@.type=="Ready")].status`,
-				},
-				{
-					Name:     "Status",
-					Type:     "string",
-					JSONPath: `.status.conditions[?(@.type=="Ready")].message`,
-					Priority: 1,
-				},
-				{
-					Name:     "Age",
-					Type:     "date",
-					JSONPath: ".metadata.creationTimestamp",
-					Description: `CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.
-					\nPopulated by the system. Read-only. Null for lists. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata`,
-				},
-			},
-		},
-	}
-
-	return newCRD
 }
 
 // deploymentForOIDCClientWatcher returns a OIDCClientWatcher Deployment object
@@ -851,19 +747,10 @@ func getPodNames(pods []corev1.Pod) []string {
 func (r *ReconcileOIDCClientWatcher) deleteExternalResources(instance *operatorv1alpha1.OIDCClientWatcher) error {
 
 	crList := []string{"icp-oidc-client-operate-aggregate", "icp-oidc-client-admin-aggregate"}
-	crdList := []string{"clients.oidc.security.ibm.com"}
 	// Remove Cluster Role
 
 	for _, cr := range crList {
 		if err := removeCR(r.client, cr); err != nil {
-			return err
-		}
-	}
-
-	// Remove CustomResourceDefinition
-
-	for _, crd := range crdList {
-		if err := removeCRD(r.client, crd); err != nil {
 			return err
 		}
 	}
@@ -902,23 +789,6 @@ func removeCR(client client.Client, crName string) error {
 	} else if err == nil {
 		if err = client.Delete(context.Background(), clusterRole); err != nil {
 			log.V(1).Info("Error deleting cluster role", "name", crName, "error message", err)
-			return err
-		}
-	} else {
-		return err
-	}
-	return nil
-}
-
-func removeCRD(client client.Client, crdName string) error {
-	// Delete CustomResourceDefinition
-	customResourceDefinition := &extv1.CustomResourceDefinition{}
-	if err := client.Get(context.Background(), types.NamespacedName{Name: crdName, Namespace: ""}, customResourceDefinition); err != nil && errors.IsNotFound(err) {
-		log.V(1).Info("Error getting custome resource definition", "msg", err)
-		return nil
-	} else if err == nil {
-		if err = client.Delete(context.Background(), customResourceDefinition); err != nil {
-			log.V(1).Info("Error deleting custom resource definition", "name", crdName, "error message", err)
 			return err
 		}
 	} else {

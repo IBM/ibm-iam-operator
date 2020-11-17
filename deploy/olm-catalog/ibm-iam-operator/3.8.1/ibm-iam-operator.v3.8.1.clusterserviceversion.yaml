@@ -1694,11 +1694,11 @@ spec:
                 - name: IDENTITY_PROVIDER_TAG_OR_SHA
                   value: sha256:36363afe3a1af38f2ae5c73dc875a3c9b00dde4cc9d9242105644ab0458b5a99
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
-                  value: sha256:66cbf3a90df2a5f66eef841c03896a6fe0e1bad2ad508fe0026efb33c75da44d
+                  value: sha256:51c9231e416ce7a6fe01e8961c9fd6dd92e81522e36b634262f2d53f0dce0be9
                 - name: POLICY_ADMINISTRATION_TAG_OR_SHA
                   value: sha256:d65d7f86c399376a488bf831f599ff3805d533958f1b41b9a86b2be9815c8a8c
                 - name: POLICY_DECISION_TAG_OR_SHA
-                  value: sha256:dea8a4508142c0a59f9ae12ef770988af34b3f03f1d0fdea9df305125f828f7d
+                  value: sha256:8c4f9a630609bd8caf88cbe9acbe95e7c08e3adfc1192609ebaf346424b4b75f
                 - name: SECRET_WATCHER_TAG_OR_SHA
                   value: sha256:e0ce33ccb120fa9e3eee60331c17b2324285f223fc905a3f64bafb0d929db4fb
                 - name: CLIENT_WATCHER_TAG_OR_SHA

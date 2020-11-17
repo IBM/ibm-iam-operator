@@ -1704,7 +1704,7 @@ spec:
                 - name: CLIENT_WATCHER_TAG_OR_SHA
                   value: sha256:e54229b819c40915de792bdf4b15e0098c99b9f0a650385c339db54c64687845
                 - name: POLICY_CONTROLLER_TAG_OR_SHA
-                  value: sha256:2576bd401bbd9be25009968700aac850081366b7b145f7724f588935da012d0e
+                  value: sha256:0f20b1abe1ac4926b0d58ac30863e015f4f75f0fcc166c398a5348e1e2e8fa27
                 - name: IAM_ONBOARDING_TAG_OR_SHA
                   value: sha256:ccba1e105ac647c4ccc8a3ce1c152e74074ab380600ddbb4b5f3075123023c0b
                 - name: AUDIT_TAG_OR_SHA

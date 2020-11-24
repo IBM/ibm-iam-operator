@@ -48,7 +48,7 @@ spec:
             - name: IDENTITY_PROVIDER_TAG_OR_SHA
               value: "sha256:afc04ca31c2e6791d4c7bc4d941638f2d9bc521c122cc0290363fecccd8fc1dd"
             - name: IDENTITY_MANAGER_TAG_OR_SHA
-              value: "sha256:619d956c933e1bcc81173b0da075afa10cb1e04cfaab0b560e61066ca00f2ae9"
+              value: "sha256:ee60f5bed3376c4500e5483cd428292eb2c2bae23910339ad91e04bce30073bc"
             - name: POLICY_ADMINISTRATION_TAG_OR_SHA
               value: "sha256:f39989469270bf5845f289388e12b98d60d72bc32cd12931705fc8a3f37ad3c0"
             - name: POLICY_DECISION_TAG_OR_SHA
@@ -56,7 +56,7 @@ spec:
             - name: SECRET_WATCHER_TAG_OR_SHA
               value: "sha256:e0ce33ccb120fa9e3eee60331c17b2324285f223fc905a3f64bafb0d929db4fb"
             - name: CLIENT_WATCHER_TAG_OR_SHA
-              value: "sha256:e54229b819c40915de792bdf4b15e0098c99b9f0a650385c339db54c64687845"
+              value: "sha256:9ce7514d58c78eb4df41575c3e4e92a725b3f35c300046d1ee89290b51a14c43"
             - name: POLICY_CONTROLLER_TAG_OR_SHA
               value: "sha256:0f20b1abe1ac4926b0d58ac30863e015f4f75f0fcc166c398a5348e1e2e8fa27"
             - name: IAM_ONBOARDING_TAG_OR_SHA

@@ -1694,7 +1694,7 @@ spec:
                 - name: IDENTITY_PROVIDER_TAG_OR_SHA
                   value: sha256:afc04ca31c2e6791d4c7bc4d941638f2d9bc521c122cc0290363fecccd8fc1dd
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
-                  value: sha256:619d956c933e1bcc81173b0da075afa10cb1e04cfaab0b560e61066ca00f2ae9
+                  value: sha256:ee60f5bed3376c4500e5483cd428292eb2c2bae23910339ad91e04bce30073bc
                 - name: POLICY_ADMINISTRATION_TAG_OR_SHA
                   value: sha256:f39989469270bf5845f289388e12b98d60d72bc32cd12931705fc8a3f37ad3c0
                 - name: POLICY_DECISION_TAG_OR_SHA

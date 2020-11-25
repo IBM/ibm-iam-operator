@@ -423,7 +423,7 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 									{
 										MatchExpressions: []corev1.NodeSelectorRequirement{
 											{
-												Key:      "beta.kubernetes.io/arch",
+												Key:      "kubernetes.io/arch",
 												Operator: corev1.NodeSelectorOpIn,
 												Values:   []string{gorun.GOARCH},
 											},

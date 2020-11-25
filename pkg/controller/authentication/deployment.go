@@ -179,7 +179,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 									{
 										MatchExpressions: []corev1.NodeSelectorRequirement{
 											{
-												Key:      "beta.kubernetes.io/arch",
+												Key:      "kubernetes.io/arch",
 												Operator: corev1.NodeSelectorOpIn,
 												Values:   []string{gorun.GOARCH},
 											},

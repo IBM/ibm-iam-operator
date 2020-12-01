@@ -33,7 +33,7 @@ metadata:
             "oidcInitAuthService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.7",
+              "imageTag": "3.3.12",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -48,7 +48,7 @@ metadata:
             "oidcInitIdentityProvider": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.7",
+              "imageTag": "3.3.12",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -63,7 +63,7 @@ metadata:
             "oidcInitIdentityManager": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.7",
+              "imageTag": "3.3.12",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -111,7 +111,7 @@ metadata:
             "initMongodb": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.7",
+              "imageTag": "3.3.12",
               "resources": {
                 "limits": {
                   "cpu": "100m",
@@ -168,7 +168,7 @@ metadata:
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.7",
+              "imageTag": "3.3.12",
               "ldapsCACert": "platform-auth-ldaps-ca-cert",
               "resources": {
                 "limits": {
@@ -185,7 +185,7 @@ metadata:
             "clientRegistration": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.7",
+              "imageTag": "3.3.12",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -230,7 +230,7 @@ metadata:
             "identityManager": {
               "imageName": "icp-identity-manager",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.6",
+              "imageTag": "3.3.12",
               "masterNodesList": "10.0.0.1",
               "resources": {
                 "limits": {
@@ -246,7 +246,7 @@ metadata:
             "identityProvider": {
               "imageName": "icp-identity-provider",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.6",
+              "imageTag": "3.3.12",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -261,7 +261,7 @@ metadata:
             "initMongodb": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.7",
+              "imageTag": "3.3.12",
               "resources": {
                 "limits": {
                   "cpu": "100m",
@@ -309,7 +309,7 @@ metadata:
             "papService": {
               "imageName": "iam-policy-administration",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.4",
+              "imageTag": "3.3.9",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -416,7 +416,7 @@ metadata:
             "initAuthService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.7",
+              "imageTag": "3.3.12",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -431,7 +431,7 @@ metadata:
             "initIdentityManager": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.7",
+              "imageTag": "3.3.12",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -446,7 +446,7 @@ metadata:
             "initIdentityProvider": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.7",
+              "imageTag": "3.3.12",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -461,7 +461,7 @@ metadata:
             "initPAPSpec": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.7",
+              "imageTag": "3.3.12",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -476,7 +476,7 @@ metadata:
             "initTokenService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.7",
+              "imageTag": "3.3.12",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -1690,13 +1690,13 @@ spec:
                 - ibm-iam-operator
                 env:
                 - name: AUTH_SERVICE_TAG_OR_SHA
-                  value: sha256:b6e6009529eddc668fb2c376036d0621c3bc8bc9afee4814afe73a0411d9126a
+                  value: sha256:959f0fa63c15a5407b81935df0c26988da2af68d1668f56f7270ddec77fe4fe0
                 - name: IDENTITY_PROVIDER_TAG_OR_SHA
-                  value: sha256:afc04ca31c2e6791d4c7bc4d941638f2d9bc521c122cc0290363fecccd8fc1dd
+                  value: sha256:7884f81d0d024495289d1c783f3d0fc50ef266ec70570df2c22fca2c125ddd32
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
-                  value: sha256:310b89a22fcf57f2a50b673d072dbf5098599f36c45e23ddc6bc9dd9f10b8b09
+                  value: sha256:a51fe1fef139cb574799796bc7f0b9a78ef5b0ccb1d1d81d9902478f3f7f55ba
                 - name: POLICY_ADMINISTRATION_TAG_OR_SHA
-                  value: sha256:f39989469270bf5845f289388e12b98d60d72bc32cd12931705fc8a3f37ad3c0
+                  value: sha256:bcd8f1297a72e484fb4f0cc113c8dfaa678bd2ee7418786a90ce44f850c286a8
                 - name: POLICY_DECISION_TAG_OR_SHA
                   value: sha256:8c4f9a630609bd8caf88cbe9acbe95e7c08e3adfc1192609ebaf346424b4b75f
                 - name: SECRET_WATCHER_TAG_OR_SHA

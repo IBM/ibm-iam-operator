@@ -60,7 +60,7 @@ spec:
             - name: POLICY_CONTROLLER_TAG_OR_SHA
               value: "sha256:0f20b1abe1ac4926b0d58ac30863e015f4f75f0fcc166c398a5348e1e2e8fa27"
             - name: IAM_ONBOARDING_TAG_OR_SHA
-              value: "sha256:ccba1e105ac647c4ccc8a3ce1c152e74074ab380600ddbb4b5f3075123023c0b"
+              value: "sha256:85cb9c78ec897fdd9eca89c77150986241c9ed23e73dd59d4add8d60c7efddf4"
             - name: AUDIT_TAG_OR_SHA
               value: "sha256:4d68ee3e14b74e117b54e1c49686de847008d5e453b267168f6e52af9c9e9d4d"
             - name: WATCH_NAMESPACE

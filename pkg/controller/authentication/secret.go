@@ -29,6 +29,7 @@ import (
 )
 
 var rule2 = `^([a-zA-Z0-9]){32,}$`
+var rule3 = `^([a-zA-Z0-9]){16,}$`
 var adminPassword = generateRandomString(rule2)
 var encryptionKey = generateRandomString(rule2)
 var wlpClientRegistrationSecret = generateRandomString(rule2)

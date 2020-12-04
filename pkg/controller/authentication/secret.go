@@ -33,6 +33,7 @@ var rule3 = `^([a-zA-Z0-9]){16,}$`
 var adminPassword = generateRandomString(rule2)
 var encryptionKey = generateRandomString(rule2)
 var wlpClientRegistrationSecret = generateRandomString(rule2)
+var encryptionIV = generateRandomString(rule3)
 
 func generateSecretData(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string) map[string]map[string][]byte {
 
@@ -46,6 +47,7 @@ func generateSecretData(instance *operatorv1alpha1.Authentication, wlpClientID s
 		},
 		"platform-auth-idp-encryption": {
 			"ENCRYPTION_KEY": []byte(encryptionKey),
+			"ENCRYPTION_IV":  []byte(encryptionIV),
 			"algorithm":      []byte("aes256"),
 			"inputEncoding":  []byte("utf8"),
 			"outputEncoding": []byte("hex"),
@@ -82,20 +84,39 @@ func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authen
 
 	for secret := range secretData {
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: secret, Namespace: instance.Namespace}, currentSecret)
-		if err != nil && errors.IsNotFound(err) {
-			// Define a new Secret
-			newSecret := generateSecretObject(instance, r.scheme, secret, secretData[secret])
-			reqLogger.Info("Creating a new Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
-			err = r.client.Create(context.TODO(), newSecret)
-			if err != nil {
-				reqLogger.Error(err, "Failed to create new Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				// Define a new Secret
+				newSecret := generateSecretObject(instance, r.scheme, secret, secretData[secret])
+				reqLogger.Info("Creating a new Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
+				err = r.client.Create(context.TODO(), newSecret)
+				if err != nil {
+					reqLogger.Error(err, "Failed to create new Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
+					return err
+				}
+				// Secret created successfully - return and requeue
+				*requeueResult = true
+			} else{
+				reqLogger.Error(err, "Failed to get Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
 				return err
 			}
-			// Secret created successfully - return and requeue
-			*requeueResult = true
-		} else if err != nil {
-			reqLogger.Error(err, "Failed to get Secret")
-			return err
+		} else {
+			secretUpdateRequired := false
+			if secret == "platform-auth-idp-encryption" {
+				if _,keyExists := currentSecret.Data["ENCRYPTION_IV"]; !keyExists{
+					reqLogger.Info("Updating an existing Secret", "Secret.Namespace", currentSecret.Namespace, "Secret.Name", currentSecret.Name)
+					newSecret := generateSecretObject(instance, r.scheme, secret, secretData[secret])
+					currentSecret.Data["ENCRYPTION_IV"] = newSecret.Data["ENCRYPTION_IV"]
+					secretUpdateRequired = true
+				}
+			}
+			if secretUpdateRequired {
+				err = r.client.Update(context.TODO(), currentSecret)
+				if err != nil {
+					reqLogger.Error(err, "Failed to update an existing Secret", "Secret.Namespace", currentSecret.Namespace, "Secret.Name", currentSecret.Name)
+					return err
+				}
+			}
 		}
 
 	}

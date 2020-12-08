@@ -134,7 +134,7 @@ Complete the following steps:
 
 3. Create a CR, which is an instance of the CRD.
   1. Edit `deploy/crds/operator.ibm.com_v1alpha1_authentications_cr.yaml`.
-  2. `kubectl create -f deploy/crds/operator.ibm.com_v1alpha1_authentications_cr.yaml`
+  2. Create the CR `kubectl create -f deploy/crds/operator.ibm.com_v1alpha1_authentications_cr.yaml`
 
 4. Delete the CR and the associated resources that were created.
   - `kubectl delete authentications example-authentication`

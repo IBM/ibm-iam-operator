@@ -483,6 +483,17 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			},
 		},
 		{
+			Name: "ENCRYPTION_IV",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp-encryption",
+					},
+					Key: "ENCRYPTION_IV",
+				},
+			},
+		},
+		{
 			Name: "algorithm",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{

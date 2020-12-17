@@ -46,19 +46,19 @@ spec:
             - name: AUTH_SERVICE_TAG_OR_SHA
               value: "sha256:959f0fa63c15a5407b81935df0c26988da2af68d1668f56f7270ddec77fe4fe0"
             - name: IDENTITY_PROVIDER_TAG_OR_SHA
-              value: "sha256:ee7cefe289dc53374af0df7f2b20d9c89af43dc6f5e2eec2a541cba044d9c33b"
+              value: "sha256:524206a2185288866f48f0ccd25dac7b0c794c28e5c80714b8a858d52f9d7e32"
             - name: IDENTITY_MANAGER_TAG_OR_SHA
-              value: "sha256:a51fe1fef139cb574799796bc7f0b9a78ef5b0ccb1d1d81d9902478f3f7f55ba"
+              value: "sha256:450d4f5d982e756952ce67a55728d32019c0793fe3f8615cb509749ccd72c2a2"
             - name: POLICY_ADMINISTRATION_TAG_OR_SHA
               value: "sha256:bcd8f1297a72e484fb4f0cc113c8dfaa678bd2ee7418786a90ce44f850c286a8"
             - name: POLICY_DECISION_TAG_OR_SHA
-              value: "sha256:8c4f9a630609bd8caf88cbe9acbe95e7c08e3adfc1192609ebaf346424b4b75f"
+              value: "sha256:9abb4ded6045af2e43559c6cfdcb7325eb110fcf144583f0c6dd4f5e10622378"
             - name: SECRET_WATCHER_TAG_OR_SHA
-              value: "sha256:e0ce33ccb120fa9e3eee60331c17b2324285f223fc905a3f64bafb0d929db4fb"
+              value: "sha256:85fc756b043bf9a4800e601353490f0cf7822a294d22698315f3f31b9dd74080"
             - name: CLIENT_WATCHER_TAG_OR_SHA
-              value: "sha256:8e79c247ba71c59a943ae71eca23588bdbdaa4f423925c834100a31d76287e10"
+              value: "sha256:39fd0ae3e671f82baecd89f3c41943878abe7d0fe8f64f1286a87a56d95feb42"
             - name: POLICY_CONTROLLER_TAG_OR_SHA
-              value: "sha256:0f20b1abe1ac4926b0d58ac30863e015f4f75f0fcc166c398a5348e1e2e8fa27"
+              value: "sha256:d080f925186f92348892d63799d1cdb0e18cc82c710b162992d3229aac89f454"
             - name: IAM_ONBOARDING_TAG_OR_SHA
               value: "sha256:85cb9c78ec897fdd9eca89c77150986241c9ed23e73dd59d4add8d60c7efddf4"
             - name: AUDIT_TAG_OR_SHA

@@ -1694,13 +1694,13 @@ spec:
                 - name: AUTH_SERVICE_TAG_OR_SHA
                   value: sha256:959f0fa63c15a5407b81935df0c26988da2af68d1668f56f7270ddec77fe4fe0
                 - name: IDENTITY_PROVIDER_TAG_OR_SHA
-                  value: sha256:524206a2185288866f48f0ccd25dac7b0c794c28e5c80714b8a858d52f9d7e32
+                  value: sha256:dc8b9c534f211e464f1a9e384a88b001602aa1e24be279fc83a1083be040307c
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
-                  value: sha256:450d4f5d982e756952ce67a55728d32019c0793fe3f8615cb509749ccd72c2a2
+                  value: sha256:16fb5bd2a487ecdc1fb0f5bee73a4cbb808706a0c911bfcb32d30d7bf40d67a5
                 - name: POLICY_ADMINISTRATION_TAG_OR_SHA
                   value: sha256:bcd8f1297a72e484fb4f0cc113c8dfaa678bd2ee7418786a90ce44f850c286a8
                 - name: POLICY_DECISION_TAG_OR_SHA
-                  value: sha256:9abb4ded6045af2e43559c6cfdcb7325eb110fcf144583f0c6dd4f5e10622378
+                  value: sha256:a696d99a9baf53fc3b1048a79993b30acb8cf563115e2aa3220fe8bd285e2ff9
                 - name: SECRET_WATCHER_TAG_OR_SHA
                   value: sha256:85fc756b043bf9a4800e601353490f0cf7822a294d22698315f3f31b9dd74080
                 - name: CLIENT_WATCHER_TAG_OR_SHA

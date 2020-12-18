@@ -38,6 +38,15 @@ type CRBData struct {
 func generateCRBData(defaultAdminUser string, oidcIssuerURL string) map[string]CRBData {
 
 	return map[string]CRBData{
+		"icp:default:cloudpakadmin": {
+			Subject: []SubjectData{
+				{
+					Name: "icp:default:cloudpakadmin",
+					Kind: "Group",
+				},
+			},
+			RoleName: "icp:cloudpakadmin",
+		},
 		"icp:default:accountadmin": {
 			Subject: []SubjectData{
 				{

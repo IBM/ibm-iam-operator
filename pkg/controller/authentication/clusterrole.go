@@ -53,6 +53,39 @@ func generateCRData() map[string]CRData {
 				},
 			},
 		},
+		"icp:cloudpakadmin": {
+			Labels: map[string]string{
+				"app": "auth-idp",
+			},
+			MatchLabels: nil,
+			Rules: []rbacv1.PolicyRule{
+				{
+					APIGroups: []string{""},
+					Resources: []string{"namespaces"},
+					Verbs:     adminVerbs,
+				},
+				{
+					APIGroups: []string{"rbac.authorization.k8s.io"},
+					Resources: []string{"clusterrolebindings"},
+					Verbs:     adminVerbs,
+				},
+				{
+					APIGroups: []string{"clusterhealth.ibm.com"},
+					Resources: []string{"clusterservicestatuses"},
+					Verbs:     viewerVerbs,
+				},
+				{
+					APIGroups: []string{"user.openshift.io"},
+					Resources: []string{"users"},
+					Verbs:     adminVerbs,
+				},
+				{
+					APIGroups: []string{"user.openshift.io"},
+					Resources: []string{"groups"},
+					Verbs:     adminVerbs,
+				},
+			},
+		},
 		"icp:accountadmin": {
 			Labels: map[string]string{
 				"app": "auth-idp",

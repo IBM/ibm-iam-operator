@@ -26,6 +26,7 @@ var ElasticSearch = `{
           },
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator",
             "crn:v1:icp:private:iam::::role:Operator"
@@ -38,6 +39,7 @@ var ElasticSearch = `{
           },
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator",
             "crn:v1:icp:private:iam::::role:Operator"
@@ -50,6 +52,7 @@ var ElasticSearch = `{
           },
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator",
             "crn:v1:icp:private:iam::::role:Operator"
@@ -62,6 +65,7 @@ var ElasticSearch = `{
           },
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator",
             "crn:v1:icp:private:iam::::role:Operator"
@@ -74,6 +78,7 @@ var ElasticSearch = `{
           },
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator",
             "crn:v1:icp:private:iam::::role:Operator"
@@ -86,6 +91,7 @@ var ElasticSearch = `{
           },
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator",
             "crn:v1:icp:private:iam::::role:Operator"
@@ -98,6 +104,7 @@ var ElasticSearch = `{
           },
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator",
             "crn:v1:icp:private:iam::::role:Operator"
@@ -110,6 +117,7 @@ var ElasticSearch = `{
           },
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator",
             "crn:v1:icp:private:iam::::role:Operator"
@@ -122,6 +130,9 @@ var ElasticSearch = `{
       }],
       "supportedRoles": [{
           "id": "crn:v1:icp:private:iam::::role:ClusterAdministrator"
+        },
+        {
+          "id": "crn:v1:icp:private:iam::::role:CloudpakAdministrator"
         },
         {
           "id": "crn:v1:icp:private:iam::::role:AccountAdministrator"
@@ -149,6 +160,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator",
@@ -162,7 +174,8 @@ var HelmApi = `{
                 "default": "helmapi.repos.put.updaterepo"
             },
             "roles": [
-                "crn:v1:icp:private:iam::::role:ClusterAdministrator"
+                "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator"
             ]
         },
         {
@@ -171,7 +184,8 @@ var HelmApi = `{
                 "default": "helmapi.repos.post.addrepo"
             },
             "roles": [
-                "crn:v1:icp:private:iam::::role:ClusterAdministrator"
+                "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator"
             ]
         },
         {
@@ -180,7 +194,8 @@ var HelmApi = `{
                 "default": "helmapi.repos.delete.removerepo"
             },
             "roles": [
-                "crn:v1:icp:private:iam::::role:ClusterAdministrator"
+                "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator"
             ]
         },
         {
@@ -190,6 +205,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator"
             ]
@@ -201,6 +217,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator",
@@ -215,6 +232,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator",
@@ -229,6 +247,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator"
@@ -241,6 +260,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator"
@@ -253,6 +273,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator"
@@ -265,6 +286,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator",
@@ -279,6 +301,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator",
@@ -292,7 +315,8 @@ var HelmApi = `{
                 "default": "helmapi.defaults.get.restoredefaultrepos"
             },
             "roles": [
-                "crn:v1:icp:private:iam::::role:ClusterAdministrator"
+                "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator"
             ]
         },
         {
@@ -302,6 +326,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator",
@@ -316,6 +341,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator",
@@ -330,6 +356,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator",
@@ -344,6 +371,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator",
@@ -358,6 +386,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator",
@@ -371,7 +400,8 @@ var HelmApi = `{
                 "default": "helmapi.repos.put.updaterepo"
             },
             "roles": [
-                "crn:v1:icp:private:iam::::role:ClusterAdministrator"
+                "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator"
             ]
         },
         {
@@ -380,7 +410,8 @@ var HelmApi = `{
                 "default": "helmapi.repos.post.addrepo"
             },
             "roles": [
-                "crn:v1:icp:private:iam::::role:ClusterAdministrator"
+                "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator"
             ]
         },
         {
@@ -389,7 +420,8 @@ var HelmApi = `{
                 "default": "helmapi.repos.delete.removerepo"
             },
             "roles": [
-                "crn:v1:icp:private:iam::::role:ClusterAdministrator"
+                "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator"
             ]
         },
         {
@@ -399,6 +431,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator"
             ]
@@ -410,6 +443,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator",
@@ -424,6 +458,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator",
@@ -438,6 +473,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator"
@@ -450,6 +486,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator"
@@ -462,6 +499,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator"
@@ -474,6 +512,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator",
@@ -488,6 +527,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator",
@@ -501,7 +541,8 @@ var HelmApi = `{
                 "default": "helmapi.defaults.get.restoredefaultrepos"
             },
             "roles": [
-                "crn:v1:icp:private:iam::::role:ClusterAdministrator"
+                "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator"
             ]
         },
         {
@@ -511,6 +552,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator",
@@ -525,6 +567,7 @@ var HelmApi = `{
             },
             "roles": [
                 "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+                "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
                 "crn:v1:icp:private:iam::::role:AccountAdministrator",
                 "crn:v1:icp:private:iam::::role:Administrator",
                 "crn:v1:icp:private:iam::::role:Operator",
@@ -542,6 +585,9 @@ var HelmApi = `{
     "supportedRoles": [
         {
             "id": "crn:v1:icp:private:iam::::role:ClusterAdministrator"
+        },
+        {
+          "id": "crn:v1:icp:private:iam::::role:CloudpakAdministrator"
         },
         {
             "id": "crn:v1:icp:private:iam::::role:AccountAdministrator"
@@ -573,6 +619,7 @@ var HelmRepo = `{
           },
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator",
             "crn:v1:icp:private:iam::::role:Operator",
@@ -587,6 +634,7 @@ var HelmRepo = `{
           },
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator",
             "crn:v1:icp:private:iam::::role:Operator",
@@ -601,6 +649,7 @@ var HelmRepo = `{
           },
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator"
           ]
@@ -612,6 +661,7 @@ var HelmRepo = `{
           },
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator"
           ]
@@ -623,6 +673,7 @@ var HelmRepo = `{
           },
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator",
             "crn:v1:icp:private:iam::::role:Operator",
@@ -637,6 +688,7 @@ var HelmRepo = `{
           },
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator",
             "crn:v1:icp:private:iam::::role:Operator",
@@ -651,6 +703,7 @@ var HelmRepo = `{
           },
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator"
           ]
@@ -662,6 +715,7 @@ var HelmRepo = `{
           },
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator"
           ]
@@ -674,6 +728,9 @@ var HelmRepo = `{
       "supportedRoles": [
         {
           "id": "crn:v1:icp:private:iam::::role:ClusterAdministrator"
+        },
+        {
+          "id": "crn:v1:icp:private:iam::::role:CloudpakAdministrator"
         },
         {
           "id": "crn:v1:icp:private:iam::::role:AccountAdministrator"
@@ -704,6 +761,7 @@ var Kms = `{
           "id": "POST /kms/secrets/create",
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator",
             "crn:v1:icp:private:iam::::role:Editor"
@@ -714,6 +772,7 @@ var Kms = `{
           "id": "DELETE /kms/secrets/delete",
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator"
           ]
@@ -723,6 +782,7 @@ var Kms = `{
           "id": "GET /kms/secrets/list",
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator",
             "crn:v1:icp:private:iam::::role:Editor"
@@ -733,6 +793,7 @@ var Kms = `{
           "id": "GET /kms/secrets/read",
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator",
             "crn:v1:icp:private:iam::::role:Editor"
@@ -743,6 +804,7 @@ var Kms = `{
           "id": "POST /kms/secrets/wrap",
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator",
             "crn:v1:icp:private:iam::::role:Editor",
@@ -754,6 +816,7 @@ var Kms = `{
           "id": "POST /kms/secrets/unwrap",
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator",
             "crn:v1:icp:private:iam::::role:Editor",
@@ -765,6 +828,7 @@ var Kms = `{
           "id": "POST /kms/secrets/rotate",
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator"
           ]
@@ -777,6 +841,9 @@ var Kms = `{
     "supportedRoles": [
         {
             "id": "crn:v1:icp:private:iam::::role:ClusterAdministrator"
+        },
+        {
+          "id": "crn:v1:icp:private:iam::::role:CloudpakAdministrator"
         },
         {
             "id": "crn:v1:icp:private:iam::::role:AccountAdministrator"
@@ -806,6 +873,7 @@ var Monitoring = `{
           },
             "roles": [
               "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+              "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
               "crn:v1:icp:private:iam::::role:AccountAdministrator",
               "crn:v1:icp:private:iam::::role:Administrator",
               "crn:v1:icp:private:iam::::role:Operator"
@@ -818,6 +886,7 @@ var Monitoring = `{
           },
             "roles": [
               "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+              "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
               "crn:v1:icp:private:iam::::role:AccountAdministrator",
               "crn:v1:icp:private:iam::::role:Administrator"
             ]
@@ -829,6 +898,7 @@ var Monitoring = `{
           },
             "roles": [
               "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+              "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
               "crn:v1:icp:private:iam::::role:AccountAdministrator",
               "crn:v1:icp:private:iam::::role:Administrator",
               "crn:v1:icp:private:iam::::role:Operator"
@@ -841,6 +911,7 @@ var Monitoring = `{
           },
             "roles": [
               "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+              "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
               "crn:v1:icp:private:iam::::role:AccountAdministrator",
               "crn:v1:icp:private:iam::::role:Administrator",
               "crn:v1:icp:private:iam::::role:Operator"
@@ -853,6 +924,7 @@ var Monitoring = `{
           },
             "roles": [
               "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+              "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
               "crn:v1:icp:private:iam::::role:AccountAdministrator",
               "crn:v1:icp:private:iam::::role:Administrator",
               "crn:v1:icp:private:iam::::role:Operator"
@@ -865,6 +937,7 @@ var Monitoring = `{
           },
             "roles": [
               "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+              "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
               "crn:v1:icp:private:iam::::role:AccountAdministrator",
               "crn:v1:icp:private:iam::::role:Administrator"
             ]
@@ -876,6 +949,7 @@ var Monitoring = `{
           },
             "roles": [
               "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+              "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
               "crn:v1:icp:private:iam::::role:AccountAdministrator",
               "crn:v1:icp:private:iam::::role:Administrator"
             ]
@@ -887,6 +961,7 @@ var Monitoring = `{
           },
             "roles": [
               "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+              "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
               "crn:v1:icp:private:iam::::role:AccountAdministrator",
               "crn:v1:icp:private:iam::::role:Administrator"
             ]
@@ -900,6 +975,9 @@ var Monitoring = `{
       ],
       "supportedRoles": [{
           "id": "crn:v1:icp:private:iam::::role:ClusterAdministrator"
+        },
+        {
+          "id": "crn:v1:icp:private:iam::::role:CloudpakAdministrator"
         },
         {
           "id": "crn:v1:icp:private:iam::::role:AccountAdministrator"
@@ -924,6 +1002,7 @@ var TillerService = `{
           },
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator",
             "crn:v1:icp:private:iam::::role:Operator",
@@ -937,6 +1016,7 @@ var TillerService = `{
           },
           "roles": [
             "crn:v1:icp:private:iam::::role:ClusterAdministrator",
+            "crn:v1:icp:private:iam::::role:CloudpakAdministrator",
             "crn:v1:icp:private:iam::::role:AccountAdministrator",
             "crn:v1:icp:private:iam::::role:Administrator",
             "crn:v1:icp:private:iam::::role:Operator",
@@ -952,6 +1032,9 @@ var TillerService = `{
       "supportedRoles": [
         {
           "id": "crn:v1:icp:private:iam::::role:ClusterAdministrator"
+        },
+        {
+          "id": "crn:v1:icp:private:iam::::role:CloudpakAdministrator"
         },
         {
           "id": "crn:v1:icp:private:iam::::role:AccountAdministrator"
@@ -981,6 +1064,9 @@ var Tiller_Serviceid_Policies = `{
       "roles": [
           {
               "id": "crn:v1:icp:private:iam::::role:ClusterAdministrator"
+          },
+          {
+              "id": "crn:v1:icp:private:iam::::role:CloudpakAdministrator"
           },
           {
               "id": "crn:v1:icp:private:iam::::role:AccountAdministrator"

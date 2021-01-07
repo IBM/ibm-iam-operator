@@ -296,6 +296,7 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"MONGO_POOL_MIN_SIZE":                "5",
 			"MONGO_POOL_MAX_SIZE":                "15",
 			"MONGO_MAX_STALENESS":                "90",
+			"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
 		},
 	}
 

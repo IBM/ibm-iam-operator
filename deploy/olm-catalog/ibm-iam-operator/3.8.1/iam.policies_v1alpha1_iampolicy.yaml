@@ -3,7 +3,10 @@ kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
   labels:
-    controller-tools.k8s.io: "1.0"
+    controller-tools.k8s.io: "1.0"    
+    app.kubernetes.io/instance: ibm-iam-operator
+    app.kubernetes.io/managed-by: ibm-iam-operator
+    app.kubernetes.io/name: ibm-iam-operator
   name: iampolicies.iam.policies.ibm.com
 spec:
   group: iam.policies.ibm.com

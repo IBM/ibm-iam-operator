@@ -20,7 +20,7 @@ RUN wget -O /qemu-s390x-static https://github.com/multiarch/qemu-user-static/rel
 
 RUN chmod +x /qemu-s390x-static
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal@sha256:c16e3df0de887329613549ca94934353bc3d2212bb8e51eb7c0af94805d410ea
+FROM registry.access.redhat.com/ubi8/ubi-minimal@sha256:768552c16ef80d4e7cf28e29266322dc5d6b68a431a41afd74757a3f0eff03e2
 ARG VCS_REF
 ARG VCS_URL
 

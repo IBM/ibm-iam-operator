@@ -305,7 +305,7 @@ metadata:
                 }
               }
             },
-            "operatorVersion": "3.8.1",
+            "operatorVersion": "3.8.2",
             "papService": {
               "imageName": "iam-policy-administration",
               "imageRegistry": "quay.io/opencloudio",
@@ -570,7 +570,7 @@ metadata:
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
       the lifecycle of IAM services. With this operator, you can simply deploy and
       upgrade the IAM services
-    olm.skipRange: '>=3.5.0 <3.8.1'
+    olm.skipRange: '>=3.5.0 <3.8.2'
     repository: https://github.com/IBM/ibm-iam-operator
     support: IBM
   labels:
@@ -578,7 +578,7 @@ metadata:
     operatorframework.io/os.linux: supported 
     operatorframework.io/arch.amd64: supported
     operatorframework.io/arch.ppc64le: supported
-  name: ibm-iam-operator.v3.8.1
+  name: ibm-iam-operator.v3.8.2
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -1478,6 +1478,7 @@ spec:
         - Linux on IBM Z and LinuxONE
 
     ## Operator versions
+     - 3.8.2
      - 3.8.1
      - 3.8.0
      - 3.7.5
@@ -1679,7 +1680,7 @@ spec:
                   requiredDuringSchedulingIgnoredDuringExecution:
                     nodeSelectorTerms:
                     - matchExpressions:
-                      - key: kubernetes.io/arch
+                      - key: beta.kubernetes.io/arch
                         operator: In
                         values:
                         - amd64
@@ -1692,7 +1693,7 @@ spec:
                 - name: AUTH_SERVICE_TAG_OR_SHA
                   value: sha256:959f0fa63c15a5407b81935df0c26988da2af68d1668f56f7270ddec77fe4fe0
                 - name: IDENTITY_PROVIDER_TAG_OR_SHA
-                  value: sha256:7884f81d0d024495289d1c783f3d0fc50ef266ec70570df2c22fca2c125ddd32
+                  value: sha256:ee7cefe289dc53374af0df7f2b20d9c89af43dc6f5e2eec2a541cba044d9c33b
                 - name: IDENTITY_MANAGER_TAG_OR_SHA
                   value: sha256:a51fe1fef139cb574799796bc7f0b9a78ef5b0ccb1d1d81d9902478f3f7f55ba
                 - name: POLICY_ADMINISTRATION_TAG_OR_SHA
@@ -1954,5 +1955,5 @@ spec:
   maturity: stable
   provider:
     name: IBM
-  replaces: ibm-iam-operator.v3.8.0
-  version: 3.8.1
+  replaces: ibm-iam-operator.v3.8.1
+  version: 3.8.2

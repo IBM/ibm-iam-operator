@@ -260,7 +260,7 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 									{
 										MatchExpressions: []corev1.NodeSelectorRequirement{
 											{
-												Key:      "beta.kubernetes.io/arch",
+												Key:      "kubernetes.io/arch",
 												Operator: corev1.NodeSelectorOpIn,
 												Values:   []string{gorun.GOARCH},
 											},

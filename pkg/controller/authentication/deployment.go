@@ -172,6 +172,28 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 					ServiceAccountName:            serviceAccountName,
 					HostIPC:                       falseVar,
 					HostPID:                       falseVar,
+					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+						{
+							MaxSkew: 1,
+							TopologyKey: "topology.kubernetes.io/zone",
+							WhenUnsatisfiable: corev1.ScheduleAnyway,
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"app": deployment,
+								},
+							},
+						},
+						{
+							MaxSkew: 1,
+							TopologyKey: "topology.kubernetes.io/region",
+							WhenUnsatisfiable: corev1.ScheduleAnyway,
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"app": deployment,
+								},
+							},
+						},
+					},
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{

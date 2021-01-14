@@ -68,6 +68,7 @@ var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024
 var rule = `^([a-z0-9]){32,}$`
 var wlpClientID = generateRandomString(rule)
 var wlpClientSecret = generateRandomString(rule)
+var zenInstance = generateRandomString(rule)
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller

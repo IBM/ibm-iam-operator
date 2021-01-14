@@ -10,6 +10,7 @@ spec:
     plural: clients
     singular: client
   scope: Namespaced
+  zenInstance: ""
   subresources:
     status: {}
   validation:

@@ -270,7 +270,7 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 
 	//Check if this ConfigMap already exists and create it if it doesn't
 	currentConfigMap := &corev1.ConfigMap{}
-	err = r.handleConfigMap(instance, wlpClientID, wlpClientSecret, currentConfigMap, &requeueResult)
+	err = r.handleConfigMap(instance, wlpClientID, wlpClientSecret, zenInstance, currentConfigMap, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
 	}

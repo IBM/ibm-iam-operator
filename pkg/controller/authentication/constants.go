@@ -46,7 +46,8 @@ fi
 var registrationJson string = `{
    "token_endpoint_auth_method":"client_secret_basic",
    "client_id": "WLP_CLIENT_ID",
-   "client_secret": "WLP_CLIENT_SECRET",
+	 "client_secret": "WLP_CLIENT_SECRET",
+	 "zen_instance": "ZEN_INSTANCE",
    "scope":"openid profile email",
    "grant_types":[
       "authorization_code",

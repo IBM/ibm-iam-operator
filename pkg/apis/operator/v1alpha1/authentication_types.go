@@ -116,6 +116,7 @@ type ConfigSpec struct {
 	ClaimsMap                   string `json:"claimsMap,omitempty"`
 	ScopeClaim                  string `json:"scopeClaim,omitempty"`
 	OIDCIssuerURL               string `json:"oidcIssuerURL"`
+	ZenInstance									string `json:"zenInstance"`
 }
 
 // AuthenticationStatus defines the observed state of Authentication

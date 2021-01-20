@@ -471,6 +471,28 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 	podSpec := corev1.PodSpec{
 		RestartPolicy:      "OnFailure",
 		ServiceAccountName: serviceAccountName,
+		TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+			{
+				MaxSkew: 1,
+				TopologyKey: "topology.kubernetes.io/zone",
+				WhenUnsatisfiable: corev1.ScheduleAnyway,
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "security-onboarding",
+					},
+				},
+			},
+			{
+				MaxSkew: 1,
+				TopologyKey: "topology.kubernetes.io/region",
+				WhenUnsatisfiable: corev1.ScheduleAnyway,
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "security-onboarding",
+					},
+				},
+			},
+		},
 		InitContainers:     tmpInitContainers,
 		Tolerations: []corev1.Toleration{
 			{
@@ -982,6 +1004,28 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		InitContainers:     tmpInitContainers,
 		Volumes:            tmpVolumes,
 		ServiceAccountName: serviceAccountName,
+		TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+			{
+				MaxSkew: 1,
+				TopologyKey: "topology.kubernetes.io/zone",
+				WhenUnsatisfiable: corev1.ScheduleAnyway,
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "iam-onboarding",
+					},
+				},
+			},
+			{
+				MaxSkew: 1,
+				TopologyKey: "topology.kubernetes.io/region",
+				WhenUnsatisfiable: corev1.ScheduleAnyway,
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "iam-onboarding",
+					},
+				},
+			},
+		},
 		Tolerations: []corev1.Toleration{
 			{
 				Key:      "dedicated",

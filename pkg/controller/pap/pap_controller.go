@@ -650,6 +650,28 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 					TerminationGracePeriodSeconds: &seconds60,
 					HostIPC:                       falseVar,
 					HostPID:                       falseVar,
+					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+						{
+							MaxSkew: 1,
+							TopologyKey: "topology.kubernetes.io/zone",
+							WhenUnsatisfiable: corev1.ScheduleAnyway,
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"app": iamPapServiceValues.PodName,
+								},
+							},
+						},
+						{
+							MaxSkew: 1,
+							TopologyKey: "topology.kubernetes.io/region",
+							WhenUnsatisfiable: corev1.ScheduleAnyway,
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"app": iamPapServiceValues.PodName,
+								},
+							},
+						},
+					},
 					ServiceAccountName:            serviceAccountName,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{

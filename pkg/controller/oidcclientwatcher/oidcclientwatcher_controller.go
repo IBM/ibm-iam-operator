@@ -455,6 +455,28 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 					ServiceAccountName:            serviceAccountName,
 					HostIPC:                       false,
 					HostPID:                       false,
+					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+						{
+							MaxSkew: 1,
+							TopologyKey: "topology.kubernetes.io/zone",
+							WhenUnsatisfiable: corev1.ScheduleAnyway,
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"app": "oidcclient-watcher",
+								},
+							},
+						},
+						{
+							MaxSkew: 1,
+							TopologyKey: "topology.kubernetes.io/region",
+							WhenUnsatisfiable: corev1.ScheduleAnyway,
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"app": "oidcclient-watcher",
+								},
+							},
+						},
+					},
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{

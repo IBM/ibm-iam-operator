@@ -563,6 +563,28 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 					TerminationGracePeriodSeconds: &seconds60,
 					HostIPC:                       falseVar,
 					HostPID:                       falseVar,
+					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+						{
+							MaxSkew: 1,
+							TopologyKey: "topology.kubernetes.io/zone",
+							WhenUnsatisfiable: corev1.ScheduleAnyway,
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"app": "auth-pdp",
+								},
+							},
+						},
+						{
+							MaxSkew: 1,
+							TopologyKey: "topology.kubernetes.io/region",
+							WhenUnsatisfiable: corev1.ScheduleAnyway,
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"app": "auth-pdp",
+								},
+							},
+						},
+					},
 					ServiceAccountName:            serviceAccountName,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{

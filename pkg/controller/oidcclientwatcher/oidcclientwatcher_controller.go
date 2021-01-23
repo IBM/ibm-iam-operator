@@ -355,7 +355,7 @@ func (r *ReconcileOIDCClientWatcher) operatorClusterRoleForOIDCClientWatcher(ins
 // deploymentForOIDCClientWatcher returns a OIDCClientWatcher Deployment object
 func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *operatorv1alpha1.OIDCClientWatcher) *appsv1.Deployment {
 	reqLogger := log.WithValues("deploymentForOIDCClientWatcher", "Entry", "instance.Name", instance.Name)
-	image := instance.Spec.ImageRegistry + shatag.GetImageRef("CLIENT_WATCHER_TAG_OR_SHA")
+	image := instance.Spec.ImageRegistry + shatag.GetImageRef("ICP_OIDCCLIENT_WATCHER_IMAGE")
 	replicas := instance.Spec.Replicas
 	resources := instance.Spec.Resources
 	if resources == nil {
@@ -457,8 +457,8 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 					HostPID:                       false,
 					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 						{
-							MaxSkew: 1,
-							TopologyKey: "topology.kubernetes.io/zone",
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/zone",
 							WhenUnsatisfiable: corev1.ScheduleAnyway,
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -467,8 +467,8 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 							},
 						},
 						{
-							MaxSkew: 1,
-							TopologyKey: "topology.kubernetes.io/region",
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/region",
 							WhenUnsatisfiable: corev1.ScheduleAnyway,
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -536,7 +536,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 						{
 							Name:            "init-auth-service",
 							Command:         []string{"sh", "-c", "sleep 75; until curl -k -i -fsS https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration | grep '200 OK'; do sleep 3; done;"},
-							Image:           initAuthSvcContainerImageRegistry + "/" + initAuthSvcContainerImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA"),
+							Image:           initAuthSvcContainerImageRegistry + "/" + initAuthSvcContainerImageName + shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
 							ImagePullPolicy: corev1.PullPolicy("Always"),
 							SecurityContext: &corev1.SecurityContext{
 								Privileged:               &falseVar,
@@ -552,7 +552,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 						{
 							Name:            "init-identity-provider",
 							Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-provider:4300 | grep '200 OK'; do sleep 3; done;"},
-							Image:           initIdProviderContainerImageRegistry + "/" + initIdProviderContainerImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA"),
+							Image:           initIdProviderContainerImageRegistry + "/" + initIdProviderContainerImageName + shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
 							ImagePullPolicy: corev1.PullPolicy("Always"),
 							SecurityContext: &corev1.SecurityContext{
 								Privileged:               &falseVar,
@@ -568,7 +568,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 						{
 							Name:            "init-identity-manager",
 							Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-management:4500 | grep '200 OK'; do sleep 3; done;"},
-							Image:           initIdMgrContainerImageRegistry + "/" + initIdMgrContainerImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA"),
+							Image:           initIdMgrContainerImageRegistry + "/" + initIdMgrContainerImageName + shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
 							ImagePullPolicy: corev1.PullPolicy("Always"),
 							SecurityContext: &corev1.SecurityContext{
 								Privileged:               &falseVar,

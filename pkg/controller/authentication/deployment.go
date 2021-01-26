@@ -473,5 +473,22 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume
 				},
 			},
 		},
+		{
+			Name: "scim-ldap-attributes-mapping",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp",
+					},
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "SCIM_LDAP_ATTRIBUTES_MAPPING",
+							Path: "scim_ldap_attributes_mapping.json",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		},
 	}
 }

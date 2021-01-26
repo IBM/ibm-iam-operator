@@ -73,29 +73,40 @@ var registrationJson string = `{
 
 var scimLdapAttributesMapping string = `{
     "default": {
-        "id": "dn",
-        "name": "cn",
-        "userName": "uid",
-        "userDisplayName": "displayName",
-        "groupDisplayName": "cn",
-        "givenName": "givenName",
-        "familyName": "sn",
-        "fullName": "cn",
-        "externalId": "dn",
-        "emails": "mail",
-        "departmentNumber": "departmentNumber",
-        "created": "createTimestamp",
-        "lastModified": "modifyTimestamp",
-        "phoneNumbers": [{
-            "value": "mobile",
-            "type": "mobile"
-        },{
-            "value": "telephoneNumber",
-            "type": "work"
-        }],
-        "userObjectClass": "person",
-        "groupObjectClass": "groupOfUniqueNames",
-        "memberAttribute": "uniqueMember"
+        "user": {
+            "id": "dn",
+            "userName": "uid",
+            "principalName": "uid",
+            "displayName": "displayName",
+            "givenName": "cn",
+            "familyName": "sn",
+            "fullName": "cn",
+            "externalId": "dn",
+            "emails": "mail",
+            "created": "createTimestamp",
+            "lastModified": "modifyTimestamp",
+            "phoneNumbers": [{
+                    "value": "mobile",
+                    "type": "mobile"
+                },
+                {
+                    "value": "telephoneNumber",
+                    "type": "work"
+                }],
+            "objectClass": "person",
+            "groups": "memberOf",
+        },
+        "group": {
+            "id": "dn",
+            "name": "cn",
+            "principalName": "cn",
+            "displayName": "cn",
+            "externalId": "dn",
+            "created": "createTimestamp",
+            "lastModified": "modifyTimestamp",
+            "objectClass": "groupOfUniqueNames",
+            "members": "uniqueMember",
+        }
     }
 }
 `

@@ -761,7 +761,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 
 }
 
-func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string) corev1.Container {
+func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string, icpConsoleURL string) corev1.Container {
 
 	//@posriniv - find a better solution
 	replicaCount := int(instance.Spec.Replicas)
@@ -989,11 +989,16 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 				},
 			},
 		},
+		{
+			Name:  "MASTER_HOST",
+			Value: icpConsoleURL,
+		},
 	}
 
 	idpEnvVarList := []string{"NODE_ENV", "LOG_LEVEL_IDMGMT", "LOG_LEVEL_MW", "IBMID_PROFILE_URL", "IBMID_PROFILE_CLIENT_ID", "IBMID_PROFILE_FIELDS", "AUDIT_DETAIL",
 		"ROKS_ENABLED", "ROKS_USER_PREFIX", "IDENTITY_AUTH_DIRECTORY_URL", "OIDC_ISSUER_URL", "BOOTSTRAP_USERID", "CLUSTER_NAME", "HTTP_ONLY", "LDAP_SEARCH_SIZE_LIMIT", "LDAP_SEARCH_TIME_LIMIT",
-		"LDAP_SEARCH_CN_ATTR_ONLY", "LDAP_SEARCH_ID_ATTR_ONLY", "LDAP_SEARCH_EXCLUDE_WILDCARD_CHARS", "IGNORE_LDAP_FILTERS_VALIDATION", "MASTER_HOST"}
+		"LDAP_SEARCH_CN_ATTR_ONLY", "LDAP_SEARCH_ID_ATTR_ONLY", "LDAP_SEARCH_EXCLUDE_WILDCARD_CHARS", "IGNORE_LDAP_FILTERS_VALIDATION",
+		"SCIM_LDAP_SEARCH_SIZE_LIMIT", "SCIM_LDAP_SEARCH_TIME_LIMIT", "SCIM_ASYNC_PARALLEL_LIMIT", "SCIM_GET_DISPLAY_FOR_GROUP_USERS"}
 
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
 
@@ -1060,6 +1065,10 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 				Name:      "mongodb-client-cert",
 				MountPath: "/certs/mongodb-client",
 			},
+			{
+				Name:      "scim-ldap-attributes-mapping",
+				MountPath: "/opt/ibm/identity-mgmt/config/scim-config",
+			},
 		},
 		ReadinessProbe: &corev1.Probe{
 			Handler: corev1.Handler{
@@ -1096,7 +1105,7 @@ func buildContainers(instance *operatorv1alpha1.Authentication, auditImage strin
 	auditContainer := buildAuditContainer(auditImage, syslogTlsPath, auditResources)
 	authServiceContainer := buildAuthServiceContainer(instance, authServiceImage)
 	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL)
-	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage)
+	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL)
 
 	return []corev1.Container{auditContainer, authServiceContainer, identityProviderContainer, identityManagerContainer}
 }

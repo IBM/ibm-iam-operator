@@ -70,3 +70,43 @@ var registrationJson string = `{
    "redirect_uris":["https://ICP_CONSOLE_URL/auth/liberty/callback","https://127.0.0.1:443/idauth/oidc/endpoint/OP"]
 }
 `
+
+var scimLdapAttributesMapping string = `{
+    "default": {
+        "user": {
+            "id": "dn",
+            "userName": "uid",
+            "principalName": "uid",
+            "displayName": "displayName",
+            "givenName": "cn",
+            "familyName": "sn",
+            "fullName": "cn",
+            "externalId": "dn",
+            "emails": "mail",
+            "created": "createTimestamp",
+            "lastModified": "modifyTimestamp",
+            "phoneNumbers": [{
+                    "value": "mobile",
+                    "type": "mobile"
+                },
+                {
+                    "value": "telephoneNumber",
+                    "type": "work"
+                }],
+            "objectClass": "person",
+            "groups": "memberOf",
+        },
+        "group": {
+            "id": "dn",
+            "name": "cn",
+            "principalName": "cn",
+            "displayName": "cn",
+            "externalId": "dn",
+            "created": "createTimestamp",
+            "lastModified": "modifyTimestamp",
+            "objectClass": "groupOfUniqueNames",
+            "members": "uniqueMember",
+        }
+    }
+}
+`

@@ -126,11 +126,11 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 		instance.Spec.AuditService.ImageName = res.AuditImageName
 	}
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
-	authServiceImage := instance.Spec.AuthService.ImageRegistry + "/" + instance.Spec.AuthService.ImageName + shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
-	identityProviderImage := instance.Spec.IdentityProvider.ImageRegistry + "/" + instance.Spec.IdentityProvider.ImageName + shatag.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
-	identityManagerImage := instance.Spec.IdentityManager.ImageRegistry + "/" + instance.Spec.IdentityManager.ImageName + shatag.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
-	mongoDBImage := instance.Spec.InitMongodb.ImageRegistry + "/" + instance.Spec.InitMongodb.ImageName + shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
-	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + shatag.GetImageRef("AUDIT_SYSLOG_SERVICE_IMAGE")
+	authServiceImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
+	identityProviderImage := shatag.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
+	identityManagerImage := shatag.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
+	mongoDBImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
+	auditImage := shatag.GetImageRef("AUDIT_SYSLOG_SERVICE_IMAGE")
 	replicas := instance.Spec.Replicas
 	syslogTlsPath := instance.Spec.AuditService.SyslogTlsPath
 	ldapCACert := instance.Spec.AuthService.LdapsCACert

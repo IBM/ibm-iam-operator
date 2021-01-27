@@ -18,7 +18,6 @@ package oidcclientwatcher
 
 import (
 	"context"
-	"path"
 	"reflect"
 	gorun "runtime"
 
@@ -355,7 +354,7 @@ func (r *ReconcileOIDCClientWatcher) operatorClusterRoleForOIDCClientWatcher(ins
 // deploymentForOIDCClientWatcher returns a OIDCClientWatcher Deployment object
 func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *operatorv1alpha1.OIDCClientWatcher) *appsv1.Deployment {
 	reqLogger := log.WithValues("deploymentForOIDCClientWatcher", "Entry", "instance.Name", instance.Name)
-	image := instance.Spec.ImageRegistry + shatag.GetImageRef("ICP_OIDCCLIENT_WATCHER_IMAGE")
+	image := shatag.GetImageRef("ICP_OIDCCLIENT_WATCHER_IMAGE")
 	replicas := instance.Spec.Replicas
 	resources := instance.Spec.Resources
 	if resources == nil {
@@ -370,8 +369,6 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 	}
 
 	// Get imageRegistry value from OIDCClientWatcher-->imageRegistry, should be like "quay.io/opencloudio"
-	initIdMgrContainerImageRegistry := path.Dir(instance.Spec.ImageRegistry)
-	initIdMgrContainerImageName := "icp-platform-auth"
 	initIdMgrContainerResources := &corev1.ResourceRequirements{
 		Limits: map[corev1.ResourceName]resource.Quantity{
 			corev1.ResourceCPU:    *cpu200,
@@ -381,14 +378,10 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 			corev1.ResourceMemory: *memory128},
 	}
 	if (instance.Spec.OidcInitIdentityManager != operatorv1alpha1.OidcInitIdentityManagerSpec{}) {
-		initIdMgrContainerImageRegistry = instance.Spec.OidcInitIdentityManager.ImageRegistry
-		initIdMgrContainerImageName = instance.Spec.OidcInitIdentityManager.ImageName
 		initIdMgrContainerResources = instance.Spec.OidcInitIdentityManager.Resources
 	}
 
 	// Get imageRegistry value from OIDCClientWatcher-->imageRegistry, should be like "quay.io/opencloudio"
-	initAuthSvcContainerImageRegistry := path.Dir(instance.Spec.ImageRegistry)
-	initAuthSvcContainerImageName := "icp-platform-auth"
 	initAuthSvcContainerResources := &corev1.ResourceRequirements{
 		Limits: map[corev1.ResourceName]resource.Quantity{
 			corev1.ResourceCPU:    *cpu200,
@@ -398,14 +391,10 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 			corev1.ResourceMemory: *memory128},
 	}
 	if (instance.Spec.OidcInitAuthService != operatorv1alpha1.OidcInitAuthServiceSpec{}) {
-		initAuthSvcContainerImageRegistry = instance.Spec.OidcInitAuthService.ImageRegistry
-		initAuthSvcContainerImageName = instance.Spec.OidcInitAuthService.ImageName
 		initAuthSvcContainerResources = instance.Spec.OidcInitAuthService.Resources
 	}
 
 	// Get imageRegistry value from OIDCClientWatcher-->imageRegistry, should be like "quay.io/opencloudio"
-	initIdProviderContainerImageRegistry := path.Dir(instance.Spec.ImageRegistry)
-	initIdProviderContainerImageName := "icp-platform-auth"
 	initIdProviderContainerResources := &corev1.ResourceRequirements{
 		Limits: map[corev1.ResourceName]resource.Quantity{
 			corev1.ResourceCPU:    *cpu200,
@@ -415,8 +404,6 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 			corev1.ResourceMemory: *memory128},
 	}
 	if (instance.Spec.OidcInitIdentityProvider != operatorv1alpha1.OidcInitIdentityProviderSpec{}) {
-		initIdProviderContainerImageRegistry = instance.Spec.OidcInitIdentityProvider.ImageRegistry
-		initIdProviderContainerImageName = instance.Spec.OidcInitIdentityProvider.ImageName
 		initIdProviderContainerResources = instance.Spec.OidcInitIdentityProvider.Resources
 	}
 
@@ -536,7 +523,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 						{
 							Name:            "init-auth-service",
 							Command:         []string{"sh", "-c", "sleep 75; until curl -k -i -fsS https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration | grep '200 OK'; do sleep 3; done;"},
-							Image:           initAuthSvcContainerImageRegistry + "/" + initAuthSvcContainerImageName + shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
+							Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
 							ImagePullPolicy: corev1.PullPolicy("Always"),
 							SecurityContext: &corev1.SecurityContext{
 								Privileged:               &falseVar,
@@ -552,7 +539,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 						{
 							Name:            "init-identity-provider",
 							Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-provider:4300 | grep '200 OK'; do sleep 3; done;"},
-							Image:           initIdProviderContainerImageRegistry + "/" + initIdProviderContainerImageName + shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
+							Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
 							ImagePullPolicy: corev1.PullPolicy("Always"),
 							SecurityContext: &corev1.SecurityContext{
 								Privileged:               &falseVar,
@@ -568,7 +555,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 						{
 							Name:            "init-identity-manager",
 							Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-management:4500 | grep '200 OK'; do sleep 3; done;"},
-							Image:           initIdMgrContainerImageRegistry + "/" + initIdMgrContainerImageName + shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
+							Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
 							ImagePullPolicy: corev1.PullPolicy("Always"),
 							SecurityContext: &corev1.SecurityContext{
 								Privileged:               &falseVar,

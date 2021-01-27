@@ -120,17 +120,17 @@ func getPodNames(pods []corev1.Pod) []string {
 }
 
 func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string) *appsv1.Deployment {
-	
+
 	// Update the audit image for upgrade scenarios
 	if instance.Spec.AuditService.ImageName != res.AuditImageName {
 		instance.Spec.AuditService.ImageName = res.AuditImageName
 	}
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
-	authServiceImage := instance.Spec.AuthService.ImageRegistry + "/" + instance.Spec.AuthService.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA")
-	identityProviderImage := instance.Spec.IdentityProvider.ImageRegistry + "/" + instance.Spec.IdentityProvider.ImageName + shatag.GetImageRef("IDENTITY_PROVIDER_TAG_OR_SHA")
-	identityManagerImage := instance.Spec.IdentityManager.ImageRegistry + "/" + instance.Spec.IdentityManager.ImageName + shatag.GetImageRef("IDENTITY_MANAGER_TAG_OR_SHA")
-	mongoDBImage := instance.Spec.InitMongodb.ImageRegistry + "/" + instance.Spec.InitMongodb.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA")
-	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + shatag.GetImageRef("AUDIT_TAG_OR_SHA")
+	authServiceImage := instance.Spec.AuthService.ImageRegistry + "/" + instance.Spec.AuthService.ImageName + shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
+	identityProviderImage := instance.Spec.IdentityProvider.ImageRegistry + "/" + instance.Spec.IdentityProvider.ImageName + shatag.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
+	identityManagerImage := instance.Spec.IdentityManager.ImageRegistry + "/" + instance.Spec.IdentityManager.ImageName + shatag.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
+	mongoDBImage := instance.Spec.InitMongodb.ImageRegistry + "/" + instance.Spec.InitMongodb.ImageName + shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
+	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + shatag.GetImageRef("AUDIT_SYSLOG_SERVICE_IMAGE")
 	replicas := instance.Spec.Replicas
 	syslogTlsPath := instance.Spec.AuditService.SyslogTlsPath
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
@@ -174,8 +174,8 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 					HostPID:                       falseVar,
 					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 						{
-							MaxSkew: 1,
-							TopologyKey: "topology.kubernetes.io/zone",
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/zone",
 							WhenUnsatisfiable: corev1.ScheduleAnyway,
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -184,8 +184,8 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 							},
 						},
 						{
-							MaxSkew: 1,
-							TopologyKey: "topology.kubernetes.io/region",
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/region",
 							WhenUnsatisfiable: corev1.ScheduleAnyway,
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -264,11 +264,11 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "audit-server-certs",
-					Optional: &trueVar,
+					Optional:   &trueVar,
 				},
 			},
 		},
-		{			
+		{
 			Name: "audit-ingest",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{

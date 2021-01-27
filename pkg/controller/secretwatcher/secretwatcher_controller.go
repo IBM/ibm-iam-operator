@@ -211,7 +211,7 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 	labels1 := labelsForSecretWatcherMeta(secretWatcherDeploymentName)
 	labels2 := labelsForSecretWatcherSelect(instance.Name, secretWatcherDeploymentName)
 	labels3 := labelsForSecretWatcherPod(instance.Name, secretWatcherDeploymentName)
-	image := instance.Spec.ImageRegistry + shatag.GetImageRef("ICP_SECRET_WATCHER_IMAGE")
+	image := shatag.GetImageRef("ICP_SECRET_WATCHER_IMAGE")
 	replicas := instance.Spec.Replicas
 	resources := instance.Spec.Resources
 

@@ -18,18 +18,11 @@ package shatag
 
 import (
 	"os"
-	"strings"
 )
 
 func GetImageRef(envVar string) string {
 
-	var imageSuffix string
-	imageTagOrSHA := os.Getenv(envVar)
-	if strings.HasPrefix(imageTagOrSHA, "sha256:") {
-		imageSuffix = "@" + imageTagOrSHA
-	} else {
-		imageSuffix = ":" + imageTagOrSHA
-	}
+	imageName := os.Getenv(envVar)
 
-	return imageSuffix
+	return imageName
 }

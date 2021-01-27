@@ -520,9 +520,9 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 	}
 
 	reqLogger := log.WithValues("deploymentForPolicyDecision", "Entry", "instance.Name", instance.Name)
-	pdpImage := instance.Spec.ImageRegistry + "/" + instance.Spec.ImageName + shatag.GetImageRef("IAM_POLICY_DECISION_IMAGE")
-	mongoDBImage := instance.Spec.InitMongodb.ImageRegistry + "/" + instance.Spec.InitMongodb.ImageName + shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
-	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + shatag.GetImageRef("AUDIT_SYSLOG_SERVICE_IMAGE")
+	pdpImage := shatag.GetImageRef("IAM_POLICY_DECISION_IMAGE")
+	mongoDBImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
+	auditImage := shatag.GetImageRef("AUDIT_SYSLOG_SERVICE_IMAGE")
 	replicas := instance.Spec.Replicas
 	syslogTlsPath := instance.Spec.AuditService.SyslogTlsPath
 	auditResources := instance.Spec.AuditService.Resources

@@ -367,7 +367,7 @@ func (r *ReconcilePolicyController) clusterRoleBindingForPolicyController(instan
 // deploymentForPolicyController returns a IAM PolicyController Deployment object
 func (r *ReconcilePolicyController) deploymentForPolicyController(instance *operatorv1alpha1.PolicyController) *appsv1.Deployment {
 	reqLogger := log.WithValues("deploymentForPolicyController", "Entry", "instance.Name", instance.Name)
-	image := instance.Spec.ImageRegistry + shatag.GetImageRef("IAM_POLICY_CONTROLLER_IMAGE")
+	image := shatag.GetImageRef("IAM_POLICY_CONTROLLER_IMAGE")
 	replicas := instance.Spec.Replicas
 	resources := instance.Spec.Resources
 

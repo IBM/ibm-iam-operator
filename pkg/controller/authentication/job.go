@@ -60,7 +60,7 @@ func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentic
 
 func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, jobName string) *batchv1.Job {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	image := instance.Spec.ClientRegistration.ImageRegistry + "/" + instance.Spec.ClientRegistration.ImageName + shatag.GetImageRef("AUTH_SERVICE_TAG_OR_SHA")
+	image := instance.Spec.ClientRegistration.ImageRegistry + "/" + instance.Spec.ClientRegistration.ImageName + shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
 	resources := instance.Spec.ClientRegistration.Resources
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{

@@ -608,8 +608,8 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 	}
 	
 	reqLogger := log.WithValues("deploymentForPap", "Entry", "instance.Name", instance.Name)
-	papImage := instance.Spec.PapService.ImageRegistry + "/" + instance.Spec.PapService.ImageName + shatag.GetImageRef("IAM_POLICY_ADMINISTRATION_IMAGE")
-	auditImage := instance.Spec.AuditService.ImageRegistry + "/" + instance.Spec.AuditService.ImageName + shatag.GetImageRef("AUDIT_SYSLOG_SERVICE_IMAGE")
+	papImage := shatag.GetImageRef("IAM_POLICY_ADMINISTRATION_IMAGE")
+	auditImage := shatag.GetImageRef("AUDIT_SYSLOG_SERVICE_IMAGE")
 	replicas := instance.Spec.Replicas
 	syslogTlsPath := instance.Spec.AuditService.SyslogTlsPath
 	auditResources := instance.Spec.AuditService.Resources

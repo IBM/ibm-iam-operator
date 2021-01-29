@@ -158,6 +158,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 						"k8s-app":                    deployment,
 						"component":                  deployment,
 						"app.kubernetes.io/instance": "auth-idp",
+						"intent":                     "projected",
 					},
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",

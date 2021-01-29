@@ -200,6 +200,12 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["SCIM_GET_DISPLAY_FOR_GROUP_USERS"] = newConfigMap.Data["SCIM_GET_DISPLAY_FOR_GROUP_USERS"]
 					cmUpdateRequired = true
 				}
+				if _, keyExists := currentConfigMap.Data["AUTH_SVC_LDAP_CONFIG_TIMEOUT"]; !keyExists {
+					reqLogger.Info("Updating an existing Configmap to add new variable for auth-service LDAP configuration timeout", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					newConfigMap = functionList[index](instance, r.scheme)
+					currentConfigMap.Data["AUTH_SVC_LDAP_CONFIG_TIMEOUT"] = newConfigMap.Data["AUTH_SVC_LDAP_CONFIG_TIMEOUT"]
+					cmUpdateRequired = true
+				}
 				if cmUpdateRequired {
 					err = r.client.Update(context.TODO(), currentConfigMap)
 					if err != nil {
@@ -278,6 +284,7 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"LIBERTY_DEBUG_ENABLED":              "false",
 			"LOGJAM_DHKEYSIZE_2048_BITS_ENABLED": "true",
 			"LDAP_RECURSIVE_SEARCH":              "true",
+			"AUTH_SVC_LDAP_CONFIG_TIMEOUT":       "25",
 			"LDAP_ATTR_CACHE_SIZE":               "2000",
 			"LDAP_ATTR_CACHE_TIMEOUT":            "1200s",
 			"LDAP_ATTR_CACHE_ENABLED":            "true",

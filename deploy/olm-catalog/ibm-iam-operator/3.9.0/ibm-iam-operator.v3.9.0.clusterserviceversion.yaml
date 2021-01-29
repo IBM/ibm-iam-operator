@@ -1533,6 +1533,20 @@ spec:
           - watch
         # used in identity manager
         - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterroles
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+          - escalate
+          - bind
+        - apiGroups:
           - authorization.openshift.io
           resources:
           - clusterrolebindings
@@ -1790,6 +1804,20 @@ spec:
           - patch
           - update
           - watch
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - roles
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+          - bind
+          - escalate
         - apiGroups:
           - rbac.authorization.k8s.io
           resources:

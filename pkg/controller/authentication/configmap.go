@@ -271,6 +271,7 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"FIPS_ENABLED":                       strconv.FormatBool(instance.Spec.Config.FIPSEnabled),
 			"NONCE_ENABLED":                      strconv.FormatBool(instance.Spec.Config.NONCEEnabled),
 			"ROKS_ENABLED":                       strconv.FormatBool(instance.Spec.Config.ROKSEnabled),
+			"IBM_CLOUD_SASS":                     strconv.FormatBool(instance.Spec.Config.IBMCloudSass),
 			"ROKS_URL":                           instance.Spec.Config.ROKSURL,
 			"ROKS_USER_PREFIX":                   roksUserPrefix,
 			"CLAIMS_SUPPORTED":                   instance.Spec.Config.ClaimsSupported,

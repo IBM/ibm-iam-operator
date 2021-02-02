@@ -43,26 +43,26 @@ spec:
           - ibm-iam-operator
           imagePullPolicy: Always
           env:
-            - name: AUTH_SERVICE_TAG_OR_SHA
-              value: "sha256:acff27adac74cc058c72e735317502d5ef1f54f8b9b8bb46e921d779740ecb2c"
-            - name: IDENTITY_PROVIDER_TAG_OR_SHA
-              value: "sha256:ee7cefe289dc53374af0df7f2b20d9c89af43dc6f5e2eec2a541cba044d9c33b"
-            - name: IDENTITY_MANAGER_TAG_OR_SHA
-              value: "sha256:a51fe1fef139cb574799796bc7f0b9a78ef5b0ccb1d1d81d9902478f3f7f55ba"
-            - name: POLICY_ADMINISTRATION_TAG_OR_SHA
-              value: "sha256:67e37da717419c7ee0834d185f280c302db43737fb9b315ffd729e2ec2571b42"
-            - name: POLICY_DECISION_TAG_OR_SHA
-              value: "sha256:8c4f9a630609bd8caf88cbe9acbe95e7c08e3adfc1192609ebaf346424b4b75f"
-            - name: SECRET_WATCHER_TAG_OR_SHA
-              value: "sha256:e0ce33ccb120fa9e3eee60331c17b2324285f223fc905a3f64bafb0d929db4fb"
-            - name: CLIENT_WATCHER_TAG_OR_SHA
-              value: "sha256:8e79c247ba71c59a943ae71eca23588bdbdaa4f423925c834100a31d76287e10"
-            - name: POLICY_CONTROLLER_TAG_OR_SHA
-              value: "sha256:0f20b1abe1ac4926b0d58ac30863e015f4f75f0fcc166c398a5348e1e2e8fa27"
-            - name: IAM_ONBOARDING_TAG_OR_SHA
-              value: "sha256:bb3efc1064f642bd86ddfc2268dcfe164399a77a23f28d376b7a2163d59a614a"
-            - name: AUDIT_TAG_OR_SHA
-              value: "sha256:4d68ee3e14b74e117b54e1c49686de847008d5e453b267168f6e52af9c9e9d4d"
+            - name: ICP_PLATFORM_AUTH_IMAGE
+              value: quay.io/opencloudio/icp-platform-auth:3.3.13
+            - name: ICP_IDENTITY_PROVIDER_IMAGE
+              value: quay.io/opencloudio/icp-identity-provider:3.3.13
+            - name: ICP_IDENTITY_MANAGER_IMAGE
+              value: quay.io/opencloudio/icp-identity-manager:3.3.12
+            - name: IAM_POLICY_ADMINISTRATION_IMAGE
+              value: quay.io/opencloudio/iam-policy-administration:3.3.10
+            - name: IAM_POLICY_DECISION_IMAGE
+              value: quay.io/opencloudio/iam-policy-decision:3.3.7
+            - name: ICP_SECRET_WATCHER_IMAGE
+              value: quay.io/opencloudio/icp-secret-watcher:3.3.6
+            - name: ICP_OIDCCLIENT_WATCHER_IMAGE
+              value: quay.io/opencloudio/icp-oidcclient-watcher:3.3.7
+            - name: IAM_POLICY_CONTROLLER_IMAGE
+              value: quay.io/opencloudio/iam-policy-controller:3.3.6
+            - name: ICP_IAM_ONBOARDING_IMAGE
+              value: quay.io/opencloudio/icp-iam-onboarding:3.3.9
+            - name: AUDIT_SYSLOG_SERVICE_IMAGE
+              value: quay.io/opencloudio/audit-syslog-service:1.0.4
             - name: WATCH_NAMESPACE
               valueFrom:
                 fieldRef:

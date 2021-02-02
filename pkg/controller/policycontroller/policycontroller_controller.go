@@ -367,7 +367,7 @@ func (r *ReconcilePolicyController) clusterRoleBindingForPolicyController(instan
 // deploymentForPolicyController returns a IAM PolicyController Deployment object
 func (r *ReconcilePolicyController) deploymentForPolicyController(instance *operatorv1alpha1.PolicyController) *appsv1.Deployment {
 	reqLogger := log.WithValues("deploymentForPolicyController", "Entry", "instance.Name", instance.Name)
-	image := instance.Spec.ImageRegistry + shatag.GetImageRef("POLICY_CONTROLLER_TAG_OR_SHA")
+	image := shatag.GetImageRef("IAM_POLICY_CONTROLLER_IMAGE")
 	replicas := instance.Spec.Replicas
 	resources := instance.Spec.Resources
 
@@ -418,8 +418,8 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 					HostPID:                       false,
 					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 						{
-							MaxSkew: 1,
-							TopologyKey: "topology.kubernetes.io/zone",
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/zone",
 							WhenUnsatisfiable: corev1.ScheduleAnyway,
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -428,8 +428,8 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 							},
 						},
 						{
-							MaxSkew: 1,
-							TopologyKey: "topology.kubernetes.io/region",
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/region",
 							WhenUnsatisfiable: corev1.ScheduleAnyway,
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{

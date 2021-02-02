@@ -44,25 +44,25 @@ spec:
           imagePullPolicy: Always
           env:
             - name: ICP_PLATFORM_AUTH_IMAGE
-              value: "sha256:acff27adac74cc058c72e735317502d5ef1f54f8b9b8bb46e921d779740ecb2c"
+              value: quay.io/opencloudio/icp-platform-auth:3.4.0
             - name: ICP_IDENTITY_PROVIDER_IMAGE
-              value: "sha256:bcc3411a11a9939f673df0fd4f90500028d96e580ca37958099704786f479d0e"
+              value: quay.io/opencloudio/icp-identity-provider:3.4.0
             - name: ICP_IDENTITY_MANAGER_IMAGE
-              value: "sha256:837880f789d1f96e66c65e90fea50cb9c5438ddd6ca1f1f2f0b2d13af070e5d5"
+              value: quay.io/opencloudio/icp-identity-manager:3.4.0
             - name: IAM_POLICY_ADMINISTRATION_IMAGE
-              value: "sha256:67e37da717419c7ee0834d185f280c302db43737fb9b315ffd729e2ec2571b42"
+              value: quay.io/opencloudio/iam-policy-administration:3.4.0
             - name: IAM_POLICY_DECISION_IMAGE
-              value: "sha256:a696d99a9baf53fc3b1048a79993b30acb8cf563115e2aa3220fe8bd285e2ff9"
+              value: quay.io/opencloudio/iam-policy-decision:3.4.0
             - name: ICP_SECRET_WATCHER_IMAGE
-              value: "sha256:85fc756b043bf9a4800e601353490f0cf7822a294d22698315f3f31b9dd74080"
+              value: quay.io/opencloudio/icp-secret-watcher:3.4.0
             - name: ICP_OIDCCLIENT_WATCHER_IMAGE
-              value: "sha256:39fd0ae3e671f82baecd89f3c41943878abe7d0fe8f64f1286a87a56d95feb42"
+              value: quay.io/opencloudio/icp-oidcclient-watcher:3.4.0
             - name: IAM_POLICY_CONTROLLER_IMAGE
-              value: "sha256:d080f925186f92348892d63799d1cdb0e18cc82c710b162992d3229aac89f454"
+              value: quay.io/opencloudio/iam-policy-controller:3.4.0
             - name: ICP_IAM_ONBOARDING_IMAGE
-              value: "sha256:bb3efc1064f642bd86ddfc2268dcfe164399a77a23f28d376b7a2163d59a614a"
+              value: quay.io/opencloudio/icp-iam-onboarding:3.4.0
             - name: AUDIT_SYSLOG_SERVICE_IMAGE
-              value: "sha256:4d68ee3e14b74e117b54e1c49686de847008d5e453b267168f6e52af9c9e9d4d"
+              value: quay.io/opencloudio/audit-syslog-service:1.0.4
             - name: WATCH_NAMESPACE
               valueFrom:
                 fieldRef:

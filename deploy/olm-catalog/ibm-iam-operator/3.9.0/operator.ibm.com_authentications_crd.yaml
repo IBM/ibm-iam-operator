@@ -193,7 +193,7 @@ spec:
                   type: string
                 roksUserPrefix:
                   type: string
-                ibmCloudSass:
+                ibmCloudSaas:
                   type: boolean  
                 wlpClientID:
                   type: string

@@ -189,7 +189,7 @@ spec:
                   type: string
                 roksUserPrefix:
                   type: string
-                ibmCloudSass:
+                ibmCloudSaas:
                   type: boolean
                 scopeClaim:
                   type: string

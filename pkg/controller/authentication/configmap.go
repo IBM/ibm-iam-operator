@@ -206,10 +206,10 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["AUTH_SVC_LDAP_CONFIG_TIMEOUT"] = newConfigMap.Data["AUTH_SVC_LDAP_CONFIG_TIMEOUT"]
 					cmUpdateRequired = true
 				}
-				if _, keyExists := currentConfigMap.Data["IBM_CLOUD_SASS"]; !keyExists {
+				if _, keyExists := currentConfigMap.Data["IBM_CLOUD_SAAS"]; !keyExists {
 					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.scheme)
-					currentConfigMap.Data["IBM_CLOUD_SASS"] = newConfigMap.Data["IBM_CLOUD_SASS"]
+					currentConfigMap.Data["IBM_CLOUD_SAAS"] = newConfigMap.Data["IBM_CLOUD_SAAS"]
 					cmUpdateRequired = true
 				}
 				if cmUpdateRequired {

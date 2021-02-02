@@ -104,7 +104,7 @@ type ConfigSpec struct {
 	ICPPort                     int32  `json:"icpPort"`
 	FIPSEnabled                 bool   `json:"fipsEnabled"`
 	ROKSEnabled                 bool   `json:"roksEnabled"`
-	IBMCloudSass                bool   `json:"ibmCloudSass"`
+	IBMCloudSaas                bool   `json:"ibmCloudSaas,omitempty"`
 	NONCEEnabled                bool   `json:"nonceEnabled"`
 	XFrameDomain                string `json:"xframeDomain,omitempty"`
 	PreferredLogin              string `json:"preferredLogin,omitempty"`

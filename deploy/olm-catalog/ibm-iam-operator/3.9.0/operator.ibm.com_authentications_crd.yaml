@@ -188,11 +188,13 @@ spec:
                   format: int32
                   type: integer
                 roksEnabled:
-                  type: boolean
+                  type: boolean            
                 roksURL:
                   type: string
                 roksUserPrefix:
                   type: string
+                ibmCloudSass:
+                  type: boolean  
                 wlpClientID:
                   type: string
                 wlpClientRegistrationSecret:

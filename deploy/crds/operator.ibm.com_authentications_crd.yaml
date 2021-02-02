@@ -189,6 +189,8 @@ spec:
                   type: string
                 roksUserPrefix:
                   type: string
+                ibmCloudSass:
+                  type: boolean
                 scopeClaim:
                   type: string
                 wlpClientID:

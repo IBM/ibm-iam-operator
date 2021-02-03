@@ -77,7 +77,7 @@ var scimLdapAttributesMapping string = `{
             "id": "dn",
             "userName": "uid",
             "principalName": "uid",
-            "displayName": "displayName",
+            "displayName": "cn",
             "givenName": "cn",
             "familyName": "sn",
             "fullName": "cn",

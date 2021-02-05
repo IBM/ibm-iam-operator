@@ -95,6 +95,8 @@ spec:
     isOpenshiftEnv: true
     openshiftPort: 443
     roksEnabled: true
+    ibmCloudSaas: false
+    saasClientRedirectUrl: ""
     nonceEnabled: true
     xframeDomain: ""
     preferredLogin: ""

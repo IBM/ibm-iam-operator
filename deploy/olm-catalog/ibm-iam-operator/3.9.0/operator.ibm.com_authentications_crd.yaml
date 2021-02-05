@@ -193,6 +193,10 @@ spec:
                   type: string
                 roksUserPrefix:
                   type: string
+                ibmCloudSaas:
+                  type: boolean
+                saasClientRedirectUrl:
+                  type: string
                 wlpClientID:
                   type: string
                 wlpClientRegistrationSecret:

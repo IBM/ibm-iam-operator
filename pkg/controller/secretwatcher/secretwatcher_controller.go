@@ -159,7 +159,7 @@ func (r *ReconcileSecretWatcher) Reconcile(request reconcile.Request) (reconcile
 		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", instance.Name)
 		newDeployment := r.deploymentForSecretWatcher(SecretWatcher)
 		certmanagerLabel := "certmanager.k8s.io/time-restarted"
-		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
+		if val, ok := instance.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
 			newDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val
 		}
 		instance.Spec = newDeployment.Spec

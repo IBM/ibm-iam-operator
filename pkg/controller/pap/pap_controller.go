@@ -410,6 +410,10 @@ func (r *ReconcilePap) handleDeployment(instance *operatorv1alpha1.Pap, currentD
 		}
 	} else {
 		newDeployment := r.deploymentForPap(instance)
+		certmanagerLabel := "certmanager.k8s.io/time-restarted"
+		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
+			newDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val
+		}
 		currentDeployment.Spec = newDeployment.Spec
 		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
 		err = r.client.Update(context.TODO(), currentDeployment)

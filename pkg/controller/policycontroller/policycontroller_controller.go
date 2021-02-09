@@ -257,6 +257,10 @@ func (r *ReconcilePolicyController) handleDeployment(instance *operatorv1alpha1.
 		}
 	} else {
 		newDeployment := r.deploymentForPolicyController(instance)
+		certmanagerLabel := "certmanager.k8s.io/time-restarted"
+		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
+			newDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val
+		}
 		currentDeployment.Spec = newDeployment.Spec
 		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
 		err = r.client.Update(context.TODO(), currentDeployment)

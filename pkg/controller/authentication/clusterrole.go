@@ -70,6 +70,11 @@ func generateCRData() map[string]CRData {
 					Verbs:     adminVerbs,
 				},
 				{
+					APIGroups: []string{"operator.ibm.com"},
+					Resources: []string{"mustgatherjobs"},
+					Verbs:     adminVerbs,
+				},
+				{
 					APIGroups: []string{"clusterhealth.ibm.com"},
 					Resources: []string{"clusterservicestatuses"},
 					Verbs:     viewerVerbs,

@@ -1693,7 +1693,7 @@ spec:
                 - name: ICP_PLATFORM_AUTH_IMAGE
                   value: quay.io/opencloudio/icp-platform-auth:3.3.13
                 - name: ICP_IDENTITY_PROVIDER_IMAGE
-                  value: quay.io/opencloudio/icp-identity-provider:3.3.13
+                  value: quay.io/opencloudio/icp-identity-provider:3.3.14
                 - name: ICP_IDENTITY_MANAGER_IMAGE
                   value: quay.io/opencloudio/icp-identity-manager:3.3.13
                 - name: IAM_POLICY_ADMINISTRATION_IMAGE

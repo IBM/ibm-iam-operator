@@ -553,7 +553,7 @@ metadata:
               "public-cam-secret": {
                 "secret" : "oauth-client-secret"
               },
-              "public-zen-serviceid": {
+              "protected-zen-serviceid": {
                 "secret" : "zen-serviceid-apikey-secret"
               },
               "public-cam-map": {

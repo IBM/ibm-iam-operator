@@ -320,7 +320,7 @@ func getAccessPolicy(label string) (error, string) {
 func (r *ReconcileSecurityOnboarding) handleJob(instance *operatorv1alpha1.SecurityOnboarding) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	//Create security-onboarding job
-	securityOnboardJob, err := getSecurityOnboardJob(instance, r)
+	securityOnboardJob, restartRequired, err := getSecurityOnboardJob(instance, r)
 
 	secJobExists := false
 	foundErr1 := false
@@ -337,10 +337,18 @@ func (r *ReconcileSecurityOnboarding) handleJob(instance *operatorv1alpha1.Secur
 		} else {
 			reqLogger.Info("Successfully created Job", "Job.Namespace", instance.Namespace, "Job.Name", "security-onboarding")
 		}
+	} else if restartRequired {
+		err = r.client.Delete(context.TODO(), securityOnboardJob)
+		if err != nil {
+			reqLogger.Error(err, "Failed to delete job", "Job.Namespace", instance.Namespace, "Job.Name", "security-onboarding")
+			foundErr1 = true
+		} else {
+			reqLogger.Info("Successfully deleted Job", "Job.Namespace", instance.Namespace, "Job.Name", "security-onboarding")
+		}
 	}
 
 	//Create security-onboarding job
-	iamOnboardJob, err := getIAMOnboardJob(instance, r)
+	iamOnboardJob, restartRequired, err := getIAMOnboardJob(instance, r)
 	foundErr2 := false
 	iamJobExists := false
 	if err != nil {
@@ -356,6 +364,14 @@ func (r *ReconcileSecurityOnboarding) handleJob(instance *operatorv1alpha1.Secur
 		} else {
 			reqLogger.Info("Successfully created Job", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
 		}
+	} else if restartRequired {
+		err = r.client.Delete(context.TODO(), iamOnboardJob)
+		if err != nil {
+			reqLogger.Error(err, "Failed to delete job", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
+			foundErr2 = true
+		} else {
+			reqLogger.Info("Successfully deleted Job", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
+		}
 	}
 
 	if foundErr1 && foundErr2 {
@@ -366,7 +382,7 @@ func (r *ReconcileSecurityOnboarding) handleJob(instance *operatorv1alpha1.Secur
 
 }
 
-func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *ReconcileSecurityOnboarding) (*batchv1.Job, error) {
+func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *ReconcileSecurityOnboarding) (*batchv1.Job, bool, error) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	//Create all the Volumes
@@ -551,7 +567,10 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 	currentJob := &batchv1.Job{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "security-onboarding", Namespace: instance.Namespace}, currentJob)
 	if err == nil {
-		return currentJob, fmt.Errorf("Job %v already exists.", "security-onboarding")
+		if currentJob.Spec.Template.Spec.Containers[0].Image != shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE"){
+			return currentJob, true, fmt.Errorf("Job %v already exists.", "security-onboarding")
+		}
+		return currentJob, false, fmt.Errorf("Job %v already exists.", "security-onboarding")
 	}
 
 	job := &batchv1.Job{
@@ -585,14 +604,14 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 
 	if err1 != nil {
 		reqLogger.Error(err1, "Failed to set owner for security-onboarding Job")
-		return job, err1
+		return job, false, err1
 	}
 
-	return job, nil
+	return job, false, nil
 
 }
 
-func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *ReconcileSecurityOnboarding) (*batchv1.Job, error) {
+func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *ReconcileSecurityOnboarding) (*batchv1.Job, bool, error) {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
 	resources := instance.Spec.IAMOnboarding.Resources
@@ -1084,7 +1103,10 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 	currentJob := &batchv1.Job{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "iam-onboarding", Namespace: instance.Namespace}, currentJob)
 	if err == nil {
-		return currentJob, fmt.Errorf("Job %v already exists.", "iam-onboarding")
+		if currentJob.Spec.Template.Spec.Containers[0].Image != shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE"){
+			return currentJob, true, fmt.Errorf("Job %v already exists.", "iam-onboarding")
+		}
+		return currentJob, false, fmt.Errorf("Job %v already exists.", "iam-onboarding")
 	}
 
 	job := &batchv1.Job{
@@ -1118,8 +1140,8 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 
 	if err1 != nil {
 		reqLogger.Error(err1, "Failed to set owner for iam-onboarding Job")
-		return job, err1
+		return job, false, err1
 	}
 
-	return job, nil
+	return job, false, nil
 }

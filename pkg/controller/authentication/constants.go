@@ -94,7 +94,7 @@ var scimLdapAttributesMapping string = `{
                     "type": "work"
                 }],
             "objectClass": "person",
-            "groups": "memberOf",
+            "groups": "memberOf"
         },
         "group": {
             "id": "dn",
@@ -105,7 +105,7 @@ var scimLdapAttributesMapping string = `{
             "created": "createTimestamp",
             "lastModified": "modifyTimestamp",
             "objectClass": "groupOfUniqueNames",
-            "members": "uniqueMember",
+            "members": "uniqueMember"
         }
     }
 }

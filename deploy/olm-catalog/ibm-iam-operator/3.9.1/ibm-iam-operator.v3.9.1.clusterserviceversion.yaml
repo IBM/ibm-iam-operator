@@ -309,7 +309,7 @@ metadata:
             "papService": {
               "imageName": "iam-policy-administration",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.10",
+              "imageTag": "3.4.1",
               "resources": {
                 "limits": {
                   "cpu": "1000m",

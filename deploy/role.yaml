@@ -291,6 +291,20 @@ rules:
   - update
   - watch
   - delete
+# this is used by identity provider to create/delete rolebinding for zen user
+- apiGroups:
+  - authorization.openshift.io
+  resources:
+  - rolebindings
+  - rolebindings/finalizers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1

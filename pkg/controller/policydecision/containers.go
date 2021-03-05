@@ -316,6 +316,10 @@ func buildPdpContainer(pdpImage string, resources *corev1.ResourceRequirements) 
 				Name:  "IDENTITY_PROVIDER_URL",
 				Value: "https://platform-identity-provider:4300",
 			},
+			{
+				Name:  "IDENTITY_MGMT_URL",
+				Value: "https://platform-identity-management:4500",
+			},
 		},
 	}
 

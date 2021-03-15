@@ -145,4 +145,4 @@ The IAM operator service does not support running under the OpenShift Container 
 
 ## PodSecurityPolicy Requirements
 
-The IAM operator does not define any specific pod security requirements.
+The IBM IAM operator does not define any specific pod security requirements.

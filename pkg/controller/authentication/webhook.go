@@ -51,6 +51,7 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 	caCertData := caCertSecret.Data["tls.crt"]
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: webhook, Namespace: ""}, currentWebhook)
+<<<<<<< HEAD
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new Webhook
 		newWebhook := generateWebhookObject(instance, r.scheme, webhook, caCertData)
@@ -58,13 +59,36 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 		err = r.client.Create(context.TODO(), newWebhook)
 		if err != nil {
 			reqLogger.Error(err, "Failed to create new webhook", "Webhook.Namespace", instance.Namespace, "Webhook.Name", webhook)
+=======
+	if err != nil {
+
+		if errors.IsNotFound(err) {
+			// Define a new Webhook
+			newWebhook := generateWebhookObject(instance, r.scheme, webhook)
+			reqLogger.Info("Creating a new Webhook", "Webhook.Namespace", instance.Namespace, "Webhook.Name", webhook)
+			err = r.client.Create(context.TODO(), newWebhook)
+			if err != nil {
+				reqLogger.Error(err, "Failed to create new webhook", "Webhook.Namespace", instance.Namespace, "Webhook.Name", webhook)
+				return err
+			}
+			// User created successfully - return and requeue
+			*requeueResult = true
+		} else {
+>>>>>>> 7804546... update webhook on upgrade (#319)
 			return err
 		}
-		// User created successfully - return and requeue
-		*requeueResult = true
-	} else if err != nil {
-		reqLogger.Error(err, "Failed to get Webhook")
-		return err
+	} else {
+		if currentWebhook.ObjectMeta.Annotations == nil {
+			reqLogger.Info("Updating an existing Webhook", "Webhook.Namespace", currentWebhook.Namespace, "Webhook.Name", currentWebhook.Name)
+			currentWebhook.ObjectMeta.Annotations = map[string]string{
+				"certmanager.k8s.io/inject-ca-from": instance.Namespace+"/platform-identity-management",
+			}
+			err = r.client.Update(context.TODO(), currentWebhook)
+			if err != nil {
+				reqLogger.Error(err, "Failed to update an existing webhook", "Webhook.Namespace", currentWebhook.Namespace, "Webhook.Name", currentWebhook.Name)
+				return err
+			}
+		}
 	}
 
 	return nil

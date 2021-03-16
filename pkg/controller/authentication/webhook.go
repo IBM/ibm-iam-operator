@@ -55,7 +55,7 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 
 		if errors.IsNotFound(err) {
 			// Define a new Webhook
-			newWebhook := generateWebhookObject(instance, r.scheme, webhook)
+			newWebhook := generateWebhookObject(instance, r.scheme, webhook, caCertData)
 			reqLogger.Info("Creating a new Webhook", "Webhook.Namespace", instance.Namespace, "Webhook.Name", webhook)
 			err = r.client.Create(context.TODO(), newWebhook)
 			if err != nil {

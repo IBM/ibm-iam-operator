@@ -56,7 +56,7 @@ spec:
             - name: ICP_SECRET_WATCHER_IMAGE
               value: quay.io/opencloudio/icp-secret-watcher:3.4.0
             - name: ICP_OIDCCLIENT_WATCHER_IMAGE
-              value: quay.io/opencloudio/icp-oidcclient-watcher:3.4.1
+              value: quay.io/opencloudio/icp-oidcclient-watcher:3.4.2
             - name: IAM_POLICY_CONTROLLER_IMAGE
               value: quay.io/opencloudio/iam-policy-controller:3.4.0
             - name: ICP_IAM_ONBOARDING_IMAGE

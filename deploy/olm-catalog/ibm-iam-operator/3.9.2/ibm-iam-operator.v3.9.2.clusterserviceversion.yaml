@@ -107,7 +107,7 @@ metadata:
             },
             "imageName": "iam-policy-decision",
             "imageRegistry": "quay.io/opencloudio",
-            "imageTag": "3.3.8",
+            "imageTag": "3.4.2",
             "initMongodb": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
@@ -1719,7 +1719,7 @@ spec:
                 - name: IAM_POLICY_ADMINISTRATION_IMAGE
                   value: quay.io/opencloudio/iam-policy-administration:3.4.1
                 - name: IAM_POLICY_DECISION_IMAGE
-                  value: quay.io/opencloudio/iam-policy-decision:3.4.1
+                  value: quay.io/opencloudio/iam-policy-decision:3.4.2
                 - name: ICP_SECRET_WATCHER_IMAGE
                   value: quay.io/opencloudio/icp-secret-watcher:3.4.0
                 - name: ICP_OIDCCLIENT_WATCHER_IMAGE

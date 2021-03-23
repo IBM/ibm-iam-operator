@@ -168,7 +168,7 @@ metadata:
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.13",
+              "imageTag": "3.4.1",
               "ldapsCACert": "platform-auth-ldaps-ca-cert",
               "resources": {
                 "limits": {

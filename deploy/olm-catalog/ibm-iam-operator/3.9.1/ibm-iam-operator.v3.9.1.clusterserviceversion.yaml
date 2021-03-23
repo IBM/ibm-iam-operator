@@ -309,7 +309,7 @@ metadata:
             "papService": {
               "imageName": "iam-policy-administration",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.4.1",
+              "imageTag": "3.4.2",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -1710,13 +1710,13 @@ spec:
                 - ibm-iam-operator
                 env:
                 - name: ICP_PLATFORM_AUTH_IMAGE
-                  value: quay.io/opencloudio/icp-platform-auth:3.4.0
+                  value: quay.io/opencloudio/icp-platform-auth:3.4.1
                 - name: ICP_IDENTITY_PROVIDER_IMAGE
                   value: quay.io/opencloudio/icp-identity-provider:3.4.1
                 - name: ICP_IDENTITY_MANAGER_IMAGE
                   value: quay.io/opencloudio/icp-identity-manager:3.4.1
                 - name: IAM_POLICY_ADMINISTRATION_IMAGE
-                  value: quay.io/opencloudio/iam-policy-administration:3.4.1
+                  value: quay.io/opencloudio/iam-policy-administration:3.4.2
                 - name: IAM_POLICY_DECISION_IMAGE
                   value: quay.io/opencloudio/iam-policy-decision:3.4.1
                 - name: ICP_SECRET_WATCHER_IMAGE

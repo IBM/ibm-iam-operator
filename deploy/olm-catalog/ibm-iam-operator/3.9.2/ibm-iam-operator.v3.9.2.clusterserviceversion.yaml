@@ -337,7 +337,7 @@ metadata:
           },
           "spec": {
             "imageRegistry": "quay.io/opencloudio/iam-policy-controller",
-            "imageTagPostfix": "3.3.7",
+            "imageTagPostfix": "3.4.1",
             "operatorVersion": "0.14.1",
             "replicas": 1,
             "resources": {

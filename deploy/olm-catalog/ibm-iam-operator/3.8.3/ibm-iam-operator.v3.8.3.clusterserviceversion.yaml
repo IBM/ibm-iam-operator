@@ -17,7 +17,7 @@ metadata:
           },
           "spec": {
             "imageRegistry": "quay.io/opencloudio/icp-oidcclient-watcher",
-            "imageTagPostfix": "3.3.3",
+            "imageTagPostfix": "3.3.8",
             "operatorVersion": "0.14.1",
             "replicas": 1,
             "resources": {
@@ -337,7 +337,7 @@ metadata:
           },
           "spec": {
             "imageRegistry": "quay.io/opencloudio/iam-policy-controller",
-            "imageTagPostfix": "3.3.2",
+            "imageTagPostfix": "3.3.7",
             "operatorVersion": "0.14.1",
             "replicas": 1,
             "resources": {

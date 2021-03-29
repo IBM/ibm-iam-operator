@@ -395,7 +395,7 @@ metadata:
             "iamOnboarding": {
               "imageName": "icp-iam-onboarding",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.3.9",
+              "imageTag": "3.4.1",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -409,7 +409,7 @@ metadata:
             },
             "imageName": "icp-iam-onboarding",
             "imageRegistry": "quay.io/opencloudio",
-            "imageTag": "3.3.9",
+            "imageTag": "3.4.1",
             "impersonation": {
               "enableImpersonation": false
             },
@@ -1727,7 +1727,7 @@ spec:
                 - name: IAM_POLICY_CONTROLLER_IMAGE
                   value: quay.io/opencloudio/iam-policy-controller:3.4.0
                 - name: ICP_IAM_ONBOARDING_IMAGE
-                  value: quay.io/opencloudio/icp-iam-onboarding:3.4.0
+                  value: quay.io/opencloudio/icp-iam-onboarding:3.4.1
                 - name: AUDIT_SYSLOG_SERVICE_IMAGE
                   value: quay.io/opencloudio/audit-syslog-service:1.0.5
                 - name: WATCH_NAMESPACE

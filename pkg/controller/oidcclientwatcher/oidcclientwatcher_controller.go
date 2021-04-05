@@ -525,6 +525,24 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 								EmptyDir: &corev1.EmptyDirVolumeSource{},
 							},
 						},
+						{
+							Name: "cluster-ca",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: "cs-ca-certificate-secret",
+									Items: []corev1.KeyToPath{
+										{
+											Key:  "tls.key",
+											Path: "ca.key",
+										},
+										{
+											Key:  "tls.crt",
+											Path: "ca.crt",
+										},
+									},
+								},
+							},
+						},
 					},
 					InitContainers: []corev1.Container{
 						{

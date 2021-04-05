@@ -162,6 +162,10 @@ func (r *ReconcileSecretWatcher) Reconcile(request reconcile.Request) (reconcile
 		if val, ok := instance.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
 			newDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val
 		}
+		nssAnnotation := "nss.ibm.com/namespaceList"
+		if val, ok := instance.Spec.Template.ObjectMeta.Annotations[nssAnnotation]; ok {
+			newDeployment.Spec.Template.ObjectMeta.Annotations[nssAnnotation] = val
+		}
 		instance.Spec = newDeployment.Spec
 		err = r.client.Update(context.TODO(), instance)
 		if err != nil {
@@ -258,8 +262,8 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 					HostPID:                       false,
 					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 						{
-							MaxSkew: 1,
-							TopologyKey: "topology.kubernetes.io/zone",
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/zone",
 							WhenUnsatisfiable: corev1.ScheduleAnyway,
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -268,8 +272,8 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 							},
 						},
 						{
-							MaxSkew: 1,
-							TopologyKey: "topology.kubernetes.io/region",
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/region",
 							WhenUnsatisfiable: corev1.ScheduleAnyway,
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -278,7 +282,7 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 							},
 						},
 					},
-					ServiceAccountName:            serviceAccountName,
+					ServiceAccountName: serviceAccountName,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{

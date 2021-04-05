@@ -249,6 +249,9 @@ func (r *ReconcileOIDCClientWatcher) handleDeployment(instance *operatorv1alpha1
 		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
 			ocwDep.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val
 		}
+		if val, ok := currentDeployment.Metadata.Labels[certmanagerLabel]; ok {
+			ocwDep.Metadata.Labels[certmanagerLabel] = val
+		}
 		nssAnnotation := "nss.ibm.com/namespaceList"
 		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Annotations[nssAnnotation]; ok {
 			ocwDep.Spec.Template.ObjectMeta.Annotations[nssAnnotation] = val

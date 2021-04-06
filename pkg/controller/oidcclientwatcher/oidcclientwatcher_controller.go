@@ -246,9 +246,6 @@ func (r *ReconcileOIDCClientWatcher) handleDeployment(instance *operatorv1alpha1
 		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
 		ocwDep := r.deploymentForOIDCClientWatcher(instance)
 		certmanagerLabel := "certmanager.k8s.io/time-restarted"
-		if val, ok := currentDeployment.ObjectMeta.Labels[certmanagerLabel]; ok {
-			ocwDep.ObjectMeta.Labels[certmanagerLabel] = val
-		}
 		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
 			ocwDep.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val
 		}

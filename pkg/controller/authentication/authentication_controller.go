@@ -330,7 +330,7 @@ func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1al
 	crMap := generateCRData()
 	crbMap := generateCRBData("dummy", "dummy")
 	userName := instance.Spec.Config.DefaultAdminUser
-	webhook := "namespace-admission-config"
+	webhook := "namespace-admission-config" + "-" + instance.Namespace
 
 	// Remove Cluster Role
 	for crName := range crMap {

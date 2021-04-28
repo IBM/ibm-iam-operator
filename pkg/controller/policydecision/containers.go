@@ -280,6 +280,17 @@ func buildPdpContainer(pdpImage string, resources *corev1.ResourceRequirements) 
 				},
 			},
 			{
+				Name: "IBM_CLOUD_SAAS",
+				ValueFrom: &corev1.EnvVarSource{
+					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "platform-auth-idp",
+						},
+						Key: "IBM_CLOUD_SAAS",
+					},
+				},
+			},
+			{
 				Name: "ROKS_ENABLED",
 				ValueFrom: &corev1.EnvVarSource{
 					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{

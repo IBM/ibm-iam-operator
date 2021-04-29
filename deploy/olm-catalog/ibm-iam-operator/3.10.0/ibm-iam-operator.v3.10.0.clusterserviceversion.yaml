@@ -584,6 +584,29 @@ metadata:
   name: ibm-iam-operator.v3.10.0
   namespace: placeholder
 spec:
+  relatedImages:
+    - name: ibm-iam-operator
+      value: quay.io/opencloudio/ibm-iam-operator:3.10.0
+    - name: ICP_PLATFORM_AUTH_IMAGE
+      value: quay.io/opencloudio/icp-platform-auth:3.5.0
+    - name: ICP_IDENTITY_PROVIDER_IMAGE
+      value: quay.io/opencloudio/icp-identity-provider:3.5.0
+    - name: ICP_IDENTITY_MANAGER_IMAGE
+      value: quay.io/opencloudio/icp-identity-manager:3.5.0
+    - name: IAM_POLICY_ADMINISTRATION_IMAGE
+      value: quay.io/opencloudio/iam-policy-administration:3.5.0
+    - name: IAM_POLICY_DECISION_IMAGE
+      value: quay.io/opencloudio/iam-policy-decision:3.5.0
+    - name: ICP_SECRET_WATCHER_IMAGE
+      value: quay.io/opencloudio/icp-secret-watcher:3.5.0
+    - name: ICP_OIDCCLIENT_WATCHER_IMAGE
+      value: quay.io/opencloudio/icp-oidcclient-watcher:3.5.0
+    - name: IAM_POLICY_CONTROLLER_IMAGE
+      value: quay.io/opencloudio/iam-policy-controller:3.5.0
+    - name: ICP_IAM_ONBOARDING_IMAGE
+      value: quay.io/opencloudio/icp-iam-onboardin:3.5.0
+    - name: AUDIT_SYSLOG_SERVICE_IMAGE
+      value: quay.io/opencloudio/audit-syslog-service:3.5.0
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:

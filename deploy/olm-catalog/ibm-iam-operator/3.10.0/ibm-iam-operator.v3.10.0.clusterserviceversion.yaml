@@ -592,7 +592,7 @@ spec:
     - name: icp-identity-provider
       value: quay.io/opencloudio/icp-identity-provider@sha256:15c8a1c9b2384bfa4cff1ae38bf0261492a4fef4d9a4907de3b0e7411cd3c0dd
     - name: icp-identity-manager
-      value: quay.io/opencloudio/icp-identity-manager@sha256:1b39131ea93e790fe1a7c2011af63eb02b43b3fe720083d95374789978ad5bc6
+      value: quay.io/opencloudio/icp-identity-manager@sha256:191c45c6e69849123c8d5f0f7a789cb522b2fb5c2aab75563f43af78150e030a
     - name: iam-policy-administration
       value: quay.io/opencloudio/iam-policy-administration@sha256:1f565c7b6cb1797d7e5be3c1fbe98a4279714a86aec3a6ca3ee84c3aeac0afef
     - name: iam-policy-decision

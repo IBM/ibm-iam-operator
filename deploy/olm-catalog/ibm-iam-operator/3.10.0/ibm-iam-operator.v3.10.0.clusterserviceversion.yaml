@@ -586,7 +586,7 @@ metadata:
 spec:
   relatedImages:
     - name: ibm-iam-operator
-      value: quay.io/opencloudio/ibm-iam-operator@sha256:fd64492e4f94a04d36106ebe38e9624d0fb4207229371c628d66cd88bfbfcd3f
+      value: quay.io/opencloudio/ibm-iam-operator@sha256:90e5a5f7c4e7143f71280de4fa689bb9bc23a0c6f44bb44c8120483015033e3f
     - name: icp-platform-auth
       value: quay.io/opencloudio/icp-platform-auth@sha256:12715da7cb32bc60b9869856c8430e4673a95d9d883f96de3afde5c2fe579437
     - name: icp-identity-provider

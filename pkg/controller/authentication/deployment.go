@@ -39,6 +39,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
 	// Check for the presence of dependencies
+	var saasServiceIdCrn string = ""
 	consoleConfigMapName := "management-ingress-info"
 	consoleConfigMap := &corev1.ConfigMap{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: consoleConfigMapName, Namespace: instance.Namespace}, consoleConfigMap)
@@ -53,6 +54,28 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	}
 	icpConsoleURL := consoleConfigMap.Data["MANAGEMENT_INGRESS_ROUTE_HOST"]
 
+	reqLogger.Info("Is SAAS enabled?", "Instance spec config value", instance.Spec.Config.IBMCloudSaas, "Update configmap with value", saasServiceIdCrn)
+
+	// Check for the presence of dependencies, for SAAS
+	reqLogger.Info("Is SAAS enabled?", "Instance spec config value", instance.Spec.Config.IBMCloudSaas)
+	if instance.Spec.Config.IBMCloudSaas {
+		saasTenantConfigMapName := "cs-saas-tenant-config"
+		saasTenantConfigMap := &corev1.ConfigMap{}
+		err := r.client.Get(context.TODO(), types.NamespacedName{Name: saasTenantConfigMapName, Namespace: instance.Namespace}, saasTenantConfigMap)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				reqLogger.Info("SAAS is enabled ", "Configmap is not yet created, do nothing", saasTenantConfigMapName)
+				//reqLogger.Error(err, "The configmap ", saasTenantConfigMapName, " is not created yet")
+				//return nil
+			} else {
+				reqLogger.Error(err, "Failed to get ConfigMap", saasTenantConfigMapName)
+				return err
+			}
+		}
+		saasServiceIdCrn = saasTenantConfigMap.Data["service_crn_id"]
+		reqLogger.Info("Configmap found", "Found and updating saasServiceIdCrn value ", saasServiceIdCrn)
+	}
+
 	// Check if this Deployment already exists
 	deployment := "auth-idp"
 
@@ -60,7 +83,8 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	if err != nil {
 		if errors.IsNotFound(err) {
 			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", deployment)
-			newDeployment := generateDeploymentObject(instance, r.scheme, deployment, icpConsoleURL)
+			reqLogger.Info("Creating a new deployment", "Instance spec config value", instance.Spec.Config.IBMCloudSaas, "Update configmap with value", saasServiceIdCrn)
+			newDeployment := generateDeploymentObject(instance, r.scheme, deployment, icpConsoleURL, saasServiceIdCrn)
 			err = r.client.Create(context.TODO(), newDeployment)
 			if err != nil {
 				return err
@@ -72,7 +96,8 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 		}
 	} else {
 		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
-		ocwDep := generateDeploymentObject(instance, r.scheme, deployment, icpConsoleURL)
+		reqLogger.Info("Update existing deployment", "Instance spec config value", instance.Spec.Config.IBMCloudSaas, "Update configmap with value", saasServiceIdCrn)
+		ocwDep := generateDeploymentObject(instance, r.scheme, deployment, icpConsoleURL, saasServiceIdCrn)
 		certmanagerLabel := "certmanager.k8s.io/time-restarted"
 		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
 			ocwDep.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val
@@ -123,7 +148,7 @@ func getPodNames(pods []corev1.Pod) []string {
 	return podNames
 }
 
-func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string) *appsv1.Deployment {
+func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string, saasCrnId string) *appsv1.Deployment {
 
 	// Update the audit image for upgrade scenarios
 	if instance.Spec.AuditService.ImageName != res.AuditImageName {
@@ -247,7 +272,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 						},
 					},
 					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret),
-					Containers:     buildContainers(instance, auditImage, authServiceImage, identityProviderImage, identityManagerImage, syslogTlsPath, icpConsoleURL),
+					Containers:     buildContainers(instance, auditImage, authServiceImage, identityProviderImage, identityManagerImage, syslogTlsPath, icpConsoleURL, saasCrnId),
 					InitContainers: buildInitContainers(mongoDBImage),
 				},
 			},

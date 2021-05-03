@@ -567,7 +567,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			Value: "admin",
 		},
 		{
-			Name:  "SERVICE_CRN_ID",
+			Name:  "service_crn_id",
 			Value: saasCRNId,
 		},
 		{

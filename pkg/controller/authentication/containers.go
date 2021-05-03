@@ -74,7 +74,7 @@ func buildAuditContainer(auditImage string, syslogTlsPath string, resources *cor
 	if len(syslogTlsPath) == 0 {
 		syslogTlsPath = "/etc/audit-tls"
 	}
-	
+
 	return corev1.Container{
 		Name:            "icp-audit-service",
 		Image:           auditImage,
@@ -83,7 +83,7 @@ func buildAuditContainer(auditImage string, syslogTlsPath string, resources *cor
 			{
 				Name:  "AUDIT_DIR",
 				Value: "/var/log/audit",
-			},			
+			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
@@ -420,7 +420,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 
 }
 
-func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string) corev1.Container {
+func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string, saasCRNId string) corev1.Container {
 
 	resources := instance.Spec.IdentityProvider.Resources
 	if resources == nil {
@@ -565,6 +565,10 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		{
 			Name:  "MONGO_AUTHSOURCE",
 			Value: "admin",
+		},
+		{
+			Name:  "service_crn_id",
+			Value: saasCRNId,
 		},
 		{
 			Name:  "OPENSHIFT_URL",
@@ -1110,12 +1114,12 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 
 }
 
-func buildContainers(instance *operatorv1alpha1.Authentication, auditImage string, authServiceImage string, identityProviderImage string, identityManagerImage string, syslogTlsPath string, icpConsoleURL string) []corev1.Container {
+func buildContainers(instance *operatorv1alpha1.Authentication, auditImage string, authServiceImage string, identityProviderImage string, identityManagerImage string, syslogTlsPath string, icpConsoleURL string, saasCrnId string) []corev1.Container {
 
 	auditResources := instance.Spec.AuditService.Resources
 	auditContainer := buildAuditContainer(auditImage, syslogTlsPath, auditResources)
 	authServiceContainer := buildAuthServiceContainer(instance, authServiceImage)
-	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL)
+	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId)
 	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL)
 
 	return []corev1.Container{auditContainer, authServiceContainer, identityProviderContainer, identityManagerContainer}

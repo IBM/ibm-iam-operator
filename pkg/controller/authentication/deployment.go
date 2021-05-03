@@ -65,8 +65,8 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 		if err != nil {
 			if errors.IsNotFound(err) {
 				reqLogger.Info("SAAS is enabled ", "Configmap is not yet created, do nothing", saasTenantConfigMapName)
-				//reqLogger.Error(err, "The configmap ", saasTenantConfigMapName, " is not created yet")
-				//return nil
+				reqLogger.Error(err, "The configmap ", saasTenantConfigMapName, " is not created yet")
+				return nil
 			} else {
 				reqLogger.Error(err, "Failed to get ConfigMap", saasTenantConfigMapName)
 				return err

@@ -58,22 +58,21 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 
 	// Check for the presence of dependencies, for SAAS
 	reqLogger.Info("Is SAAS enabled?", "Instance spec config value", instance.Spec.Config.IBMCloudSaas)
+	saasTenantConfigMapName := "cs-saas-tenant-config"
+	saasTenantConfigMap := &corev1.ConfigMap{}
 	if instance.Spec.Config.IBMCloudSaas {
-		saasTenantConfigMapName := "cs-saas-tenant-config"
-		saasTenantConfigMap := &corev1.ConfigMap{}
 		err := r.client.Get(context.TODO(), types.NamespacedName{Name: saasTenantConfigMapName, Namespace: instance.Namespace}, saasTenantConfigMap)
 		if err != nil {
 			if errors.IsNotFound(err) {
-				reqLogger.Info("SAAS is enabled ", "Configmap is not yet created, do nothing", saasTenantConfigMapName)
 				reqLogger.Error(err, "The configmap ", saasTenantConfigMapName, " is not created yet")
-				return nil
+				return err
 			} else {
 				reqLogger.Error(err, "Failed to get ConfigMap", saasTenantConfigMapName)
 				return err
 			}
 		}
+		reqLogger.Info("SAAS tenant configmap was created", "Value retrieved from ", saasTenantConfigMapName)
 		saasServiceIdCrn = saasTenantConfigMap.Data["service_crn_id"]
-		reqLogger.Info("Configmap found", "Found and updating saasServiceIdCrn value ", saasServiceIdCrn)
 	}
 
 	// Check if this Deployment already exists
@@ -83,7 +82,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	if err != nil {
 		if errors.IsNotFound(err) {
 			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", deployment)
-			reqLogger.Info("Creating a new deployment", "Instance spec config value", instance.Spec.Config.IBMCloudSaas, "Update configmap with value", saasServiceIdCrn)
+			reqLogger.Info("SAAS tenant configmap was found", "Creating deployment with value from configmap", saasTenantConfigMapName)
 			newDeployment := generateDeploymentObject(instance, r.scheme, deployment, icpConsoleURL, saasServiceIdCrn)
 			err = r.client.Create(context.TODO(), newDeployment)
 			if err != nil {
@@ -96,7 +95,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 		}
 	} else {
 		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
-		reqLogger.Info("Update existing deployment", "Instance spec config value", instance.Spec.Config.IBMCloudSaas, "Update configmap with value", saasServiceIdCrn)
+		reqLogger.Info("SAAS tenant configmap was found", "Updating deployment with value from configmap", saasTenantConfigMapName)
 		ocwDep := generateDeploymentObject(instance, r.scheme, deployment, icpConsoleURL, saasServiceIdCrn)
 		certmanagerLabel := "certmanager.k8s.io/time-restarted"
 		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {

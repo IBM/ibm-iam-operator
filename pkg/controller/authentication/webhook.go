@@ -32,7 +32,7 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
-	webhook := "namespace-admission-config"
+	webhook := "namespace-admission-config" + "-" + instance.Namespace
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: webhook, Namespace: ""}, currentWebhook)
 	if err != nil {
@@ -49,6 +49,7 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 			// User created successfully - return and requeue
 			*requeueResult = true
 		} else {
+			reqLogger.Error(err, "Failed to get an existing webhook", "Webhook.Namespace", instance.Namespace, "Webhook.Name", webhook)
 			return err
 		}
 	} else {
@@ -82,7 +83,7 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 		},
 		Webhooks: []reg.MutatingWebhook{
 			{
-				Name:          "iam.hooks.securityenforcement.admission.cloud.ibm.com",
+				Name:          instance.Namespace + "." + "iam.hooks.securityenforcement.admission.cloud.ibm.com",
 				FailurePolicy: &failurePolicy,
 				ClientConfig: reg.WebhookClientConfig{
 					Service: &reg.ServiceReference{

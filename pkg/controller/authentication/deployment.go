@@ -99,6 +99,10 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
 			ocwDep.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val
 		}
+		nssAnnotation := "nss.ibm.com/namespaceList"
+		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Annotations[nssAnnotation]; ok {
+			ocwDep.Spec.Template.ObjectMeta.Annotations[nssAnnotation] = val
+		}
 		currentDeployment.Spec = ocwDep.Spec
 		err = r.client.Update(context.TODO(), currentDeployment)
 		if err != nil {

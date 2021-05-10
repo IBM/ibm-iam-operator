@@ -618,6 +618,10 @@ func platformIdProviderIngress(instance *operatorv1alpha1.Authentication, scheme
 				"icp.management.ibm.com/secure-backends": "true",
 				"icp.management.ibm.com/rewrite-target":  "/",
 				"icp.management.ibm.com/authz-type":      "rbac",
+                                "icp.management.ibm.com/configuration-snippet": `
+                                 \n
+                                 \           limit_req zone=management-ingress-rps-1000 burst=100 nodelay;`,
+
 			},
 		},
 		Spec: net.IngressSpec{

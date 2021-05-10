@@ -92,7 +92,7 @@ metadata:
             "auditService": {
               "imageName": "audit-syslog-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "1.0.5",
+              "imageTag": "1.0.7",
               "syslogTlsPath": "/etc/audit-tls",
               "resources": {
                 "limits": {
@@ -584,6 +584,29 @@ metadata:
   name: ibm-iam-operator.v3.10.0
   namespace: placeholder
 spec:
+  relatedImages:
+    - name: ibm-iam-operator
+      value: quay.io/opencloudio/ibm-iam-operator@sha256:90e5a5f7c4e7143f71280de4fa689bb9bc23a0c6f44bb44c8120483015033e3f
+    - name: icp-platform-auth
+      value: quay.io/opencloudio/icp-platform-auth@sha256:12715da7cb32bc60b9869856c8430e4673a95d9d883f96de3afde5c2fe579437
+    - name: icp-identity-provider
+      value: quay.io/opencloudio/icp-identity-provider@sha256:15c8a1c9b2384bfa4cff1ae38bf0261492a4fef4d9a4907de3b0e7411cd3c0dd
+    - name: icp-identity-manager
+      value: quay.io/opencloudio/icp-identity-manager@sha256:191c45c6e69849123c8d5f0f7a789cb522b2fb5c2aab75563f43af78150e030a
+    - name: iam-policy-administration
+      value: quay.io/opencloudio/iam-policy-administration@sha256:1f565c7b6cb1797d7e5be3c1fbe98a4279714a86aec3a6ca3ee84c3aeac0afef
+    - name: iam-policy-decision
+      value: quay.io/opencloudio/iam-policy-decision@sha256:d5e180383338bf7b17956946bff7b6deb17cec86967ba0e5b904ec3e46168310
+    - name: icp-secret-watcher
+      value: quay.io/opencloudio/icp-secret-watcher@sha256:ef189c20f205f67985af85a581859b95af41a71bd33325398e7220855517199c
+    - name: icp-oidcclient-watcher
+      value: quay.io/opencloudio/icp-oidcclient-watcher@sha256:87b80b342fb8523b1ff96eded391446d3ce578e2148369a2826c82c9a657ad28
+    - name: iam-policy-controller
+      value: quay.io/opencloudio/iam-policy-controller@sha256:09da7e73c38bca3d5f13ba879df5123f962858d1d5b05286409ddb4f9c1733bb
+    - name: icp-iam-onboarding
+      value: quay.io/opencloudio/icp-iam-onboarding@sha256:f52fb8fcb76005274887996e29f97720bd18324f20f1742f32e4b04f87935d25
+    - name: audit-syslog-service
+      value: quay.io/opencloudio/audit-syslog-service@sha256:232d0407440b3b051d612a6ce48d4c92e1859cc94c3170b0450bde069b838e42
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
@@ -1729,7 +1752,7 @@ spec:
                 - name: ICP_IAM_ONBOARDING_IMAGE
                   value: quay.io/opencloudio/icp-iam-onboarding:3.5.0
                 - name: AUDIT_SYSLOG_SERVICE_IMAGE
-                  value: quay.io/opencloudio/audit-syslog-service:1.0.5
+                  value: quay.io/opencloudio/audit-syslog-service:1.0.7
                 - name: WATCH_NAMESPACE
                   valueFrom:
                     fieldRef:

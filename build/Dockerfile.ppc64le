@@ -20,7 +20,7 @@ RUN wget -O /qemu-ppc64le-static https://github.com/multiarch/qemu-user-static/r
 
 RUN chmod +x /qemu-ppc64le-static
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal@sha256:7c3f8a353a25b4a3265526b22fb1eca61f1be4fae6b18be9f4263f4a8d5fbebd
+FROM registry.access.redhat.com/ubi8/ubi-minimal@sha256:0d42603bf9f539f28c133e9a13e74cec8d3baaa0165c6f873ff931d50c708d8c
 ARG VCS_REF
 ARG VCS_URL
 

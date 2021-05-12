@@ -1,5 +1,5 @@
 #
-# Copyright 2020 IBM Corporation
+# Copyright 2020,2021 IBM Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ RUN wget -O /qemu-s390x-static https://github.com/multiarch/qemu-user-static/rel
 
 RUN chmod +x /qemu-s390x-static
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal@sha256:7e7e3802f4f4bc1082eb859ad08bafed535e5777e3c265319de35caee6ce5176
+FROM registry.access.redhat.com/ubi8/ubi-minimal@sha256:4b3905174e708d2656df72b4800a7abf87284a20ab44b3ef4d7136193caccf9f
 ARG VCS_REF
 ARG VCS_URL
 

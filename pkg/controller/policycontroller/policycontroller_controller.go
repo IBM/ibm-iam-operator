@@ -137,6 +137,12 @@ func (r *ReconcilePolicyController) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, recErr
 	}
 
+	// skip deploying policycontroller if chosen not to deploy
+	if instance.Spec.Config.ExcludeOperand {
+		reqLogger.Info("The policycontroller will not be deployed, it has chosen not to deploy")
+		return reconcile.Result{}, nil
+	}
+
 	// Credit: kubebuilder book
 	finalizerName := "policycontroller.operator.ibm.com"
 	// Determine if the Policy Controller CR is going to be deleted

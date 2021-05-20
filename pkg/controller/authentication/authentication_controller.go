@@ -330,7 +330,15 @@ func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1al
 	crMap := generateCRData()
 	crbMap := generateCRBData("dummy", "dummy")
 	userName := instance.Spec.Config.DefaultAdminUser
-	webhook := "namespace-admission-config" + "-" + instance.Namespace
+	// These code changes handles all use cases:
+	// - fresh install in saas or on-prem mode and
+	// - upgrade on older releases in on-prem mode
+	webhook := "namespace-admission-config"
+	if instance.Spec.Config.IBMCloudSaas {
+		// in saas mode
+		webhook = webhook + "-" + instance.Namespace
+	}
+
 
 	// Remove Cluster Role
 	for crName := range crMap {

@@ -146,3 +146,11 @@ The IAM operator service does not support running under the OpenShift Container 
 ## PodSecurityPolicy Requirements
 
 The IAM operator does not define any specific pod security requirements.
+
+## Custom PodSecurityPolicy definition:
+
+The IAM operator does not define any specific custom pod security requirements.
+
+## Custom SecurityContextConstraints definition:
+
+The IAM operator service runs under a restricted security context constraint with a non root uid.

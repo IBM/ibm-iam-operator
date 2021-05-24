@@ -31,5 +31,5 @@ spec:
       requests:
         cpu: 50m
         memory: 200Mi
-  operatorVersion: "3.5.0"
+  operatorVersion: "0.14.1"
   replicas: 1

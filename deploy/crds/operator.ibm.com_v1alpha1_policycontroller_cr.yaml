@@ -7,9 +7,11 @@ metadata:
     app.kubernetes.io/managed-by: ibm-iam-operator
     app.kubernetes.io/name: ibm-iam-operator
 spec:
+  config:
+    excludeOperand: false
   operatorVersion: "0.14.1"
   imageRegistry: "quay.io/opencloudio/iam-policy-controller"
-  imageTagPostfix: "3.3.2"
+  imageTagPostfix: "3.5.0"
   replicas: 1
   resources:
     limits:

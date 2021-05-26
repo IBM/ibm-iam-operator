@@ -263,8 +263,6 @@ rules:
   - patch
   - update
   - watch
-  - bind
-  - escalate
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:

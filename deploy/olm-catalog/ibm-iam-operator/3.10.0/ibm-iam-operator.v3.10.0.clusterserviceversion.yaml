@@ -152,7 +152,7 @@ metadata:
             "auditService": {
               "imageName": "audit-syslog-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "1.0.5",
+              "imageTag": "1.0.7",
               "syslogTlsPath": "/etc/audit-tls",
               "resources": {
                 "limits": {
@@ -207,6 +207,7 @@ metadata:
               "defaultAdminUser": "admin",
               "enableImpersonation": false,
               "fipsEnabled": true,
+              "ibmCloudSaas": false,
               "icpPort": 8443,
               "installType": "fresh",
               "isOpenshiftEnv": true,
@@ -223,6 +224,7 @@ metadata:
               "roksEnabled": true,
               "roksURL": "https://roks.domain.name:443",
               "roksUserPrefix": "changeme",
+              "saasClientRedirectUrl": "",
               "wlpClientID": "4444be3a738841016ab76d71b650e836",
               "wlpClientRegistrationSecret": "f1362ca4d20b8389af2d1ea68042c9af",
               "wlpClientSecret": "aa73bf39752053bf723d1143fb4cf8a2"
@@ -292,7 +294,7 @@ metadata:
             "auditService": {
               "imageName": "audit-syslog-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "1.0.5",
+              "imageTag": "1.0.7",
               "syslogTlsPath": "/etc/audit-tls",
               "resources": {
                 "limits": {
@@ -305,7 +307,7 @@ metadata:
                 }
               }
             },
-            "operatorVersion": "3.9.1",
+            "operatorVersion": "0.14.1",
             "papService": {
               "imageName": "iam-policy-administration",
               "imageRegistry": "quay.io/opencloudio",
@@ -336,6 +338,9 @@ metadata:
             "name": "policycontroller-deployment"
           },
           "spec": {
+            "config": {
+              "excludeOperand": false
+            },
             "imageRegistry": "quay.io/opencloudio/iam-policy-controller",
             "imageTagPostfix": "3.5.0",
             "operatorVersion": "0.14.1",
@@ -364,6 +369,9 @@ metadata:
             "name": "secretwatcher-deployment"
           },
           "spec": {
+            "config": {
+              "excludeOperand": false
+            },
             "imageRegistry": "quay.io/opencloudio/icp-secret-watcher",
             "imageTagPostfix": "3.5.0",
             "operatorVersion": "0.14.1",
@@ -578,7 +586,7 @@ metadata:
     support: IBM
   labels:
     operatorframework.io/arch.s390x: supported
-    operatorframework.io/os.linux: supported 
+    operatorframework.io/os.linux: supported
     operatorframework.io/arch.amd64: supported
     operatorframework.io/arch.ppc64le: supported
   name: ibm-iam-operator.v3.10.0
@@ -1519,7 +1527,7 @@ spec:
      - 3.6.5
      - 3.6.4
      - 3.6.3
-     - 3.6.2    
+     - 3.6.2
      - 3.6.0
         - With this version, support for OpenShift 4.3 is added.
      - 3.5.0
@@ -1628,7 +1636,7 @@ spec:
           - patch
           - update
           - watch
-          - delete      
+          - delete
         # this is used by iam poliy controller
         - apiGroups:
           - iam.policies.ibm.com
@@ -1641,14 +1649,14 @@ spec:
           - patch
           - update
           - watch
-          - delete                                           
+          - delete
         serviceAccountName: ibm-iam-operand-restricted
       - rules:
         - apiGroups:
           - admissionregistration.k8s.io
           resources:
           - mutatingwebhookconfigurations
-          #iam.hooks.securityenforcement.admission.cloud.ibm.com used by oidcclient-watcher 
+          #iam.hooks.securityenforcement.admission.cloud.ibm.com used by oidcclient-watcher
           verbs:
           - get
           - list
@@ -1671,7 +1679,7 @@ spec:
           - update
           - watch
           - escalate
-          - bind  
+          - bind
         - apiGroups:
           - rbac.authorization.k8s.io
           resources:
@@ -1694,7 +1702,7 @@ spec:
           - get
           - list
           - patch
-          - update            
+          - update
           - watch
           - delete
         serviceAccountName: ibm-iam-operator

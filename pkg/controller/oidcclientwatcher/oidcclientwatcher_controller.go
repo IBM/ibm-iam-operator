@@ -19,10 +19,12 @@ package oidcclientwatcher
 import (
 	"context"
 	"reflect"
+	"time"
 	gorun "runtime"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
+	res "github.com/IBM/ibm-iam-operator/pkg/resources"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -187,37 +189,94 @@ func (r *ReconcileOIDCClientWatcher) Reconcile(request reconcile.Request) (recon
 
 func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha1.OIDCClientWatcher, currentClusterRole *rbacv1.ClusterRole) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	csCfgAnnotationName := res.GetCsConfigAnnotation(instance.Namespace)
+
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "icp-oidc-client-admin-aggregate", Namespace: ""}, currentClusterRole)
-	if err != nil && errors.IsNotFound(err) {
-		// Define admin cluster role
-		adminClusterRole := r.adminClusterRoleForOIDCClientWatcher(instance)
-		reqLogger.Info("Creating a new ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-admin-aggregate")
-		err = r.client.Create(context.TODO(), adminClusterRole)
-		if err != nil {
-			reqLogger.Error(err, "Failed to create new ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-admin-aggregate")
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Define admin cluster role
+			adminClusterRole := r.adminClusterRoleForOIDCClientWatcher(instance)
+	
+			// Add multiple deployment common-service/config annotation
+			if len(adminClusterRole.ObjectMeta.Annotations) == 0 {
+				adminClusterRole.ObjectMeta.Annotations = map[string]string{
+					csCfgAnnotationName: "true",
+				}
+			} else {
+				adminClusterRole.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
+			}
+	
+			reqLogger.Info("Creating a new ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-admin-aggregate")
+			err = r.client.Create(context.TODO(), adminClusterRole)
+			if err != nil {
+				reqLogger.Error(err, "Failed to create new ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-admin-aggregate")
+				return reconcile.Result{}, err
+			}
+		} else {
+			reqLogger.Error(err, "Failed to get ClusterRole")
 			return reconcile.Result{}, err
 		}
+	} else {
+		// Add multiple deployment common-service/config annotation
+		if len(currentClusterRole.ObjectMeta.Annotations) == 0 {
+			currentClusterRole.ObjectMeta.Annotations = map[string]string{
+				csCfgAnnotationName: "true",
+			}
+		} else {
+			currentClusterRole.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
+		}
 
-	} else if err != nil {
-		reqLogger.Error(err, "Failed to get ClusterRole")
-		return reconcile.Result{}, err
+		reqLogger.Info("Updating the ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-admin-aggregate")
+		err = r.client.Update(context.TODO(), currentClusterRole)
+		if err != nil {
+			reqLogger.Error(err, "Failed to update ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-admin-aggregate")
+			return reconcile.Result{}, err
+		}
 	}
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "icp-oidc-client-operate-aggregate", Namespace: ""}, currentClusterRole)
-	if err != nil && errors.IsNotFound(err) {
-		// Define operator cluster role
-		operatorClusterRole := r.operatorClusterRoleForOIDCClientWatcher(instance)
-		reqLogger.Info("Creating a new ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-operate-aggregate")
-		err = r.client.Create(context.TODO(), operatorClusterRole)
-		if err != nil {
-			reqLogger.Error(err, "Failed to create new ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-operate-aggregate")
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Define operator cluster role
+			operatorClusterRole := r.operatorClusterRoleForOIDCClientWatcher(instance)
+	
+			// Add multiple deployment common-service/config annotation
+			if len(operatorClusterRole.ObjectMeta.Annotations) == 0 {
+				operatorClusterRole.ObjectMeta.Annotations = map[string]string{
+					csCfgAnnotationName: "true",
+				}
+			} else {
+				operatorClusterRole.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
+			}
+	
+			reqLogger.Info("Creating a new ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-operate-aggregate")
+			err = r.client.Create(context.TODO(), operatorClusterRole)
+			if err != nil {
+				reqLogger.Error(err, "Failed to create new ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-operate-aggregate")
+				return reconcile.Result{}, err
+			}
+		} else if err != nil {
+			reqLogger.Error(err, "Failed to get ClusterRole")
 			return reconcile.Result{}, err
 		}
-	} else if err != nil {
-		reqLogger.Error(err, "Failed to get ClusterRole")
-		return reconcile.Result{}, err
+	} else {
+		// Add multiple deployment common-service/config annotation
+		if len(currentClusterRole.ObjectMeta.Annotations) == 0 {
+			currentClusterRole.ObjectMeta.Annotations = map[string]string{
+				csCfgAnnotationName: "true",
+			}
+		} else {
+			currentClusterRole.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
+		}
+
+		reqLogger.Info("Updating the ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-operate-aggregate")
+		err = r.client.Update(context.TODO(), currentClusterRole)
+		if err != nil {
+			reqLogger.Error(err, "Failed to update ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-operate-aggregate")
+			return reconcile.Result{}, err
+		}
 	}
-	//admin roles created successfully
+	//cluster roles created successfully
 	return reconcile.Result{Requeue: true}, nil
 }
 
@@ -797,8 +856,19 @@ func getPodNames(pods []corev1.Pod) []string {
 func (r *ReconcileOIDCClientWatcher) deleteExternalResources(instance *operatorv1alpha1.OIDCClientWatcher) error {
 
 	crList := []string{"icp-oidc-client-operate-aggregate", "icp-oidc-client-admin-aggregate"}
-	// Remove Cluster Role
+	csCfgAnnotationName := res.GetCsConfigAnnotation(instance.Namespace)
 
+	// Remove multiple deployment common-service/config annotation
+	for _, cr := range crList {
+		if err := removeCsAnnotationFromCR(r.client, cr, csCfgAnnotationName); err != nil {
+			return err
+		}
+	}
+
+	log.V(0).Info("Wait for 2 seconds.")
+	time.Sleep(time.Second * 2)
+
+	// Finally check and remove Cluster Role
 	for _, cr := range crList {
 		if err := removeCR(r.client, cr); err != nil {
 			return err
@@ -830,6 +900,32 @@ func removeString(slice []string, s string) (result []string) {
 
 // Functions to remove cluster scoped resources
 
+func removeCsAnnotationFromCR(client client.Client, crName string, csCfgAnnotationName string) error {
+	// Remove common-service/config annotation
+	clusterRole := &rbacv1.ClusterRole{}
+	if err := client.Get(context.Background(), types.NamespacedName{Name: crName, Namespace: ""}, clusterRole); err != nil && errors.IsNotFound(err) {
+		log.V(1).Info("Error getting cluster role", crName, err)
+		return nil
+	} else if err == nil {
+		if len(clusterRole.ObjectMeta.Annotations) > 0 {
+			if _, ok := clusterRole.ObjectMeta.Annotations[csCfgAnnotationName]; ok {
+				delete(clusterRole.ObjectMeta.Annotations, csCfgAnnotationName);
+				if err = client.Update(context.Background(), clusterRole); err != nil {
+					// if error, retry second time to avoid manual deletion after uninstall
+					if err2 := client.Update(context.Background(), clusterRole); err2 != nil {
+						log.V(1).Info("Error removing common-service/config from cluster role", "name", crName, "error message", err2)
+						return err2
+					}
+				}
+			}
+		}
+	} else {
+		return err
+	}
+	return nil
+}
+
+
 func removeCR(client client.Client, crName string) error {
 	// Delete Clusterrole
 	clusterRole := &rbacv1.ClusterRole{}
@@ -837,9 +933,11 @@ func removeCR(client client.Client, crName string) error {
 		log.V(1).Info("Error getting cluster role", crName, err)
 		return nil
 	} else if err == nil {
-		if err = client.Delete(context.Background(), clusterRole); err != nil {
-			log.V(1).Info("Error deleting cluster role", "name", crName, "error message", err)
-			return err
+		if !res.IsCsConfigAnnotationExists(clusterRole.ObjectMeta.Annotations) {
+			if err = client.Delete(context.Background(), clusterRole); err != nil {
+				log.V(1).Info("Error deleting cluster role", "name", crName, "error message", err)
+				return err
+			}
 		}
 	} else {
 		return err

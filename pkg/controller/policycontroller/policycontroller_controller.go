@@ -19,7 +19,6 @@ package policycontroller
 import (
 	"context"
 	"reflect"
-
 	gorun "runtime"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"

@@ -43,9 +43,9 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 			},
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
-				RunAsNonRoot:             &trueVar,
-				ReadOnlyRootFilesystem:   &trueVar,
-				AllowPrivilegeEscalation: &falseVar,
+				RunAsNonRoot:             &falseVar,
+				ReadOnlyRootFilesystem:   &falseVar,
+				AllowPrivilegeEscalation: &trueVar,
 				Capabilities: &corev1.Capabilities{
 					Drop: []corev1.Capability{"ALL"},
 				},
@@ -115,9 +115,9 @@ func buildAuditContainer(auditImage string, syslogTlsPath string, resources *cor
 		},
 		SecurityContext: &corev1.SecurityContext{
 			Privileged:               &falseVar,
-			RunAsNonRoot:             &trueVar,
-			ReadOnlyRootFilesystem:   &trueVar,
-			AllowPrivilegeEscalation: &falseVar,
+			RunAsNonRoot:             &falseVar,
+			ReadOnlyRootFilesystem:   &falseVar,
+			AllowPrivilegeEscalation: &trueVar,
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
 			},
@@ -146,9 +146,10 @@ func buildPdpContainer(pdpImage string, resources *corev1.ResourceRequirements) 
 		ImagePullPolicy: corev1.PullAlways,
 		SecurityContext: &corev1.SecurityContext{
 			Privileged:               &falseVar,
-			RunAsNonRoot:             &trueVar,
-			ReadOnlyRootFilesystem:   &trueVar,
+			RunAsNonRoot:             &falseVar,
+			ReadOnlyRootFilesystem:   &falseVar,
 			AllowPrivilegeEscalation: &falseVar,
+			RunAsUser:                new(int64),
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
 			},

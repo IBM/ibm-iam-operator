@@ -29,7 +29,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	net "k8s.io/api/networking/v1beta1"
+	net "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -38,13 +38,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+
+	//logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logf.Log.WithName("controller_authentication")
+//var log = logf.Log.WithName("controller_authentication")
 var fullAccess int32 = 0777
 var trueVar bool = true
 var falseVar bool = false
@@ -190,9 +192,9 @@ type ReconcileAuthentication struct {
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-	reqLogger.Info("Reconciling Authentication")
+func (r *ReconcileAuthentication) Reconcile(contect context.Context, request reconcile.Request) (reconcile.Result, error) {
+	//	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	klog.Info("Reconciling Authentication")
 	var requeueResult bool = false
 
 	// Fetch the Authentication instance
@@ -217,7 +219,7 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 		if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
 			if err := r.client.Update(context.Background(), instance); err != nil {
-				log.Error(err, "Error adding the finalizer to the CR")
+				klog.Error(err, "Error adding the finalizer to the CR")
 				return reconcile.Result{}, err
 			}
 		}
@@ -225,14 +227,14 @@ func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcil
 		// Object scheduled to be deleted
 		if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 			if err := r.deleteExternalResources(instance); err != nil {
-				log.Error(err, "Error deleting resources created by this operator")
+				klog.Error(err, "Error deleting resources created by this operator")
 
 				return reconcile.Result{}, err
 			}
 
 			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
 			if err := r.client.Update(context.Background(), instance); err != nil {
-				log.Error(err, "Error updating the CR to remove the finalizer")
+				klog.Error(err, "Error updating the CR to remove the finalizer")
 				return reconcile.Result{}, err
 			}
 
@@ -387,11 +389,11 @@ func removeCR(client client.Client, crName string) error {
 	// Delete Clusterrole
 	clusterRole := &rbacv1.ClusterRole{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: crName, Namespace: ""}, clusterRole); err != nil && errors.IsNotFound(err) {
-		log.V(1).Info("Error getting cluster role", crName, err)
+		klog.Info("Error getting cluster role", crName, err)
 		return nil
 	} else if err == nil {
 		if err = client.Delete(context.Background(), clusterRole); err != nil {
-			log.V(1).Info("Error deleting cluster role", "name", crName, "error message", err)
+			klog.Info("Error deleting cluster role", "name", crName, "error message", err)
 			return err
 		}
 	} else {
@@ -404,18 +406,18 @@ func removeCRB(client client.Client, crbName string) error {
 	// Delete ClusterRoleBinding
 	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: crbName, Namespace: ""}, clusterRoleBinding); err != nil && errors.IsNotFound(err) {
-		log.V(1).Info("Error getting cluster role binding", crbName, err)
+		klog.Info("Error getting cluster role binding", crbName, err)
 		return nil
 	} else if err == nil {
 		if crbName == "oidc-admin-binding" {
 			clusterRoleBinding.ObjectMeta.Finalizers = []string{}
 			if err = client.Update(context.Background(), clusterRoleBinding); err != nil {
-				log.V(1).Info("Error updating cluster role binding", "name", crbName, "error message", err)
+				klog.Info("Error updating cluster role binding", "name", crbName, "error message", err)
 				return err
 			}
 		}
 		if err = client.Delete(context.Background(), clusterRoleBinding); err != nil {
-			log.V(1).Info("Error deleting cluster role binding", "name", crbName, "error message", err)
+			klog.Info("Error deleting cluster role binding", "name", crbName, "error message", err)
 			return err
 		}
 	} else {
@@ -428,11 +430,11 @@ func removeUser(client client.Client, userName string) error {
 	// Delete User
 	user := &userv1.User{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: userName, Namespace: ""}, user); err != nil && errors.IsNotFound(err) {
-		log.V(1).Info("Error getting user", userName, err)
+		klog.Info("Error getting user", userName, err)
 		return nil
 	} else if err == nil {
 		if err = client.Delete(context.Background(), user); err != nil {
-			log.V(1).Info("Error deleting user", "name", userName, "error message", err)
+			klog.Info("Error deleting user", "name", userName, "error message", err)
 			return err
 		}
 	} else {
@@ -445,11 +447,11 @@ func removeWebhook(client client.Client, webhookName string) error {
 	// Delete Webhook
 	webhook := &reg.MutatingWebhookConfiguration{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: webhookName, Namespace: ""}, webhook); err != nil && errors.IsNotFound(err) {
-		log.V(1).Info("Error getting webhook", webhookName, err)
+		klog.Info("Error getting webhook", webhookName, err)
 		return nil
 	} else if err == nil {
 		if err = client.Delete(context.Background(), webhook); err != nil {
-			log.V(1).Info("Error deleting webhook", "name", webhookName, "error message", err)
+			klog.Info("Error deleting webhook", "name", webhookName, "error message", err)
 			return err
 		}
 	} else {

@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -53,7 +54,7 @@ func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.A
 
 	generateCertificateData(instance)
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 
 	for certificate := range certificateData {
@@ -61,16 +62,16 @@ func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.A
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new Certificate
 			newCertificate := generateCertificateObject(instance, r.scheme, certificate)
-			reqLogger.Info("Creating a new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", certificate)
+			klog.Info("Creating a new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", certificate)
 			err = r.client.Create(context.TODO(), newCertificate)
 			if err != nil {
-				reqLogger.Error(err, "Failed to create new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", certificate)
+				klog.Error(err, "Failed to create new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", certificate)
 				return err
 			}
 			// Certificate created successfully - return and requeue
 			*requeueResult = true
 		} else if err != nil {
-			reqLogger.Error(err, "Failed to get Certificate")
+			klog.Error(err, "Failed to get Certificate")
 			return err
 		}
 
@@ -81,7 +82,7 @@ func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.A
 }
 
 func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, certificateName string) *certmgr.Certificate {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	certSpec := certmgr.CertificateSpec{
 		SecretName: certificateData[certificateName]["secretName"],
 		IssuerRef: certmgr.ObjectReference{
@@ -109,7 +110,7 @@ func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme
 	// Set Authentication instance as the owner and controller of the Certificate
 	err := controllerutil.SetControllerReference(instance, newCertificate, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Certificate")
+		klog.Error(err, "Failed to set owner for Certificate")
 		return nil
 	}
 	return newCertificate

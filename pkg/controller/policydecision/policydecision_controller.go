@@ -37,13 +37,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+
+	//logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logf.Log.WithName("controller_policydecision")
+//var log = logf.Log.WithName("controller_policydecision")
 var trueVar bool = true
 var falseVar bool = false
 var defaultMode int32 = 420
@@ -152,13 +154,13 @@ type ReconcilePolicyDecision struct {
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-func (r *ReconcilePolicyDecision) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-	reqLogger.Info("Reconciling PolicyDecision")
+func (r *ReconcilePolicyDecision) Reconcile(context context.Context, request reconcile.Request) (reconcile.Result, error) {
+	//	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	klog.Info("Reconciling PolicyDecision")
 
 	// Fetch the PolicyDecision instance
 	instance := &operatorv1alpha1.PolicyDecision{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	err := r.client.Get(context, request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -211,21 +213,21 @@ func (r *ReconcilePolicyDecision) Reconcile(request reconcile.Request) (reconcil
 
 func (r *ReconcilePolicyDecision) handleCertificate(instance *operatorv1alpha1.PolicyDecision, currentCertificate *certmgr.Certificate) (reconcile.Result, error) {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "auth-pdp-cert", Namespace: instance.Namespace}, currentCertificate)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	err := r.client.Get(context.Background(), types.NamespacedName{Name: "auth-pdp-cert", Namespace: instance.Namespace}, currentCertificate)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new certificate
 		newCertificate := r.certificateForPolicyDecision(instance)
-		reqLogger.Info("Creating a new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", "auth-pdp-cert")
+		klog.Info("Creating a new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", "auth-pdp-cert")
 		err = r.client.Create(context.TODO(), newCertificate)
 		if err != nil {
-			reqLogger.Error(err, "Failed to create new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", "auth-pdp-cert")
+			klog.Error(err, "Failed to create new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", "auth-pdp-cert")
 			return reconcile.Result{}, err
 		}
 		// Certificate created successfully - return and requeue
 		return reconcile.Result{Requeue: true}, nil
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get Service")
+		klog.Error(err, "Failed to get Service")
 		return reconcile.Result{}, err
 	}
 
@@ -235,21 +237,21 @@ func (r *ReconcilePolicyDecision) handleCertificate(instance *operatorv1alpha1.P
 
 func (r *ReconcilePolicyDecision) handleConfigMap(instance *operatorv1alpha1.PolicyDecision, currentConfigMap *corev1.ConfigMap) (reconcile.Result, error) {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "auth-pdp", Namespace: instance.Namespace}, currentConfigMap)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new configmap
 		newConfigMap := r.configMapForPolicyDecision(instance)
-		reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "auth-pdp")
+		klog.Info("Creating a new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "auth-pdp")
 		err = r.client.Create(context.TODO(), newConfigMap)
 		if err != nil {
-			reqLogger.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "auth-pdp")
+			klog.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "auth-pdp")
 			return reconcile.Result{}, err
 		}
 		// ConfigMap created successfully - return and requeue
 		return reconcile.Result{Requeue: true}, nil
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get Service")
+		klog.Error(err, "Failed to get Service")
 		return reconcile.Result{}, err
 	}
 
@@ -259,21 +261,21 @@ func (r *ReconcilePolicyDecision) handleConfigMap(instance *operatorv1alpha1.Pol
 
 func (r *ReconcilePolicyDecision) handleIngress(instance *operatorv1alpha1.PolicyDecision, currentIngress *net.Ingress) (reconcile.Result, error) {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "iam-pdp", Namespace: instance.Namespace}, currentIngress)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new ingress
 		newIngress := r.ingressForPolicyDecision(instance)
-		reqLogger.Info("Creating a new Ingress", "Ingress.Namespace", instance.Namespace, "Ingress.Name", "iam-pdp")
+		klog.Info("Creating a new Ingress", "Ingress.Namespace", instance.Namespace, "Ingress.Name", "iam-pdp")
 		err = r.client.Create(context.TODO(), newIngress)
 		if err != nil {
-			reqLogger.Error(err, "Failed to create new Ingress", "Ingress.Namespace", instance.Namespace, "Ingress.Name", "iam-pdp")
+			klog.Error(err, "Failed to create new Ingress", "Ingress.Namespace", instance.Namespace, "Ingress.Name", "iam-pdp")
 			return reconcile.Result{}, err
 		}
 		// Ingress created successfully - return and requeue
 		return reconcile.Result{Requeue: true}, nil
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get Service")
+		klog.Error(err, "Failed to get Service")
 		return reconcile.Result{}, err
 	}
 
@@ -283,21 +285,21 @@ func (r *ReconcilePolicyDecision) handleIngress(instance *operatorv1alpha1.Polic
 
 func (r *ReconcilePolicyDecision) handleService(instance *operatorv1alpha1.PolicyDecision, currentService *corev1.Service) (reconcile.Result, error) {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "iam-pdp", Namespace: instance.Namespace}, currentService)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new service
 		newService := r.serviceForPolicyDecision(instance)
-		reqLogger.Info("Creating a new Service", "Service.Namespace", instance.Namespace, "Service.Name", "iam-pdp")
+		klog.Info("Creating a new Service", "Service.Namespace", instance.Namespace, "Service.Name", "iam-pdp")
 		err = r.client.Create(context.TODO(), newService)
 		if err != nil {
-			reqLogger.Error(err, "Failed to create new Service", "Service.Namespace", instance.Namespace, "Service.Name", "iam-pdp")
+			klog.Error(err, "Failed to create new Service", "Service.Namespace", instance.Namespace, "Service.Name", "iam-pdp")
 			return reconcile.Result{}, err
 		}
 		// Service created successfully - return and requeue
 		return reconcile.Result{Requeue: true}, nil
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get Service")
+		klog.Error(err, "Failed to get Service")
 		return reconcile.Result{}, err
 	}
 
@@ -308,22 +310,22 @@ func (r *ReconcilePolicyDecision) handleService(instance *operatorv1alpha1.Polic
 func (r *ReconcilePolicyDecision) handleDeployment(instance *operatorv1alpha1.PolicyDecision, currentDeployment *appsv1.Deployment) (reconcile.Result, error) {
 
 	// Check if this Deployment already exists
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "auth-pdp", Namespace: instance.Namespace}, currentDeployment)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", "auth-pdp")
+			klog.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", "auth-pdp")
 			newDeployment := r.deploymentForPolicyDecision(instance)
 			err = r.client.Create(context.TODO(), newDeployment)
 
 			// Deployment created successfully - don't requeue
 			return reconcile.Result{}, nil
 		} else {
-			reqLogger.Error(err, "Failed to get Deployment")
+			klog.Error(err, "Failed to get Deployment")
 			return reconcile.Result{}, err
 		}
 	} else {
-		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", "auth-pdp")
+		klog.Info("Updating an existing Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", "auth-pdp")
 		newDeployment := r.deploymentForPolicyDecision(instance)
 		certmanagerLabel := "certmanager.k8s.io/time-restarted"
 		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
@@ -332,7 +334,7 @@ func (r *ReconcilePolicyDecision) handleDeployment(instance *operatorv1alpha1.Po
 		currentDeployment.Spec = newDeployment.Spec
 		err = r.client.Update(context.TODO(), currentDeployment)
 		if err != nil {
-			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
+			klog.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
 			return reconcile.Result{}, err
 		}
 	}
@@ -343,41 +345,41 @@ func (r *ReconcilePolicyDecision) handleDeployment(instance *operatorv1alpha1.Po
 		client.MatchingLabels(map[string]string{"k8s-app": "auth-pdp"}),
 	}
 	if err = r.client.List(context.TODO(), podList, listOpts...); err != nil {
-		reqLogger.Error(err, "Failed to list pods", "PolicyDecision.Namespace", instance.Namespace, "PolicyDecision.Name", "auth-pdp")
+		klog.Error(err, "Failed to list pods", "PolicyDecision.Namespace", instance.Namespace, "PolicyDecision.Name", "auth-pdp")
 		return reconcile.Result{}, err
 	}
-	reqLogger.Info("CS??? get pod names")
+	klog.Info("CS??? get pod names")
 	podNames := getPodNames(podList.Items)
 
 	// Update status.Nodes if needed
 	if !reflect.DeepEqual(podNames, instance.Status.Nodes) {
 		instance.Status.Nodes = podNames
-		reqLogger.Info("CS??? put pod names in status")
+		klog.Info("CS??? put pod names in status")
 		err := r.client.Status().Update(context.TODO(), instance)
 		if err != nil {
-			reqLogger.Error(err, "Failed to update PolicyDecision status")
+			klog.Error(err, "Failed to update PolicyDecision status")
 			return reconcile.Result{}, err
 		}
 	}
 	// Deployment already exists - don't requeue
-	reqLogger.Info("Skip reconcile: Deployment already exists", "Deployment.Namespace", instance.Namespace, "Deployment.Name", "auth-pdp")
+	klog.Info("Skip reconcile: Deployment already exists", "Deployment.Namespace", instance.Namespace, "Deployment.Name", "auth-pdp")
 	return reconcile.Result{}, nil
 
 }
 
 func getPodNames(pods []corev1.Pod) []string {
-	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
+	//	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
 	var podNames []string
 	for _, pod := range pods {
 		podNames = append(podNames, pod.Name)
-		reqLogger.Info("CS??? pod name=" + pod.Name)
+		klog.Info("CS??? pod name=" + pod.Name)
 	}
 	return podNames
 }
 
 func (r *ReconcilePolicyDecision) certificateForPolicyDecision(instance *operatorv1alpha1.PolicyDecision) *certmgr.Certificate {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	pdpCertificate := &certmgr.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "auth-pdp-cert",
@@ -398,7 +400,7 @@ func (r *ReconcilePolicyDecision) certificateForPolicyDecision(instance *operato
 	// Set PolicyDecision instance as the owner and controller of the Certificate
 	err := controllerutil.SetControllerReference(instance, pdpCertificate, r.scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Certificate")
+		klog.Error(err, "Failed to set owner for Certificate")
 		return nil
 	}
 	return pdpCertificate
@@ -407,7 +409,7 @@ func (r *ReconcilePolicyDecision) certificateForPolicyDecision(instance *operato
 
 func (r *ReconcilePolicyDecision) serviceForPolicyDecision(instance *operatorv1alpha1.PolicyDecision) *corev1.Service {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	pdpService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "iam-pdp",
@@ -431,7 +433,7 @@ func (r *ReconcilePolicyDecision) serviceForPolicyDecision(instance *operatorv1a
 	// Set PolicyDecision instance as the owner and controller of the Service
 	err := controllerutil.SetControllerReference(instance, pdpService, r.scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Service")
+		klog.Error(err, "Failed to set owner for Service")
 		return nil
 	}
 	return pdpService
@@ -439,7 +441,7 @@ func (r *ReconcilePolicyDecision) serviceForPolicyDecision(instance *operatorv1a
 }
 
 func (r *ReconcilePolicyDecision) configMapForPolicyDecision(instance *operatorv1alpha1.PolicyDecision) *corev1.ConfigMap {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	pdpConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "auth-pdp",
@@ -447,9 +449,9 @@ func (r *ReconcilePolicyDecision) configMapForPolicyDecision(instance *operatorv
 			Labels:    map[string]string{"app": "auth-pdp"},
 		},
 		Data: map[string]string{
-			"AUDIT_ENABLED":  "false",
-			"AUDIT_LOG_PATH": "/var/log/audit",
-			"SYSLOG_TLS_PATH":   instance.Spec.AuditService.SyslogTlsPath,
+			"AUDIT_ENABLED":   "false",
+			"AUDIT_LOG_PATH":  "/var/log/audit",
+			"SYSLOG_TLS_PATH": instance.Spec.AuditService.SyslogTlsPath,
 			"logrotate-conf": `\n # rotate log files weekly\ndaily\n\n# use the syslog group by
 								default, since this is the owning group # of /var/log/syslog.\n#su root syslog\n\n#
 								keep 4 weeks worth of backlogs\nrotate 4\n\n# create new (empty) log files after
@@ -463,7 +465,7 @@ func (r *ReconcilePolicyDecision) configMapForPolicyDecision(instance *operatorv
 	// Set PolicyDecision instance as the owner and controller of the ConfigMap
 	err := controllerutil.SetControllerReference(instance, pdpConfigMap, r.scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for ConfigMap")
+		klog.Error(err, "Failed to set owner for ConfigMap")
 		return nil
 	}
 	return pdpConfigMap
@@ -471,7 +473,7 @@ func (r *ReconcilePolicyDecision) configMapForPolicyDecision(instance *operatorv
 
 func (r *ReconcilePolicyDecision) ingressForPolicyDecision(instance *operatorv1alpha1.PolicyDecision) *net.Ingress {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	pdpIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "iam-pdp",
@@ -509,7 +511,7 @@ func (r *ReconcilePolicyDecision) ingressForPolicyDecision(instance *operatorv1a
 	// Set PolicyDecision instance as the owner and controller of the Ingress
 	err := controllerutil.SetControllerReference(instance, pdpIngress, r.scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Ingress")
+		klog.Error(err, "Failed to set owner for Ingress")
 		return nil
 	}
 	return pdpIngress
@@ -523,8 +525,8 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 		instance.Spec.AuditService.ImageName = res.AuditImageName
 	}
 
-	reqLogger := log.WithValues("deploymentForPolicyDecision", "Entry", "instance.Name", instance.Name)
-	pdpImage := shatag.GetImageRef("IAM_POLICY_DECISION_IMAGE")
+	//	reqLogger := klog.WithValues("deploymentForPolicyDecision", "Entry", "instance.Name", instance.Name)
+	pdpImage := "quay.io/yannizhang2019/iam-policy-decision:0.1"
 	mongoDBImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
 	auditImage := shatag.GetImageRef("AUDIT_SYSLOG_SERVICE_IMAGE")
 	replicas := instance.Spec.Replicas
@@ -569,8 +571,8 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 					HostPID:                       falseVar,
 					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 						{
-							MaxSkew: 1,
-							TopologyKey: "topology.kubernetes.io/zone",
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/zone",
 							WhenUnsatisfiable: corev1.ScheduleAnyway,
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -579,8 +581,8 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 							},
 						},
 						{
-							MaxSkew: 1,
-							TopologyKey: "topology.kubernetes.io/region",
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/region",
 							WhenUnsatisfiable: corev1.ScheduleAnyway,
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -589,7 +591,7 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 							},
 						},
 					},
-					ServiceAccountName:            serviceAccountName,
+					ServiceAccountName: serviceAccountName,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
@@ -647,7 +649,7 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 	// Set SecretWatcher instance as the owner and controller
 	err := controllerutil.SetControllerReference(instance, pdpDeployment, r.scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Deployment")
+		klog.Error(err, "Failed to set owner for Deployment")
 		return nil
 	}
 	return pdpDeployment
@@ -713,11 +715,11 @@ func buildPdpVolumes() []corev1.Volume {
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "audit-server-certs",
-					Optional: &trueVar,
+					Optional:   &trueVar,
 				},
 			},
 		},
-		{			
+		{
 			Name: "audit-ingest",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{

@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -79,7 +80,7 @@ func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authen
 
 	secretData := generateSecretData(instance, wlpClientID, wlpClientSecret)
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 
 	for secret := range secretData {
@@ -88,23 +89,23 @@ func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authen
 			if errors.IsNotFound(err) {
 				// Define a new Secret
 				newSecret := generateSecretObject(instance, r.scheme, secret, secretData[secret])
-				reqLogger.Info("Creating a new Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
+				klog.Info("Creating a new Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
 				err = r.client.Create(context.TODO(), newSecret)
 				if err != nil {
-					reqLogger.Error(err, "Failed to create new Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
+					klog.Error(err, "Failed to create new Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
 					return err
 				}
 				// Secret created successfully - return and requeue
 				*requeueResult = true
-			} else{
-				reqLogger.Error(err, "Failed to get Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
+			} else {
+				klog.Error(err, "Failed to get Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
 				return err
 			}
 		} else {
 			secretUpdateRequired := false
 			if secret == "platform-auth-idp-encryption" {
-				if _,keyExists := currentSecret.Data["ENCRYPTION_IV"]; !keyExists{
-					reqLogger.Info("Updating an existing Secret", "Secret.Namespace", currentSecret.Namespace, "Secret.Name", currentSecret.Name)
+				if _, keyExists := currentSecret.Data["ENCRYPTION_IV"]; !keyExists {
+					klog.Info("Updating an existing Secret", "Secret.Namespace", currentSecret.Namespace, "Secret.Name", currentSecret.Name)
 					newSecret := generateSecretObject(instance, r.scheme, secret, secretData[secret])
 					currentSecret.Data["ENCRYPTION_IV"] = newSecret.Data["ENCRYPTION_IV"]
 					secretUpdateRequired = true
@@ -113,7 +114,7 @@ func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authen
 			if secretUpdateRequired {
 				err = r.client.Update(context.TODO(), currentSecret)
 				if err != nil {
-					reqLogger.Error(err, "Failed to update an existing Secret", "Secret.Namespace", currentSecret.Namespace, "Secret.Name", currentSecret.Name)
+					klog.Error(err, "Failed to update an existing Secret", "Secret.Namespace", currentSecret.Namespace, "Secret.Name", currentSecret.Name)
 					return err
 				}
 			}
@@ -126,7 +127,7 @@ func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authen
 }
 
 func generateSecretObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, secretName string, secretData map[string][]byte) *corev1.Secret {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name, "Secret.Name", secretName)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name, "Secret.Name", secretName)
 	newSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
@@ -139,7 +140,7 @@ func generateSecretObject(instance *operatorv1alpha1.Authentication, scheme *run
 	// Set Authentication instance as the owner and controller of the Secret
 	err := controllerutil.SetControllerReference(instance, newSecret, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Secret")
+		klog.Error(err, "Failed to set owner for Secret")
 		return nil
 	}
 	return newSecret

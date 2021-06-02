@@ -38,7 +38,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+
+	//	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -101,7 +103,7 @@ type IcpAuditValues struct {
 	}
 }
 
-var log = logf.Log.WithName("controller_pap")
+//var log = logf.Log.WithName("controller_pap")
 
 var trueVar bool = true
 var falseVar bool = false
@@ -229,16 +231,16 @@ type ReconcilePap struct {
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-func (r *ReconcilePap) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-	reqLogger.Info("Reconciling Pap")
+func (r *ReconcilePap) Reconcile(context context.Context, request reconcile.Request) (reconcile.Result, error) {
+	//reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	klog.Info("Reconciling Pap")
 
 	// if we need to create several resources, set a flag so we just requeue one time instead of after each create.
 	needToRequeue := false
 
 	// Fetch the Pap instance
 	instance := &operatorv1alpha1.Pap{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	err := r.client.Get(context, request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -280,7 +282,7 @@ func (r *ReconcilePap) Reconcile(request reconcile.Request) (reconcile.Result, e
 
 	if needToRequeue {
 		// one or more resources was created, so requeue the request
-		reqLogger.Info("Requeue the request")
+		klog.Info("Requeue the request")
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -296,21 +298,21 @@ func (r *ReconcilePap) Reconcile(request reconcile.Request) (reconcile.Result, e
 
 func (r *ReconcilePap) handleCertificate(instance *operatorv1alpha1.Pap, currentCertificate *certmgr.Certificate, needToRequeue *bool) error {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: iamPapCertificateValues.Name, Namespace: instance.Namespace}, currentCertificate)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new certificate
 		newCertificate := r.certificateForPap(instance)
-		reqLogger.Info("Creating a new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", iamPapCertificateValues.Name)
+		klog.Info("Creating a new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", iamPapCertificateValues.Name)
 		err = r.client.Create(context.TODO(), newCertificate)
 		if err != nil {
-			reqLogger.Error(err, "Failed to create new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", iamPapCertificateValues.Name)
+			klog.Error(err, "Failed to create new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", iamPapCertificateValues.Name)
 			return err
 		}
 		// Certificate created successfully - return and requeue
 		*needToRequeue = true
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get Certificate")
+		klog.Error(err, "Failed to get Certificate")
 		return err
 	}
 
@@ -320,21 +322,21 @@ func (r *ReconcilePap) handleCertificate(instance *operatorv1alpha1.Pap, current
 
 func (r *ReconcilePap) handleConfigMap(instance *operatorv1alpha1.Pap, currentConfigMap *corev1.ConfigMap, needToRequeue *bool) error {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: iamPapServiceValues.PodName, Namespace: instance.Namespace}, currentConfigMap)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new configmap
 		newConfigMap := r.configMapForPap(instance)
-		reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", iamPapServiceValues.PodName)
+		klog.Info("Creating a new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", iamPapServiceValues.PodName)
 		err = r.client.Create(context.TODO(), newConfigMap)
 		if err != nil {
-			reqLogger.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", iamPapServiceValues.PodName)
+			klog.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", iamPapServiceValues.PodName)
 			return err
 		}
 		// ConfigMap created successfully - return and requeue
 		*needToRequeue = true
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get ConfigMap")
+		klog.Error(err, "Failed to get ConfigMap")
 		return err
 	}
 
@@ -343,22 +345,22 @@ func (r *ReconcilePap) handleConfigMap(instance *operatorv1alpha1.Pap, currentCo
 
 func (r *ReconcilePap) handleIngress(instance *operatorv1alpha1.Pap, currentIngress *net.Ingress, needToRequeue *bool) error {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: iamPapServiceValues.Name, Namespace: instance.Namespace}, currentIngress)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new ingress
 		newIngress := r.ingressForPap(instance)
-		reqLogger.Info("Creating a new Ingress", "Ingress.Namespace", instance.Namespace, "Ingress.Name", iamPapServiceValues.Name)
+		klog.Info("Creating a new Ingress", "Ingress.Namespace", instance.Namespace, "Ingress.Name", iamPapServiceValues.Name)
 		err = r.client.Create(context.TODO(), newIngress)
 		if err != nil {
-			reqLogger.Error(err, "Failed to create new Ingress", "Ingress.Namespace", instance.Namespace, "Ingress.Name", iamPapServiceValues.Name)
+			klog.Error(err, "Failed to create new Ingress", "Ingress.Namespace", instance.Namespace, "Ingress.Name", iamPapServiceValues.Name)
 			return err
 		}
 		// Ingress created successfully - return and requeue
 		*needToRequeue = true
 		return nil
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get Ingress")
+		klog.Error(err, "Failed to get Ingress")
 		return err
 	}
 
@@ -368,21 +370,21 @@ func (r *ReconcilePap) handleIngress(instance *operatorv1alpha1.Pap, currentIngr
 
 func (r *ReconcilePap) handleService(instance *operatorv1alpha1.Pap, currentService *corev1.Service, needToRequeue *bool) error {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: iamPapServiceValues.Name, Namespace: instance.Namespace}, currentService)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new service
 		newService := r.serviceForPap(instance)
-		reqLogger.Info("Creating a new Service", "Service.Namespace", instance.Namespace, "Service.Name", iamPapServiceValues.Name)
+		klog.Info("Creating a new Service", "Service.Namespace", instance.Namespace, "Service.Name", iamPapServiceValues.Name)
 		err = r.client.Create(context.TODO(), newService)
 		if err != nil {
-			reqLogger.Error(err, "Failed to create new Service", "Service.Namespace", instance.Namespace, "Service.Name", iamPapServiceValues.Name)
+			klog.Error(err, "Failed to create new Service", "Service.Namespace", instance.Namespace, "Service.Name", iamPapServiceValues.Name)
 			return err
 		}
 		// Service created successfully - return and requeue
 		*needToRequeue = true
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get Service")
+		klog.Error(err, "Failed to get Service")
 		return err
 	}
 
@@ -392,11 +394,11 @@ func (r *ReconcilePap) handleService(instance *operatorv1alpha1.Pap, currentServ
 func (r *ReconcilePap) handleDeployment(instance *operatorv1alpha1.Pap, currentDeployment *appsv1.Deployment) error {
 
 	// Check if this Deployment already exists
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: iamPapServiceValues.PodName, Namespace: instance.Namespace}, currentDeployment)
 	if err != nil && errors.IsNotFound(err) {
 		if errors.IsNotFound(err) {
-			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", iamPapServiceValues.PodName)
+			klog.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", iamPapServiceValues.PodName)
 			newDeployment := r.deploymentForPap(instance)
 			err = r.client.Create(context.TODO(), newDeployment)
 			if err != nil {
@@ -405,7 +407,7 @@ func (r *ReconcilePap) handleDeployment(instance *operatorv1alpha1.Pap, currentD
 			// Deployment created successfully - don't requeue
 			return nil
 		} else {
-			reqLogger.Error(err, "Failed to get Deployment")
+			klog.Error(err, "Failed to get Deployment")
 			return err
 		}
 	} else {
@@ -415,10 +417,10 @@ func (r *ReconcilePap) handleDeployment(instance *operatorv1alpha1.Pap, currentD
 			newDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val
 		}
 		currentDeployment.Spec = newDeployment.Spec
-		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
+		klog.Info("Updating an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
 		err = r.client.Update(context.TODO(), currentDeployment)
 		if err != nil {
-			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
+			klog.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
 			return err
 		}
 	}
@@ -429,43 +431,43 @@ func (r *ReconcilePap) handleDeployment(instance *operatorv1alpha1.Pap, currentD
 		client.MatchingLabels(map[string]string{"k8s-app": iamPapServiceValues.PodName}),
 	}
 	if err = r.client.List(context.TODO(), podList, listOpts...); err != nil {
-		reqLogger.Error(err, "Failed to list pods", "Pap.Namespace", instance.Namespace, "Pap.Name", iamPapServiceValues.PodName)
+		klog.Error(err, "Failed to list pods", "Pap.Namespace", instance.Namespace, "Pap.Name", iamPapServiceValues.PodName)
 		return err
 	}
 
-	reqLogger.Info("CS??? get pod names")
+	klog.Info("CS??? get pod names")
 	podNames := getPodNames(podList.Items)
 
 	// Update status.Nodes if needed
 	if !reflect.DeepEqual(podNames, instance.Status.Nodes) {
 		instance.Status.Nodes = podNames
-		reqLogger.Info("CS??? put pod names in status")
+		klog.Info("CS??? put pod names in status")
 		err := r.client.Status().Update(context.TODO(), instance)
 		if err != nil {
-			reqLogger.Error(err, "Failed to update Pap status")
+			klog.Error(err, "Failed to update Pap status")
 			return err
 		}
 	}
 
 	// Deployment already exists - don't requeue
-	reqLogger.Info("Skip reconcile: Deployment already exists", "Deployment.Namespace", instance.Namespace, "Deployment.Name", iamPapServiceValues.PodName)
+	klog.Info("Skip reconcile: Deployment already exists", "Deployment.Namespace", instance.Namespace, "Deployment.Name", iamPapServiceValues.PodName)
 	return nil
 
 }
 
 func getPodNames(pods []corev1.Pod) []string {
-	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
+	//reqLogger := klog.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
 	var podNames []string
 	for _, pod := range pods {
 		podNames = append(podNames, pod.Name)
-		reqLogger.Info("CS??? pod name=" + pod.Name)
+		klog.Info("CS??? pod name=" + pod.Name)
 	}
 	return podNames
 }
 
 func (r *ReconcilePap) certificateForPap(instance *operatorv1alpha1.Pap) *certmgr.Certificate {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := klog.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	papCertificate := &certmgr.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      iamPapCertificateValues.Name,
@@ -486,7 +488,7 @@ func (r *ReconcilePap) certificateForPap(instance *operatorv1alpha1.Pap) *certmg
 	// Set Pap instance as the owner and controller of the Certificate
 	err := controllerutil.SetControllerReference(instance, papCertificate, r.scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Certificate")
+		klog.Error(err, "Failed to set owner for Certificate")
 		return nil
 	}
 	return papCertificate
@@ -495,7 +497,7 @@ func (r *ReconcilePap) certificateForPap(instance *operatorv1alpha1.Pap) *certmg
 
 func (r *ReconcilePap) serviceForPap(instance *operatorv1alpha1.Pap) *corev1.Service {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	papService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      iamPapServiceValues.Name,
@@ -519,7 +521,7 @@ func (r *ReconcilePap) serviceForPap(instance *operatorv1alpha1.Pap) *corev1.Ser
 	// Set Pap instance as the owner and controller of the Service
 	err := controllerutil.SetControllerReference(instance, papService, r.scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Service")
+		klog.Error(err, "Failed to set owner for Service")
 		return nil
 	}
 	return papService
@@ -527,7 +529,7 @@ func (r *ReconcilePap) serviceForPap(instance *operatorv1alpha1.Pap) *corev1.Ser
 }
 
 func (r *ReconcilePap) configMapForPap(instance *operatorv1alpha1.Pap) *corev1.ConfigMap {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	papConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      iamPapServiceValues.PodName,
@@ -535,9 +537,9 @@ func (r *ReconcilePap) configMapForPap(instance *operatorv1alpha1.Pap) *corev1.C
 			Labels:    map[string]string{"app": iamPapServiceValues.PodName},
 		},
 		Data: map[string]string{
-			"AUDIT_ENABLED": "false",
-			"AUDIT_DETAIL":  "false",
-			"SYSLOG_TLS_PATH":  instance.Spec.AuditService.SyslogTlsPath,
+			"AUDIT_ENABLED":   "false",
+			"AUDIT_DETAIL":    "false",
+			"SYSLOG_TLS_PATH": instance.Spec.AuditService.SyslogTlsPath,
 			"logrotate-conf": "\n # rotate log files weekly\ndaily\n\n# use the syslog group by " +
 				"default, since this is the owning group # of /var/log/syslog.\n#su root syslog\n\n# " +
 				"keep 4 weeks worth of backlogs\nrotate 4\n\n# create new (empty) log files after " +
@@ -551,7 +553,7 @@ func (r *ReconcilePap) configMapForPap(instance *operatorv1alpha1.Pap) *corev1.C
 	// Set Pap instance as the owner and controller of the ConfigMap
 	err := controllerutil.SetControllerReference(instance, papConfigMap, r.scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for ConfigMap")
+		klog.Error(err, "Failed to set owner for ConfigMap")
 		return nil
 	}
 	return papConfigMap
@@ -559,7 +561,7 @@ func (r *ReconcilePap) configMapForPap(instance *operatorv1alpha1.Pap) *corev1.C
 
 func (r *ReconcilePap) ingressForPap(instance *operatorv1alpha1.Pap) *net.Ingress {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	papIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      iamPapServiceValues.Name,
@@ -597,7 +599,7 @@ func (r *ReconcilePap) ingressForPap(instance *operatorv1alpha1.Pap) *net.Ingres
 	// Set Pap instance as the owner and controller of the Ingress
 	err := controllerutil.SetControllerReference(instance, papIngress, r.scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Ingress")
+		klog.Error(err, "Failed to set owner for Ingress")
 		return nil
 	}
 	return papIngress
@@ -610,9 +612,10 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 	if instance.Spec.AuditService.ImageName != res.AuditImageName {
 		instance.Spec.AuditService.ImageName = res.AuditImageName
 	}
-	
-	reqLogger := log.WithValues("deploymentForPap", "Entry", "instance.Name", instance.Name)
-	papImage := shatag.GetImageRef("IAM_POLICY_ADMINISTRATION_IMAGE")
+
+	//reqLogger := log.WithValues("deploymentForPap", "Entry", "instance.Name", instance.Name)
+	//papImage := shatag.GetImageRef("IAM_POLICY_ADMINISTRATION_IMAGE")
+	papImage := "quay.io/yannizhang2019/pap:0.1"
 	auditImage := shatag.GetImageRef("AUDIT_SYSLOG_SERVICE_IMAGE")
 	replicas := instance.Spec.Replicas
 	syslogTlsPath := instance.Spec.AuditService.SyslogTlsPath
@@ -656,8 +659,8 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 					HostPID:                       falseVar,
 					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 						{
-							MaxSkew: 1,
-							TopologyKey: "topology.kubernetes.io/zone",
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/zone",
 							WhenUnsatisfiable: corev1.ScheduleAnyway,
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -666,8 +669,8 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 							},
 						},
 						{
-							MaxSkew: 1,
-							TopologyKey: "topology.kubernetes.io/region",
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/region",
 							WhenUnsatisfiable: corev1.ScheduleAnyway,
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -676,7 +679,7 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 							},
 						},
 					},
-					ServiceAccountName:            serviceAccountName,
+					ServiceAccountName: serviceAccountName,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
@@ -733,7 +736,7 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 	// Set SecretWatcher instance as the owner and controller
 	err := controllerutil.SetControllerReference(instance, papDeployment, r.scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Deployment")
+		klog.Error(err, "Failed to set owner for Deployment")
 		return nil
 	}
 	return papDeployment
@@ -782,11 +785,11 @@ func buildPapVolumes() []corev1.Volume {
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "audit-server-certs",
-					Optional: &trueVar,
+					Optional:   &trueVar,
 				},
 			},
 		},
-		{			
+		{
 			Name: "audit-ingest",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{

@@ -18,11 +18,13 @@ package authentication
 
 import (
 	"context"
+
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 )
 
 type SubjectData struct {
@@ -120,7 +122,7 @@ func generateCRBData(defaultAdminUser string, oidcIssuerURL string) map[string]C
 
 func (r *ReconcileAuthentication) handleClusterRoleBinding(instance *operatorv1alpha1.Authentication, currentClusterRoleBinding *rbacv1.ClusterRoleBinding, requeueResult *bool) error {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 	defaultAdminUser := instance.Spec.Config.DefaultAdminUser
 	oidcIssuerURL := instance.Spec.Config.OIDCIssuerURL
@@ -132,16 +134,16 @@ func (r *ReconcileAuthentication) handleClusterRoleBinding(instance *operatorv1a
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new clusterRoleBinding
 			newClusterRoleBinding := createClusterRoleBinding(clusterRoleBinding, crbValue)
-			reqLogger.Info("Creating a new clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
+			klog.Info("Creating a new clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
 			err = r.client.Create(context.TODO(), newClusterRoleBinding)
 			if err != nil {
-				reqLogger.Error(err, "Failed to create new clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
+				klog.Error(err, "Failed to create new clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
 				return err
 			}
 			// clusterRoleBinding created successfully - return and requeue
 			*requeueResult = true
 		} else if err != nil {
-			reqLogger.Error(err, "Failed to get clusterRoleBinding")
+			klog.Error(err, "Failed to get clusterRoleBinding")
 			return err
 		}
 

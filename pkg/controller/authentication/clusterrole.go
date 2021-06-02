@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 )
 
 type CRData struct {
@@ -233,7 +234,7 @@ func getPolicyRules(verbs []string) []rbacv1.PolicyRule {
 
 func (r *ReconcileAuthentication) handleClusterRole(instance *operatorv1alpha1.Authentication, currentClusterRole *rbacv1.ClusterRole, requeueResult *bool) error {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 
 	crData := generateCRData()
@@ -243,16 +244,16 @@ func (r *ReconcileAuthentication) handleClusterRole(instance *operatorv1alpha1.A
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new ClusterRole
 			newClusterRole := createClusterRole(clusterRole, crData[clusterRole])
-			reqLogger.Info("Creating a new ClusterRole", "ClusterRole.Name", clusterRole)
+			klog.Info("Creating a new ClusterRole", "ClusterRole.Name", clusterRole)
 			err = r.client.Create(context.TODO(), newClusterRole)
 			if err != nil {
-				reqLogger.Error(err, "Failed to create new ClusterRole", "ClusterRole.Name", clusterRole)
+				klog.Error(err, "Failed to create new ClusterRole", "ClusterRole.Name", clusterRole)
 				return err
 			}
 			// ClusterRole created successfully - return and requeue
 			*requeueResult = true
 		} else if err != nil {
-			reqLogger.Error(err, "Failed to get ClusterRole")
+			klog.Error(err, "Failed to get ClusterRole")
 			return err
 		}
 

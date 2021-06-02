@@ -18,19 +18,21 @@ package authentication
 
 import (
 	"context"
+
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	reg "k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 )
 
 var defaultTimeoutSeconds int32 = 10
 
 func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authentication, currentWebhook *reg.MutatingWebhookConfiguration, requeueResult *bool) error {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 	webhook := "namespace-admission-config" + "-" + instance.Namespace
 
@@ -40,27 +42,27 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 		if errors.IsNotFound(err) {
 			// Define a new Webhook
 			newWebhook := generateWebhookObject(instance, r.scheme, webhook)
-			reqLogger.Info("Creating a new Webhook", "Webhook.Namespace", instance.Namespace, "Webhook.Name", webhook)
+			klog.Info("Creating a new Webhook", "Webhook.Namespace", instance.Namespace, "Webhook.Name", webhook)
 			err = r.client.Create(context.TODO(), newWebhook)
 			if err != nil {
-				reqLogger.Error(err, "Failed to create new webhook", "Webhook.Namespace", instance.Namespace, "Webhook.Name", webhook)
+				klog.Error(err, "Failed to create new webhook", "Webhook.Namespace", instance.Namespace, "Webhook.Name", webhook)
 				return err
 			}
 			// User created successfully - return and requeue
 			*requeueResult = true
 		} else {
-			reqLogger.Error(err, "Failed to get an existing webhook", "Webhook.Namespace", instance.Namespace, "Webhook.Name", webhook)
+			klog.Error(err, "Failed to get an existing webhook", "Webhook.Namespace", instance.Namespace, "Webhook.Name", webhook)
 			return err
 		}
 	} else {
 		if currentWebhook.ObjectMeta.Annotations == nil {
-			reqLogger.Info("Updating an existing Webhook", "Webhook.Namespace", currentWebhook.Namespace, "Webhook.Name", currentWebhook.Name)
+			klog.Info("Updating an existing Webhook", "Webhook.Namespace", currentWebhook.Namespace, "Webhook.Name", currentWebhook.Name)
 			currentWebhook.ObjectMeta.Annotations = map[string]string{
-				"certmanager.k8s.io/inject-ca-from": instance.Namespace+"/platform-identity-management",
+				"certmanager.k8s.io/inject-ca-from": instance.Namespace + "/platform-identity-management",
 			}
 			err = r.client.Update(context.TODO(), currentWebhook)
 			if err != nil {
-				reqLogger.Error(err, "Failed to update an existing webhook", "Webhook.Namespace", currentWebhook.Namespace, "Webhook.Name", currentWebhook.Name)
+				klog.Error(err, "Failed to update an existing webhook", "Webhook.Namespace", currentWebhook.Namespace, "Webhook.Name", currentWebhook.Name)
 				return err
 			}
 		}
@@ -78,7 +80,7 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 		ObjectMeta: metav1.ObjectMeta{
 			Name: webhook,
 			Annotations: map[string]string{
-				"certmanager.k8s.io/inject-ca-from": instance.Namespace+"/platform-identity-management",
+				"certmanager.k8s.io/inject-ca-from": instance.Namespace + "/platform-identity-management",
 			},
 		},
 		Webhooks: []reg.MutatingWebhook{

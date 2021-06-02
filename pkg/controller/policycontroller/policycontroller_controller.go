@@ -36,7 +36,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+
+	//logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -54,7 +56,7 @@ var memory384 = resource.NewQuantity(384*1024*1024, resource.BinarySI) // 384Mi
 var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI) // 128Mi
 var serviceAccountName string = "ibm-iam-operand-restricted"
 
-var log = logf.Log.WithName("controller_policycontroller")
+//var log = logf.Log.WithName("controller_policycontroller")
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -117,23 +119,23 @@ type ReconcilePolicyController struct {
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-func (r *ReconcilePolicyController) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-	reqLogger.Info("Reconciling PolicyController")
+func (r *ReconcilePolicyController) Reconcile(context context.Context, request reconcile.Request) (reconcile.Result, error) {
+	//reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	klog.Info("Reconciling PolicyController")
 
 	// Fetch the PolicyController instance
 	instance := &operatorv1alpha1.PolicyController{}
-	recErr := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	recErr := r.client.Get(context, request.NamespacedName, instance)
 	if recErr != nil {
 		if errors.IsNotFound(recErr) {
 			// Request object not instance, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			reqLogger.Info("PolicyController resource instance not found. Ignoring since object must be deleted")
+			klog.Info("PolicyController resource instance not found. Ignoring since object must be deleted")
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		reqLogger.Error(recErr, "Failed to get deploymentForPolicyController")
+		klog.Error(recErr, "Failed to get deploymentForPolicyController")
 		return reconcile.Result{}, recErr
 	}
 
@@ -144,8 +146,8 @@ func (r *ReconcilePolicyController) Reconcile(request reconcile.Request) (reconc
 		// Object not being deleted, but add our finalizer so we know to remove this object later when it is going to be deleted
 		if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
-			if err := r.client.Update(context.Background(), instance); err != nil {
-				log.Error(err, "Error adding the finalizer to the CR")
+			if err := r.client.Update(context, instance); err != nil {
+				klog.Error(err, "Error adding the finalizer to the CR")
 				return reconcile.Result{}, err
 			}
 		}
@@ -153,14 +155,14 @@ func (r *ReconcilePolicyController) Reconcile(request reconcile.Request) (reconc
 		// Object scheduled to be deleted
 		if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 			if err := r.deleteExternalResources(instance); err != nil {
-				log.Error(err, "Error deleting resources created by this operator")
+				klog.Error(err, "Error deleting resources created by this operator")
 
 				return reconcile.Result{}, err
 			}
 
 			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
-			if err := r.client.Update(context.Background(), instance); err != nil {
-				log.Error(err, "Error updating the CR to remove the finalizer")
+			if err := r.client.Update(context, instance); err != nil {
+				klog.Error(err, "Error updating the CR to remove the finalizer")
 				return reconcile.Result{}, err
 			}
 
@@ -193,20 +195,20 @@ func (r *ReconcilePolicyController) Reconcile(request reconcile.Request) (reconc
 }
 
 func (r *ReconcilePolicyController) handleClusterRoleBinding(instance *operatorv1alpha1.PolicyController, currentClusterRoleBinding *rbacv1.ClusterRoleBinding) (reconcile.Result, error) {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "iam-policy-controller-rolebinding", Namespace: ""}, currentClusterRoleBinding)
 	if err != nil && errors.IsNotFound(err) {
 		// Define  Cluster Rolebinding
 		clusterRoleBinding := r.clusterRoleBindingForPolicyController(instance)
-		reqLogger.Info("Creating ClusterRoleBinding", "ClusterRoleBinding.Namespace", instance.Namespace, "ClusterRoleBinding.Name", "iam-policy-controller-rolebinding")
+		klog.Info("Creating ClusterRoleBinding", "ClusterRoleBinding.Namespace", instance.Namespace, "ClusterRoleBinding.Name", "iam-policy-controller-rolebinding")
 		err = r.client.Create(context.TODO(), clusterRoleBinding)
 		if err != nil {
-			reqLogger.Error(err, "Failed to create ClusterRoleBinding", "ClusterRoleBinding.Namespace", instance.Namespace, "ClusterRoleBinding.Name", "iam-policy-controller-rolebinding")
+			klog.Error(err, "Failed to create ClusterRoleBinding", "ClusterRoleBinding.Namespace", instance.Namespace, "ClusterRoleBinding.Name", "iam-policy-controller-rolebinding")
 			return reconcile.Result{}, err
 		}
 
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get ClusterRoleBinding")
+		klog.Error(err, "Failed to get ClusterRoleBinding")
 		return reconcile.Result{}, err
 	}
 	//Cluster rolebinding has created successfully
@@ -214,20 +216,20 @@ func (r *ReconcilePolicyController) handleClusterRoleBinding(instance *operatorv
 }
 
 func (r *ReconcilePolicyController) handleClusterRole(instance *operatorv1alpha1.PolicyController, currentClusterRole *rbacv1.ClusterRole) (reconcile.Result, error) {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "iam-policy-controller-role", Namespace: ""}, currentClusterRole)
 	if err != nil && errors.IsNotFound(err) {
 		// Define cluster role
 		clusterRole := r.clusterRoleForPolicyController(instance)
-		reqLogger.Info("Creating ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "iam-policy-controller-role")
+		klog.Info("Creating ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "iam-policy-controller-role")
 		err = r.client.Create(context.TODO(), clusterRole)
 		if err != nil {
-			reqLogger.Error(err, "Failed to create ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "iam-policy-controller-role")
+			klog.Error(err, "Failed to create ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "iam-policy-controller-role")
 			return reconcile.Result{}, err
 		}
 
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get ClusterRole")
+		klog.Error(err, "Failed to get ClusterRole")
 		return reconcile.Result{}, err
 	}
 	//Cluster Adminstrator roles created successfully
@@ -237,22 +239,22 @@ func (r *ReconcilePolicyController) handleClusterRole(instance *operatorv1alpha1
 func (r *ReconcilePolicyController) handleDeployment(instance *operatorv1alpha1.PolicyController, currentDeployment *appsv1.Deployment) (reconcile.Result, error) {
 
 	// Check if this Deployment already exists
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: iamPolicyControllerDepName, Namespace: instance.Namespace}, currentDeployment)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Define a new deployment
 			ocwDep := r.deploymentForPolicyController(instance)
-			reqLogger.Info("Creating Deployment", "Deployment.Namespace", ocwDep.Namespace, "Deployment.Name", ocwDep.Name)
+			klog.Info("Creating Deployment", "Deployment.Namespace", ocwDep.Namespace, "Deployment.Name", ocwDep.Name)
 			err = r.client.Create(context.TODO(), ocwDep)
 			if err != nil {
-				reqLogger.Error(err, "Failed to create Deployment", "Deployment.Namespace", ocwDep.Namespace, "Deployment.Name", ocwDep.Name)
+				klog.Error(err, "Failed to create Deployment", "Deployment.Namespace", ocwDep.Namespace, "Deployment.Name", ocwDep.Name)
 				return reconcile.Result{}, err
 			}
 			// Deployment created successfully - return and requeue
 			return reconcile.Result{Requeue: true}, nil
 		} else {
-			reqLogger.Error(err, "Failed to get Deployment")
+			klog.Error(err, "Failed to get Deployment")
 			return reconcile.Result{}, err
 		}
 	} else {
@@ -262,10 +264,10 @@ func (r *ReconcilePolicyController) handleDeployment(instance *operatorv1alpha1.
 			newDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val
 		}
 		currentDeployment.Spec = newDeployment.Spec
-		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
+		klog.Info("Updating an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
 		err = r.client.Update(context.TODO(), currentDeployment)
 		if err != nil {
-			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
+			klog.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
 			return reconcile.Result{}, err
 		}
 	}
@@ -276,7 +278,7 @@ func (r *ReconcilePolicyController) handleDeployment(instance *operatorv1alpha1.
 		currentDeployment.Spec.Replicas = &replicas
 		err = r.client.Update(context.TODO(), instance)
 		if err != nil {
-			reqLogger.Error(err, "Failed to update Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", instance.Name)
+			klog.Error(err, "Failed to update Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", instance.Name)
 			return reconcile.Result{}, err
 		}
 		// Spec updated - return and requeue
@@ -291,7 +293,7 @@ func (r *ReconcilePolicyController) handleDeployment(instance *operatorv1alpha1.
 		client.MatchingLabels(map[string]string{"app": "iam-policy-controller"}),
 	}
 	if err = r.client.List(context.TODO(), podList, listOpts...); err != nil {
-		reqLogger.Error(err, "Failed to list pods", "PolicyController", instance.Namespace, "PolicyController.Name", instance.Name)
+		klog.Error(err, "Failed to list pods", "PolicyController", instance.Namespace, "PolicyController.Name", instance.Name)
 		return reconcile.Result{}, err
 	}
 	podNames := getPodNames(podList.Items)
@@ -301,7 +303,7 @@ func (r *ReconcilePolicyController) handleDeployment(instance *operatorv1alpha1.
 		instance.Status.Nodes = podNames
 		err := r.client.Status().Update(context.TODO(), instance)
 		if err != nil {
-			reqLogger.Error(err, "Failed to update PolicyController status")
+			klog.Error(err, "Failed to update PolicyController status")
 			return reconcile.Result{}, err
 		}
 	}
@@ -370,7 +372,7 @@ func (r *ReconcilePolicyController) clusterRoleBindingForPolicyController(instan
 
 // deploymentForPolicyController returns a IAM PolicyController Deployment object
 func (r *ReconcilePolicyController) deploymentForPolicyController(instance *operatorv1alpha1.PolicyController) *appsv1.Deployment {
-	reqLogger := log.WithValues("deploymentForPolicyController", "Entry", "instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("deploymentForPolicyController", "Entry", "instance.Name", instance.Name)
 	image := shatag.GetImageRef("IAM_POLICY_CONTROLLER_IMAGE")
 	replicas := instance.Spec.Replicas
 	resources := instance.Spec.Resources
@@ -546,7 +548,7 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 	// Set PolicyController  instance as the owner and controller
 	err := controllerutil.SetControllerReference(instance, iamPolicyDep, r.scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Deployment")
+		klog.Error(err, "Failed to set owner for Deployment")
 		return nil
 	}
 	return iamPolicyDep
@@ -554,11 +556,11 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 
 // getPodNames returns the pod names of the array of pods passed in
 func getPodNames(pods []corev1.Pod) []string {
-	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
+	//reqLogger := klog.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
 	var podNames []string
 	for _, pod := range pods {
 		podNames = append(podNames, pod.Name)
-		reqLogger.Info("CS??? pod name=" + pod.Name)
+		klog.Info("CS??? pod name=" + pod.Name)
 	}
 	return podNames
 }
@@ -611,11 +613,11 @@ func removeCR(client client.Client, crName string) error {
 	// Delete Clusterrole
 	clusterRole := &rbacv1.ClusterRole{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: crName, Namespace: ""}, clusterRole); err != nil && errors.IsNotFound(err) {
-		log.V(1).Info("Error getting cluster role", crName, err)
+		klog.Info("Error getting cluster role", crName, err)
 		return nil
 	} else if err == nil {
 		if err = client.Delete(context.Background(), clusterRole); err != nil {
-			log.V(1).Info("Error deleting cluster role", "name", crName, "error message", err)
+			klog.Info("Error deleting cluster role", "name", crName, "error message", err)
 			return err
 		}
 	} else {
@@ -628,11 +630,11 @@ func removeCRB(client client.Client, crbName string) error {
 	// Delete ClusterRoleBinding
 	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: crbName, Namespace: ""}, clusterRoleBinding); err != nil && errors.IsNotFound(err) {
-		log.V(1).Info("Error getting cluster role binding", crbName, err)
+		klog.Info("Error getting cluster role binding", crbName, err)
 		return nil
 	} else if err == nil {
 		if err = client.Delete(context.Background(), clusterRoleBinding); err != nil {
-			log.V(1).Info("Error deleting cluster role binding", "name", crbName, "error message", err)
+			klog.Info("Error deleting cluster role binding", "name", crbName, "error message", err)
 			return err
 		}
 	} else {

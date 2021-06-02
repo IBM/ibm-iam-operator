@@ -18,17 +18,19 @@ package authentication
 
 import (
 	"context"
+
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	userv1 "github.com/openshift/api/user/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 )
 
 func (r *ReconcileAuthentication) handleUser(instance *operatorv1alpha1.Authentication, currentUser *userv1.User, requeueResult *bool) error {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 
 	user := instance.Spec.Config.DefaultAdminUser
@@ -36,16 +38,16 @@ func (r *ReconcileAuthentication) handleUser(instance *operatorv1alpha1.Authenti
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new User
 		newUser := generateUserObject(instance, r.scheme, user)
-		reqLogger.Info("Creating a new User", "User.Namespace", instance.Namespace, "User.Name", user)
+		klog.Info("Creating a new User", "User.Namespace", instance.Namespace, "User.Name", user)
 		err = r.client.Create(context.TODO(), newUser)
 		if err != nil {
-			reqLogger.Error(err, "Failed to create new User", "User.Namespace", instance.Namespace, "User.Name", user)
+			klog.Error(err, "Failed to create new User", "User.Namespace", instance.Namespace, "User.Name", user)
 			return err
 		}
 		// User created successfully - return and requeue
 		*requeueResult = true
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get User")
+		klog.Error(err, "Failed to get User")
 		return err
 	}
 

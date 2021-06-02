@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -42,8 +43,8 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	configMapList := []string{"platform-auth-idp", "registration-script", "oauth-client-map", "registration-json"}
 
 	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{r.authIdpConfigMap, registrationScriptConfigMap}
-        isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 	var newConfigMap *corev1.ConfigMap
 
@@ -53,10 +54,10 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: consoleConfigMapName, Namespace: instance.Namespace}, consoleConfigMap)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			reqLogger.Error(err, "The configmap ", consoleConfigMapName, " is not created yet")
+			klog.Error(err, "The configmap ", consoleConfigMapName, " is not created yet")
 			return err
 		}
-		reqLogger.Error(err, "Failed to get ConfigMap", consoleConfigMapName)
+		klog.Error(err, "Failed to get ConfigMap", consoleConfigMapName)
 		return err
 	}
 
@@ -67,15 +68,15 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: proxyConfigMapName, Namespace: instance.Namespace}, proxyConfigMap)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			reqLogger.Error(err, "The configmap ", proxyConfigMapName, " is not created yet")
+			klog.Error(err, "The configmap ", proxyConfigMapName, " is not created yet")
 			return err
 		}
-		reqLogger.Error(err, "Failed to get ConfigMap", proxyConfigMapName)
+		klog.Error(err, "Failed to get ConfigMap", proxyConfigMapName)
 		return err
 	}
 	icpProxyURL, ok := proxyConfigMap.Data["proxy_address"]
 	if !ok {
-		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain proxy address")
+		klog.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain proxy address")
 		*requeueResult = true
 		return nil
 	}
@@ -94,25 +95,25 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					newConfigMap = functionList[index](instance, r.scheme)
 					if configMapList[index] == "platform-auth-idp" {
 						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL == "https://roks.domain.name:443" { //we enable it by default
-							reqLogger.Info("Create platform-auth-idp Configmap roks settings", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+							klog.Info("Create platform-auth-idp Configmap roks settings", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 							issuer, err := readROKSURL(instance)
 							if err != nil {
-								reqLogger.Error(err, "Failed to get issuer URL", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
+								klog.Error(err, "Failed to get issuer URL", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
 								return err
 							}
 							newConfigMap.Data["ROKS_ENABLED"] = "true"
 							newConfigMap.Data["ROKS_URL"] = issuer
 							if instance.Spec.Config.ROKSUserPrefix == "changeme" { //we change it to empty prefix, that's the new default in 3.5
-								if (isPublicCloud) {
+								if isPublicCloud {
 									newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
-						                } else {
-								newConfigMap.Data["ROKS_USER_PREFIX"] = ""
-							        }
+								} else {
+									newConfigMap.Data["ROKS_USER_PREFIX"] = ""
+								}
 							} else { // user specifies prefix but does not specify roksEnabled and roksURL we take the user provided prefix
 								newConfigMap.Data["ROKS_USER_PREFIX"] = instance.Spec.Config.ROKSUserPrefix
 							}
 						} else {
-							reqLogger.Info("Honor end user's setting", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+							klog.Info("Honor end user's setting", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 							//if user does not specify the prefix, we set it to IAM# to be consistent with previous release
 							if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL != "https://roks.domain.name:443" && instance.Spec.Config.ROKSUserPrefix == "changeme" {
 								newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
@@ -125,16 +126,16 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 						}
 					}
 				}
-				reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
+				klog.Info("Creating a new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
 				err = r.client.Create(context.TODO(), newConfigMap)
 				if err != nil {
-					reqLogger.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
+					klog.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
 					return err
 				}
 				// ConfigMap created successfully - return and requeue
 				*requeueResult = true
 			} else {
-				reqLogger.Error(err, "Failed to get ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
+				klog.Error(err, "Failed to get ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
 				return err
 			}
 		} else {
@@ -142,13 +143,13 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 			if configMapList[index] == "platform-auth-idp" {
 				cmUpdateRequired := false
 				if _, keyExists := currentConfigMap.Data["LDAP_RECURSIVE_SEARCH"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					klog.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.scheme)
 					currentConfigMap.Data["LDAP_RECURSIVE_SEARCH"] = newConfigMap.Data["LDAP_RECURSIVE_SEARCH"]
 					cmUpdateRequired = true
 				}
 				if _, keyExists := currentConfigMap.Data["CLAIMS_SUPPORTED"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					klog.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.scheme)
 					currentConfigMap.Data["CLAIMS_SUPPORTED"] = newConfigMap.Data["CLAIMS_SUPPORTED"]
 					currentConfigMap.Data["CLAIMS_MAP"] = newConfigMap.Data["CLAIMS_MAP"]
@@ -157,19 +158,19 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					cmUpdateRequired = true
 				}
 				if _, keyExists := currentConfigMap.Data["PROVIDER_ISSUER_URL"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					klog.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.scheme)
 					currentConfigMap.Data["PROVIDER_ISSUER_URL"] = newConfigMap.Data["PROVIDER_ISSUER_URL"]
 					cmUpdateRequired = true
 				}
 				if _, keyExists := currentConfigMap.Data["PREFERRED_LOGIN"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					klog.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.scheme)
 					currentConfigMap.Data["PREFERRED_LOGIN"] = newConfigMap.Data["PREFERRED_LOGIN"]
 					cmUpdateRequired = true
 				}
 				if _, keyExists := currentConfigMap.Data["MONGO_READ_TIMEOUT"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					klog.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.scheme)
 					currentConfigMap.Data["MONGO_READ_TIMEOUT"] = newConfigMap.Data["MONGO_READ_TIMEOUT"]
 					currentConfigMap.Data["MONGO_MAX_STALENESS"] = newConfigMap.Data["MONGO_MAX_STALENESS"]
@@ -184,14 +185,14 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 				if _, keyExists := currentConfigMap.Data["OS_TOKEN_LENGTH"]; keyExists {
 					if currentConfigMap.Data["OS_TOKEN_LENGTH"] == "45" {
 						newConfigMap = functionList[index](instance, r.scheme)
-						reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-						reqLogger.Info("Updating OS token length", "New length is ", newConfigMap.Data["OS_TOKEN_LENGTH"])
+						klog.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+						klog.Info("Updating OS token length", "New length is ", newConfigMap.Data["OS_TOKEN_LENGTH"])
 						currentConfigMap.Data["OS_TOKEN_LENGTH"] = newConfigMap.Data["OS_TOKEN_LENGTH"]
 						cmUpdateRequired = true
 					}
 				}
 				if _, keyExists := currentConfigMap.Data["SCIM_LDAP_ATTRIBUTES_MAPPING"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap to add new SCIM variables", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					klog.Info("Updating an existing Configmap to add new SCIM variables", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.scheme)
 					currentConfigMap.Data["SCIM_LDAP_ATTRIBUTES_MAPPING"] = newConfigMap.Data["SCIM_LDAP_ATTRIBUTES_MAPPING"]
 					currentConfigMap.Data["SCIM_LDAP_SEARCH_SIZE_LIMIT"] = newConfigMap.Data["SCIM_LDAP_SEARCH_SIZE_LIMIT"]
@@ -201,13 +202,13 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					cmUpdateRequired = true
 				}
 				if _, keyExists := currentConfigMap.Data["AUTH_SVC_LDAP_CONFIG_TIMEOUT"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap to add new variable for auth-service LDAP configuration timeout", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					klog.Info("Updating an existing Configmap to add new variable for auth-service LDAP configuration timeout", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.scheme)
 					currentConfigMap.Data["AUTH_SVC_LDAP_CONFIG_TIMEOUT"] = newConfigMap.Data["AUTH_SVC_LDAP_CONFIG_TIMEOUT"]
 					cmUpdateRequired = true
 				}
 				if _, keyExists := currentConfigMap.Data["IBM_CLOUD_SAAS"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					klog.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.scheme)
 					currentConfigMap.Data["IBM_CLOUD_SAAS"] = newConfigMap.Data["IBM_CLOUD_SAAS"]
 					currentConfigMap.Data["SAAS_CLIENT_REDIRECT_URL"] = newConfigMap.Data["SAAS_CLIENT_REDIRECT_URL"]
@@ -216,7 +217,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 				if cmUpdateRequired {
 					err = r.client.Update(context.TODO(), currentConfigMap)
 					if err != nil {
-						reqLogger.Error(err, "Failed to update an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "Configmap.Name", currentConfigMap.Name)
+						klog.Error(err, "Failed to update an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "Configmap.Name", currentConfigMap.Name)
 						return err
 					}
 				}
@@ -230,14 +231,14 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 }
 
 func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
 	bootStrapUserId := instance.Spec.Config.BootstrapUserId
 	roksUserPrefix := instance.Spec.Config.ROKSUserPrefix
-	if (len(bootStrapUserId) > 0 && strings.EqualFold(bootStrapUserId, "kubeadmin") && isPublicCloud) {
+	if len(bootStrapUserId) > 0 && strings.EqualFold(bootStrapUserId, "kubeadmin") && isPublicCloud {
 		bootStrapUserId = ""
 	}
-	if (isPublicCloud) {
+	if isPublicCloud {
 		roksUserPrefix = "IAM#"
 	}
 	newConfigMap := &corev1.ConfigMap{
@@ -259,10 +260,10 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"AUDIT_ENABLED_IDPROVIDER":    "false",
 			"AUDIT_ENABLED_IDMGMT":        "false",
 			"AUDIT_DETAIL":                "false",
-			"LOG_LEVEL_IDPROVIDER":        "info",
-			"LOG_LEVEL_AUTHSVC":           "info",
-			"LOG_LEVEL_IDMGMT":            "info",
-			"LOG_LEVEL_MW":                "info",
+			"LOG_LEVEL_IDPROVIDER":        "debug",
+			"LOG_LEVEL_AUTHSVC":           "debug",
+			"LOG_LEVEL_IDMGMT":            "debug",
+			"LOG_LEVEL_MW":                "debug",
 			"IDTOKEN_LIFETIME":            "12h",
 			"SYSLOG_TLS_PATH":             instance.Spec.AuditService.SyslogTlsPath,
 			"SESSION_TIMEOUT":             "43200",
@@ -333,14 +334,14 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 	// Set Authentication instance as the owner and controller of the ConfigMap
 	err := controllerutil.SetControllerReference(instance, newConfigMap, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for ConfigMap")
+		klog.Error(err, "Failed to set owner for ConfigMap")
 		return nil
 	}
 	return newConfigMap
 }
 
 func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, icpConsoleURL string, scheme *runtime.Scheme) *corev1.ConfigMap {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	tempRegistrationJson := registrationJson
 	tempRegistrationJson = strings.ReplaceAll(tempRegistrationJson, "WLP_CLIENT_ID", wlpClientID)
 	tempRegistrationJson = strings.ReplaceAll(tempRegistrationJson, "WLP_CLIENT_SECRET", wlpClientSecret)
@@ -360,7 +361,7 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 	// Set Authentication instance as the owner and controller of the ConfigMap
 	err := controllerutil.SetControllerReference(instance, newConfigMap, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for ConfigMap")
+		klog.Error(err, "Failed to set owner for ConfigMap")
 		return nil
 	}
 	return newConfigMap
@@ -368,7 +369,7 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 
 func registrationScriptConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "registration-script",
@@ -383,7 +384,7 @@ func registrationScriptConfigMap(instance *operatorv1alpha1.Authentication, sche
 	// Set Authentication instance as the owner and controller of the ConfigMap
 	err := controllerutil.SetControllerReference(instance, newConfigMap, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for ConfigMap")
+		klog.Error(err, "Failed to set owner for ConfigMap")
 		return nil
 	}
 	return newConfigMap
@@ -392,7 +393,7 @@ func registrationScriptConfigMap(instance *operatorv1alpha1.Authentication, sche
 
 func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, icpConsoleURL string, icpProxyURL string, scheme *runtime.Scheme) *corev1.ConfigMap {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "oauth-client-map",
@@ -410,7 +411,7 @@ func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, icpConsoleU
 	// Set Authentication instance as the owner and controller of the ConfigMap
 	err := controllerutil.SetControllerReference(instance, newConfigMap, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for ConfigMap")
+		klog.Error(err, "Failed to set owner for ConfigMap")
 		return nil
 	}
 	return newConfigMap
@@ -418,11 +419,11 @@ func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, icpConsoleU
 }
 
 // Check if hosted on IBM Cloud
-func isPublicCloud(client client.Client, namespace string , configMap string) bool {
+func isPublicCloud(client client.Client, namespace string, configMap string) bool {
 	currentConfigMap := &corev1.ConfigMap{}
 	err := client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: namespace}, currentConfigMap)
 	if err != nil {
-		log.V(1).Info("Error getting configmap", configMap)
+		klog.Info("Error getting configmap", configMap)
 		return false
 	} else if err == nil {
 		host := currentConfigMap.Data["cluster_kube_apiserver_host"]
@@ -432,26 +433,26 @@ func isPublicCloud(client client.Client, namespace string , configMap string) bo
 }
 
 func readROKSURL(instance *operatorv1alpha1.Authentication) (string, error) {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	wellknownURL := "https://kubernetes.default:443/.well-known/oauth-authorization-server"
 	tokenFile := "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	caCert, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
 	if err != nil {
-		reqLogger.Error(err, "Failed to read ca cert", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+		klog.Error(err, "Failed to read ca cert", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
 		return "", err
 	}
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCert)
 	content, err := ioutil.ReadFile(tokenFile)
 	if err != nil {
-		reqLogger.Error(err, "Failed to read default token", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+		klog.Error(err, "Failed to read default token", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
 		return "", err
 	}
 	token := string(content)
 	transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: caCertPool}}
 	req, err := http.NewRequest("GET", wellknownURL, nil)
 	if err != nil {
-		reqLogger.Error(err, "Failed to get well known URL", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+		klog.Error(err, "Failed to get well known URL", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
 		return "", err
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
@@ -459,7 +460,7 @@ func readROKSURL(instance *operatorv1alpha1.Authentication) (string, error) {
 	response, err := client.Do(req)
 
 	if err != nil {
-		reqLogger.Error(err, "Failed to get OpenShift server URL", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+		klog.Error(err, "Failed to get OpenShift server URL", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
 		return "", err
 	}
 	var issuer string
@@ -467,18 +468,18 @@ func readROKSURL(instance *operatorv1alpha1.Authentication) (string, error) {
 		defer response.Body.Close()
 		body, err1 := ioutil.ReadAll(response.Body)
 		if err1 != nil {
-			reqLogger.Error(err, "Failed to readAll", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+			klog.Error(err, "Failed to readAll", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
 			return "", err1
 		}
 		var result map[string]interface{}
 		err = json.Unmarshal(body, &result)
 		if err != nil {
-			reqLogger.Error(err, "Failed to unmarshal", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+			klog.Error(err, "Failed to unmarshal", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
 			return "", err
 		}
 		issuer = result["issuer"].(string)
 	} else {
-		reqLogger.Error(err, "Response status is not ok:"+response.Status, "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+		klog.Error(err, "Response status is not ok:"+response.Status, "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
 		return "", err
 	}
 	return issuer, nil

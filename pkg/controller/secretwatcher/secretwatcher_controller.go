@@ -22,7 +22,7 @@ import (
 	gorun "runtime"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
-	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -34,7 +34,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+
+	//logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -52,7 +54,7 @@ var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)        // 200m
 var memory64 = resource.NewQuantity(64*1024*1024, resource.BinarySI)   // 64Mi
 var memory512 = resource.NewQuantity(512*1024*1024, resource.BinarySI) // 512Mi
 
-var log = logf.Log.WithName("controller_secretwatcher")
+//var log = logf.Log.WithName("controller_secretwatcher")
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -115,48 +117,48 @@ type ReconcileSecretWatcher struct {
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-func (r *ReconcileSecretWatcher) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-	reqLogger.Info("Reconciling SecretWatcher")
+func (r *ReconcileSecretWatcher) Reconcile(context context.Context, request reconcile.Request) (reconcile.Result, error) {
+	//	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	klog.Info("Reconciling SecretWatcher")
 
 	// Fetch the SecretWatcher instance
 	SecretWatcher := &operatorv1alpha1.SecretWatcher{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, SecretWatcher)
+	err := r.client.Get(context, request.NamespacedName, SecretWatcher)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not instance, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			reqLogger.Info("SecretWatcher resource not instance. Ignoring since object must be deleted")
+			klog.Info("SecretWatcher resource not instance. Ignoring since object must be deleted")
 			return reconcile.Result{}, nil
 		} else {
 			// Error reading the object - requeue the request.
-			reqLogger.Error(err, "Failed to get SecretWatcher")
+			klog.Error(err, "Failed to get SecretWatcher")
 			return reconcile.Result{}, err
 		}
 	}
 
 	// Check if the deployment already exists, if not create a new one
 	instance := &appsv1.Deployment{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "secret-watcher", Namespace: SecretWatcher.Namespace}, instance)
+	err = r.client.Get(context, types.NamespacedName{Name: "secret-watcher", Namespace: SecretWatcher.Namespace}, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Define a new deployment
 			swDep := r.deploymentForSecretWatcher(SecretWatcher)
-			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", swDep.Namespace, "Deployment.Name", swDep.Name)
-			err = r.client.Create(context.TODO(), swDep)
+			klog.Info("Creating a new Deployment", "Deployment.Namespace", swDep.Namespace, "Deployment.Name", swDep.Name)
+			err = r.client.Create(context, swDep)
 			if err != nil {
-				reqLogger.Error(err, "Failed to create new Deployment", "Deployment.Namespace", swDep.Namespace, "Deployment.Name", swDep.Name)
+				klog.Error(err, "Failed to create new Deployment", "Deployment.Namespace", swDep.Namespace, "Deployment.Name", swDep.Name)
 				return reconcile.Result{}, err
 			}
 			// Deployment created successfully - return and requeue
 			return reconcile.Result{Requeue: true}, nil
 		} else {
-			reqLogger.Error(err, "Failed to get Deployment")
+			klog.Error(err, "Failed to get Deployment")
 			return reconcile.Result{}, err
 		}
 	} else {
-		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", instance.Name)
+		klog.Info("Updating an existing Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", instance.Name)
 		newDeployment := r.deploymentForSecretWatcher(SecretWatcher)
 		certmanagerLabel := "certmanager.k8s.io/time-restarted"
 		if val, ok := instance.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
@@ -167,9 +169,9 @@ func (r *ReconcileSecretWatcher) Reconcile(request reconcile.Request) (reconcile
 			newDeployment.Spec.Template.ObjectMeta.Annotations[nssAnnotation] = val
 		}
 		instance.Spec = newDeployment.Spec
-		err = r.client.Update(context.TODO(), instance)
+		err = r.client.Update(context, instance)
 		if err != nil {
-			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", instance.Name)
+			klog.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", instance.Name)
 			return reconcile.Result{}, err
 		}
 	}
@@ -178,9 +180,9 @@ func (r *ReconcileSecretWatcher) Reconcile(request reconcile.Request) (reconcile
 	replicas := SecretWatcher.Spec.Replicas
 	if *instance.Spec.Replicas != replicas {
 		instance.Spec.Replicas = &replicas
-		err = r.client.Update(context.TODO(), instance)
+		err = r.client.Update(context, instance)
 		if err != nil {
-			reqLogger.Error(err, "Failed to update Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", instance.Name)
+			klog.Error(err, "Failed to update Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", instance.Name)
 			return reconcile.Result{}, err
 		}
 		// Spec updated - return and requeue
@@ -194,8 +196,8 @@ func (r *ReconcileSecretWatcher) Reconcile(request reconcile.Request) (reconcile
 		client.InNamespace(SecretWatcher.Namespace),
 		client.MatchingLabels(labelsForSecretWatcherSelect(SecretWatcher.Name, instance.Name)),
 	}
-	if err = r.client.List(context.TODO(), podList, listOpts...); err != nil {
-		reqLogger.Error(err, "Failed to list pods", "SecretWatcher.Namespace", SecretWatcher.Namespace, "SecretWatcher.Name", SecretWatcher.Name)
+	if err = r.client.List(context, podList, listOpts...); err != nil {
+		klog.Error(err, "Failed to list pods", "SecretWatcher.Namespace", SecretWatcher.Namespace, "SecretWatcher.Name", SecretWatcher.Name)
 		return reconcile.Result{}, err
 	}
 	podNames := getPodNames(podList.Items)
@@ -203,9 +205,9 @@ func (r *ReconcileSecretWatcher) Reconcile(request reconcile.Request) (reconcile
 	// Update status.Nodes if needed
 	if !reflect.DeepEqual(podNames, SecretWatcher.Status.Nodes) {
 		SecretWatcher.Status.Nodes = podNames
-		err := r.client.Status().Update(context.TODO(), SecretWatcher)
+		err := r.client.Status().Update(context, SecretWatcher)
 		if err != nil {
-			reqLogger.Error(err, "Failed to update SecretWatcher status")
+			klog.Error(err, "Failed to update SecretWatcher status")
 			return reconcile.Result{}, err
 		}
 	}
@@ -215,11 +217,12 @@ func (r *ReconcileSecretWatcher) Reconcile(request reconcile.Request) (reconcile
 
 // deploymentForSecretWatcher returns a SecretWatcher Deployment object
 func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1alpha1.SecretWatcher) *appsv1.Deployment {
-	reqLogger := log.WithValues("deploymentForSecretWatcher", "Entry", "instance.Name", instance.Name)
+	//reqLogger := log.WithValues("deploymentForSecretWatcher", "Entry", "instance.Name", instance.Name)
 	labels1 := labelsForSecretWatcherMeta(secretWatcherDeploymentName)
 	labels2 := labelsForSecretWatcherSelect(instance.Name, secretWatcherDeploymentName)
 	labels3 := labelsForSecretWatcherPod(instance.Name, secretWatcherDeploymentName)
-	image := shatag.GetImageRef("ICP_SECRET_WATCHER_IMAGE")
+	//image := shatag.GetImageRef("ICP_SECRET_WATCHER_IMAGE")
+	image := "quay.io/yannizhang2019/secret-watcher:0.1"
 	replicas := instance.Spec.Replicas
 	resources := instance.Spec.Resources
 
@@ -482,7 +485,7 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 	// Set SecretWatcher instance as the owner and controller
 	err := controllerutil.SetControllerReference(instance, swDep, r.scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Deployment")
+		klog.Error(err, "Failed to set owner for Deployment")
 		return nil
 	}
 	return swDep
@@ -510,11 +513,11 @@ func labelsForSecretWatcherMeta(deploymentName string) map[string]string {
 
 // getPodNames returns the pod names of the array of pods passed in
 func getPodNames(pods []corev1.Pod) []string {
-	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
+	//	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
 	var podNames []string
 	for _, pod := range pods {
 		podNames = append(podNames, pod.Name)
-		reqLogger.Info("CS??? pod name=" + pod.Name)
+		klog.Info("CS??? pod name=" + pod.Name)
 	}
 	return podNames
 }

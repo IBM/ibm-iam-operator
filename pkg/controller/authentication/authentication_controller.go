@@ -357,7 +357,7 @@ func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1al
 	log.V(0).Info("Wait for 2 seconds.")
 	time.Sleep(time.Second * 2)
 
-	// Remove Cluster Role
+	// Finally check and remove Cluster Role
 	for crName := range crMap {
 		if err := removeCR(r.client, crName); err != nil {
 			return err

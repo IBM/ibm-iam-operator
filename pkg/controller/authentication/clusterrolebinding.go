@@ -135,7 +135,7 @@ func (r *ReconcileAuthentication) handleClusterRoleBinding(instance *operatorv1a
 			if errors.IsNotFound(err) {
 				// Define a new clusterRoleBinding
 				newClusterRoleBinding := createClusterRoleBinding(clusterRoleBinding, crbValue)
-	
+
 				// Add multiple deployment common-service/config annotation
 				if len(newClusterRoleBinding.ObjectMeta.Annotations) == 0 {
 					newClusterRoleBinding.ObjectMeta.Annotations = map[string]string{
@@ -144,7 +144,7 @@ func (r *ReconcileAuthentication) handleClusterRoleBinding(instance *operatorv1a
 				} else {
 					newClusterRoleBinding.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
 				}
-	
+
 				reqLogger.Info("Creating a new clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
 				err = r.client.Create(context.TODO(), newClusterRoleBinding)
 				if err != nil {
@@ -167,10 +167,10 @@ func (r *ReconcileAuthentication) handleClusterRoleBinding(instance *operatorv1a
 				currentClusterRoleBinding.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
 			}
 
-			reqLogger.Info("Updating the clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
+			reqLogger.Info("Updating an existing clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
 			err = r.client.Update(context.TODO(), currentClusterRoleBinding)
 			if err != nil {
-				reqLogger.Error(err, "Failed to update clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
+				reqLogger.Error(err, "Failed to update an existing clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
 				return err
 			}
 			// clusterRoleBinding updated successfully - return and requeue

@@ -246,7 +246,7 @@ func (r *ReconcileAuthentication) handleClusterRole(instance *operatorv1alpha1.A
 			if errors.IsNotFound(err) {
 				// Define a new ClusterRole
 				newClusterRole := createClusterRole(clusterRole, crData[clusterRole])
-	
+
 				// Add multiple deployment common-service/config annotation
 				if len(newClusterRole.ObjectMeta.Annotations) == 0 {
 					newClusterRole.ObjectMeta.Annotations = map[string]string{
@@ -255,7 +255,7 @@ func (r *ReconcileAuthentication) handleClusterRole(instance *operatorv1alpha1.A
 				} else {
 					newClusterRole.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
 				}
-	
+
 				reqLogger.Info("Creating a new ClusterRole", "ClusterRole.Name", clusterRole)
 				err = r.client.Create(context.TODO(), newClusterRole)
 				if err != nil {

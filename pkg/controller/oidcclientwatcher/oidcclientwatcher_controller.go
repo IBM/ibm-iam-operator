@@ -196,7 +196,7 @@ func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha
 		if errors.IsNotFound(err) {
 			// Define admin cluster role
 			adminClusterRole := r.adminClusterRoleForOIDCClientWatcher(instance)
-	
+
 			// Add multiple deployment common-service/config annotation
 			if len(adminClusterRole.ObjectMeta.Annotations) == 0 {
 				adminClusterRole.ObjectMeta.Annotations = map[string]string{
@@ -205,7 +205,7 @@ func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha
 			} else {
 				adminClusterRole.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
 			}
-	
+
 			reqLogger.Info("Creating a new ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-admin-aggregate")
 			err = r.client.Create(context.TODO(), adminClusterRole)
 			if err != nil {
@@ -216,6 +216,7 @@ func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha
 			reqLogger.Error(err, "Failed to get ClusterRole")
 			return reconcile.Result{}, err
 		}
+		//cluster role created successfully
 	} else {
 		// Add multiple deployment common-service/config annotation
 		if len(currentClusterRole.ObjectMeta.Annotations) == 0 {
@@ -226,12 +227,13 @@ func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha
 			currentClusterRole.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
 		}
 
-		reqLogger.Info("Updating the ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-admin-aggregate")
+		reqLogger.Info("Updating an existing ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-admin-aggregate")
 		err = r.client.Update(context.TODO(), currentClusterRole)
 		if err != nil {
-			reqLogger.Error(err, "Failed to update ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-admin-aggregate")
+			reqLogger.Error(err, "Failed to update an existing ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-admin-aggregate")
 			return reconcile.Result{}, err
 		}
+		//cluster role updated successfully
 	}
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "icp-oidc-client-operate-aggregate", Namespace: ""}, currentClusterRole)
@@ -239,7 +241,7 @@ func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha
 		if errors.IsNotFound(err) {
 			// Define operator cluster role
 			operatorClusterRole := r.operatorClusterRoleForOIDCClientWatcher(instance)
-	
+
 			// Add multiple deployment common-service/config annotation
 			if len(operatorClusterRole.ObjectMeta.Annotations) == 0 {
 				operatorClusterRole.ObjectMeta.Annotations = map[string]string{
@@ -248,7 +250,7 @@ func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha
 			} else {
 				operatorClusterRole.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
 			}
-	
+
 			reqLogger.Info("Creating a new ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-operate-aggregate")
 			err = r.client.Create(context.TODO(), operatorClusterRole)
 			if err != nil {
@@ -259,6 +261,7 @@ func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha
 			reqLogger.Error(err, "Failed to get ClusterRole")
 			return reconcile.Result{}, err
 		}
+		//cluster role created successfully
 	} else {
 		// Add multiple deployment common-service/config annotation
 		if len(currentClusterRole.ObjectMeta.Annotations) == 0 {
@@ -269,14 +272,15 @@ func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha
 			currentClusterRole.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
 		}
 
-		reqLogger.Info("Updating the ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-operate-aggregate")
+		reqLogger.Info("Updating an existing ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-operate-aggregate")
 		err = r.client.Update(context.TODO(), currentClusterRole)
 		if err != nil {
-			reqLogger.Error(err, "Failed to update ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-operate-aggregate")
+			reqLogger.Error(err, "Failed to update an existing ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-operate-aggregate")
 			return reconcile.Result{}, err
 		}
+		//cluster role updated successfully
 	}
-	//cluster roles created successfully
+
 	return reconcile.Result{Requeue: true}, nil
 }
 

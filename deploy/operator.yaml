@@ -62,7 +62,7 @@ spec:
             - name: ICP_IAM_ONBOARDING_IMAGE
               value: quay.io/opencloudio/icp-iam-onboarding:3.5.0
             - name: AUDIT_SYSLOG_SERVICE_IMAGE
-              value: quay.io/opencloudio/audit-syslog-service:1.0.5
+              value: quay.io/opencloudio/audit-syslog-service:1.0.7
             - name: WATCH_NAMESPACE
               valueFrom:
                 fieldRef:

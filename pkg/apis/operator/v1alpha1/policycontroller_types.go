@@ -34,6 +34,11 @@ type PolicyControllerSpec struct {
 	ImageRegistry   string                       `json:"imageRegistry,omitempty"`
 	ImageTagPostfix string                       `json:"imageTagPostfix,omitempty"`
 	Resources       *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Config          PolicyControllerConfigSpec   `json:"config,omitempty"`
+}
+
+type PolicyControllerConfigSpec struct {
+	ExcludeOperand bool `json:"excludeOperand,omitempty"`
 }
 
 // PolicyControllerStatus defines the observed state of PolicyController

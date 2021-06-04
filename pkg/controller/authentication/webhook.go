@@ -34,7 +34,14 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 
 	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
-	webhook := "namespace-admission-config" + "-" + instance.Namespace
+	// These code changes handles all use cases:
+	// - fresh install in saas or on-prem mode and
+	// - upgrade on older releases in on-prem mode
+	webhook := "namespace-admission-config"
+	if instance.Spec.Config.IBMCloudSaas {
+		// in saas mode
+		webhook = webhook + "-" + instance.Namespace
+	}
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: webhook, Namespace: ""}, currentWebhook)
 	if err != nil {
@@ -76,6 +83,13 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 
 	servicePath := "/identity/api/v1/users/validateandmutate"
 	failurePolicy := reg.Ignore
+
+	hooksName := "iam.hooks.securityenforcement.admission.cloud.ibm.com"
+	if instance.Spec.Config.IBMCloudSaas {
+		// in saas mode
+		hooksName = instance.Namespace + "." + hooksName
+	}
+
 	newWebhook := &reg.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: webhook,
@@ -85,7 +99,7 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 		},
 		Webhooks: []reg.MutatingWebhook{
 			{
-				Name:          instance.Namespace + "." + "iam.hooks.securityenforcement.admission.cloud.ibm.com",
+				Name:          hooksName,
 				FailurePolicy: &failurePolicy,
 				ClientConfig: reg.WebhookClientConfig{
 					Service: &reg.ServiceReference{

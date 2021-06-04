@@ -20,6 +20,7 @@ import (
 	"context"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	res "github.com/IBM/ibm-iam-operator/pkg/resources"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -126,27 +127,57 @@ func (r *ReconcileAuthentication) handleClusterRoleBinding(instance *operatorv1a
 	var err error
 	defaultAdminUser := instance.Spec.Config.DefaultAdminUser
 	oidcIssuerURL := instance.Spec.Config.OIDCIssuerURL
+	csCfgAnnotationName := res.GetCsConfigAnnotation(instance.Namespace)
 
 	crbData := generateCRBData(defaultAdminUser, oidcIssuerURL)
 
 	for clusterRoleBinding, crbValue := range crbData {
 		err = r.client.Get(context.Background(), types.NamespacedName{Name: clusterRoleBinding, Namespace: ""}, currentClusterRoleBinding)
-		if err != nil && errors.IsNotFound(err) {
-			// Define a new clusterRoleBinding
-			newClusterRoleBinding := createClusterRoleBinding(clusterRoleBinding, crbValue)
-			klog.Info("Creating a new clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
-			err = r.client.Create(context.TODO(), newClusterRoleBinding)
-			if err != nil {
-				klog.Error(err, "Failed to create new clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				// Define a new clusterRoleBinding
+				newClusterRoleBinding := createClusterRoleBinding(clusterRoleBinding, crbValue)
+
+				// Add multiple deployment common-service/config annotation
+				if len(newClusterRoleBinding.ObjectMeta.Annotations) == 0 {
+					newClusterRoleBinding.ObjectMeta.Annotations = map[string]string{
+						csCfgAnnotationName: "true",
+					}
+				} else {
+					newClusterRoleBinding.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
+				}
+
+				reqLogger.Info("Creating a new clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
+				err = r.client.Create(context.TODO(), newClusterRoleBinding)
+				if err != nil {
+					reqLogger.Error(err, "Failed to create new clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
+					return err
+				}
+				// clusterRoleBinding created successfully - return and requeue
+				*requeueResult = true
+			} else if err != nil {
+				reqLogger.Error(err, "Failed to get clusterRoleBinding")
 				return err
 			}
-			// clusterRoleBinding created successfully - return and requeue
-			*requeueResult = true
-		} else if err != nil {
-			klog.Error(err, "Failed to get clusterRoleBinding")
-			return err
-		}
+		} else {
+			// Add multiple deployment common-service/config annotation
+			if len(currentClusterRoleBinding.ObjectMeta.Annotations) == 0 {
+				currentClusterRoleBinding.ObjectMeta.Annotations = map[string]string{
+					csCfgAnnotationName: "true",
+				}
+			} else {
+				currentClusterRoleBinding.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
+			}
 
+			reqLogger.Info("Updating an existing clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
+			err = r.client.Update(context.TODO(), currentClusterRoleBinding)
+			if err != nil {
+				reqLogger.Error(err, "Failed to update an existing clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
+				return err
+			}
+			// clusterRoleBinding updated successfully - return and requeue
+			*requeueResult = true
+		}
 	}
 
 	return nil

@@ -35,6 +35,11 @@ spec:
         spec:
           description: PolicyControllerSpec defines the desired state of PolicyController
           properties:
+            config:
+              properties:
+                excludeOperand:
+                  type: boolean
+              type: object
             imageRegistry:
               type: string
             imageTagPostfix:

@@ -34,6 +34,11 @@ type SecretWatcherSpec struct {
 	ImageRegistry   string                       `json:"imageRegistry,omitempty"`
 	ImageTagPostfix string                       `json:"imageTagPostfix,omitempty"`
 	Resources       *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Config          SecretWatcherConfigSpec      `json:"config,omitempty"`
+}
+
+type SecretWatcherConfigSpec struct {
+	ExcludeOperand bool `json:"excludeOperand,omitempty"`
 }
 
 // SecretWatcherStatus defines the observed state of SecretWatcher

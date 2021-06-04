@@ -20,6 +20,7 @@ import (
 	"context"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	res "github.com/IBM/ibm-iam-operator/pkg/resources"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -236,25 +237,56 @@ func (r *ReconcileAuthentication) handleClusterRole(instance *operatorv1alpha1.A
 
 	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
+	csCfgAnnotationName := res.GetCsConfigAnnotation(instance.Namespace)
 
 	crData := generateCRData()
 
 	for clusterRole := range crData {
 		err = r.client.Get(context.Background(), types.NamespacedName{Name: clusterRole, Namespace: ""}, currentClusterRole)
-		if err != nil && errors.IsNotFound(err) {
-			// Define a new ClusterRole
-			newClusterRole := createClusterRole(clusterRole, crData[clusterRole])
-			klog.Info("Creating a new ClusterRole", "ClusterRole.Name", clusterRole)
-			err = r.client.Create(context.TODO(), newClusterRole)
-			if err != nil {
-				klog.Error(err, "Failed to create new ClusterRole", "ClusterRole.Name", clusterRole)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				// Define a new ClusterRole
+				newClusterRole := createClusterRole(clusterRole, crData[clusterRole])
+
+				// Add multiple deployment common-service/config annotation
+				if len(newClusterRole.ObjectMeta.Annotations) == 0 {
+					newClusterRole.ObjectMeta.Annotations = map[string]string{
+						csCfgAnnotationName: "true",
+					}
+				} else {
+					newClusterRole.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
+				}
+
+				reqLogger.Info("Creating a new ClusterRole", "ClusterRole.Name", clusterRole)
+				err = r.client.Create(context.TODO(), newClusterRole)
+				if err != nil {
+					reqLogger.Error(err, "Failed to create new ClusterRole", "ClusterRole.Name", clusterRole)
+					return err
+				}
+				// ClusterRole created successfully - return and requeue
+				*requeueResult = true
+			} else if err != nil {
+				reqLogger.Error(err, "Failed to get ClusterRole")
 				return err
 			}
-			// ClusterRole created successfully - return and requeue
+		} else {
+			// Add multiple deployment common-service/config annotation
+			if len(currentClusterRole.ObjectMeta.Annotations) == 0 {
+				currentClusterRole.ObjectMeta.Annotations = map[string]string{
+					csCfgAnnotationName: "true",
+				}
+			} else {
+				currentClusterRole.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
+			}
+
+			reqLogger.Info("Updating the ClusterRole", "ClusterRole.Name", clusterRole)
+			err = r.client.Update(context.TODO(), currentClusterRole)
+			if err != nil {
+				reqLogger.Error(err, "Failed to update ClusterRole", "ClusterRole.Name", clusterRole)
+				return err
+			}
+			// ClusterRole updated successfully - return and requeue
 			*requeueResult = true
-		} else if err != nil {
-			klog.Error(err, "Failed to get ClusterRole")
-			return err
 		}
 
 	}

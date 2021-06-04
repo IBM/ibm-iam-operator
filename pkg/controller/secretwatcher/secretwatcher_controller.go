@@ -138,6 +138,12 @@ func (r *ReconcileSecretWatcher) Reconcile(context context.Context, request reco
 		}
 	}
 
+	// skip deploying secretwatcher if chosen not to deploy
+	if SecretWatcher.Spec.Config.ExcludeOperand {
+		reqLogger.Info("The secretwatcher will not be deployed, it has chosen not to deploy")
+		return reconcile.Result{}, nil
+	}
+
 	// Check if the deployment already exists, if not create a new one
 	instance := &appsv1.Deployment{}
 	err = r.client.Get(context, types.NamespacedName{Name: "secret-watcher", Namespace: SecretWatcher.Namespace}, instance)

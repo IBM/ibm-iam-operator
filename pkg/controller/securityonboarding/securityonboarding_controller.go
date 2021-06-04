@@ -920,6 +920,15 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			},
 		},
 		{
+			Name: "IBM_CLOUD_SAAS",
+			ValueFrom: &corev1.EnvVarSource{
+				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+					Key:                  "IBM_CLOUD_SAAS",
+					LocalObjectReference: corev1.LocalObjectReference{Name: "platform-auth-idp"},
+				},
+			},
+		},
+		{
 			Name:  "MONGO_DB",
 			Value: "platform-db",
 		},

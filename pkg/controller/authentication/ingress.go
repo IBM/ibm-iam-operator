@@ -89,6 +89,7 @@ func apiKeyIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Sc
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/apikeys",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-auth-service",
@@ -142,6 +143,7 @@ func explorerIdmgmtIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/idmgmt/explorer/",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-identity-management",
@@ -191,6 +193,7 @@ func iamTokenRedirectIngress(instance *operatorv1alpha1.Authentication, scheme *
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/iam-token/oidc/",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-auth-service",
@@ -240,6 +243,7 @@ func iamTokenIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/iam-token/",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-auth-service",
@@ -289,6 +293,7 @@ func ibmidUiCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *r
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/oidcclient/redirect/ICP_IBMID",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-auth-service",
@@ -343,6 +348,7 @@ func idMgmtIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Sc
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/idmgmt/",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-identity-management",
@@ -393,6 +399,7 @@ func idmgmtV2ApiIngress(instance *operatorv1alpha1.Authentication, scheme *runti
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/idmgmt/identity/api/v2/teams/resources",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-identity-management",
@@ -442,6 +449,7 @@ func platformAuthDirIngress(instance *operatorv1alpha1.Authentication, scheme *r
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/authdir/",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-auth-service",
@@ -501,6 +509,7 @@ func platformAuthIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/v1/auth/",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-identity-provider",
@@ -552,6 +561,7 @@ func platformIdAuthBlockIngress(instance *operatorv1alpha1.Authentication, schem
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/idauth/oidc/endpoint",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "default-http-backend",
@@ -601,6 +611,7 @@ func platformIdAuthIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/idauth",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-auth-service",
@@ -652,6 +663,7 @@ func platformIdProviderIngress(instance *operatorv1alpha1.Authentication, scheme
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/idprovider/",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-identity-provider",
@@ -708,6 +720,7 @@ func platformLoginIngress(instance *operatorv1alpha1.Authentication, scheme *run
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/login",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-identity-provider",
@@ -759,6 +772,7 @@ func platformOidcBlockIngress(instance *operatorv1alpha1.Authentication, scheme 
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/oidc/endpoint",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "default-http-backend",
@@ -826,6 +840,7 @@ func platformOidcIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/oidc",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-auth-service",
@@ -876,6 +891,7 @@ func platformOidcIntrospectIngress(instance *operatorv1alpha1.Authentication, sc
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/oidc/introspect",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-auth-service",
@@ -926,6 +942,7 @@ func platformOidcKeysIngress(instance *operatorv1alpha1.Authentication, scheme *
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/oidc/keys",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-auth-service",
@@ -975,6 +992,7 @@ func platformOidcToken2Ingress(instance *operatorv1alpha1.Authentication, scheme
 							Paths: []net.HTTPIngressPath{
 								{ // @posriniv - double check the route
 									Path: "/oidc/token",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-auth-service",
@@ -1025,6 +1043,7 @@ func platformOidcTokenIngress(instance *operatorv1alpha1.Authentication, scheme 
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/oidc/token",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-auth-service",
@@ -1074,6 +1093,7 @@ func serviceIdIngress(instance *operatorv1alpha1.Authentication, scheme *runtime
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/serviceids",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-auth-service",
@@ -1123,6 +1143,7 @@ func tokenServiceVersionIngress(instance *operatorv1alpha1.Authentication, schem
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/v1",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-auth-service",
@@ -1172,6 +1193,7 @@ func samlUiCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/ibm/saml20/defaultSP/acs",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-auth-service",
@@ -1222,6 +1244,7 @@ func versionIdmgmtIngress(instance *operatorv1alpha1.Authentication, scheme *run
 							Paths: []net.HTTPIngressPath{
 								{
 									Path: "/idmgmt/identity/api/v1/",
+									PathType: "ImplementationSpecific",
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{
 											Name: "platform-identity-management",

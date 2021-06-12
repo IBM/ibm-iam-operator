@@ -27,12 +27,11 @@ import (
 	res "github.com/IBM/ibm-iam-operator/pkg/resources"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	net "k8s.io/api/networking/v1beta1"
+	net "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -472,7 +471,7 @@ func (r *ReconcilePolicyDecision) configMapForPolicyDecision(instance *operatorv
 }
 
 func (r *ReconcilePolicyDecision) ingressForPolicyDecision(instance *operatorv1alpha1.PolicyDecision) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	pdpIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -492,11 +491,14 @@ func (r *ReconcilePolicyDecision) ingressForPolicyDecision(instance *operatorv1a
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/iam-pdp/",
+									Path:     "/iam-pdp/",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "iam-pdp",
-										ServicePort: intstr.IntOrString{
-											IntVal: port,
+										Service: &net.IngressServiceBackend{
+											Name: "iam-pdp",
+											Port: net.ServiceBackendPort{
+												Number: 7998,
+											},
 										},
 									},
 								},

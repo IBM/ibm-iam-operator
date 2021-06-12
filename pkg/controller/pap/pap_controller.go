@@ -28,12 +28,11 @@ import (
 	res "github.com/IBM/ibm-iam-operator/pkg/resources"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	net "k8s.io/api/networking/v1beta1"
+	net "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -560,7 +559,7 @@ func (r *ReconcilePap) configMapForPap(instance *operatorv1alpha1.Pap) *corev1.C
 }
 
 func (r *ReconcilePap) ingressForPap(instance *operatorv1alpha1.Pap) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	papIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -580,11 +579,14 @@ func (r *ReconcilePap) ingressForPap(instance *operatorv1alpha1.Pap) *net.Ingres
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/iam-pap/",
+									Path:     "/iam-pap/",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: iamPapServiceValues.Name,
-										ServicePort: intstr.IntOrString{
-											IntVal: iamPapServiceValues.Port,
+										Service: &net.IngressServiceBackend{
+											Name: "iam-pap",
+											Port: net.ServiceBackendPort{
+												Number: 39001,
+											},
 										},
 									},
 								},

@@ -1743,9 +1743,9 @@ spec:
                 - ibm-iam-operator
                 env:
                 - name: ICP_PLATFORM_AUTH_IMAGE
-                  value: quay.io/opencloudio/icp-platform-auth:3.5.0
+                  value: quay.io/opencloudio/icp-platform-auth:3.6.0
                 - name: ICP_IDENTITY_PROVIDER_IMAGE
-                  value: quay.io/opencloudio/icp-identity-provider:3.5.0
+                  value: quay.io/opencloudio/icp-identity-provider:3.6.0
                 - name: ICP_IDENTITY_MANAGER_IMAGE
                   value: quay.io/opencloudio/icp-identity-manager:3.5.0
                 - name: IAM_POLICY_ADMINISTRATION_IMAGE
@@ -2033,5 +2033,5 @@ spec:
   maturity: stable
   provider:
     name: IBM
-  replaces: ibm-iam-operator.v3.10.1
+  replaces: ibm-iam-operator.v3.10.0
   version: 3.11.0

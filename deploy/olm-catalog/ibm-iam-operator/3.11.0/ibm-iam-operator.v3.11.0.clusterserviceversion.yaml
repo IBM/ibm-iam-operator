@@ -263,7 +263,7 @@ metadata:
             "initMongodb": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.6.0",
+              "imageTag": "3.5.0",
               "resources": {
                 "limits": {
                   "cpu": "100m",

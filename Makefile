@@ -29,7 +29,7 @@ NAMESPACE=ibm-common-services
 # Use your own docker registry and image name for dev/test by overridding the IMG and REGISTRY environment variable.
 IMG ?= ibm-iam-operator
 REGISTRY ?= "hyc-cloud-private-integration-docker-local.artifactory.swg-devops.com/ibmcom"
-CSV_VERSION ?= 3.10.0
+CSV_VERSION ?= 3.11.0
 
 QUAY_USERNAME ?=
 QUAY_PASSWORD ?=

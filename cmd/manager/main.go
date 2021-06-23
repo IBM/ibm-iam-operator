@@ -37,7 +37,9 @@ import (
 	"github.com/operator-framework/operator-sdk/pkg/log/zap"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+
+	//"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
@@ -50,19 +52,19 @@ var (
 	operatorMetricsPort int32 = 8686
 )
 
-//var log = logf.Log.WithName("cmd")
+var log = logf.Log.WithName("cmd")
 
 func printVersion() {
 
-	klog.Infof(fmt.Sprintf("Operator Version: %s", version.Version))
-	klog.Infof(fmt.Sprintf("Go Version: %s", runtime.Version()))
-	klog.Infof(fmt.Sprintf("Go OS/Arch: %s/%s", runtime.GOOS, runtime.GOARCH))
-	klog.Infof(fmt.Sprintf("Version of operator-sdk: %v", sdkVersion.Version))
+	log.Info(fmt.Sprintf("Operator Version: %s", version.Version))
+	log.Info(fmt.Sprintf("Go Version: %s", runtime.Version()))
+	log.Info(fmt.Sprintf("Go OS/Arch: %s/%s", runtime.GOOS, runtime.GOARCH))
+	log.Info(fmt.Sprintf("Version of operator-sdk: %v", sdkVersion.Version))
 }
 
 func main() {
-	klog.InitFlags(nil)
-	defer klog.Flush()
+	//log.InitFlags(nil)
+	//defer log.Flush()
 	// Add the zap logger flag set to the CLI. The flag set must
 	// be added before calling pflag.Parse().
 	pflag.CommandLine.AddFlagSet(zap.FlagSet())
@@ -87,14 +89,14 @@ func main() {
 
 	namespace, err := k8sutil.GetWatchNamespace()
 	if err != nil {
-		klog.Error(err, "Failed to get watch namespace")
+		log.Error(err, "Failed to get watch namespace")
 		os.Exit(1)
 	}
 
 	// Get a config to talk to the apiserver
 	cfg, err := config.GetConfig()
 	if err != nil {
-		klog.Error(err, "")
+		log.Error(err, "")
 		os.Exit(1)
 	}
 
@@ -102,7 +104,7 @@ func main() {
 	// Become the leader before proceeding
 	err = leader.Become(ctx, "ibm-iam-operator-lock")
 	if err != nil {
-		klog.Error(err, "")
+		log.Error(err, "")
 		os.Exit(1)
 	}
 
@@ -112,21 +114,21 @@ func main() {
 		MetricsBindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),
 	})
 	if err != nil {
-		klog.Error(err, "")
+		log.Error(err, "")
 		os.Exit(1)
 	}
 
-	klog.Info("Registering Components.")
+	log.Info("Registering Components.")
 
 	// Setup Scheme for all resources
 	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
-		klog.Error(err, "")
+		log.Error(err, "")
 		os.Exit(1)
 	}
 
 	// Setup all Controllers
 	if err := controller.AddToManager(mgr); err != nil {
-		klog.Error(err, "")
+		log.Error(err, "")
 		os.Exit(1)
 	}
 
@@ -134,11 +136,11 @@ func main() {
 	// Disable metrics for now to avoid continuous 'failed to list' logs
 	//addMetrics(ctx, cfg, namespace)
 
-	klog.Info("Starting the Cmd.")
+	log.Info("Starting the Cmd.")
 
 	// Start the Cmd
 	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
-		klog.Error(err, "Manager exited non-zero")
+		log.Error(err, "Manager exited non-zero")
 		os.Exit(1)
 	}
 }
@@ -148,10 +150,10 @@ func main() {
 func addMetrics(ctx context.Context, cfg *rest.Config, namespace string) {
 	/*if err := serveCRMetrics(cfg); err != nil {
 		if errors.Is(err, k8sutil.ErrRunLocal) {
-			klog.Info("Skipping CR metrics server creation; not running in a cluster.")
+			log.Info("Skipping CR metrics server creation; not running in a cluster.")
 			return
 		}
-		klog.Info("Could not generate and serve custom resource metrics", "error", err.Error())
+		log.Info("Could not generate and serve custom resource metrics", "error", err.Error())
 	}
 
 		// Add to the below struct any other metrics ports you want to expose.

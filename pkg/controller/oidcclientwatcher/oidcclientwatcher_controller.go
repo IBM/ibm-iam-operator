@@ -19,8 +19,8 @@ package oidcclientwatcher
 import (
 	"context"
 	"reflect"
-	"time"
 	gorun "runtime"
+	"time"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
@@ -33,13 +33,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
-	//logf "sigs.k8s.io/controller-runtime/pkg/log"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -60,7 +59,7 @@ var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI) // 128Mi
 var memory256 = resource.NewQuantity(256*1024*1024, resource.BinarySI) // 256Mi
 var serviceAccountName string = "ibm-iam-operand-restricted"
 
-//var log = logf.Log.WithName("controller_oidcclientwatcher")
+var log = logf.Log.WithName("controller_oidcclientwatcher")
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -124,7 +123,7 @@ type ReconcileOIDCClientWatcher struct {
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 func (r *ReconcileOIDCClientWatcher) Reconcile(context context.Context, request reconcile.Request) (reconcile.Result, error) {
-	//reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 
 	// Fetch the OIDCClientWatcher instance
 	instance := &operatorv1alpha1.OIDCClientWatcher{}
@@ -136,11 +135,11 @@ func (r *ReconcileOIDCClientWatcher) Reconcile(context context.Context, request 
 			// Request object not instance, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			klog.Info("OIDCClientWatcher resource not instance. Ignoring since object must be deleted")
+			reqLogger.Info("OIDCClientWatcher resource not instance. Ignoring since object must be deleted")
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		klog.Error(err, "Failed to get OIDCClientWatcher")
+		reqLogger.Error(err, "Failed to get OIDCClientWatcher")
 		return reconcile.Result{}, err
 	}
 
@@ -152,7 +151,7 @@ func (r *ReconcileOIDCClientWatcher) Reconcile(context context.Context, request 
 		if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
 			if err := r.client.Update(context, instance); err != nil {
-				klog.Error(err, "Error adding the finalizer to the CR")
+				reqLogger.Error(err, "Error adding the finalizer to the CR")
 				return reconcile.Result{}, err
 			}
 		}
@@ -160,14 +159,14 @@ func (r *ReconcileOIDCClientWatcher) Reconcile(context context.Context, request 
 		// Object scheduled to be deleted
 		if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 			if err := r.deleteExternalResources(instance); err != nil {
-				klog.Error(err, "Error deleting resources created by this operator")
+				reqLogger.Error(err, "Error deleting resources created by this operator")
 
 				return reconcile.Result{}, err
 			}
 
 			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
 			if err := r.client.Update(context, instance); err != nil {
-				klog.Error(err, "Error updating the CR to remove the finalizer")
+				reqLogger.Error(err, "Error updating the CR to remove the finalizer")
 				return reconcile.Result{}, err
 			}
 
@@ -217,7 +216,7 @@ func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha
 				return reconcile.Result{}, err
 			}
 		} else {
-			reqLogger.Error(err, "Failed to get ClusterRole")
+			//reqLogger.Error(err, "Failed to get ClusterRole")
 			return reconcile.Result{}, err
 		}
 		//cluster role created successfully
@@ -290,26 +289,26 @@ func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha
 func (r *ReconcileOIDCClientWatcher) handleDeployment(instance *operatorv1alpha1.OIDCClientWatcher, currentDeployment *appsv1.Deployment) (reconcile.Result, error) {
 
 	// Check if this Deployment already exists
-	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "oidcclient-watcher", Namespace: instance.Namespace}, currentDeployment)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Define a new deployment
 			ocwDep := r.deploymentForOIDCClientWatcher(instance)
-			klog.Info("Creating a new Deployment", "Deployment.Namespace", ocwDep.Namespace, "Deployment.Name", ocwDep.Name)
+			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", ocwDep.Namespace, "Deployment.Name", ocwDep.Name)
 			err = r.client.Create(context.TODO(), ocwDep)
 			if err != nil {
-				klog.Error(err, "Failed to create new Deployment", "Deployment.Namespace", ocwDep.Namespace, "Deployment.Name", ocwDep.Name)
+				reqLogger.Error(err, "Failed to create new Deployment", "Deployment.Namespace", ocwDep.Namespace, "Deployment.Name", ocwDep.Name)
 				return reconcile.Result{}, err
 			}
 			// Deployment created successfully - return and requeue
 			return reconcile.Result{Requeue: true}, nil
 		} else {
-			klog.Error(err, "Failed to get Deployment")
+			reqLogger.Error(err, "Failed to get Deployment")
 			return reconcile.Result{}, err
 		}
 	} else {
-		klog.Info("Updating an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
+		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
 		ocwDep := r.deploymentForOIDCClientWatcher(instance)
 		certmanagerLabel := "certmanager.k8s.io/time-restarted"
 		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
@@ -322,7 +321,7 @@ func (r *ReconcileOIDCClientWatcher) handleDeployment(instance *operatorv1alpha1
 		currentDeployment.Spec = ocwDep.Spec
 		err = r.client.Update(context.TODO(), currentDeployment)
 		if err != nil {
-			klog.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
+			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
 			return reconcile.Result{}, err
 		}
 	}
@@ -333,7 +332,7 @@ func (r *ReconcileOIDCClientWatcher) handleDeployment(instance *operatorv1alpha1
 		currentDeployment.Spec.Replicas = &replicas
 		err = r.client.Update(context.TODO(), instance)
 		if err != nil {
-			klog.Error(err, "Failed to update Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", instance.Name)
+			reqLogger.Error(err, "Failed to update Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", instance.Name)
 			return reconcile.Result{}, err
 		}
 		// Spec updated - return and requeue
@@ -348,7 +347,7 @@ func (r *ReconcileOIDCClientWatcher) handleDeployment(instance *operatorv1alpha1
 		client.MatchingLabels(map[string]string{"app": "oidcclient-watcher"}),
 	}
 	if err = r.client.List(context.TODO(), podList, listOpts...); err != nil {
-		klog.Error(err, "Failed to list pods", "OIDCClientWatcher.Namespace", instance.Namespace, "OIDCClientWatcher.Name", instance.Name)
+		reqLogger.Error(err, "Failed to list pods", "OIDCClientWatcher.Namespace", instance.Namespace, "OIDCClientWatcher.Name", instance.Name)
 		return reconcile.Result{}, err
 	}
 	podNames := getPodNames(podList.Items)
@@ -358,7 +357,7 @@ func (r *ReconcileOIDCClientWatcher) handleDeployment(instance *operatorv1alpha1
 		instance.Status.Nodes = podNames
 		err := r.client.Status().Update(context.TODO(), instance)
 		if err != nil {
-			klog.Error(err, "Failed to update OIDCClientWatcher status")
+			reqLogger.Error(err, "Failed to update OIDCClientWatcher status")
 			return reconcile.Result{}, err
 		}
 	}
@@ -427,9 +426,9 @@ func (r *ReconcileOIDCClientWatcher) operatorClusterRoleForOIDCClientWatcher(ins
 
 // deploymentForOIDCClientWatcher returns a OIDCClientWatcher Deployment object
 func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *operatorv1alpha1.OIDCClientWatcher) *appsv1.Deployment {
-	//	reqLogger := log.WithValues("deploymentForOIDCClientWatcher", "Entry", "instance.Name", instance.Name)
+	reqLogger := log.WithValues("deploymentForOIDCClientWatcher", "Entry", "instance.Name", instance.Name)
 	//image := instance.Spec.ImageRegistry + shatag.GetImageRef("ICP_OIDCCLIENT_WATCHER_IMAGE")
-	image := "quay.io/yannizhang2019/oidccilent-watcher:0.1"
+	image := shatag.GetImageRef("ICP_OIDCCLIENT_WATCHER_IMAGE")
 	replicas := instance.Spec.Replicas
 	resources := instance.Spec.Resources
 	if resources == nil {
@@ -842,7 +841,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 	// Set OIDCClientWatcher instance as the owner and controller
 	err := controllerutil.SetControllerReference(instance, ocwDep, r.scheme)
 	if err != nil {
-		klog.Error(err, "Failed to set owner for Deployment")
+		reqLogger.Error(err, "Failed to set owner for Deployment")
 		return nil
 	}
 	return ocwDep
@@ -854,7 +853,7 @@ func getPodNames(pods []corev1.Pod) []string {
 	var podNames []string
 	for _, pod := range pods {
 		podNames = append(podNames, pod.Name)
-		klog.Info("CS??? pod name=" + pod.Name)
+		log.Info("CS??? pod name=" + pod.Name)
 	}
 	return podNames
 }
@@ -917,7 +916,7 @@ func removeCsAnnotationFromCR(client client.Client, crName string, csCfgAnnotati
 	} else if err == nil {
 		if len(clusterRole.ObjectMeta.Annotations) > 0 {
 			if _, ok := clusterRole.ObjectMeta.Annotations[csCfgAnnotationName]; ok {
-				delete(clusterRole.ObjectMeta.Annotations, csCfgAnnotationName);
+				delete(clusterRole.ObjectMeta.Annotations, csCfgAnnotationName)
 				if err = client.Update(context.Background(), clusterRole); err != nil {
 					// if error, retry second time to avoid manual deletion after uninstall
 					if err2 := client.Update(context.Background(), clusterRole); err2 != nil {
@@ -933,12 +932,11 @@ func removeCsAnnotationFromCR(client client.Client, crName string, csCfgAnnotati
 	return nil
 }
 
-
 func removeCR(client client.Client, crName string) error {
 	// Delete Clusterrole
 	clusterRole := &rbacv1.ClusterRole{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: crName, Namespace: ""}, clusterRole); err != nil && errors.IsNotFound(err) {
-		klog.Info("Error getting cluster role", crName, err)
+		log.Info("Error getting cluster role", crName, err)
 		return nil
 	} else if err == nil {
 		if !res.IsCsConfigAnnotationExists(clusterRole.ObjectMeta.Annotations) {

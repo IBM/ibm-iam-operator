@@ -40,14 +40,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
-	//logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"k8s.io/klog"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-//var log = logf.Log.WithName("controller_authentication")
+var log = logf.Log.WithName("controller_authentication")
 var fullAccess int32 = 0777
 var trueVar bool = true
 var falseVar bool = false
@@ -194,8 +193,8 @@ type ReconcileAuthentication struct {
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 func (r *ReconcileAuthentication) Reconcile(contect context.Context, request reconcile.Request) (reconcile.Result, error) {
-	//	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-	klog.Info("Reconciling Authentication", "Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	reqLogger.Info("Reconciling Authentication", "Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	var requeueResult bool = false
 
 	// Fetch the Authentication instance
@@ -220,7 +219,7 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 		if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
 			if err := r.client.Update(context.Background(), instance); err != nil {
-				klog.Error(err, "Error adding the finalizer to the CR")
+				log.Error(err, "Error adding the finalizer to the CR")
 				return reconcile.Result{}, err
 			}
 		}
@@ -228,14 +227,14 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 		// Object scheduled to be deleted
 		if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 			if err := r.deleteExternalResources(instance); err != nil {
-				klog.Error(err, "Error deleting resources created by this operator")
+				log.Error(err, "Error deleting resources created by this operator")
 
 				return reconcile.Result{}, err
 			}
 
 			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
 			if err := r.client.Update(context.Background(), instance); err != nil {
-				klog.Error(err, "Error updating the CR to remove the finalizer")
+				log.Error(err, "Error updating the CR to remove the finalizer")
 				return reconcile.Result{}, err
 			}
 
@@ -299,12 +298,12 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 		return reconcile.Result{}, err
 	}
 
-	klog.Info("Calling webhook configuration")
+	log.Info("Calling webhook configuration")
 
 	currentWebhook := &reg.MutatingWebhookConfiguration{}
 	err = r.handleWebhook(instance, currentWebhook, &requeueResult)
 	if err != nil {
-		klog.Info("Webhook error", err)
+		log.Info("Webhook error", err)
 		return reconcile.Result{}, err
 	}
 
@@ -359,7 +358,7 @@ func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1al
 		}
 	}
 
-	klog.V(0).Info("Wait for 2 seconds.")
+	log.V(0).Info("Wait for 2 seconds.")
 	time.Sleep(time.Second * 2)
 
 	// Finally check and remove Cluster Role
@@ -376,7 +375,7 @@ func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1al
 		}
 	}
 
-	klog.V(0).Info("Wait for 2 seconds.")
+	log.V(0).Info("Wait for 2 seconds.")
 	time.Sleep(time.Second * 2)
 
 	// Remove User
@@ -430,7 +429,7 @@ func removeCsAnnotationFromCR(client client.Client, crName string, csCfgAnnotati
 	// Remove common-service/config annotation
 	clusterRole := &rbacv1.ClusterRole{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: crName, Namespace: ""}, clusterRole); err != nil && errors.IsNotFound(err) {
-		klog.V(1).Info("Error getting cluster role", crName, err)
+		log.V(1).Info("Error getting cluster role", crName, err)
 		return nil
 	} else if err == nil {
 		if len(clusterRole.ObjectMeta.Annotations) > 0 {
@@ -439,7 +438,7 @@ func removeCsAnnotationFromCR(client client.Client, crName string, csCfgAnnotati
 				if err = client.Update(context.Background(), clusterRole); err != nil {
 					// if error, retry second time to avoid manual deletion after uninstall
 					if err2 := client.Update(context.Background(), clusterRole); err2 != nil {
-						klog.V(1).Info("Error removing common-service/config from cluster role", "name", crName, "error message", err2)
+						log.V(1).Info("Error removing common-service/config from cluster role", "name", crName, "error message", err2)
 						return err2
 					}
 				}
@@ -455,7 +454,7 @@ func removeCsAnnotationFromCRB(client client.Client, crbName string, csCfgAnnota
 	// Remove common-service/config annotation
 	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: crbName, Namespace: ""}, clusterRoleBinding); err != nil && errors.IsNotFound(err) {
-		klog.V(1).Info("Error getting cluster role binding", crbName, err)
+		log.V(1).Info("Error getting cluster role binding", crbName, err)
 		return nil
 	} else if err == nil {
 		if len(clusterRoleBinding.ObjectMeta.Annotations) > 0 {
@@ -464,7 +463,7 @@ func removeCsAnnotationFromCRB(client client.Client, crbName string, csCfgAnnota
 				if err = client.Update(context.Background(), clusterRoleBinding); err != nil {
 					// if error, retry second time to avoid manual deletion after uninstall
 					if err2 := client.Update(context.Background(), clusterRoleBinding); err2 != nil {
-						klog.V(1).Info("Error removing common-service/config annotation from cluster role binding", "name", crbName, "error message", err2)
+						log.V(1).Info("Error removing common-service/config annotation from cluster role binding", "name", crbName, "error message", err2)
 						return err2
 					}
 				}
@@ -480,12 +479,12 @@ func removeCR(client client.Client, crName string) error {
 	// Delete Clusterrole
 	clusterRole := &rbacv1.ClusterRole{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: crName, Namespace: ""}, clusterRole); err != nil && errors.IsNotFound(err) {
-		klog.V(1).Info("Error getting cluster role", crName, err)
+		log.V(1).Info("Error getting cluster role", crName, err)
 		return nil
 	} else if err == nil {
 		if !res.IsCsConfigAnnotationExists(clusterRole.ObjectMeta.Annotations) {
 			if err = client.Delete(context.Background(), clusterRole); err != nil {
-				klog.V(1).Info("Error deleting cluster role", "name", crName, "error message", err)
+				log.V(1).Info("Error deleting cluster role", "name", crName, "error message", err)
 				return err
 			}
 		}
@@ -499,19 +498,19 @@ func removeCRB(client client.Client, crbName string) error {
 	// Delete ClusterRoleBinding
 	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: crbName, Namespace: ""}, clusterRoleBinding); err != nil && errors.IsNotFound(err) {
-		klog.Info("Error getting cluster role binding", crbName, err)
+		log.Info("Error getting cluster role binding", crbName, err)
 		return nil
 	} else if err == nil {
 		if crbName == "oidc-admin-binding" {
 			clusterRoleBinding.ObjectMeta.Finalizers = []string{}
 			if err = client.Update(context.Background(), clusterRoleBinding); err != nil {
-				klog.Info("Error updating cluster role binding", "name", crbName, "error message", err)
+				log.Info("Error updating cluster role binding", "name", crbName, "error message", err)
 				return err
 			}
 		}
 		if !res.IsCsConfigAnnotationExists(clusterRoleBinding.ObjectMeta.Annotations) {
 			if err = client.Delete(context.Background(), clusterRoleBinding); err != nil {
-				klog.V(1).Info("Error deleting cluster role binding", "name", crbName, "error message", err)
+				log.V(1).Info("Error deleting cluster role binding", "name", crbName, "error message", err)
 				return err
 			}
 		}
@@ -525,13 +524,13 @@ func removeUser(client client.Client, userName string) error {
 	// Delete User
 	user := &userv1.User{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: userName, Namespace: ""}, user); err != nil && errors.IsNotFound(err) {
-		klog.V(1).Info("Error getting user", userName, err)
+		log.V(1).Info("Error getting user", userName, err)
 		return nil
 	} else if err == nil {
 		// check if oidc-admin-binding CRB exists or not
 		if !isOidcAdminBindingCRBExists(client) {
 			if err = client.Delete(context.Background(), user); err != nil {
-				klog.V(1).Info("Error deleting user", "name", userName, "error message", err)
+				log.V(1).Info("Error deleting user", "name", userName, "error message", err)
 				return err
 			}
 		}
@@ -545,11 +544,11 @@ func removeWebhook(client client.Client, webhookName string) error {
 	// Delete Webhook
 	webhook := &reg.MutatingWebhookConfiguration{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: webhookName, Namespace: ""}, webhook); err != nil && errors.IsNotFound(err) {
-		klog.Info("Error getting webhook", webhookName, err)
+		log.Info("Error getting webhook", webhookName, err)
 		return nil
 	} else if err == nil {
 		if err = client.Delete(context.Background(), webhook); err != nil {
-			klog.V(1).Info("Error deleting webhook", "name", webhookName, "error message", err)
+			log.V(1).Info("Error deleting webhook", "name", webhookName, "error message", err)
 			return err
 		}
 	} else {

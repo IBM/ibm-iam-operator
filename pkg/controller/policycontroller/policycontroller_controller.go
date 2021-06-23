@@ -37,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -153,7 +152,7 @@ func (r *ReconcilePolicyController) Reconcile(context context.Context, request r
 		if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
 			if err := r.client.Update(context, instance); err != nil {
-				reqLogger.Error(err, "Error adding the finalizer to the CR")
+				log.Error(err, "Error adding the finalizer to the CR")
 				return reconcile.Result{}, err
 			}
 		}
@@ -161,14 +160,14 @@ func (r *ReconcilePolicyController) Reconcile(context context.Context, request r
 		// Object scheduled to be deleted
 		if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 			if err := r.deleteExternalResources(instance); err != nil {
-				reqLogger.Error(err, "Error deleting resources created by this operator")
+				log.Error(err, "Error deleting resources created by this operator")
 
 				return reconcile.Result{}, err
 			}
 
 			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
 			if err := r.client.Update(context, instance); err != nil {
-				reqLogger.Error(err, "Error updating the CR to remove the finalizer")
+				log.Error(err, "Error updating the CR to remove the finalizer")
 				return reconcile.Result{}, err
 			}
 
@@ -761,7 +760,7 @@ func removeCRB(client client.Client, crbName string) error {
 	// Delete ClusterRoleBinding
 	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: crbName, Namespace: ""}, clusterRoleBinding); err != nil && errors.IsNotFound(err) {
-		log.Info("Error getting cluster role binding", crbName, err)
+		log.V(1).Info("Error getting cluster role binding", crbName, err)
 		return nil
 	} else if err == nil {
 		if !res.IsCsConfigAnnotationExists(clusterRoleBinding.ObjectMeta.Annotations) {

@@ -527,7 +527,7 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 	}
 
 	reqLogger := log.WithValues("deploymentForPolicyDecision", "Entry", "instance.Name", instance.Name)
-	pdpImage := "quay.io/yannizhang2019/iam-policy-decision:0.1"
+	pdpImage := shatag.GetImageRef("IAM_POLICY_DECISION_IMAGE")
 	mongoDBImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
 	auditImage := shatag.GetImageRef("AUDIT_SYSLOG_SERVICE_IMAGE")
 	replicas := instance.Spec.Replicas

@@ -30,14 +30,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Authentication, currentDeployment *appsv1.Deployment, requeueResult *bool) error {
 
-	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
 	// Check for the presence of dependencies
 	consoleConfigMapName := "management-ingress-info"
@@ -45,17 +44,17 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: consoleConfigMapName, Namespace: instance.Namespace}, consoleConfigMap)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			klog.Error(err, "The configmap ", consoleConfigMapName, " is not created yet")
+			reqLogger.Error(err, "The configmap ", consoleConfigMapName, " is not created yet")
 			return err
 		} else {
-			klog.Error(err, "Failed to get ConfigMap", consoleConfigMapName)
+			reqLogger.Error(err, "Failed to get ConfigMap", consoleConfigMapName)
 			return err
 		}
 	}
 	icpConsoleURL := consoleConfigMap.Data["MANAGEMENT_INGRESS_ROUTE_HOST"]
 
 	// Check for the presence of dependencies, for SAAS
-	klog.Info("Is SAAS enabled?", "Instance spec config value", instance.Spec.Config.IBMCloudSaas)
+	reqLogger.Info("Is SAAS enabled?", "Instance spec config value", instance.Spec.Config.IBMCloudSaas)
 	var saasServiceIdCrn string = ""
 	saasTenantConfigMapName := "cs-saas-tenant-config"
 	saasTenantConfigMap := &corev1.ConfigMap{}
@@ -63,14 +62,14 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 		err := r.client.Get(context.TODO(), types.NamespacedName{Name: saasTenantConfigMapName, Namespace: instance.Namespace}, saasTenantConfigMap)
 		if err != nil {
 			if errors.IsNotFound(err) {
-				klog.Error(err, "SAAS is enabled, waiting for the configmap ", saasTenantConfigMapName, " to be created")
+				reqLogger.Error(err, "SAAS is enabled, waiting for the configmap ", saasTenantConfigMapName, " to be created")
 				return err
 			} else {
-				klog.Error(err, "Failed to get ConfigMap", saasTenantConfigMapName)
+				reqLogger.Error(err, "Failed to get ConfigMap", saasTenantConfigMapName)
 				return err
 			}
 		}
-		klog.Info("SAAS tenant configmap was created", "Updating service_crn_id from configmap", saasTenantConfigMapName)
+		reqLogger.Info("SAAS tenant configmap was created", "Updating service_crn_id from configmap", saasTenantConfigMapName)
 		saasServiceIdCrn = saasTenantConfigMap.Data["service_crn_id"]
 	}
 
@@ -80,8 +79,8 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: deployment, Namespace: instance.Namespace}, currentDeployment)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			klog.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", deployment)
-			klog.Info("SAAS tenant configmap was found", "Creating deployment with value from configmap", saasTenantConfigMapName)
+			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", deployment)
+			reqLogger.Info("SAAS tenant configmap was found", "Creating deployment with value from configmap", saasTenantConfigMapName)
 			newDeployment := generateDeploymentObject(instance, r.scheme, deployment, icpConsoleURL, saasServiceIdCrn)
 			err = r.client.Create(context.TODO(), newDeployment)
 			if err != nil {
@@ -93,8 +92,8 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 			return err
 		}
 	} else {
-		klog.Info("Updating an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
-		klog.Info("SAAS tenant configmap was found", "Updating deployment with value from configmap", saasTenantConfigMapName)
+		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
+		reqLogger.Info("SAAS tenant configmap was found", "Updating deployment with value from configmap", saasTenantConfigMapName)
 		ocwDep := generateDeploymentObject(instance, r.scheme, deployment, icpConsoleURL, saasServiceIdCrn)
 		certmanagerLabel := "certmanager.k8s.io/time-restarted"
 		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
@@ -107,7 +106,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 		currentDeployment.Spec = ocwDep.Spec
 		err = r.client.Update(context.TODO(), currentDeployment)
 		if err != nil {
-			klog.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
+			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
 			return err
 		}
 	}
@@ -118,34 +117,34 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 		client.MatchingLabels(map[string]string{"k8s-app": deployment}),
 	}
 	if err = r.client.List(context.TODO(), podList, listOpts...); err != nil {
-		klog.Error(err, "Failed to list pods", "Authentication.Namespace", instance.Namespace, "Authentication.Name", deployment)
+		reqLogger.Error(err, "Failed to list pods", "Authentication.Namespace", instance.Namespace, "Authentication.Name", deployment)
 		return err
 	}
-	klog.Info("CS??? get pod names")
+	reqLogger.Info("CS??? get pod names")
 	podNames := getPodNames(podList.Items)
 
 	// Update status.Nodes if needed
 	if !reflect.DeepEqual(podNames, instance.Status.Nodes) {
 		instance.Status.Nodes = podNames
-		klog.Info("CS??? put pod names in status")
+		reqLogger.Info("CS??? put pod names in status")
 		err := r.client.Status().Update(context.TODO(), instance)
 		if err != nil {
-			klog.Error(err, "Failed to update Authentication status")
+			reqLogger.Error(err, "Failed to update Authentication status")
 			return err
 		}
 	}
 	// Deployment already exists - don't requeue
-	klog.Info("Skip reconcile: Deployment already exists", "Deployment.Namespace", instance.Namespace, "Deployment.Name", deployment)
+	reqLogger.Info("Skip reconcile: Deployment already exists", "Deployment.Namespace", instance.Namespace, "Deployment.Name", deployment)
 	return nil
 
 }
 
 func getPodNames(pods []corev1.Pod) []string {
-	//	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
+	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
 	var podNames []string
 	for _, pod := range pods {
 		podNames = append(podNames, pod.Name)
-		klog.Info("CS??? pod name=" + pod.Name)
+		reqLogger.Info("CS??? pod name=" + pod.Name)
 	}
 	return podNames
 }
@@ -156,7 +155,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 	if instance.Spec.AuditService.ImageName != res.AuditImageName {
 		instance.Spec.AuditService.ImageName = res.AuditImageName
 	}
-	//	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
+	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	authServiceImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
 	identityProviderImage := shatag.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
 	identityManagerImage := shatag.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
@@ -283,7 +282,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 	// Set SecretWatcher instance as the owner and controller
 	err := controllerutil.SetControllerReference(instance, idpDeployment, scheme)
 	if err != nil {
-		klog.Error(err, "Failed to set owner for Deployment")
+		reqLogger.Error(err, "Failed to set owner for Deployment")
 		return nil
 	}
 	return idpDeployment

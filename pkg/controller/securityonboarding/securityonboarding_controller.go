@@ -37,14 +37,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
-	//logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"k8s.io/klog"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-//var log = logf.Log.WithName("controller_securityonboarding")
+var log = logf.Log.WithName("controller_securityonboarding")
 var cpu20 = resource.NewMilliQuantity(20, resource.DecimalSI)            // 20m
 var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
 var cpu200 = resource.NewMilliQuantity(200, resource.DecimalSI)          // 200m
@@ -137,8 +136,8 @@ type ReconcileSecurityOnboarding struct {
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 func (r *ReconcileSecurityOnboarding) Reconcile(context context.Context, request reconcile.Request) (reconcile.Result, error) {
-	//reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-	klog.Info("Reconciling SecurityOnboarding")
+	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	reqLogger.Info("Reconciling SecurityOnboarding")
 
 	// Fetch the SecurityOnboarding instance
 	instance := &operatorv1alpha1.SecurityOnboarding{}
@@ -159,14 +158,14 @@ func (r *ReconcileSecurityOnboarding) Reconcile(context context.Context, request
 		return recResult, err
 	}
 
-	klog.Info("Complete - handleConfigMap")
+	reqLogger.Info("Complete - handleConfigMap")
 
 	recResult, err = r.handleJob(instance)
 	if err != nil {
 		return recResult, err
 	}
 
-	klog.Info("Complete - handleConfigMap")
+	reqLogger.Info("Complete - handleConfigMap")
 	// Update the SecurityOnboarding status with the pod names
 	// List the pods for this SecurityOnboarding's job
 	jobList := &batchv1.JobList{}
@@ -174,9 +173,9 @@ func (r *ReconcileSecurityOnboarding) Reconcile(context context.Context, request
 		client.InNamespace(instance.Namespace),
 		client.MatchingLabels(map[string]string{"app": "security-onboarding"}),
 	}
-	klog.Info("Complete - got job list")
+	reqLogger.Info("Complete - got job list")
 	if err = r.client.List(context, jobList, listOpts...); err != nil {
-		klog.Error(err, "Failed to list jobs", "SecurityOnboarding.Namespace", instance.Namespace, "SecurityOnboarding.Name", instance.Name)
+		reqLogger.Error(err, "Failed to list jobs", "SecurityOnboarding.Namespace", instance.Namespace, "SecurityOnboarding.Name", instance.Name)
 		return reconcile.Result{}, err
 	}
 	jobNames := getJobNames(jobList.Items)
@@ -185,7 +184,7 @@ func (r *ReconcileSecurityOnboarding) Reconcile(context context.Context, request
 		instance.Status.PodNames = jobNames
 		err := r.client.Status().Update(context, instance)
 		if err != nil {
-			klog.Error(err, "Failed to update SecurityOnboarding status")
+			reqLogger.Error(err, "Failed to update SecurityOnboarding status")
 			return reconcile.Result{}, err
 		}
 	}
@@ -194,38 +193,38 @@ func (r *ReconcileSecurityOnboarding) Reconcile(context context.Context, request
 
 // getJobNames returns the pod names of the array of pods passed in
 func getJobNames(jobs []batchv1.Job) []string {
-	//reqLogger := klog.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
+	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
 	var jobNames []string
 	for _, job := range jobs {
 		jobNames = append(jobNames, job.Name)
-		klog.Info("CS??? pod name=" + job.Name)
+		reqLogger.Info("CS??? pod name=" + job.Name)
 	}
 	return jobNames
 }
 
 func (r *ReconcileSecurityOnboarding) handleConfigMap(instance *operatorv1alpha1.SecurityOnboarding) (reconcile.Result, error) {
 
-	//	reqLogger := klog.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := klog.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	m := []string{"ElasticSearch", "HelmApi", "HelmRepo", "Kms", "Monitoring", "TillerService", "Tiller_Serviceid_Policies", "Onboard_Script"}
 
 	foundErr := false
 	for _, ele := range m {
 		configExists := false
-		klog.Info("Creating a new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", ele)
+		reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", ele)
 		newConfigMap, err := createConfigMap(instance, r, ele)
 		if err != nil {
 			//			reqLogger.Error(err, "Failed to create new ConfigMap -1, exists already ", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", ele)
-			klog.Info("Failed to create new ConfigMap -1, exists already ", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", ele)
+			reqLogger.Info("Failed to create new ConfigMap -1, exists already ", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", ele)
 			configExists = true
 		}
 
 		if !configExists {
 			err = r.client.Create(context.TODO(), newConfigMap)
 			if err != nil {
-				klog.Error(err, "Failed to create new ConfigMap - 2", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", ele)
+				reqLogger.Error(err, "Failed to create new ConfigMap - 2", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", ele)
 				foundErr = true
 			} else {
-				klog.Info("Successfully created ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", ele)
+				reqLogger.Info("Successfully created ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", ele)
 			}
 		}
 	}
@@ -241,7 +240,7 @@ func (r *ReconcileSecurityOnboarding) handleConfigMap(instance *operatorv1alpha1
  * Generic method to create a ConfigMap given a Access Policy file.
  */
 func createConfigMap(instance *operatorv1alpha1.SecurityOnboarding, r *ReconcileSecurityOnboarding, configName string) (*corev1.ConfigMap, error) {
-	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
 	err0, accessPolicy := getAccessPolicy(configName)
 	if err0 != nil {
@@ -286,7 +285,7 @@ func createConfigMap(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcile
 	err1 := controllerutil.SetControllerReference(instance, configMap, r.scheme)
 
 	if err1 != nil {
-		klog.Error(err1, "Failed to set owner for ConfigMap")
+		reqLogger.Error(err1, "Failed to set owner for ConfigMap")
 		return configMap, err1
 	}
 
@@ -320,32 +319,32 @@ func getAccessPolicy(label string) (error, string) {
 }
 
 func (r *ReconcileSecurityOnboarding) handleJob(instance *operatorv1alpha1.SecurityOnboarding) (reconcile.Result, error) {
-	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	//Create security-onboarding job
 	securityOnboardJob, restartRequired, err := getSecurityOnboardJob(instance, r)
 
 	secJobExists := false
 	foundErr1 := false
 	if err != nil {
-		klog.Info("Failed to create security-onboarding Job, exists already ", "Job.Namespace", instance.Namespace, "Job.Name", "security-onboarding")
+		reqLogger.Info("Failed to create security-onboarding Job, exists already ", "Job.Namespace", instance.Namespace, "Job.Name", "security-onboarding")
 		secJobExists = true
 	}
 
 	if !secJobExists {
 		err = r.client.Create(context.TODO(), securityOnboardJob)
 		if err != nil {
-			klog.Error(err, "Failed to create job", "Job.Namespace", instance.Namespace, "Job.Name", "security-onboarding")
+			reqLogger.Error(err, "Failed to create job", "Job.Namespace", instance.Namespace, "Job.Name", "security-onboarding")
 			foundErr1 = true
 		} else {
-			klog.Info("Successfully created Job", "Job.Namespace", instance.Namespace, "Job.Name", "security-onboarding")
+			reqLogger.Info("Successfully created Job", "Job.Namespace", instance.Namespace, "Job.Name", "security-onboarding")
 		}
 	} else if restartRequired {
 		err = r.client.Delete(context.TODO(), securityOnboardJob)
 		if err != nil {
-			klog.Error(err, "Failed to delete job", "Job.Namespace", instance.Namespace, "Job.Name", "security-onboarding")
+			reqLogger.Error(err, "Failed to delete job", "Job.Namespace", instance.Namespace, "Job.Name", "security-onboarding")
 			foundErr1 = true
 		} else {
-			klog.Info("Successfully deleted Job", "Job.Namespace", instance.Namespace, "Job.Name", "security-onboarding")
+			reqLogger.Info("Successfully deleted Job", "Job.Namespace", instance.Namespace, "Job.Name", "security-onboarding")
 		}
 	}
 
@@ -354,25 +353,25 @@ func (r *ReconcileSecurityOnboarding) handleJob(instance *operatorv1alpha1.Secur
 	foundErr2 := false
 	iamJobExists := false
 	if err != nil {
-		klog.Info("Failed to create iam-onboarding Job, exists already ", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
+		reqLogger.Info("Failed to create iam-onboarding Job, exists already ", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
 		iamJobExists = true
 	}
 
 	if !iamJobExists {
 		err = r.client.Create(context.TODO(), iamOnboardJob)
 		if err != nil {
-			klog.Error(err, "Failed to create job", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
+			reqLogger.Error(err, "Failed to create job", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
 			foundErr2 = true
 		} else {
-			klog.Info("Successfully created Job", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
+			reqLogger.Info("Successfully created Job", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
 		}
 	} else if restartRequired {
 		err = r.client.Delete(context.TODO(), iamOnboardJob)
 		if err != nil {
-			klog.Error(err, "Failed to delete job", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
+			reqLogger.Error(err, "Failed to delete job", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
 			foundErr2 = true
 		} else {
-			klog.Info("Successfully deleted Job", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
+			reqLogger.Info("Successfully deleted Job", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
 		}
 	}
 

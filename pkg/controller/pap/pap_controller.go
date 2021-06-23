@@ -453,7 +453,7 @@ func (r *ReconcilePap) handleDeployment(instance *operatorv1alpha1.Pap, currentD
 }
 
 func getPodNames(pods []corev1.Pod) []string {
-	reqLogger := klog.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
+	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
 	var podNames []string
 	for _, pod := range pods {
 		podNames = append(podNames, pod.Name)
@@ -464,7 +464,7 @@ func getPodNames(pods []corev1.Pod) []string {
 
 func (r *ReconcilePap) certificateForPap(instance *operatorv1alpha1.Pap) *certmgr.Certificate {
 
-	reqLogger := klog.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	papCertificate := &certmgr.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      iamPapCertificateValues.Name,

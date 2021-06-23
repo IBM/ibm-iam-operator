@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
 )
 
 type CRData struct {
@@ -235,7 +234,7 @@ func getPolicyRules(verbs []string) []rbacv1.PolicyRule {
 
 func (r *ReconcileAuthentication) handleClusterRole(instance *operatorv1alpha1.Authentication, currentClusterRole *rbacv1.ClusterRole, requeueResult *bool) error {
 
-	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 	csCfgAnnotationName := res.GetCsConfigAnnotation(instance.Namespace)
 
@@ -257,16 +256,16 @@ func (r *ReconcileAuthentication) handleClusterRole(instance *operatorv1alpha1.A
 					newClusterRole.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
 				}
 
-				klog.Info("Creating a new ClusterRole", "ClusterRole.Name", clusterRole)
+				reqLogger.Info("Creating a new ClusterRole", "ClusterRole.Name", clusterRole)
 				err = r.client.Create(context.TODO(), newClusterRole)
 				if err != nil {
-					klog.Error(err, "Failed to create new ClusterRole", "ClusterRole.Name", clusterRole)
+					reqLogger.Error(err, "Failed to create new ClusterRole", "ClusterRole.Name", clusterRole)
 					return err
 				}
 				// ClusterRole created successfully - return and requeue
 				*requeueResult = true
 			} else if err != nil {
-				klog.Error(err, "Failed to get ClusterRole")
+				reqLogger.Error(err, "Failed to get ClusterRole")
 				return err
 			}
 		} else {
@@ -279,10 +278,10 @@ func (r *ReconcileAuthentication) handleClusterRole(instance *operatorv1alpha1.A
 				currentClusterRole.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
 			}
 
-			klog.Info("Updating the ClusterRole", "ClusterRole.Name", clusterRole)
+			reqLogger.Info("Updating the ClusterRole", "ClusterRole.Name", clusterRole)
 			err = r.client.Update(context.TODO(), currentClusterRole)
 			if err != nil {
-				klog.Error(err, "Failed to update ClusterRole", "ClusterRole.Name", clusterRole)
+				reqLogger.Error(err, "Failed to update ClusterRole", "ClusterRole.Name", clusterRole)
 				return err
 			}
 			// ClusterRole updated successfully - return and requeue

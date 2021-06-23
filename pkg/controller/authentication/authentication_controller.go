@@ -194,7 +194,7 @@ type ReconcileAuthentication struct {
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 func (r *ReconcileAuthentication) Reconcile(contect context.Context, request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-	reqLogger.Info("Reconciling Authentication", "Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	reqLogger.Info("Reconciling Authentication")
 	var requeueResult bool = false
 
 	// Fetch the Authentication instance
@@ -298,12 +298,9 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 		return reconcile.Result{}, err
 	}
 
-	log.Info("Calling webhook configuration")
-
 	currentWebhook := &reg.MutatingWebhookConfiguration{}
 	err = r.handleWebhook(instance, currentWebhook, &requeueResult)
 	if err != nil {
-		log.Info("Webhook error", err)
 		return reconcile.Result{}, err
 	}
 
@@ -498,13 +495,13 @@ func removeCRB(client client.Client, crbName string) error {
 	// Delete ClusterRoleBinding
 	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: crbName, Namespace: ""}, clusterRoleBinding); err != nil && errors.IsNotFound(err) {
-		log.Info("Error getting cluster role binding", crbName, err)
+		log.V(1).("Error getting cluster role binding", crbName, err)
 		return nil
 	} else if err == nil {
 		if crbName == "oidc-admin-binding" {
 			clusterRoleBinding.ObjectMeta.Finalizers = []string{}
 			if err = client.Update(context.Background(), clusterRoleBinding); err != nil {
-				log.Info("Error updating cluster role binding", "name", crbName, "error message", err)
+				log.V(1).("Error updating cluster role binding", "name", crbName, "error message", err)
 				return err
 			}
 		}
@@ -544,7 +541,7 @@ func removeWebhook(client client.Client, webhookName string) error {
 	// Delete Webhook
 	webhook := &reg.MutatingWebhookConfiguration{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: webhookName, Namespace: ""}, webhook); err != nil && errors.IsNotFound(err) {
-		log.Info("Error getting webhook", webhookName, err)
+		log.V(1).("Error getting webhook", webhookName, err)
 		return nil
 	} else if err == nil {
 		if err = client.Delete(context.Background(), webhook); err != nil {

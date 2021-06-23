@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -199,7 +198,7 @@ func (r *ReconcileAuthentication) identityManagementService(instance *operatorv1
 
 func (r *ReconcileAuthentication) identityProviderService(instance *operatorv1alpha1.Authentication) *corev1.Service {
 
-	//	klog := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var idproviderPort int32 = 4300
 	var redirectPort int32 = 9443
 	identityProviderService := &corev1.Service{
@@ -230,7 +229,7 @@ func (r *ReconcileAuthentication) identityProviderService(instance *operatorv1al
 	// Set Authentication instance as the owner and controller of the Service
 	err := controllerutil.SetControllerReference(instance, identityProviderService, r.scheme)
 	if err != nil {
-		klog.Error(err, "Failed to set owner for Service")
+		reqLogger.Error(err, "Failed to set owner for Service")
 		return nil
 	}
 	return identityProviderService
@@ -239,7 +238,7 @@ func (r *ReconcileAuthentication) identityProviderService(instance *operatorv1al
 
 func (r *ReconcileAuthentication) iamTokenService(instance *operatorv1alpha1.Authentication) *corev1.Service {
 
-	//	klog := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var redirectPort int32 = 10443
 	iamTokenService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -267,7 +266,7 @@ func (r *ReconcileAuthentication) iamTokenService(instance *operatorv1alpha1.Aut
 	// Set Authentication instance as the owner and controller of the Service
 	err := controllerutil.SetControllerReference(instance, iamTokenService, r.scheme)
 	if err != nil {
-		klog.Error(err, "Failed to set owner for Service")
+		reqLogger.Error(err, "Failed to set owner for Service")
 		return nil
 	}
 	return iamTokenService

@@ -37,10 +37,8 @@ import (
 	"github.com/operator-framework/operator-sdk/pkg/log/zap"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
 	"github.com/spf13/pflag"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-
-	//"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )

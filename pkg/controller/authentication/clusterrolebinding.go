@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
 )
 
 type SubjectData struct {
@@ -123,7 +122,7 @@ func generateCRBData(defaultAdminUser string, oidcIssuerURL string) map[string]C
 
 func (r *ReconcileAuthentication) handleClusterRoleBinding(instance *operatorv1alpha1.Authentication, currentClusterRoleBinding *rbacv1.ClusterRoleBinding, requeueResult *bool) error {
 
-	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 	defaultAdminUser := instance.Spec.Config.DefaultAdminUser
 	oidcIssuerURL := instance.Spec.Config.OIDCIssuerURL
@@ -147,16 +146,16 @@ func (r *ReconcileAuthentication) handleClusterRoleBinding(instance *operatorv1a
 					newClusterRoleBinding.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
 				}
 
-				klog.Info("Creating a new clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
+				reqLogger.Info("Creating a new clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
 				err = r.client.Create(context.TODO(), newClusterRoleBinding)
 				if err != nil {
-					klog.Error(err, "Failed to create new clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
+					reqLogger.Error(err, "Failed to create new clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
 					return err
 				}
 				// clusterRoleBinding created successfully - return and requeue
 				*requeueResult = true
 			} else if err != nil {
-				klog.Error(err, "Failed to get clusterRoleBinding")
+				reqLogger.Error(err, "Failed to get clusterRoleBinding")
 				return err
 			}
 		} else {
@@ -169,10 +168,10 @@ func (r *ReconcileAuthentication) handleClusterRoleBinding(instance *operatorv1a
 				currentClusterRoleBinding.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
 			}
 
-			klog.Info("Updating an existing clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
+			reqLogger.Info("Updating an existing clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
 			err = r.client.Update(context.TODO(), currentClusterRoleBinding)
 			if err != nil {
-				klog.Error(err, "Failed to update an existing clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
+				reqLogger.Error(err, "Failed to update an existing clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
 				return err
 			}
 			// clusterRoleBinding updated successfully - return and requeue

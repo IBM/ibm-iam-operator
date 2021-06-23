@@ -378,7 +378,7 @@ func (r *ReconcilePolicyController) handleDeployment(instance *operatorv1alpha1.
 }
 
 func (r *ReconcilePolicyController) clusterRoleForPolicyController(instance *operatorv1alpha1.PolicyController) *rbacv1.ClusterRole {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	clusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "iam-policy-controller-role",
@@ -621,7 +621,7 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 
 // getPodNames returns the pod names of the array of pods passed in
 func getPodNames(pods []corev1.Pod) []string {
-	reqLogger := klog.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
+	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
 	var podNames []string
 	for _, pod := range pods {
 		podNames = append(podNames, pod.Name)
@@ -726,7 +726,7 @@ func removeCsAnnotationFromCRB(client client.Client, crbName string, csCfgAnnota
 				if err = client.Update(context.Background(), clusterRoleBinding); err != nil {
 					// if error, retry second time to avoid manual deletion after uninstall
 					if err2 := client.Update(context.Background(), clusterRoleBinding); err2 != nil {
-						klog.V(1).Info("Error removing common-service/config annotation from cluster role binding", "name", crbName, "error message", err2)
+						log.V(1).Info("Error removing common-service/config annotation from cluster role binding", "name", crbName, "error message", err2)
 						return err2
 					}
 				}

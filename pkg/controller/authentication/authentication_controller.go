@@ -495,13 +495,13 @@ func removeCRB(client client.Client, crbName string) error {
 	// Delete ClusterRoleBinding
 	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: crbName, Namespace: ""}, clusterRoleBinding); err != nil && errors.IsNotFound(err) {
-		log.V(1).("Error getting cluster role binding", crbName, err)
+		log.V(1).Info("Error getting cluster role binding", crbName, err)
 		return nil
 	} else if err == nil {
 		if crbName == "oidc-admin-binding" {
 			clusterRoleBinding.ObjectMeta.Finalizers = []string{}
 			if err = client.Update(context.Background(), clusterRoleBinding); err != nil {
-				log.V(1).("Error updating cluster role binding", "name", crbName, "error message", err)
+				log.V(1).Info("Error updating cluster role binding", "name", crbName, "error message", err)
 				return err
 			}
 		}
@@ -541,7 +541,7 @@ func removeWebhook(client client.Client, webhookName string) error {
 	// Delete Webhook
 	webhook := &reg.MutatingWebhookConfiguration{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: webhookName, Namespace: ""}, webhook); err != nil && errors.IsNotFound(err) {
-		log.V(1).("Error getting webhook", webhookName, err)
+		log.V(1).Info("Error getting webhook", webhookName, err)
 		return nil
 	} else if err == nil {
 		if err = client.Delete(context.Background(), webhook); err != nil {

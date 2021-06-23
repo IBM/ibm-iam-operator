@@ -366,7 +366,7 @@ func (r *ReconcilePolicyDecision) handleDeployment(instance *operatorv1alpha1.Po
 }
 
 func getPodNames(pods []corev1.Pod) []string {
-	//	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
+	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
 	var podNames []string
 	for _, pod := range pods {
 		podNames = append(podNames, pod.Name)
@@ -471,7 +471,7 @@ func (r *ReconcilePolicyDecision) configMapForPolicyDecision(instance *operatorv
 
 func (r *ReconcilePolicyDecision) ingressForPolicyDecision(instance *operatorv1alpha1.PolicyDecision) *net.Ingress {
 	pathType := net.PathType("ImplementationSpecific")
-	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	pdpIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "iam-pdp",
@@ -526,7 +526,7 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 		instance.Spec.AuditService.ImageName = res.AuditImageName
 	}
 
-	reqLogger := klog.WithValues("deploymentForPolicyDecision", "Entry", "instance.Name", instance.Name)
+	reqLogger := log.WithValues("deploymentForPolicyDecision", "Entry", "instance.Name", instance.Name)
 	pdpImage := "quay.io/yannizhang2019/iam-policy-decision:0.1"
 	mongoDBImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
 	auditImage := shatag.GetImageRef("AUDIT_SYSLOG_SERVICE_IMAGE")

@@ -204,7 +204,7 @@ func getJobNames(jobs []batchv1.Job) []string {
 
 func (r *ReconcileSecurityOnboarding) handleConfigMap(instance *operatorv1alpha1.SecurityOnboarding) (reconcile.Result, error) {
 
-	reqLogger := klog.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	m := []string{"ElasticSearch", "HelmApi", "HelmRepo", "Kms", "Monitoring", "TillerService", "Tiller_Serviceid_Policies", "Onboard_Script"}
 
 	foundErr := false
@@ -385,7 +385,7 @@ func (r *ReconcileSecurityOnboarding) handleJob(instance *operatorv1alpha1.Secur
 
 func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *ReconcileSecurityOnboarding) (*batchv1.Job, bool, error) {
 
-	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	//Create all the Volumes
 	strVolName := []string{"onboard-script", "elasticsearch-json", "monitoring-json", "helmapi-json", "helmrepo-json",
 		"tillerservice-json", "tiller-serviceid-policies", "kms-json"}
@@ -604,7 +604,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 	err1 := controllerutil.SetControllerReference(instance, job, r.scheme)
 
 	if err1 != nil {
-		klog.Error(err1, "Failed to set owner for security-onboarding Job")
+		reqLogger.Error(err1, "Failed to set owner for security-onboarding Job")
 		return job, false, err1
 	}
 
@@ -613,7 +613,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 }
 
 func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *ReconcileSecurityOnboarding) (*batchv1.Job, bool, error) {
-	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
 	resources := instance.Spec.IAMOnboarding.Resources
 
@@ -1149,7 +1149,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 	err1 := controllerutil.SetControllerReference(instance, job, r.scheme)
 
 	if err1 != nil {
-		klog.Error(err1, "Failed to set owner for iam-onboarding Job")
+		reqLogger.Error(err1, "Failed to set owner for iam-onboarding Job")
 		return job, false, err1
 	}
 

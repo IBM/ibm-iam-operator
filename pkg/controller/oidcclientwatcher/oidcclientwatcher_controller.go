@@ -37,9 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -122,14 +120,13 @@ type ReconcileOIDCClientWatcher struct {
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-func (r *ReconcileOIDCClientWatcher) Reconcile(context context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileOIDCClientWatcher) Reconcile(contect context.Context, request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	reqLogger.Info("Reconciling OIDCClientWatcher")
 
 	// Fetch the OIDCClientWatcher instance
 	instance := &operatorv1alpha1.OIDCClientWatcher{}
-	//err := r.client.Get(context.TODO(), request.NamespacedName, instance)
-
-	err := r.client.Get(context, request.NamespacedName, instance)
+	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not instance, could have been deleted after reconcile request.
@@ -150,7 +147,7 @@ func (r *ReconcileOIDCClientWatcher) Reconcile(context context.Context, request 
 		// Object not being deleted, but add our finalizer so we know to remove this object later when it is going to be deleted
 		if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
-			if err := r.client.Update(context, instance); err != nil {
+			if err := r.client.Update(context.Background(), instance); err != nil {
 				reqLogger.Error(err, "Error adding the finalizer to the CR")
 				return reconcile.Result{}, err
 			}
@@ -165,7 +162,7 @@ func (r *ReconcileOIDCClientWatcher) Reconcile(context context.Context, request 
 			}
 
 			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
-			if err := r.client.Update(context, instance); err != nil {
+			if err := r.client.Update(context.Background(), instance); err != nil {
 				reqLogger.Error(err, "Error updating the CR to remove the finalizer")
 				return reconcile.Result{}, err
 			}
@@ -216,7 +213,7 @@ func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha
 				return reconcile.Result{}, err
 			}
 		} else {
-			//reqLogger.Error(err, "Failed to get ClusterRole")
+			reqLogger.Error(err, "Failed to get ClusterRole")
 			return reconcile.Result{}, err
 		}
 		//cluster role created successfully
@@ -849,11 +846,11 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 
 // getPodNames returns the pod names of the array of pods passed in
 func getPodNames(pods []corev1.Pod) []string {
-	//reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
+	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
 	var podNames []string
 	for _, pod := range pods {
 		podNames = append(podNames, pod.Name)
-		log.Info("CS??? pod name=" + pod.Name)
+		reqLogger.Info("CS??? pod name=" + pod.Name)
 	}
 	return podNames
 }
@@ -936,7 +933,7 @@ func removeCR(client client.Client, crName string) error {
 	// Delete Clusterrole
 	clusterRole := &rbacv1.ClusterRole{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: crName, Namespace: ""}, clusterRole); err != nil && errors.IsNotFound(err) {
-		log.Info("Error getting cluster role", crName, err)
+		log.V(1).Info("Error getting cluster role", crName, err)
 		return nil
 	} else if err == nil {
 		if !res.IsCsConfigAnnotationExists(clusterRole.ObjectMeta.Annotations) {

@@ -25,12 +25,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
 )
 
 func (r *ReconcileAuthentication) handleUser(instance *operatorv1alpha1.Authentication, currentUser *userv1.User, requeueResult *bool) error {
 
-	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 
 	user := instance.Spec.Config.DefaultAdminUser
@@ -38,16 +37,16 @@ func (r *ReconcileAuthentication) handleUser(instance *operatorv1alpha1.Authenti
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new User
 		newUser := generateUserObject(instance, r.scheme, user)
-		klog.Info("Creating a new User", "User.Namespace", instance.Namespace, "User.Name", user)
+		reqLogger.Info("Creating a new User", "User.Namespace", instance.Namespace, "User.Name", user)
 		err = r.client.Create(context.TODO(), newUser)
 		if err != nil {
-			klog.Error(err, "Failed to create new User", "User.Namespace", instance.Namespace, "User.Name", user)
+			reqLogger.Error(err, "Failed to create new User", "User.Namespace", instance.Namespace, "User.Name", user)
 			return err
 		}
 		// User created successfully - return and requeue
 		*requeueResult = true
 	} else if err != nil {
-		klog.Error(err, "Failed to get User")
+		reqLogger.Error(err, "Failed to get User")
 		return err
 	}
 

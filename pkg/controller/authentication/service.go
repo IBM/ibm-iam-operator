@@ -31,21 +31,21 @@ import (
 
 func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authentication, currentService *corev1.Service, requeueResult *bool) error {
 
-	//	klog := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "platform-auth-service", Namespace: instance.Namespace}, currentService)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new service
 		platformAuthService := r.platformAuthService(instance)
-		klog.Info("Creating a new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-auth-service")
+		reqLogger.Info("Creating a new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-auth-service")
 		err = r.client.Create(context.TODO(), platformAuthService)
 		if err != nil {
-			klog.Error(err, "Failed to create new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-auth-service")
+			reqLogger.Error(err, "Failed to create new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-auth-service")
 			return err
 		}
 		// Service created successfully - return and requeue
 		*requeueResult = true
 	} else if err != nil {
-		klog.Error(err, "Failed to get Service")
+		reqLogger.Error(err, "Failed to get Service")
 		return err
 	}
 
@@ -53,16 +53,16 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new service
 		identityProviderService := r.identityProviderService(instance)
-		klog.Info("Creating a new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-identity-provider")
+		reqLogger.Info("Creating a new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-identity-provider")
 		err = r.client.Create(context.TODO(), identityProviderService)
 		if err != nil {
-			klog.Error(err, "Failed to create new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-identity-provider")
+			reqLogger.Error(err, "Failed to create new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-identity-provider")
 			return err
 		}
 		// Service created successfully - return and requeue
 		*requeueResult = true
 	} else if err != nil {
-		klog.Error(err, "Failed to get Service")
+		reqLogger.Error(err, "Failed to get Service")
 		return err
 	}
 
@@ -70,16 +70,16 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new service
 		identityManagementService := r.identityManagementService(instance)
-		klog.Info("Creating a new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-identity-management")
+		reqLogger.Info("Creating a new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-identity-management")
 		err = r.client.Create(context.TODO(), identityManagementService)
 		if err != nil {
-			klog.Error(err, "Failed to create new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-identity-management")
+			reqLogger.Error(err, "Failed to create new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-identity-management")
 			return err
 		}
 		// Service created successfully - return and requeue
 		*requeueResult = true
 	} else if err != nil {
-		klog.Error(err, "Failed to get Service")
+		reqLogger.Error(err, "Failed to get Service")
 		return err
 	}
 
@@ -87,23 +87,23 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new service
 		iamTokenService := r.iamTokenService(instance)
-		klog.Info("Creating a new Service", "Service.Namespace", instance.Namespace, "Service.Name", "iam-token-service")
+		reqLogger.Info("Creating a new Service", "Service.Namespace", instance.Namespace, "Service.Name", "iam-token-service")
 		err = r.client.Create(context.TODO(), iamTokenService)
 		if err != nil {
-			klog.Error(err, "Failed to create new Service", "Service.Namespace", instance.Namespace, "Service.Name", "iam-token-service")
+			reqLogger.Error(err, "Failed to create new Service", "Service.Namespace", instance.Namespace, "Service.Name", "iam-token-service")
 			return err
 		}
 		// Service created successfully - return and requeue
 		*requeueResult = true
 	} else if err != nil {
-		klog.Error(err, "Failed to get Service")
+		reqLogger.Error(err, "Failed to get Service")
 		return err
 	} else {
 		if currentService.Spec.Ports[0].TargetPort.IntVal == 443 {
 			currentService.Spec.Ports[0].TargetPort = intstr.FromString("https")
 			err = r.client.Update(context.TODO(), currentService)
 			if err != nil {
-				klog.Error(err, "Failed to update an existing Service", "Service.Namespace", currentService.Namespace, "Service.Name", currentService.Name)
+				reqLogger.Error(err, "Failed to update an existing Service", "Service.Namespace", currentService.Namespace, "Service.Name", currentService.Name)
 				return err
 			}
 		}
@@ -115,7 +115,7 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 
 func (r *ReconcileAuthentication) platformAuthService(instance *operatorv1alpha1.Authentication) *corev1.Service {
 
-	//	klog := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var authPort int32 = 9443
 	var dirPort int32 = 3100
 	platformAuthService := &corev1.Service{
@@ -146,7 +146,7 @@ func (r *ReconcileAuthentication) platformAuthService(instance *operatorv1alpha1
 	// Set Authentication instance as the owner and controller of the Service
 	err := controllerutil.SetControllerReference(instance, platformAuthService, r.scheme)
 	if err != nil {
-		klog.Error(err, "Failed to set owner for Service")
+		reqLogger.Error(err, "Failed to set owner for Service")
 		return nil
 	}
 	return platformAuthService
@@ -155,7 +155,7 @@ func (r *ReconcileAuthentication) platformAuthService(instance *operatorv1alpha1
 
 func (r *ReconcileAuthentication) identityManagementService(instance *operatorv1alpha1.Authentication) *corev1.Service {
 
-	//	klog := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var idmgmtPort int32 = 4500
 	var redirectPort int32 = 443
 	identityManagementService := &corev1.Service{
@@ -190,7 +190,7 @@ func (r *ReconcileAuthentication) identityManagementService(instance *operatorv1
 	// Set Authentication instance as the owner and controller of the Service
 	err := controllerutil.SetControllerReference(instance, identityManagementService, r.scheme)
 	if err != nil {
-		klog.Error(err, "Failed to set owner for Service")
+		reqLogger.Error(err, "Failed to set owner for Service")
 		return nil
 	}
 	return identityManagementService

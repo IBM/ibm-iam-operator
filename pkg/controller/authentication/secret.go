@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -105,7 +104,7 @@ func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authen
 			secretUpdateRequired := false
 			if secret == "platform-auth-idp-encryption" {
 				if _, keyExists := currentSecret.Data["ENCRYPTION_IV"]; !keyExists {
-					klog.Info("Updating an existing Secret", "Secret.Namespace", currentSecret.Namespace, "Secret.Name", currentSecret.Name)
+					reqLogger.Info("Updating an existing Secret", "Secret.Namespace", currentSecret.Namespace, "Secret.Name", currentSecret.Name)
 					newSecret := generateSecretObject(instance, r.scheme, secret, secretData[secret])
 					currentSecret.Data["ENCRYPTION_IV"] = newSecret.Data["ENCRYPTION_IV"]
 					secretUpdateRequired = true

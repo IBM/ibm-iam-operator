@@ -28,13 +28,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentication, currentJob *batchv1.Job, requeueResult *bool) error {
 
-	//	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 
 	job := "oidc-client-registration"
@@ -42,16 +41,16 @@ func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentic
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new Job
 		newJob := generateJobObject(instance, r.scheme, job)
-		klog.Info("Creating a new Job", "Job.Namespace", instance.Namespace, "Job.Name", job)
+		reqLogger.Info("Creating a new Job", "Job.Namespace", instance.Namespace, "Job.Name", job)
 		err = r.client.Create(context.TODO(), newJob)
 		if err != nil {
-			klog.Error(err, "Failed to create new Job", "Job.Namespace", instance.Namespace, "Job.Name", job)
+			reqLogger.Error(err, "Failed to create new Job", "Job.Namespace", instance.Namespace, "Job.Name", job)
 			return err
 		}
 		// Job created successfully - return and requeue
 		*requeueResult = true
 	} else if err != nil {
-		klog.Error(err, "Failed to get Job")
+		reqLogger.Error(err, "Failed to get Job")
 		return err
 	}
 
@@ -60,7 +59,7 @@ func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentic
 }
 
 func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, jobName string) *batchv1.Job {
-	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	image := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
 	resources := instance.Spec.ClientRegistration.Resources
 	if resources == nil {
@@ -144,7 +143,7 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 	// Set Authentication instance as the owner and controller of the Job
 	err := controllerutil.SetControllerReference(instance, newJob, scheme)
 	if err != nil {
-		klog.Error(err, "Failed to set owner for Job")
+		reqLogger.Error(err, "Failed to set owner for Job")
 		return nil
 	}
 	return newJob

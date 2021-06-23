@@ -157,12 +157,9 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 		instance.Spec.AuditService.ImageName = res.AuditImageName
 	}
 	//	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
-	//authServiceImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
-	authServiceImage := "quay.io/yannizhang2019/platform-auth-service:0.1"
-	//identityProviderImage := shatag.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
-	identityProviderImage := "quay.io/yannizhang2019/platform-identity-provider:0.1"
-	//identityManagerImage := shatag.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
-	identityManagerImage := "quay.io/yannizhang2019/platform-identity-manager:0.1"
+	authServiceImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
+	identityProviderImage := shatag.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
+	identityManagerImage := shatag.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
 	mongoDBImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
 	auditImage := shatag.GetImageRef("AUDIT_SYSLOG_SERVICE_IMAGE")
 	replicas := instance.Spec.Replicas

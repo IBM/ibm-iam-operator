@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-
+        "github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	//logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -140,7 +140,7 @@ func (r *ReconcileSecretWatcher) Reconcile(context context.Context, request reco
 
 	// skip deploying secretwatcher if chosen not to deploy
 	if SecretWatcher.Spec.Config.ExcludeOperand {
-		reqLogger.Info("The secretwatcher will not be deployed, it has chosen not to deploy")
+		//reqLogger.Info("The secretwatcher will not be deployed, it has chosen not to deploy")
 		return reconcile.Result{}, nil
 	}
 
@@ -227,8 +227,7 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 	labels1 := labelsForSecretWatcherMeta(secretWatcherDeploymentName)
 	labels2 := labelsForSecretWatcherSelect(instance.Name, secretWatcherDeploymentName)
 	labels3 := labelsForSecretWatcherPod(instance.Name, secretWatcherDeploymentName)
-	//image := shatag.GetImageRef("ICP_SECRET_WATCHER_IMAGE")
-	image := "quay.io/yannizhang2019/secret-watcher:0.1"
+	image := shatag.GetImageRef("ICP_SECRET_WATCHER_IMAGE")
 	replicas := instance.Spec.Replicas
 	resources := instance.Spec.Resources
 

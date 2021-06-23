@@ -20,7 +20,7 @@ import (
 	"context"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
-	reg "k8s.io/api/admissionregistration/v1beta1"
+	reg "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -89,7 +89,7 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 		// in saas mode
 		hooksName = instance.Namespace + "." + hooksName
 	}
-
+	sideEffectClass := reg.SideEffectClass("None")
 	newWebhook := &reg.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: webhook,
@@ -117,6 +117,8 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 						},
 					},
 				},
+				SideEffects: &sideEffectClass,
+				AdmissionReviewVersions: []string{"v1"},
 				Rules: []reg.RuleWithOperations{
 					{
 						Rule: reg.Rule{

@@ -257,16 +257,16 @@ func (r *ReconcileAuthentication) handleClusterRole(instance *operatorv1alpha1.A
 					newClusterRole.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
 				}
 
-				reqLogger.Info("Creating a new ClusterRole", "ClusterRole.Name", clusterRole)
+				klog.Info("Creating a new ClusterRole", "ClusterRole.Name", clusterRole)
 				err = r.client.Create(context.TODO(), newClusterRole)
 				if err != nil {
-					reqLogger.Error(err, "Failed to create new ClusterRole", "ClusterRole.Name", clusterRole)
+					klog.Error(err, "Failed to create new ClusterRole", "ClusterRole.Name", clusterRole)
 					return err
 				}
 				// ClusterRole created successfully - return and requeue
 				*requeueResult = true
 			} else if err != nil {
-				reqLogger.Error(err, "Failed to get ClusterRole")
+				klog.Error(err, "Failed to get ClusterRole")
 				return err
 			}
 		} else {
@@ -279,10 +279,10 @@ func (r *ReconcileAuthentication) handleClusterRole(instance *operatorv1alpha1.A
 				currentClusterRole.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
 			}
 
-			reqLogger.Info("Updating the ClusterRole", "ClusterRole.Name", clusterRole)
+			klog.Info("Updating the ClusterRole", "ClusterRole.Name", clusterRole)
 			err = r.client.Update(context.TODO(), currentClusterRole)
 			if err != nil {
-				reqLogger.Error(err, "Failed to update ClusterRole", "ClusterRole.Name", clusterRole)
+				klog.Error(err, "Failed to update ClusterRole", "ClusterRole.Name", clusterRole)
 				return err
 			}
 			// ClusterRole updated successfully - return and requeue

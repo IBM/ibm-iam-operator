@@ -19,8 +19,8 @@ package policycontroller
 import (
 	"context"
 	"reflect"
-	"time"
 	gorun "runtime"
+	"time"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
@@ -142,7 +142,7 @@ func (r *ReconcilePolicyController) Reconcile(context context.Context, request r
 
 	// skip deploying policycontroller if chosen not to deploy
 	if instance.Spec.Config.ExcludeOperand {
-		reqLogger.Info("The policycontroller will not be deployed, it has chosen not to deploy")
+		klog.Info("The policycontroller will not be deployed, it has chosen not to deploy")
 		return reconcile.Result{}, nil
 	}
 
@@ -202,7 +202,7 @@ func (r *ReconcilePolicyController) Reconcile(context context.Context, request r
 }
 
 func (r *ReconcilePolicyController) handleClusterRoleBinding(instance *operatorv1alpha1.PolicyController, currentClusterRoleBinding *rbacv1.ClusterRoleBinding) (reconcile.Result, error) {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	csCfgAnnotationName := res.GetCsConfigAnnotation(instance.Namespace)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "iam-policy-controller-rolebinding", Namespace: ""}, currentClusterRoleBinding)
 	if err != nil {
@@ -219,15 +219,15 @@ func (r *ReconcilePolicyController) handleClusterRoleBinding(instance *operatorv
 				clusterRoleBinding.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
 			}
 
-			reqLogger.Info("Creating ClusterRoleBinding", "ClusterRoleBinding.Namespace", instance.Namespace, "ClusterRoleBinding.Name", "iam-policy-controller-rolebinding")
+			klog.Info("Creating ClusterRoleBinding", "ClusterRoleBinding.Namespace", instance.Namespace, "ClusterRoleBinding.Name", "iam-policy-controller-rolebinding")
 			err = r.client.Create(context.TODO(), clusterRoleBinding)
 			if err != nil {
-				reqLogger.Error(err, "Failed to create ClusterRoleBinding", "ClusterRoleBinding.Namespace", instance.Namespace, "ClusterRoleBinding.Name", "iam-policy-controller-rolebinding")
+				klog.Error(err, "Failed to create ClusterRoleBinding", "ClusterRoleBinding.Namespace", instance.Namespace, "ClusterRoleBinding.Name", "iam-policy-controller-rolebinding")
 				return reconcile.Result{}, err
 			}
 			//Cluster rolebinding has created successfully
 		} else {
-			reqLogger.Error(err, "Failed to get ClusterRoleBinding")
+			klog.Error(err, "Failed to get ClusterRoleBinding")
 			return reconcile.Result{}, err
 		}
 	} else {
@@ -239,10 +239,11 @@ func (r *ReconcilePolicyController) handleClusterRoleBinding(instance *operatorv
 		} else {
 			currentClusterRoleBinding.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
 		}
-		reqLogger.Info("Updating an existing ClusterRoleBinding", "ClusterRoleBinding.Namespace", instance.Namespace, "ClusterRoleBinding.Name", "iam-policy-controller-rolebinding")
+
+		klog.Info("Updating an existing ClusterRoleBinding", "ClusterRoleBinding.Namespace", instance.Namespace, "ClusterRoleBinding.Name", "iam-policy-controller-rolebinding")
 		err = r.client.Update(context.TODO(), currentClusterRoleBinding)
 		if err != nil {
-			reqLogger.Error(err, "Failed to update an existing ClusterRoleBinding", "ClusterRoleBinding.Namespace", instance.Namespace, "ClusterRoleBinding.Name", "iam-policy-controller-rolebinding")
+			klog.Error(err, "Failed to update an existing ClusterRoleBinding", "ClusterRoleBinding.Namespace", instance.Namespace, "ClusterRoleBinding.Name", "iam-policy-controller-rolebinding")
 			return reconcile.Result{}, err
 		}
 		//Cluster rolebinding has udpated successfully
@@ -251,8 +252,8 @@ func (r *ReconcilePolicyController) handleClusterRoleBinding(instance *operatorv
 	return reconcile.Result{Requeue: true}, nil
 }
 
-func (r *ReconcilePolicyController) handleClusterRole(instance *operatorv1alpha1.PolicyController, currentClusterRole *rbacv1.ClusterRole) (reconcile.Result, error) {n reconcile.Result{}, err
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+func (r *ReconcilePolicyController) handleClusterRole(instance *operatorv1alpha1.PolicyController, currentClusterRole *rbacv1.ClusterRole) (reconcile.Result, error) {
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	csCfgAnnotationName := res.GetCsConfigAnnotation(instance.Namespace)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "iam-policy-controller-role", Namespace: ""}, currentClusterRole)
 	if err != nil {
@@ -269,14 +270,14 @@ func (r *ReconcilePolicyController) handleClusterRole(instance *operatorv1alpha1
 				clusterRole.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
 			}
 
-			reqLogger.Info("Creating ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "iam-policy-controller-role")
+			//reqLogger.Info("Creating ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "iam-policy-controller-role")
 			err = r.client.Create(context.TODO(), clusterRole)
 			if err != nil {
-				reqLogger.Error(err, "Failed to create ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "iam-policy-controller-role")
+				//reqLogger.Error(err, "Failed to create ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "iam-policy-controller-role")
 				return reconcile.Result{}, err
 			}
 		} else {
-			reqLogger.Error(err, "Failed to get ClusterRole")
+			//reqLogger.Error(err, "Failed to get ClusterRole")
 			return reconcile.Result{}, err
 		}
 		//Cluster role has created successfully
@@ -289,10 +290,10 @@ func (r *ReconcilePolicyController) handleClusterRole(instance *operatorv1alpha1
 		} else {
 			currentClusterRole.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
 		}
-		reqLogger.Info("Updating an existing ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "iam-policy-controller-role")
+		//reqLogger.Info("Updating an existing ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "iam-policy-controller-role")
 		err = r.client.Update(context.TODO(), currentClusterRole)
 		if err != nil {
-			reqLogger.Error(err, "Failed to update an existing ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "iam-policy-controller-role")
+			//reqLogger.Error(err, "Failed to update an existing ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "iam-policy-controller-role")
 			return reconcile.Result{}, err
 		}
 		//Cluster role has updated successfully
@@ -640,7 +641,6 @@ func (r *ReconcilePolicyController) deleteExternalResources(instance *operatorv1
 
 	// Remove multiple deployment common-service/config annotation
 
-
 	if err := removeCsAnnotationFromCR(r.client, crName, csCfgAnnotationName); err != nil {
 		return err
 	}
@@ -649,7 +649,7 @@ func (r *ReconcilePolicyController) deleteExternalResources(instance *operatorv1
 		return err
 	}
 
-	log.V(0).Info("Wait for 2 seconds.")
+	klog.V(0).Info("Wait for 2 seconds.")
 	time.Sleep(time.Second * 2)
 
 	// Finally check and remove Cluster Role
@@ -693,16 +693,16 @@ func removeCsAnnotationFromCR(client client.Client, crName string, csCfgAnnotati
 	// Remove common-service/config annotation
 	clusterRole := &rbacv1.ClusterRole{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: crName, Namespace: ""}, clusterRole); err != nil && errors.IsNotFound(err) {
-		log.V(1).Info("Error getting cluster role", crName, err)
+		klog.V(1).Info("Error getting cluster role", crName, err)
 		return nil
 	} else if err == nil {
 		if len(clusterRole.ObjectMeta.Annotations) > 0 {
 			if _, ok := clusterRole.ObjectMeta.Annotations[csCfgAnnotationName]; ok {
-				delete(clusterRole.ObjectMeta.Annotations, csCfgAnnotationName);
+				delete(clusterRole.ObjectMeta.Annotations, csCfgAnnotationName)
 				if err = client.Update(context.Background(), clusterRole); err != nil {
 					// if error, retry second time to avoid manual deletion after uninstall
 					if err2 := client.Update(context.Background(), clusterRole); err2 != nil {
-						log.V(1).Info("Error removing common-service/config annotation from cluster role", "name", crName, "error message", err2)
+						klog.V(1).Info("Error removing common-service/config annotation from cluster role", "name", crName, "error message", err2)
 						return err2
 					}
 				}
@@ -718,16 +718,16 @@ func removeCsAnnotationFromCRB(client client.Client, crbName string, csCfgAnnota
 	// Remove common-service/config annotation
 	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: crbName, Namespace: ""}, clusterRoleBinding); err != nil && errors.IsNotFound(err) {
-		log.V(1).Info("Error getting cluster role binding", crbName, err)
+		klog.V(1).Info("Error getting cluster role binding", crbName, err)
 		return nil
 	} else if err == nil {
 		if len(clusterRoleBinding.ObjectMeta.Annotations) > 0 {
 			if _, ok := clusterRoleBinding.ObjectMeta.Annotations[csCfgAnnotationName]; ok {
-				delete(clusterRoleBinding.ObjectMeta.Annotations, csCfgAnnotationName);
+				delete(clusterRoleBinding.ObjectMeta.Annotations, csCfgAnnotationName)
 				if err = client.Update(context.Background(), clusterRoleBinding); err != nil {
 					// if error, retry second time to avoid manual deletion after uninstall
 					if err2 := client.Update(context.Background(), clusterRoleBinding); err2 != nil {
-						log.V(1).Info("Error removing common-service/config annotation from cluster role binding", "name", crbName, "error message", err2)
+						klog.V(1).Info("Error removing common-service/config annotation from cluster role binding", "name", crbName, "error message", err2)
 						return err2
 					}
 				}
@@ -748,7 +748,7 @@ func removeCR(client client.Client, crName string) error {
 	} else if err == nil {
 		if !res.IsCsConfigAnnotationExists(clusterRole.ObjectMeta.Annotations) {
 			if err = client.Delete(context.Background(), clusterRole); err != nil {
-				log.V(1).Info("Error deleting cluster role", "name", crName, "error message", err)
+				klog.V(1).Info("Error deleting cluster role", "name", crName, "error message", err)
 				return err
 			}
 		}
@@ -767,7 +767,7 @@ func removeCRB(client client.Client, crbName string) error {
 	} else if err == nil {
 		if !res.IsCsConfigAnnotationExists(clusterRoleBinding.ObjectMeta.Annotations) {
 			if err = client.Delete(context.Background(), clusterRoleBinding); err != nil {
-				log.V(1).Info("Error deleting cluster role binding", "name", crbName, "error message", err)
+				klog.V(1).Info("Error deleting cluster role binding", "name", crbName, "error message", err)
 				return err
 			}
 		}

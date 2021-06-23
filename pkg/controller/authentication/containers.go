@@ -347,10 +347,9 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 		ImagePullPolicy: corev1.PullAlways,
 		SecurityContext: &corev1.SecurityContext{
 			Privileged:               &falseVar,
-			RunAsNonRoot:             &falseVar,
+			RunAsNonRoot:             &trueVar,
 			ReadOnlyRootFilesystem:   &falseVar,
 			AllowPrivilegeEscalation: &falseVar,
-			RunAsUser:                new(int64),
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
 			},

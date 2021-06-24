@@ -271,7 +271,7 @@ func (r *ReconcilePolicyController) handleClusterRole(instance *operatorv1alpha1
 			reqLogger.Info("Creating ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "iam-policy-controller-role")
 			err = r.client.Create(context.TODO(), clusterRole)
 			if err != nil {
-				//reqLogger.Error(err, "Failed to create ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "iam-policy-controller-role")
+				reqLogger.Error(err, "Failed to create ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "iam-policy-controller-role")
 				return reconcile.Result{}, err
 			}
 		} else {
@@ -741,7 +741,7 @@ func removeCR(client client.Client, crName string) error {
 	// Delete Clusterrole
 	clusterRole := &rbacv1.ClusterRole{}
 	if err := client.Get(context.Background(), types.NamespacedName{Name: crName, Namespace: ""}, clusterRole); err != nil && errors.IsNotFound(err) {
-		log.Info("Error getting cluster role", crName, err)
+		log.V(1).Info("Error getting cluster role", crName, err)
 		return nil
 	} else if err == nil {
 		if !res.IsCsConfigAnnotationExists(clusterRole.ObjectMeta.Annotations) {

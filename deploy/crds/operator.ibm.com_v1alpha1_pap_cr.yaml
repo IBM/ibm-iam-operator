@@ -1,0 +1,35 @@
+apiVersion: operator.ibm.com/v1alpha1
+kind: Pap
+metadata:
+  name: example-pap
+  labels:
+    app.kubernetes.io/instance: ibm-iam-operator
+    app.kubernetes.io/managed-by: ibm-iam-operator
+    app.kubernetes.io/name: ibm-iam-operator
+spec:
+  # Add fields here
+  auditService:
+    imageRegistry: "quay.io/opencloudio"
+    imageName: "audit-syslog-service"
+    imageTag: "1.0.5"
+    syslogTlsPath: "/etc/audit-tls"
+    resources:
+      limits:
+        cpu: 200m
+        memory: 200Mi
+      requests:
+        cpu: 20m
+        memory: 20Mi
+  papService:
+    imageRegistry: "quay.io/opencloudio"
+    imageName: "iam-policy-administration"
+    imageTag: "3.3.4"
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 50m
+        memory: 200Mi
+  operatorVersion: "0.14.1"
+  replicas: 1

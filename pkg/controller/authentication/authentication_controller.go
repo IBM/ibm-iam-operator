@@ -192,14 +192,14 @@ type ReconcileAuthentication struct {
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-func (r *ReconcileAuthentication) Reconcile(contect context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileAuthentication) Reconcile(context context.Context, request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling Authentication")
 	var requeueResult bool = false
 
 	// Fetch the Authentication instance
 	instance := &operatorv1alpha1.Authentication{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	err := r.client.Get(context, request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -218,7 +218,7 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 		// Object not being deleted, but add our finalizer so we know to remove this object later when it is going to be deleted
 		if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
-			if err := r.client.Update(context.Background(), instance); err != nil {
+			if err := r.client.Update(context, instance); err != nil {
 				log.Error(err, "Error adding the finalizer to the CR")
 				return reconcile.Result{}, err
 			}
@@ -233,7 +233,7 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 			}
 
 			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
-			if err := r.client.Update(context.Background(), instance); err != nil {
+			if err := r.client.Update(context, instance); err != nil {
 				log.Error(err, "Error updating the CR to remove the finalizer")
 				return reconcile.Result{}, err
 			}

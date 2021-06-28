@@ -35,6 +35,7 @@ spec:
             type: object
           status:
             type: object
+        type: object
     served: true
     storage: true
     subresources:

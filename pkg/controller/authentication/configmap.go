@@ -368,7 +368,7 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 
 func registrationScriptConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
 
-	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "registration-script",
@@ -392,7 +392,7 @@ func registrationScriptConfigMap(instance *operatorv1alpha1.Authentication, sche
 
 func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, icpConsoleURL string, icpProxyURL string, scheme *runtime.Scheme) *corev1.ConfigMap {
 
-	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "oauth-client-map",
@@ -422,7 +422,7 @@ func isPublicCloud(client client.Client, namespace string, configMap string) boo
 	currentConfigMap := &corev1.ConfigMap{}
 	err := client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: namespace}, currentConfigMap)
 	if err != nil {
-		reqLogger.Info("Error getting configmap", configMap)
+		log.Info("Error getting configmap", configMap)
 		return false
 	} else if err == nil {
 		host := currentConfigMap.Data["cluster_kube_apiserver_host"]

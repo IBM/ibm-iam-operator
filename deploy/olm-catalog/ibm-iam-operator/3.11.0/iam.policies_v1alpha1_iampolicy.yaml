@@ -13,7 +13,7 @@ spec:
     listKind: IamPolicyList
     plural: iampolicies
     singular: iampolicy
-  preserveUnknownFields: true
+  preserveUnknownFields: false
   scope: Namespaced
   versions:
   - name: v1alpha1
@@ -68,6 +68,7 @@ spec:
               compliant:
                 type: string
             type: object
+        type: object
     served: true
     storage: true
 status:

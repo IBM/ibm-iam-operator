@@ -31,8 +31,50 @@ spec:
           metadata:
             type: object
           spec:
+            properties:
+              oidcLibertyClient:
+                properties:
+                  redirect_uris:
+                    items:
+                      type: string
+                    type: array
+                  trusted_uri_prefixes:
+                    items:
+                      type: string
+                    type: array
+                  post_logout_redirect_uris:
+                    items:
+                      type: string
+                    type: array
+                type: object
+                description: 'List of trusted uris, logout uris and trusted prefixes'
+              secret:
+                type: string
+              clientId:
+                type: string
+              zenInstanceId:
+                type: string
+              zenProductNameUrl:
+                type: string
             type: object
           status:
+            properties:
+              conditions:
+                properties:
+                  type:
+                    type: string
+                  status:
+                    type: object
+                  lastTransitionTime:
+                    type: object
+                  reason:
+                    type: string
+                  message:
+                    type: string
+                description: 'The status of client creation'
+                type: object
+              lastFailureTime:
+                type: object
             type: object
         type: object
     served: true

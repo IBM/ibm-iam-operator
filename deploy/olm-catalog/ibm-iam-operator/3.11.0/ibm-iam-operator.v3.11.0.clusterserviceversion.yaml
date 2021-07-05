@@ -168,7 +168,7 @@ metadata:
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.5.0",
+              "imageTag": "3.6.0",
               "ldapsCACert": "platform-auth-ldaps-ca-cert",
               "resources": {
                 "limits": {
@@ -232,7 +232,7 @@ metadata:
             "identityManager": {
               "imageName": "icp-identity-manager",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.5.0",
+              "imageTag": "3.6.0",
               "masterNodesList": "10.0.0.1",
               "resources": {
                 "limits": {
@@ -248,7 +248,7 @@ metadata:
             "identityProvider": {
               "imageName": "icp-identity-provider",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.5.0",
+              "imageTag": "3.6.0",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -1743,11 +1743,11 @@ spec:
                 - ibm-iam-operator
                 env:
                 - name: ICP_PLATFORM_AUTH_IMAGE
-                  value: quay.io/opencloudio/icp-platform-auth:3.5.0
+                  value: quay.io/opencloudio/icp-platform-auth:3.6.0
                 - name: ICP_IDENTITY_PROVIDER_IMAGE
-                  value: quay.io/opencloudio/icp-identity-provider:3.5.0
+                  value: quay.io/opencloudio/icp-identity-provider:3.6.0
                 - name: ICP_IDENTITY_MANAGER_IMAGE
-                  value: quay.io/opencloudio/icp-identity-manager:3.5.0
+                  value: quay.io/opencloudio/icp-identity-manager:3.6.0
                 - name: IAM_POLICY_ADMINISTRATION_IMAGE
                   value: quay.io/opencloudio/iam-policy-administration:3.5.0
                 - name: IAM_POLICY_DECISION_IMAGE

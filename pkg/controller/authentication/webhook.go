@@ -39,6 +39,9 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 	if instance.Spec.Config.IBMCloudSaas {
 		// in saas mode
 		webhook = webhook + "-" + instance.Namespace
+	} else if instance.Spec.Config.OnPremMultipleDeploy {
+		// multiple deployment in on-prem mode
+		webhook = webhook + "-" + instance.Namespace
 	}
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: webhook, Namespace: ""}, currentWebhook)
@@ -65,6 +68,8 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 			currentWebhook.ObjectMeta.Annotations = map[string]string{
 				"certmanager.k8s.io/inject-ca-from": instance.Namespace+"/platform-identity-management",
 			}
+			// update webhook name
+			currentWebhook.Name = webhook
 			err = r.client.Update(context.TODO(), currentWebhook)
 			if err != nil {
 				reqLogger.Error(err, "Failed to update an existing webhook", "Webhook.Namespace", currentWebhook.Namespace, "Webhook.Name", currentWebhook.Name)

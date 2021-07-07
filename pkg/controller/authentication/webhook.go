@@ -46,8 +46,13 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 		webhook = webhook + "-" + instance.Namespace
 		if err == nil {
 			// webhook namespace-admission-config, update its name
-			currentWebhook.Name = webhook
+			currentWebhook.ObjectMeta.Name = webhook
 			reqLogger.Info("updating webhook name namespace-admission-config", "Webhook.Namespace", instance.Namespace, "Webhook.Name", webhook)
+			err = r.client.Update(context.TODO(), currentWebhook)
+			if err != nil {
+				reqLogger.Error(err, "Failed to update an existing webhook", "Webhook.Namespace", currentWebhook.Namespace, "Webhook.Name", currentWebhook.Name)
+				return err
+			}
 		}
 	}
 
@@ -75,8 +80,6 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 			currentWebhook.ObjectMeta.Annotations = map[string]string{
 				"certmanager.k8s.io/inject-ca-from": instance.Namespace+"/platform-identity-management",
 			}
-			// update webhook name
-			currentWebhook.Name = webhook
 			err = r.client.Update(context.TODO(), currentWebhook)
 			if err != nil {
 				reqLogger.Error(err, "Failed to update an existing webhook", "Webhook.Namespace", currentWebhook.Namespace, "Webhook.Name", currentWebhook.Name)

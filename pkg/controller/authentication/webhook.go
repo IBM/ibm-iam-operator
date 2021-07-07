@@ -91,6 +91,9 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 	if instance.Spec.Config.IBMCloudSaas {
 		// in saas mode
 		hooksName = instance.Namespace + "." + hooksName
+	} else if instance.Spec.Config.OnPremMultipleDeploy {
+		// multiple deployment in on-prem mode
+		hooksName = instance.Namespace + "." + hooksName
 	}
 
 	newWebhook := &reg.MutatingWebhookConfiguration{

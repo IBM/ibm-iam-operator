@@ -41,7 +41,14 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 		webhook = webhook + "-" + instance.Namespace
 	} else if instance.Spec.Config.OnPremMultipleDeploy {
 		// multiple deployment in on-prem mode
+		// check if webhook namespace-admission-config exists 
+		err = r.client.Get(context.TODO(), types.NamespacedName{Name: webhook, Namespace: ""}, currentWebhook)
 		webhook = webhook + "-" + instance.Namespace
+		if err == nil {
+			// webhook namespace-admission-config, update its name
+			currentWebhook.Name = webhook
+			reqLogger.Info("updating webhook name namespace-admission-config", "Webhook.Namespace", instance.Namespace, "Webhook.Name", webhook)
+		}
 	}
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: webhook, Namespace: ""}, currentWebhook)

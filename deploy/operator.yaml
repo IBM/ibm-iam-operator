@@ -50,17 +50,17 @@ spec:
             - name: ICP_IDENTITY_MANAGER_IMAGE
               value: quay.io/opencloudio/icp-identity-manager:3.6.0
             - name: IAM_POLICY_ADMINISTRATION_IMAGE
-              value: quay.io/opencloudio/iam-policy-administration:3.5.0
+              value: quay.io/opencloudio/iam-policy-administration:3.6.0
             - name: IAM_POLICY_DECISION_IMAGE
-              value: quay.io/opencloudio/iam-policy-decision:3.5.0
+              value: quay.io/opencloudio/iam-policy-decision:3.6.0
             - name: ICP_SECRET_WATCHER_IMAGE
-              value: quay.io/opencloudio/icp-secret-watcher:3.5.0
+              value: quay.io/opencloudio/icp-secret-watcher:3.6.0
             - name: ICP_OIDCCLIENT_WATCHER_IMAGE
-              value: quay.io/opencloudio/icp-oidcclient-watcher:3.5.0
+              value: quay.io/opencloudio/icp-oidcclient-watcher:3.6.0
             - name: IAM_POLICY_CONTROLLER_IMAGE
-              value: quay.io/opencloudio/iam-policy-controller:3.5.0
+              value: quay.io/opencloudio/iam-policy-controller:3.6.0
             - name: ICP_IAM_ONBOARDING_IMAGE
-              value: quay.io/opencloudio/icp-iam-onboarding:3.5.0
+              value: quay.io/opencloudio/icp-iam-onboarding:3.6.0
             - name: AUDIT_SYSLOG_SERVICE_IMAGE
               value: quay.io/opencloudio/audit-syslog-service:1.0.7
             - name: WATCH_NAMESPACE

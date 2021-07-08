@@ -143,7 +143,7 @@ Complete the following steps:
 
 The IBM IAM operator service supports running with the OpenShift Container Platform default restricted Security Context Constraints (SCCs).
 
-For more information about the OpenShift Container Platform Security Context Constraints, see Managing Security Context Constraints.
+For more information about the OpenShift Container Platform Security Context Constraints, see [Managing Security Context Constraints.](https://docs.openshift.com/container-platform/4.3/authentication/managing-security-context-constraints.html)
 
 ## PodSecurityPolicy Requirements
 

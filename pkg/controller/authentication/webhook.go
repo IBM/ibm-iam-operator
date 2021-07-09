@@ -119,7 +119,7 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 		// multiple deployment in on-prem mode
 		hooksName = instance.Namespace + "." + hooksName
 	}
-	sideEffectClass := reg.SideEffectClass("None")
+	sideEffectClass := reg.SideEffectClass("Unknown")
 	newWebhook := &reg.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: webhook,

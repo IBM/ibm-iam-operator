@@ -53,27 +53,68 @@ func (r *ReconcileAuthentication) handleIngress(instance *operatorv1alpha1.Authe
 				reqLogger.Error(err, "Failed to create new Ingress", "Ingress.Namespace", instance.Namespace, "Ingress.Name", ingress)
 				return err
 			}
-			// Ingress created successfully - return and requeue
+			// Ingress created successfully - return and requeue, just sets the pointer to true
 			*requeueResult = true
 		} else if err != nil {
 			reqLogger.Error(err, "Failed to get Ingress")
 			return err
-		}
-
+		} /*else {
+			reqLogger.Info("Ingress exists and should be updated", "Ingress.Namespace", instance.Namespace, "Ingress.Name", ingress)
+			err := r.updateIngress(instance, ingress, currentIngress)
+			if err != nil {
+				reqLogger.Error(err, "Failed to get Ingress")
+				return err
+			}
+			// Ingress updated successfully - return and requeue
+			*requeueResult = true
+		}*/
 	}
 
 	return nil
 
 }
 
-func apiKeyIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-	pathType := net.PathType("ImplementationSpecific")
+/*func indexOf(element string, data []string) int {
+	for k, v := range data {
+		if element == v {
+			return k
+		}
+	}
+	return -1 //not found.
+}
+
+func (r *ReconcileAuthentication) updateIngress(instance *operatorv1alpha1.Authentication, ingress string, currentIngress *net.Ingress) error {
+	ingressList := []string{"api-key", "explorer-idmgmt", "iam-token-redirect", "iam-token", "ibmid-ui-callback", "id-mgmt", "idmgmt-v2-api", "platform-auth-dir",
+		"platform-auth", "platform-id-auth-block", "platform-id-auth", "platform-id-provider", "platform-login", "platform-oidc-block", "platform-oidc", "platform-oidc-introspect",
+		"platform-oidc-keys", "platform-oidc-token-2", "platform-oidc-token", "service-id", "token-service-version", "saml-ui-callback", "version-idmgmt"}
+
+	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *net.Ingress{apiKeyIngress, explorerIdmgmtIngress, iamTokenRedirectIngress, iamTokenIngress, ibmidUiCallbackIngress, idMgmtIngress, idmgmtV2ApiIngress, platformAuthDirIngress,
+		platformAuthIngress, platformIdAuthBlockIngress, platformIdAuthIngress, platformIdProviderIngress, platformLoginIngress, platformOidcBlockIngress, platformOidcIngress, platformOidcIntrospectIngress,
+		platformOidcKeysIngress, platformOidcToken2Ingress, platformOidcTokenIngress, serviceIdIngress, tokenServiceVersionIngress, samlUiCallbackIngress, versionIdmgmtIngress}
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	index := indexOf(ingress, ingressList)
+	currentIngress = functionList[index](instance, r.scheme)
+	currentIngress.ObjectMeta.ManagedFields = nil
+	reqLogger.Info("Get API version", "Ingress.Namespace", instance.Namespace, "API Version", currentIngress.ManagedFields)
+	err := r.client.Update(context.TODO(), currentIngress)
+	if err != nil {
+		reqLogger.Error(err, "Failed to create new Ingress", "Ingress.Namespace", instance.Namespace, "Ingress.Name", currentIngress)
+		return err
+	}
+	reqLogger.Info("Updated existing Ingress successfully", "Ingress.Namespace", instance.Namespace, "Ingress.Name", currentIngress)
+	return nil
+
+}*/
+
+func apiKeyIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	pathType := net.PathType("ImplementationSpecific")
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "api-key",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			//APIVersion: "",
+			Labels: map[string]string{"app": "auth-idp"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends": "true",
@@ -112,6 +153,7 @@ func apiKeyIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Sc
 		reqLogger.Error(err, "Failed to set owner for Ingress")
 		return nil
 	}
+	reqLogger.Info("NEW INGRESS", "Ingress.Namespace", instance.Namespace, "NEW INGRESS", newIngress)
 	return newIngress
 
 }

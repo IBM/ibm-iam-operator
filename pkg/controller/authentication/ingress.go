@@ -113,8 +113,7 @@ func apiKeyIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Sc
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "api-key",
 			Namespace: instance.Namespace,
-			//APIVersion: "",
-			Labels: map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "auth-idp"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends": "true",
@@ -153,7 +152,6 @@ func apiKeyIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Sc
 		reqLogger.Error(err, "Failed to set owner for Ingress")
 		return nil
 	}
-	reqLogger.Info("NEW INGRESS", "Ingress.Namespace", instance.Namespace, "NEW INGRESS", newIngress)
 	return newIngress
 
 }

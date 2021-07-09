@@ -105,6 +105,7 @@ type ConfigSpec struct {
 	FIPSEnabled                 bool   `json:"fipsEnabled"`
 	ROKSEnabled                 bool   `json:"roksEnabled"`
 	IBMCloudSaas                bool   `json:"ibmCloudSaas,omitempty"`
+	OnPremMultipleDeploy        bool   `json:"onPremMultipleDeploy,omitempty"`
 	SaasClientRedirectUrl       string `json:"saasClientRedirectUrl,omitempty"`
 	NONCEEnabled                bool   `json:"nonceEnabled"`
 	XFrameDomain                string `json:"xframeDomain,omitempty"`

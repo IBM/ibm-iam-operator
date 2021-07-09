@@ -208,6 +208,7 @@ metadata:
               "enableImpersonation": false,
               "fipsEnabled": true,
               "ibmCloudSaas": false,
+              "onPremMultipleDeploy": false,
               "icpPort": 8443,
               "installType": "fresh",
               "isOpenshiftEnv": true,

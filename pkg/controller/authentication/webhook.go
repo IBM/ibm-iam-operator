@@ -39,6 +39,30 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 	if instance.Spec.Config.IBMCloudSaas {
 		// in saas mode
 		webhook = webhook + "-" + instance.Namespace
+	} else if instance.Spec.Config.OnPremMultipleDeploy {
+		// multiple deployment in on-prem mode
+		// check if webhook with old name "namespace-admission-config" exist 
+		err = r.client.Get(context.TODO(), types.NamespacedName{Name: webhook, Namespace: ""}, currentWebhook)
+		webhook = webhook + "-" + instance.Namespace
+		if err == nil {
+			// found existing webhook namespace-admission-config, upgrade the name and return
+			// Update() does not work, use delete --> create to re-create 
+			reqLogger.Info("updating existing webhook namespace-admission-config", "Webhook.Namespace", instance.Namespace, "Webhook.Name", webhook)
+			err = r.client.Delete(context.TODO(), currentWebhook)
+			if err != nil {
+				reqLogger.Error(err, "Failed to re-create an existing webhook when deleting the old one", "Webhook.Namespace", currentWebhook.Namespace, "Webhook.Name", currentWebhook.Name)
+				return err
+			}
+			currentWebhook.ObjectMeta.Name = webhook
+            currentWebhook.ObjectMeta.ResourceVersion = ""
+			currentWebhook.Webhooks[0].Name = instance.Namespace + "." + "iam.hooks.securityenforcement.admission.cloud.ibm.com"
+			err = r.client.Create(context.TODO(), currentWebhook)
+            if err != nil {
+				reqLogger.Error(err, "Failed to re-create an existing webhook when creating the new one", "Webhook.Namespace", currentWebhook.Namespace, "Webhook.Name", currentWebhook.Name)
+				return err
+			}
+			return nil
+		}
 	}
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: webhook, Namespace: ""}, currentWebhook)
@@ -85,6 +109,9 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 	hooksName := "iam.hooks.securityenforcement.admission.cloud.ibm.com"
 	if instance.Spec.Config.IBMCloudSaas {
 		// in saas mode
+		hooksName = instance.Namespace + "." + hooksName
+	} else if instance.Spec.Config.OnPremMultipleDeploy {
+		// multiple deployment in on-prem mode
 		hooksName = instance.Namespace + "." + hooksName
 	}
 

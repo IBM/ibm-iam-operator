@@ -340,6 +340,9 @@ func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1al
 	if instance.Spec.Config.IBMCloudSaas {
 		// in saas mode
 		webhook = webhook + "-" + instance.Namespace
+	} else if instance.Spec.Config.OnPremMultipleDeploy {
+		// multiple deployment in on-prem mode
+		webhook = webhook + "-" + instance.Namespace
 	}
 
 	// Remove multiple deployment common-service/config annotation

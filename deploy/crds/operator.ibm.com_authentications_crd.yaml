@@ -191,6 +191,8 @@ spec:
                     type: boolean
                   ibmCloudSaas:
                     type: boolean
+                  onPremMultipleDeploy:
+                    type: boolean
                   icpPort:
                     format: int32
                     type: integer

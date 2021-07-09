@@ -189,6 +189,8 @@ spec:
                     type: boolean
                   fipsEnabled:
                     type: boolean
+                  onPremMultipleDeploy:
+                    type: boolean  
                   ibmCloudSaas:
                     type: boolean
                   icpPort:

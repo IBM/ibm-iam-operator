@@ -27,16 +27,16 @@ import (
 	res "github.com/IBM/ibm-iam-operator/pkg/resources"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	net "k8s.io/api/networking/v1beta1"
+	net "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -152,13 +152,13 @@ type ReconcilePolicyDecision struct {
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-func (r *ReconcilePolicyDecision) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcilePolicyDecision) Reconcile(context context.Context, request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling PolicyDecision")
 
 	// Fetch the PolicyDecision instance
 	instance := &operatorv1alpha1.PolicyDecision{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	err := r.client.Get(context, request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -212,7 +212,7 @@ func (r *ReconcilePolicyDecision) Reconcile(request reconcile.Request) (reconcil
 func (r *ReconcilePolicyDecision) handleCertificate(instance *operatorv1alpha1.PolicyDecision, currentCertificate *certmgr.Certificate) (reconcile.Result, error) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "auth-pdp-cert", Namespace: instance.Namespace}, currentCertificate)
+	err := r.client.Get(context.Background(), types.NamespacedName{Name: "auth-pdp-cert", Namespace: instance.Namespace}, currentCertificate)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new certificate
 		newCertificate := r.certificateForPolicyDecision(instance)
@@ -447,9 +447,9 @@ func (r *ReconcilePolicyDecision) configMapForPolicyDecision(instance *operatorv
 			Labels:    map[string]string{"app": "auth-pdp"},
 		},
 		Data: map[string]string{
-			"AUDIT_ENABLED":  "false",
-			"AUDIT_LOG_PATH": "/var/log/audit",
-			"SYSLOG_TLS_PATH":   instance.Spec.AuditService.SyslogTlsPath,
+			"AUDIT_ENABLED":   "false",
+			"AUDIT_LOG_PATH":  "/var/log/audit",
+			"SYSLOG_TLS_PATH": instance.Spec.AuditService.SyslogTlsPath,
 			"logrotate-conf": `\n # rotate log files weekly\ndaily\n\n# use the syslog group by
 								default, since this is the owning group # of /var/log/syslog.\n#su root syslog\n\n#
 								keep 4 weeks worth of backlogs\nrotate 4\n\n# create new (empty) log files after
@@ -470,7 +470,7 @@ func (r *ReconcilePolicyDecision) configMapForPolicyDecision(instance *operatorv
 }
 
 func (r *ReconcilePolicyDecision) ingressForPolicyDecision(instance *operatorv1alpha1.PolicyDecision) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	pdpIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -490,11 +490,14 @@ func (r *ReconcilePolicyDecision) ingressForPolicyDecision(instance *operatorv1a
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/iam-pdp/",
+									Path:     "/iam-pdp/",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "iam-pdp",
-										ServicePort: intstr.IntOrString{
-											IntVal: port,
+										Service: &net.IngressServiceBackend{
+											Name: "iam-pdp",
+											Port: net.ServiceBackendPort{
+												Number: 7998,
+											},
 										},
 									},
 								},
@@ -569,8 +572,8 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 					HostPID:                       falseVar,
 					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 						{
-							MaxSkew: 1,
-							TopologyKey: "topology.kubernetes.io/zone",
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/zone",
 							WhenUnsatisfiable: corev1.ScheduleAnyway,
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -579,8 +582,8 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 							},
 						},
 						{
-							MaxSkew: 1,
-							TopologyKey: "topology.kubernetes.io/region",
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/region",
 							WhenUnsatisfiable: corev1.ScheduleAnyway,
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -589,7 +592,7 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 							},
 						},
 					},
-					ServiceAccountName:            serviceAccountName,
+					ServiceAccountName: serviceAccountName,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
@@ -713,11 +716,11 @@ func buildPdpVolumes() []corev1.Volume {
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "audit-server-certs",
-					Optional: &trueVar,
+					Optional:   &trueVar,
 				},
 			},
 		},
-		{			
+		{
 			Name: "audit-ingest",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{

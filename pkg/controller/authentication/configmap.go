@@ -42,7 +42,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	configMapList := []string{"platform-auth-idp", "registration-script", "oauth-client-map", "registration-json"}
 
 	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{r.authIdpConfigMap, registrationScriptConfigMap}
-        isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
+	isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 	var newConfigMap *corev1.ConfigMap
@@ -103,11 +103,11 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 							newConfigMap.Data["ROKS_ENABLED"] = "true"
 							newConfigMap.Data["ROKS_URL"] = issuer
 							if instance.Spec.Config.ROKSUserPrefix == "changeme" { //we change it to empty prefix, that's the new default in 3.5
-								if (isPublicCloud) {
+								if isPublicCloud {
 									newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
-						                } else {
-								newConfigMap.Data["ROKS_USER_PREFIX"] = ""
-							        }
+								} else {
+									newConfigMap.Data["ROKS_USER_PREFIX"] = ""
+								}
 							} else { // user specifies prefix but does not specify roksEnabled and roksURL we take the user provided prefix
 								newConfigMap.Data["ROKS_USER_PREFIX"] = instance.Spec.Config.ROKSUserPrefix
 							}
@@ -234,10 +234,10 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 	isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
 	bootStrapUserId := instance.Spec.Config.BootstrapUserId
 	roksUserPrefix := instance.Spec.Config.ROKSUserPrefix
-	if (len(bootStrapUserId) > 0 && strings.EqualFold(bootStrapUserId, "kubeadmin") && isPublicCloud) {
+	if len(bootStrapUserId) > 0 && strings.EqualFold(bootStrapUserId, "kubeadmin") && isPublicCloud {
 		bootStrapUserId = ""
 	}
-	if (isPublicCloud) {
+	if isPublicCloud {
 		roksUserPrefix = "IAM#"
 	}
 	newConfigMap := &corev1.ConfigMap{
@@ -259,10 +259,10 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"AUDIT_ENABLED_IDPROVIDER":    "false",
 			"AUDIT_ENABLED_IDMGMT":        "false",
 			"AUDIT_DETAIL":                "false",
-			"LOG_LEVEL_IDPROVIDER":        "info",
-			"LOG_LEVEL_AUTHSVC":           "info",
-			"LOG_LEVEL_IDMGMT":            "info",
-			"LOG_LEVEL_MW":                "info",
+			"LOG_LEVEL_IDPROVIDER":        "debug",
+			"LOG_LEVEL_AUTHSVC":           "debug",
+			"LOG_LEVEL_IDMGMT":            "debug",
+			"LOG_LEVEL_MW":                "debug",
 			"IDTOKEN_LIFETIME":            "12h",
 			"SYSLOG_TLS_PATH":             instance.Spec.AuditService.SyslogTlsPath,
 			"SESSION_TIMEOUT":             "43200",
@@ -418,11 +418,11 @@ func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, icpConsoleU
 }
 
 // Check if hosted on IBM Cloud
-func isPublicCloud(client client.Client, namespace string , configMap string) bool {
+func isPublicCloud(client client.Client, namespace string, configMap string) bool {
 	currentConfigMap := &corev1.ConfigMap{}
 	err := client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: namespace}, currentConfigMap)
 	if err != nil {
-		log.V(1).Info("Error getting configmap", configMap)
+		log.Info("Error getting configmap", configMap)
 		return false
 	} else if err == nil {
 		host := currentConfigMap.Data["cluster_kube_apiserver_host"]

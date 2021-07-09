@@ -18,6 +18,7 @@ package authentication
 
 import (
 	"context"
+
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -248,9 +249,9 @@ func (r *ReconcileAuthentication) iamTokenService(instance *operatorv1alpha1.Aut
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{
-					Name:     "p10443",
-					Port:     redirectPort,
-					Protocol: corev1.ProtocolTCP,
+					Name:       "p10443",
+					Port:       redirectPort,
+					Protocol:   corev1.ProtocolTCP,
 					TargetPort: intstr.FromString("https"),
 				},
 			},

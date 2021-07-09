@@ -19,8 +19,8 @@ package oidcclientwatcher
 import (
 	"context"
 	"reflect"
-	"time"
 	gorun "runtime"
+	"time"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
@@ -120,7 +120,7 @@ type ReconcileOIDCClientWatcher struct {
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-func (r *ReconcileOIDCClientWatcher) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileOIDCClientWatcher) Reconcile(contect context.Context, request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling OIDCClientWatcher")
 
@@ -148,7 +148,7 @@ func (r *ReconcileOIDCClientWatcher) Reconcile(request reconcile.Request) (recon
 		if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
 			if err := r.client.Update(context.Background(), instance); err != nil {
-				log.Error(err, "Error adding the finalizer to the CR")
+				reqLogger.Error(err, "Error adding the finalizer to the CR")
 				return reconcile.Result{}, err
 			}
 		}
@@ -156,14 +156,14 @@ func (r *ReconcileOIDCClientWatcher) Reconcile(request reconcile.Request) (recon
 		// Object scheduled to be deleted
 		if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 			if err := r.deleteExternalResources(instance); err != nil {
-				log.Error(err, "Error deleting resources created by this operator")
+				reqLogger.Error(err, "Error deleting resources created by this operator")
 
 				return reconcile.Result{}, err
 			}
 
 			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
 			if err := r.client.Update(context.Background(), instance); err != nil {
-				log.Error(err, "Error updating the CR to remove the finalizer")
+				reqLogger.Error(err, "Error updating the CR to remove the finalizer")
 				return reconcile.Result{}, err
 			}
 
@@ -226,7 +226,6 @@ func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha
 		} else {
 			currentClusterRole.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
 		}
-
 		reqLogger.Info("Updating an existing ClusterRole", "ClusterRole.Namespace", instance.Namespace, "ClusterRole.Name", "icp-oidc-client-admin-aggregate")
 		err = r.client.Update(context.TODO(), currentClusterRole)
 		if err != nil {
@@ -425,6 +424,7 @@ func (r *ReconcileOIDCClientWatcher) operatorClusterRoleForOIDCClientWatcher(ins
 // deploymentForOIDCClientWatcher returns a OIDCClientWatcher Deployment object
 func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *operatorv1alpha1.OIDCClientWatcher) *appsv1.Deployment {
 	reqLogger := log.WithValues("deploymentForOIDCClientWatcher", "Entry", "instance.Name", instance.Name)
+	//image := instance.Spec.ImageRegistry + shatag.GetImageRef("ICP_OIDCCLIENT_WATCHER_IMAGE")
 	image := shatag.GetImageRef("ICP_OIDCCLIENT_WATCHER_IMAGE")
 	replicas := instance.Spec.Replicas
 	resources := instance.Spec.Resources
@@ -913,7 +913,7 @@ func removeCsAnnotationFromCR(client client.Client, crName string, csCfgAnnotati
 	} else if err == nil {
 		if len(clusterRole.ObjectMeta.Annotations) > 0 {
 			if _, ok := clusterRole.ObjectMeta.Annotations[csCfgAnnotationName]; ok {
-				delete(clusterRole.ObjectMeta.Annotations, csCfgAnnotationName);
+				delete(clusterRole.ObjectMeta.Annotations, csCfgAnnotationName)
 				if err = client.Update(context.Background(), clusterRole); err != nil {
 					// if error, retry second time to avoid manual deletion after uninstall
 					if err2 := client.Update(context.Background(), clusterRole); err2 != nil {
@@ -928,7 +928,6 @@ func removeCsAnnotationFromCR(client client.Client, crName string, csCfgAnnotati
 	}
 	return nil
 }
-
 
 func removeCR(client client.Client, crName string) error {
 	// Delete Clusterrole

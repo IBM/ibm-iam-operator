@@ -22,6 +22,7 @@ import (
 	gorun "runtime"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -115,13 +116,13 @@ type ReconcileSecretWatcher struct {
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-func (r *ReconcileSecretWatcher) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileSecretWatcher) Reconcile(context context.Context, request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling SecretWatcher")
 
 	// Fetch the SecretWatcher instance
 	SecretWatcher := &operatorv1alpha1.SecretWatcher{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, SecretWatcher)
+	err := r.client.Get(context, request.NamespacedName, SecretWatcher)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not instance, could have been deleted after reconcile request.
@@ -144,13 +145,13 @@ func (r *ReconcileSecretWatcher) Reconcile(request reconcile.Request) (reconcile
 
 	// Check if the deployment already exists, if not create a new one
 	instance := &appsv1.Deployment{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "secret-watcher", Namespace: SecretWatcher.Namespace}, instance)
+	err = r.client.Get(context, types.NamespacedName{Name: "secret-watcher", Namespace: SecretWatcher.Namespace}, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Define a new deployment
 			swDep := r.deploymentForSecretWatcher(SecretWatcher)
 			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", swDep.Namespace, "Deployment.Name", swDep.Name)
-			err = r.client.Create(context.TODO(), swDep)
+			err = r.client.Create(context, swDep)
 			if err != nil {
 				reqLogger.Error(err, "Failed to create new Deployment", "Deployment.Namespace", swDep.Namespace, "Deployment.Name", swDep.Name)
 				return reconcile.Result{}, err
@@ -173,7 +174,7 @@ func (r *ReconcileSecretWatcher) Reconcile(request reconcile.Request) (reconcile
 			newDeployment.Spec.Template.ObjectMeta.Annotations[nssAnnotation] = val
 		}
 		instance.Spec = newDeployment.Spec
-		err = r.client.Update(context.TODO(), instance)
+		err = r.client.Update(context, instance)
 		if err != nil {
 			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", instance.Name)
 			return reconcile.Result{}, err
@@ -184,7 +185,7 @@ func (r *ReconcileSecretWatcher) Reconcile(request reconcile.Request) (reconcile
 	replicas := SecretWatcher.Spec.Replicas
 	if *instance.Spec.Replicas != replicas {
 		instance.Spec.Replicas = &replicas
-		err = r.client.Update(context.TODO(), instance)
+		err = r.client.Update(context, instance)
 		if err != nil {
 			reqLogger.Error(err, "Failed to update Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", instance.Name)
 			return reconcile.Result{}, err
@@ -200,7 +201,7 @@ func (r *ReconcileSecretWatcher) Reconcile(request reconcile.Request) (reconcile
 		client.InNamespace(SecretWatcher.Namespace),
 		client.MatchingLabels(labelsForSecretWatcherSelect(SecretWatcher.Name, instance.Name)),
 	}
-	if err = r.client.List(context.TODO(), podList, listOpts...); err != nil {
+	if err = r.client.List(context, podList, listOpts...); err != nil {
 		reqLogger.Error(err, "Failed to list pods", "SecretWatcher.Namespace", SecretWatcher.Namespace, "SecretWatcher.Name", SecretWatcher.Name)
 		return reconcile.Result{}, err
 	}
@@ -209,7 +210,7 @@ func (r *ReconcileSecretWatcher) Reconcile(request reconcile.Request) (reconcile
 	// Update status.Nodes if needed
 	if !reflect.DeepEqual(podNames, SecretWatcher.Status.Nodes) {
 		SecretWatcher.Status.Nodes = podNames
-		err := r.client.Status().Update(context.TODO(), SecretWatcher)
+		err := r.client.Status().Update(context, SecretWatcher)
 		if err != nil {
 			reqLogger.Error(err, "Failed to update SecretWatcher status")
 			return reconcile.Result{}, err

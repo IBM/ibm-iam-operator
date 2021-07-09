@@ -286,7 +286,6 @@ func (r *ReconcileAuthentication) handleClusterRole(instance *operatorv1alpha1.A
 			}
 			// ClusterRole updated successfully - return and requeue
 			*requeueResult = true
-
 		}
 
 	}

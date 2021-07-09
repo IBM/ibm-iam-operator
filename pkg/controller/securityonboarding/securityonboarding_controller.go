@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -134,13 +135,13 @@ type ReconcileSecurityOnboarding struct {
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-func (r *ReconcileSecurityOnboarding) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileSecurityOnboarding) Reconcile(context context.Context, request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling SecurityOnboarding")
 
 	// Fetch the SecurityOnboarding instance
 	instance := &operatorv1alpha1.SecurityOnboarding{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	err := r.client.Get(context, request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -173,7 +174,7 @@ func (r *ReconcileSecurityOnboarding) Reconcile(request reconcile.Request) (reco
 		client.MatchingLabels(map[string]string{"app": "security-onboarding"}),
 	}
 	reqLogger.Info("Complete - got job list")
-	if err = r.client.List(context.TODO(), jobList, listOpts...); err != nil {
+	if err = r.client.List(context, jobList, listOpts...); err != nil {
 		reqLogger.Error(err, "Failed to list jobs", "SecurityOnboarding.Namespace", instance.Namespace, "SecurityOnboarding.Name", instance.Name)
 		return reconcile.Result{}, err
 	}
@@ -181,7 +182,7 @@ func (r *ReconcileSecurityOnboarding) Reconcile(request reconcile.Request) (reco
 	// Update status.Nodes if needed
 	if !reflect.DeepEqual(jobNames, instance.Status.PodNames) {
 		instance.Status.PodNames = jobNames
-		err := r.client.Status().Update(context.TODO(), instance)
+		err := r.client.Status().Update(context, instance)
 		if err != nil {
 			reqLogger.Error(err, "Failed to update SecurityOnboarding status")
 			return reconcile.Result{}, err
@@ -567,7 +568,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 	currentJob := &batchv1.Job{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "security-onboarding", Namespace: instance.Namespace}, currentJob)
 	if err == nil {
-		if currentJob.Spec.Template.Spec.Containers[0].Image != shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE"){
+		if currentJob.Spec.Template.Spec.Containers[0].Image != shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE") {
 			return currentJob, true, fmt.Errorf("Job %v already exists.", "security-onboarding")
 		}
 		return currentJob, false, fmt.Errorf("Job %v already exists.", "security-onboarding")
@@ -1112,7 +1113,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 	currentJob := &batchv1.Job{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "iam-onboarding", Namespace: instance.Namespace}, currentJob)
 	if err == nil {
-		if currentJob.Spec.Template.Spec.Containers[0].Image != shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE"){
+		if currentJob.Spec.Template.Spec.Containers[0].Image != shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE") {
 			return currentJob, true, fmt.Errorf("Job %v already exists.", "iam-onboarding")
 		}
 		return currentJob, false, fmt.Errorf("Job %v already exists.", "iam-onboarding")

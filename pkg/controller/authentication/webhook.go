@@ -18,8 +18,9 @@ package authentication
 
 import (
 	"context"
+
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
-	reg "k8s.io/api/admissionregistration/v1beta1"
+	reg "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,12 +42,12 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 		webhook = webhook + "-" + instance.Namespace
 	} else if instance.Spec.Config.OnPremMultipleDeploy {
 		// multiple deployment in on-prem mode
-		// check if webhook with old name "namespace-admission-config" exist 
+		// check if webhook with old name "namespace-admission-config" exist
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: webhook, Namespace: ""}, currentWebhook)
 		webhook = webhook + "-" + instance.Namespace
 		if err == nil {
 			// found existing webhook namespace-admission-config, upgrade the name and return
-			// Update() does not work, use delete --> create to re-create 
+			// Update() does not work, use delete --> create to re-create
 			reqLogger.Info("updating existing webhook namespace-admission-config", "Webhook.Namespace", instance.Namespace, "Webhook.Name", webhook)
 			err = r.client.Delete(context.TODO(), currentWebhook)
 			if err != nil {
@@ -54,10 +55,10 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 				return err
 			}
 			currentWebhook.ObjectMeta.Name = webhook
-            currentWebhook.ObjectMeta.ResourceVersion = ""
+			currentWebhook.ObjectMeta.ResourceVersion = ""
 			currentWebhook.Webhooks[0].Name = instance.Namespace + "." + "iam.hooks.securityenforcement.admission.cloud.ibm.com"
 			err = r.client.Create(context.TODO(), currentWebhook)
-            if err != nil {
+			if err != nil {
 				reqLogger.Error(err, "Failed to re-create an existing webhook when creating the new one", "Webhook.Namespace", currentWebhook.Namespace, "Webhook.Name", currentWebhook.Name)
 				return err
 			}
@@ -84,10 +85,14 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 			return err
 		}
 	} else {
+		// generate new webhook with v1 if it exists and copy the annotations
+		//currentWebhook := generateWebhookObject(instance, r.scheme, webhook)
+		//currentWebhook.ManagedFields = nil
+		//reqLogger.Info("Updating an existing Webhook", "Webhook.Namespace", currentWebhook.Namespace, "Webhook.Details", currentWebhook)
 		if currentWebhook.ObjectMeta.Annotations == nil {
 			reqLogger.Info("Updating an existing Webhook", "Webhook.Namespace", currentWebhook.Namespace, "Webhook.Name", currentWebhook.Name)
 			currentWebhook.ObjectMeta.Annotations = map[string]string{
-				"certmanager.k8s.io/inject-ca-from": instance.Namespace+"/platform-identity-management",
+				"certmanager.k8s.io/inject-ca-from": instance.Namespace + "/platform-identity-management",
 			}
 			err = r.client.Update(context.TODO(), currentWebhook)
 			if err != nil {
@@ -114,12 +119,12 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 		// multiple deployment in on-prem mode
 		hooksName = instance.Namespace + "." + hooksName
 	}
-
+	sideEffectClass := reg.SideEffectClass("None")
 	newWebhook := &reg.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: webhook,
 			Annotations: map[string]string{
-				"certmanager.k8s.io/inject-ca-from": instance.Namespace+"/platform-identity-management",
+				"certmanager.k8s.io/inject-ca-from": instance.Namespace + "/platform-identity-management",
 			},
 		},
 		Webhooks: []reg.MutatingWebhook{
@@ -142,6 +147,8 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 						},
 					},
 				},
+				SideEffects:             &sideEffectClass,
+				AdmissionReviewVersions: []string{"v1"},
 				Rules: []reg.RuleWithOperations{
 					{
 						Rule: reg.Rule{

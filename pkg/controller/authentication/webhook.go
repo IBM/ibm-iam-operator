@@ -41,18 +41,27 @@ func (r *ReconcileAuthentication) handleWebhook(instance *operatorv1alpha1.Authe
 		webhook = webhook + "-" + instance.Namespace
 	} else if instance.Spec.Config.OnPremMultipleDeploy {
 		// multiple deployment in on-prem mode
-		// check if webhook namespace-admission-config exists 
+		// check if webhook with old name "namespace-admission-config" exist 
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: webhook, Namespace: ""}, currentWebhook)
 		webhook = webhook + "-" + instance.Namespace
 		if err == nil {
-			// webhook namespace-admission-config, update its name
-			currentWebhook.ObjectMeta.Name = webhook
-			reqLogger.Info("updating webhook name namespace-admission-config", "Webhook.Namespace", instance.Namespace, "Webhook.Name", webhook)
-			err = r.client.Update(context.TODO(), currentWebhook)
+			// found existing webhook namespace-admission-config, upgrade the name and return
+			// Update() does not work, use delete --> create to re-create 
+			reqLogger.Info("updating existing webhook namespace-admission-config", "Webhook.Namespace", instance.Namespace, "Webhook.Name", webhook)
+			err = r.client.Delete(context.TODO(), currentWebhook)
 			if err != nil {
-				reqLogger.Error(err, "Failed to update an existing webhook", "Webhook.Namespace", currentWebhook.Namespace, "Webhook.Name", currentWebhook.Name)
+				reqLogger.Error(err, "Failed to re-create an existing webhook when deleting the old one", "Webhook.Namespace", currentWebhook.Namespace, "Webhook.Name", currentWebhook.Name)
 				return err
 			}
+			currentWebhook.ObjectMeta.Name = webhook
+            currentWebhook.ObjectMeta.ResourceVersion = ""
+			currentWebhook.Webhooks[0].Name = instance.Namespace + "." + "iam.hooks.securityenforcement.admission.cloud.ibm.com"
+			err = r.client.Create(context.TODO(), currentWebhook)
+            if err != nil {
+				reqLogger.Error(err, "Failed to re-create an existing webhook when creating the new one", "Webhook.Namespace", currentWebhook.Namespace, "Webhook.Name", currentWebhook.Name)
+				return err
+			}
+			return nil
 		}
 	}
 

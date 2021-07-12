@@ -148,7 +148,7 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 					},
 				},
 				SideEffects:             &sideEffectClass,
-				AdmissionReviewVersions: []string{"v1"},
+				AdmissionReviewVersions: []string{"v1beta1","v1"},
 				Rules: []reg.RuleWithOperations{
 					{
 						Rule: reg.Rule{

@@ -619,7 +619,7 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: Authentication is the schema for the authentications API
+    - description: Authentication is the schema for the authentications API. Documentation For additional details regarding install parameters check https://ibm.biz/icpfs39install. License By installing this product you accept the license terms https://ibm.biz/icpfs39license 
       kind: Authentication
       name: authentications.operator.ibm.com
       displayName: Authentication

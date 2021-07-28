@@ -16,7 +16,7 @@
 
 FROM alpine as builder
 
-RUN wget -O /qemu-s390x-static https://github.com/multiarch/qemu-user-static/releases/latest/download/qemu-s390x-static
+RUN wget -O /qemu-s390x-static https://github.com/multiarch/qemu-user-static/releases/v5.2.0-2/download/qemu-s390x-static
 
 RUN chmod +x /qemu-s390x-static
 

@@ -16,7 +16,7 @@
 
 FROM alpine as builder
 
-RUN wget -O /qemu-ppc64le-static https://github.com/multiarch/qemu-user-static/releases/v5.2.0-2/download/qemu-ppc64le-static
+RUN wget -O /qemu-ppc64le-static https://github.com/multiarch/qemu-user-static/releases/download/v5.2.0-2/qemu-ppc64le-static
 
 RUN chmod +x /qemu-ppc64le-static
 

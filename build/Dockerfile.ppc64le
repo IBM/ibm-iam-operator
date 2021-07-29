@@ -1,5 +1,5 @@
 #
-# Copyright 2020 IBM Corporation
+# Copyright 2020, 2021 IBM Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,11 +16,11 @@
 
 FROM alpine as builder
 
-RUN wget -O /qemu-ppc64le-static https://github.com/multiarch/qemu-user-static/releases/latest/download/qemu-ppc64le-static
+RUN wget -O /qemu-ppc64le-static https://github.com/multiarch/qemu-user-static/releases/download/v5.2.0-2/qemu-ppc64le-static
 
 RUN chmod +x /qemu-ppc64le-static
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal@sha256:5bae25288d7cea563733606751e1f5f9606e4332c7755f0e5974091f0e58dac5
+FROM registry.access.redhat.com/ubi8/ubi-minimal@sha256:82b6decae91cf9cc9c3d65e264920e351850b2b3f4711b07d58d815fd4cdab3d
 ARG VCS_REF
 ARG VCS_URL
 

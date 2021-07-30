@@ -20,7 +20,11 @@ RUN wget -O /qemu-ppc64le-static https://github.com/multiarch/qemu-user-static/r
 
 RUN chmod +x /qemu-ppc64le-static
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal@sha256:1f525c72b1b0a0f67f0d00ca620fe35d25336e0392edd00512dc45ee41661beb
+FROM  hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/build-images/ubi8-minimal:latest-ppc64le
+
+RUN microdnf update -y  && \
+    microdnf clean all
+    
 ARG VCS_REF
 ARG VCS_URL
 

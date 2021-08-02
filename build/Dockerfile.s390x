@@ -20,7 +20,11 @@ RUN wget -O /qemu-s390x-static https://github.com/multiarch/qemu-user-static/rel
 
 RUN chmod +x /qemu-s390x-static
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal@sha256:5b935f49feacbda3f2fffbd091936ecd132266b10299a9b694eaa47bb814854b
+FROM hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/build-images/ubi8-minimal:latest-s390x
+
+RUN microdnf update -y  && \
+    microdnf clean all
+
 ARG VCS_REF
 ARG VCS_URL
 

@@ -1,8 +1,5 @@
 FROM hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/build-images/ubi8-minimal:latest-amd64
 
-RUN microdnf update -y  && \
-    microdnf clean all
-
 LABEL org.label-schema.vendor="IBM" \
     org.label-schema.name="ibm-iam-operator" \
     org.label-schema.description="IBM IAM Operator" \

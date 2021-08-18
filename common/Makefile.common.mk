@@ -48,7 +48,7 @@ lint-dockerfiles:
 	@${FINDFILES} -name 'Dockerfile*' -print0 | ${XARGS} hadolint -c ./common/config/.hadolint.yml
 
 lint-scripts:
-	@${FINDFILES} -name '*.sh' -print0 | ${XARGS} shellcheck
+	@${FINDFILES} -name '*.sh' -print0 | ${XARGS} shellcheck --exclude=SC2086,SC2027,SC1078
 
 lint-yaml:
 	@${FINDFILES} \( -name '*.yml' -o -name '*.yaml' \) -print0 | ${XARGS} grep -L -e "{{" | ${CLEANXARGS} yamllint -c ./common/config/.yamllint.yml

@@ -53,6 +53,9 @@ read
 
 #Update version.go to new dev version
 gsed -i "s/$CURRENT_DEV_CSV/$NEW_DEV_CSV/" version/version.go
+#Update lint-csv version
+gsed -i "s/$CURRENT_DEV_CSV/$NEW_DEV_CSV/" common/scripts/lint-csv.sh
+echo "Updated the lint-csv.sh"
 gsed -i "s/$CURRENT_DEV_CSV/$NEW_DEV_CSV/" Makefile
 echo "Updated the version.go and Makefile with new version (Push Enter when done): "
 read

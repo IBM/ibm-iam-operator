@@ -553,9 +553,6 @@ metadata:
               "public-oidc-creds": {
                 "secret": "platform-oidc-credentials"
               },
-              "public-auth-creds": {
-                "secret" : "platform-auth-idp-credentials"
-              },
               "public-auth-cert": {
                 "secret" : "platform-auth-secret"
               },

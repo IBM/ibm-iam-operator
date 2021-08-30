@@ -229,6 +229,8 @@ spec:
                     type: string
                   xframeDomain:
                     type: string
+                  attrMappingFromConfig:
+                    type: boolean
                 required:
                 - authUniqueHosts
                 - clusterCADomain

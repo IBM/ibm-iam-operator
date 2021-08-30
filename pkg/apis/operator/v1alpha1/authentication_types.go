@@ -119,6 +119,7 @@ type ConfigSpec struct {
 	ClaimsMap                   string `json:"claimsMap,omitempty"`
 	ScopeClaim                  string `json:"scopeClaim,omitempty"`
 	OIDCIssuerURL               string `json:"oidcIssuerURL"`
+	AttrMappingFromConfig       bool   `json:"attrMappingFromConfig"`
 }
 
 // AuthenticationStatus defines the observed state of Authentication

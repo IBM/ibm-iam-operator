@@ -96,6 +96,7 @@ spec:
     openshiftPort: 443
     roksEnabled: true
     ibmCloudSaas: false
+    attrMappingFromConfig: false
     saasClientRedirectUrl: ""
     nonceEnabled: true
     xframeDomain: ""
@@ -111,4 +112,3 @@ spec:
     wlpClientID: "4444be3a738841016ab76d71b650e836"
     wlpClientRegistrationSecret: "f1362ca4d20b8389af2d1ea68042c9af"
     wlpClientSecret: "aa73bf39752053bf723d1143fb4cf8a2"
-    attrMappingFromConfig: false

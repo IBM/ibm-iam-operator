@@ -18,7 +18,7 @@
 STATUS=0
 ARCH=$(uname -m)
 OS=$(uname -s)
-VERSION=${CSV_VERSION:-3.11.2}
+VERSION=${CSV_VERSION:-3.12.0}
 
 if [[ $ARCH == "x86_64" && $OS == "Linux" ]]; then
     curl -L -o /tmp/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64

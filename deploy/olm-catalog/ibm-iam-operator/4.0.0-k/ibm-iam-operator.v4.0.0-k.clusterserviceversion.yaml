@@ -1513,7 +1513,7 @@ spec:
         - Linux on IBM Z and LinuxONE
 
     ## Operator versions
-     - 4.0.0+k
+     - 4.0.0-k
      - 3.12.0
      - 3.11.2
      - 3.10.0
@@ -2038,4 +2038,4 @@ spec:
   provider:
     name: IBM
   replaces: ibm-iam-operator.v3.12.0
-  version: 4.0.0+k
+  version: 4.0.0-k

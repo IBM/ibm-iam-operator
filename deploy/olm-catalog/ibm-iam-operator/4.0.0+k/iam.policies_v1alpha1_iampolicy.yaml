@@ -1,0 +1,82 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  labels:
+    app.kubernetes.io/instance: ibm-iam-operator
+    app.kubernetes.io/managed-by: ibm-iam-operator
+    app.kubernetes.io/name: ibm-iam-operator
+  name: iampolicies.iam.policies.ibm.com
+spec:
+  group: iam.policies.ibm.com
+  names:
+    kind: IamPolicy
+    listKind: IamPolicyList
+    plural: iampolicies
+    singular: iampolicy
+  preserveUnknownFields: false
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              labelSelector:
+                description: selecting a list of namespaces where the policy applies
+                type: object
+              maxClusterRoleBindingUsers:
+                description: Maximum number of cluster role binding users still valid before it is considered non-compliant
+                format: int64
+                type: integer
+              maxRoleBindingViolationsPerNamespace:
+                description: Maximum number of iam rolebindings violations still valid before it is considered non-compliant
+                format: int64
+                type: integer
+              namespaceSelector:
+                description: Selecting a list of namespaces where the policy applies
+                properties:
+                  exclude:
+                    items:
+                      type: string
+                    type: array
+                  include:
+                    items:
+                      type: string
+                    type: array
+                type: object
+              remediationAction:
+                description: enforce, inform
+                type: string
+              severity:
+                description: low, medium, or high
+                type: string
+            type: object
+          status:
+            properties:
+              compliancyDetails:
+                description: Compliant, NonCompliant, UnkownCompliancy
+                type: object
+              compliant:
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: IamPolicy
+    listKind: IamPolicyList
+    plural: iampolicies
+    singular: iampolicy
+  conditions: []
+  storedVersions:
+  - v1alpha1

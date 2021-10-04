@@ -125,6 +125,7 @@ func generateWebhookObject(instance *operatorv1alpha1.Authentication, scheme *ru
 			Name: webhook,
 			Annotations: map[string]string{
 				"certmanager.k8s.io/inject-ca-from": instance.Namespace + "/platform-identity-management",
+				"cert-manager.io/inject-ca-from":    instance.Namespace + "/platform-identity-management",
 			},
 		},
 		Webhooks: []reg.MutatingWebhook{

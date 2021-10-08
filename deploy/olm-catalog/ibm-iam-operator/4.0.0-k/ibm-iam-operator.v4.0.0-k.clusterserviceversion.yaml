@@ -211,7 +211,7 @@ metadata:
               "onPremMultipleDeploy": false,
               "icpPort": 8443,
               "installType": "fresh",
-              "isOpenshiftEnv": true,
+              "isOpenshiftEnv": false,
               "nonceEnabled": true,
               "xframeDomain": "",
               "preferredLogin": "",

@@ -582,7 +582,7 @@ metadata:
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
       the lifecycle of IAM services. With this operator, you can simply deploy and
       upgrade the IAM services
-    olm.skipRange: '<3.12.0'
+    olm.skipRange: '<4.0.0-k'
     repository: https://github.com/IBM/ibm-iam-operator
     support: IBM
   labels:
@@ -590,12 +590,12 @@ metadata:
     operatorframework.io/os.linux: supported
     operatorframework.io/arch.amd64: supported
     operatorframework.io/arch.ppc64le: supported
-  name: ibm-iam-operator.v3.12.0
+  name: ibm-iam-operator.v4.0.0-k
   namespace: placeholder
 spec:
   relatedImages:
     - name: ibm-iam-operator
-      image: quay.io/opencloudio/ibm-iam-operator:3.12.0
+      image: quay.io/opencloudio/ibm-iam-operator:4.0.0-k
     - name: icp-platform-auth
       image: quay.io/opencloudio/icp-platform-auth:3.7.0
     - name: icp-identity-provider

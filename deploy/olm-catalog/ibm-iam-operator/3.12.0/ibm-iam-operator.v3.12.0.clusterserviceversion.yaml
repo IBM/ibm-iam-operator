@@ -601,7 +601,7 @@ spec:
     - name: icp-identity-provider
       image: quay.io/opencloudio/icp-identity-provider:3.7.0
     - name: icp-identity-manager
-      image: quay.io/opencloudio/icp-identity-manager:4.0.0
+      image: quay.io/opencloudio/icp-identity-manager:3.7.0
     - name: iam-policy-administration
       image: quay.io/opencloudio/iam-policy-administration:3.7.0
     - name: iam-policy-decision
@@ -613,7 +613,7 @@ spec:
     - name: iam-policy-controller
       image: quay.io/opencloudio/iam-policy-controller:3.7.0
     - name: icp-iam-onboarding
-      image: quay.io/opencloudio/icp-iam-onboarding:4.0.0
+      image: quay.io/opencloudio/icp-iam-onboarding:3.7.0
     - name: audit-syslog-service
       image: quay.io/opencloudio/audit-syslog-service:1.0.8
   apiservicedefinitions: {}

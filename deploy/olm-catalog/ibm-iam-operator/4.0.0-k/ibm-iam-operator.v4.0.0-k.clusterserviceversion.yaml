@@ -582,7 +582,7 @@ metadata:
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
       the lifecycle of IAM services. With this operator, you can simply deploy and
       upgrade the IAM services
-    olm.skipRange: '<3.12.0'
+    olm.skipRange: '<4.0.0-k'
     repository: https://github.com/IBM/ibm-iam-operator
     support: IBM
   labels:
@@ -590,18 +590,18 @@ metadata:
     operatorframework.io/os.linux: supported
     operatorframework.io/arch.amd64: supported
     operatorframework.io/arch.ppc64le: supported
-  name: ibm-iam-operator.v3.12.0
+  name: ibm-iam-operator.v4.0.0-k
   namespace: placeholder
 spec:
   relatedImages:
     - name: ibm-iam-operator
-      image: quay.io/opencloudio/ibm-iam-operator:3.12.0
+      image: quay.io/opencloudio/ibm-iam-operator:4.0.0-k
     - name: icp-platform-auth
       image: quay.io/opencloudio/icp-platform-auth:3.7.0
     - name: icp-identity-provider
       image: quay.io/opencloudio/icp-identity-provider:3.7.0
     - name: icp-identity-manager
-      image: quay.io/opencloudio/icp-identity-manager:3.7.0
+      image: quay.io/opencloudio/icp-identity-manager:4.0.0
     - name: iam-policy-administration
       image: quay.io/opencloudio/iam-policy-administration:3.7.0
     - name: iam-policy-decision
@@ -613,7 +613,7 @@ spec:
     - name: iam-policy-controller
       image: quay.io/opencloudio/iam-policy-controller:3.7.0
     - name: icp-iam-onboarding
-      image: quay.io/opencloudio/icp-iam-onboarding:3.7.0
+      image: quay.io/opencloudio/icp-iam-onboarding:4.0.0
     - name: audit-syslog-service
       image: quay.io/opencloudio/audit-syslog-service:1.0.8
   apiservicedefinitions: {}
@@ -1750,7 +1750,7 @@ spec:
                 - name: ICP_IDENTITY_PROVIDER_IMAGE
                   value: quay.io/opencloudio/icp-identity-provider:3.7.0
                 - name: ICP_IDENTITY_MANAGER_IMAGE
-                  value: quay.io/opencloudio/icp-identity-manager:3.7.0
+                  value: quay.io/opencloudio/icp-identity-manager:4.0.0
                 - name: IAM_POLICY_ADMINISTRATION_IMAGE
                   value: quay.io/opencloudio/iam-policy-administration:3.7.0
                 - name: IAM_POLICY_DECISION_IMAGE
@@ -1762,7 +1762,7 @@ spec:
                 - name: IAM_POLICY_CONTROLLER_IMAGE
                   value: quay.io/opencloudio/iam-policy-controller:3.7.0
                 - name: ICP_IAM_ONBOARDING_IMAGE
-                  value: quay.io/opencloudio/icp-iam-onboarding:3.7.0
+                  value: quay.io/opencloudio/icp-iam-onboarding:4.0.0
                 - name: AUDIT_SYSLOG_SERVICE_IMAGE
                   value: quay.io/opencloudio/audit-syslog-service:1.0.8
                 - name: WATCH_NAMESPACE

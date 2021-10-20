@@ -597,25 +597,25 @@ spec:
     - name: ibm-iam-operator
       image: quay.io/opencloudio/ibm-iam-operator@sha256:336efcd1aa469c6d23c6c3c51d6a051c0cb0f1c917c9b1c544c3712038a0d550
     - name: icp-platform-auth
-      image: quay.io/opencloudio/icp-platform-auth:3.7.1
+      image: quay.io/opencloudio/icp-platform-auth@sha256:7bdd203f444985c6f8e417f19cf40541fbcd679f3a345fe795eed6522eaca9e1
     - name: icp-identity-provider
-      image: quay.io/opencloudio/icp-identity-provider:3.7.1
+      image: quay.io/opencloudio/icp-identity-provider@sha256:897c58414bc195c5f982272ae24ebe372fefefe9274493411936ab74d12129f9
     - name: icp-identity-manager
-      image: quay.io/opencloudio/icp-identity-manager:3.7.1
+      image: quay.io/opencloudio/icp-identity-manager@sha256:edb7ad23130a55e9e20072de8b12c5d3f881801b4c45f3e7c2200d31dc4524db
     - name: iam-policy-administration
-      image: quay.io/opencloudio/iam-policy-administration:3.7.1
+      image: quay.io/opencloudio/iam-policy-administration@sha256:18914810e930000c95fb0e02c816fb96b0c9608414e76d95597199736d680977
     - name: iam-policy-decision
-      image: quay.io/opencloudio/iam-policy-decision:3.7.1
+      image: quay.io/opencloudio/iam-policy-decision@sha256:e24a1df21aa625314113963e434102ee503ab478430c54def578717b1c1d1925
     - name: icp-secret-watcher
-      image: quay.io/opencloudio/icp-secret-watcher:3.7.1
+      image: quay.io/opencloudio/icp-secret-watcher@sha256:8b4a2b8ecc16252d0fcf1202316e1c2fe975d44c6e03e6468b8f83cc8438cb45
     - name: icp-oidcclient-watcher
-      image: quay.io/opencloudio/icp-oidcclient-watcher:3.7.1
+      image: quay.io/opencloudio/icp-oidcclient-watcher@sha256:c72b01f262d4f21a16ab301955acec791aa6c46cfc864bf8d9e356ff3b035eb9
     - name: iam-policy-controller
-      image: quay.io/opencloudio/iam-policy-controller:3.7.1
+      image: quay.io/opencloudio/iam-policy-controller@sha256:ac043cd80fa8a551dec88345964f88d2df688d85e25aa90ecef13c53c07a4081
     - name: icp-iam-onboarding
-      image: quay.io/opencloudio/icp-iam-onboarding:3.7.1
+      image: quay.io/opencloudio/icp-iam-onboarding@sha256:c00381dd28abfa7e3fb89778b24f3bba3d1286172ee317dd470dfa9b710434a8
     - name: audit-syslog-service
-      image: quay.io/opencloudio/audit-syslog-service:1.0.8
+      image: quay.io/opencloudio/audit-syslog-service@sha256:5c4612f3e5f9e8b3f4b7bba737acca089afd4c37d45e572624edb1cee7a90e76
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:

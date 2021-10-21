@@ -596,25 +596,25 @@ spec:
   relatedImages:
     - name: ibm-iam-operator
       image: quay.io/opencloudio/ibm-iam-operator:3.12.1
-    - name: icp-platform-auth
+    - name: ICP_PLATFORM_AUTH_IMAGE
       image: quay.io/opencloudio/icp-platform-auth:3.7.1
-    - name: icp-identity-provider
+    - name: ICP_IDENTITY_PROVIDER_IMAGE
       image: quay.io/opencloudio/icp-identity-provider:3.7.1
-    - name: icp-identity-manager
+    - name: ICP_IDENTITY_MANAGER_IMAGE
       image: quay.io/opencloudio/icp-identity-manager:3.7.1
-    - name: iam-policy-administration
+    - name: IAM_POLICY_ADMINISTRATION_IMAGE
       image: quay.io/opencloudio/iam-policy-administration:3.7.1
-    - name: iam-policy-decision
+    - name: IAM_POLICY_DECISION_IMAGE
       image: quay.io/opencloudio/iam-policy-decision:3.7.1
-    - name: icp-secret-watcher
+    - name: ICP_SECRET_WATCHER_IMAGE
       image: quay.io/opencloudio/icp-secret-watcher:3.7.1
-    - name: icp-oidcclient-watcher
+    - name: ICP_OIDCCLIENT_WATCHER_IMAGE
       image: quay.io/opencloudio/icp-oidcclient-watcher:3.7.1
-    - name: iam-policy-controller
+    - name: IAM_POLICY_CONTROLLER_IMAGE
       image: quay.io/opencloudio/iam-policy-controller:3.7.1
-    - name: icp-iam-onboarding
+    - name: ICP_IAM_ONBOARDING_IMAGE
       image: quay.io/opencloudio/icp-iam-onboarding:3.7.1
-    - name: audit-syslog-service
+    - name: AUDIT_SYSLOG_SERVICE_IMAGE
       image: quay.io/opencloudio/audit-syslog-service:1.0.8
   apiservicedefinitions: {}
   customresourcedefinitions:

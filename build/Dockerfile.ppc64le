@@ -13,14 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
 FROM alpine as builder
 
-RUN wget -O /qemu-ppc64le-static https://github.com/multiarch/qemu-user-static/releases/latest/download/qemu-ppc64le-static
+RUN wget -O /qemu-ppc64le-static https://github.com/multiarch/qemu-user-static/releases/download/v5.2.0-2/qemu-ppc64le-static
 
 RUN chmod +x /qemu-ppc64le-static
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal@sha256:0d42603bf9f539f28c133e9a13e74cec8d3baaa0165c6f873ff931d50c708d8c
+FROM hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/build-images/ubi8-minimal:latest-ppc64le
+
 ARG VCS_REF
 ARG VCS_URL
 

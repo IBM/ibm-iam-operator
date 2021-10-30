@@ -1107,7 +1107,7 @@ def getServiceId(serviceName, accessToken):
     headersDef = {'Authorization': accessToken, 'Content-Type': 'application/json', 'Accept': 'application/json'}
     while True:
         r = requests.get(url, headers=headersDef, verify=False)
-        print r.status_code
+        print (r.status_code)
         if r.status_code == 200:
             response = r.json()
             if (len(response['items']) != 0):

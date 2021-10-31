@@ -389,7 +389,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	//Create all the Volumes
-	strVolName := []string{"onboard-script", "onboard-script-py3", "elasticsearch-json", "monitoring-json", "helmapi-json", "helmrepo-json",
+	strVolName := []string{"onboard-script", "onboard-py3-script", "elasticsearch-json", "monitoring-json", "helmapi-json", "helmrepo-json",
 		"tillerservice-json", "tiller-serviceid-policies", "kms-json"}
 	resources := instance.Spec.Resources
 	if resources == nil {
@@ -468,7 +468,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 	tmpMounts := []corev1.VolumeMount{}
 	//Create all the VolumeMounts
 	volMounts := map[string]string{
-		"onboard-script-py3":        "/app/scripts",
+		"onboard-py3-script":        "/app/scripts",
 		"elasticsearch-json":        "/app/elasticsearch",
 		"monitoring-json":           "/app/monitoring",
 		"helmapi-json":              "/app/helmapi",
@@ -530,7 +530,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 				Image:           shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE"),
 				ImagePullPolicy: corev1.PullPolicy("Always"),
 				//				Command:         []string{"python", "/app/scripts/onboard-script.py"},
-				Command: []string{"python", "/app/scripts/onboard-script-py3.py"},
+				Command: []string{"python", "/app/scripts/onboard-py3-script.py"},
 				SecurityContext: &corev1.SecurityContext{
 					Privileged:               &falseVar,
 					RunAsNonRoot:             &trueVar,

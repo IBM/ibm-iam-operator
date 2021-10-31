@@ -468,7 +468,6 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 	tmpMounts := []corev1.VolumeMount{}
 	//Create all the VolumeMounts
 	volMounts := map[string]string{
-		"onboard-script":            "/app/scripts",
 		"onboard-script-py3":        "/app/scripts",
 		"elasticsearch-json":        "/app/elasticsearch",
 		"monitoring-json":           "/app/monitoring",

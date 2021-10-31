@@ -205,7 +205,7 @@ func getJobNames(jobs []batchv1.Job) []string {
 func (r *ReconcileSecurityOnboarding) handleConfigMap(instance *operatorv1alpha1.SecurityOnboarding) (reconcile.Result, error) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	m := []string{"ElasticSearch", "HelmApi", "HelmRepo", "Kms", "Monitoring", "TillerService", "Tiller_Serviceid_Policies", "Onboard_Script", "Onboard_Script_Py3"}
+	m := []string{"ElasticSearch", "HelmApi", "HelmRepo", "Kms", "Monitoring", "TillerService", "Tiller_Serviceid_Policies", "Onboard_Script", "Onboard_Py3_Script"}
 
 	foundErr := false
 	for _, ele := range m {
@@ -313,8 +313,8 @@ func getAccessPolicy(label string) (error, string) {
 		return nil, operatorv1alpha1.Tiller_Serviceid_Policies
 	} else if label == "Onboard_Script" {
 		return nil, operatorv1alpha1.Onboard_Script
-	} else if label == "Onboard_Script_Py3" {
-		return nil, operatorv1alpha1.Onboard_Script_Py3
+	} else if label == "Onboard_Py3_Script" {
+		return nil, operatorv1alpha1.Onboard_Py3_Script
 	} else {
 		return fmt.Errorf("Unknown label %s", label), ""
 	}

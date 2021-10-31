@@ -1170,7 +1170,7 @@ if __name__ == "__main__":
 	main()
 `
 
-var Onboard_Script_Py3 = `import requests
+var Onboard_Py3_Script = `import requests
 import json
 import time
 import os

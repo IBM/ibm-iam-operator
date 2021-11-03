@@ -50,7 +50,7 @@ spec:
             - name: ICP_IDENTITY_MANAGER_IMAGE
               value: quay.io/opencloudio/icp-identity-manager:3.3.14
             - name: IAM_POLICY_ADMINISTRATION_IMAGE
-              value: quay.io/opencloudio/iam-policy-administration:3.3.11
+              value: quay.io/opencloudio/iam-policy-administration:3.3.12
             - name: IAM_POLICY_DECISION_IMAGE
               value: quay.io/opencloudio/iam-policy-decision:3.3.9
             - name: ICP_SECRET_WATCHER_IMAGE

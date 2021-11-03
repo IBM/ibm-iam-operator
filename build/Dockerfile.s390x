@@ -16,11 +16,12 @@
 
 FROM alpine as builder
 
-RUN wget -O /qemu-s390x-static https://github.com/multiarch/qemu-user-static/releases/latest/download/qemu-s390x-static
+RUN wget -O /qemu-s390x-static https://github.com/multiarch/qemu-user-static/releases/download/v5.2.0-2/qemu-s390x-static
 
 RUN chmod +x /qemu-s390x-static
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal@sha256:4b3905174e708d2656df72b4800a7abf87284a20ab44b3ef4d7136193caccf9f
+FROM hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/build-images/ubi8-minimal:latest-s390x
+
 ARG VCS_REF
 ARG VCS_URL
 

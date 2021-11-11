@@ -594,7 +594,7 @@ metadata:
   namespace: placeholder
 spec:
   relatedImages:
-    - name: ibm-iam-operator
+    - name: IBM_IAM_OPERATOR_IMAGE
       image: quay.io/opencloudio/ibm-iam-operator:3.12.2
     - name: ICP_PLATFORM_AUTH_IMAGE
       image: quay.io/opencloudio/icp-platform-auth:3.7.2

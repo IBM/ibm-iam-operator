@@ -1083,3 +1083,87 @@ def main():
 if __name__ == "__main__":
 	main()
 `
+
+var Onboard_Py3_Script = `import requests
+import json
+import time
+import os
+def mapActionRoles(iam_service_name, filepath, accessToken):
+    with open(filepath) as f:
+        fdata = f.read()
+        url = 'https://iam-pap:39001/acms/v1/services/' + iam_service_name
+        headersDef = {'Authorization': accessToken, 'Content-Type': 'application/json', 'Accept': 'application/json'}
+        while True:
+            r = requests.put(url, data=fdata, headers=headersDef, verify='/app/cluster-ca/ca.crt')
+            if r.status_code == 201 or r.status_code == 200:
+                break
+            else:
+                time.sleep(2)
+def getServiceId(serviceName, accessToken):
+    cluster_name = os.environ.get('CLUSTER_NAME')
+    url = 'https://platform-auth-service:9443/serviceids/?boundTo=crn%3Av1%3Aicp%3Aprivate%3Aiam%3A' + cluster_name + '%3An/NAMESPACE%3Acore%3Aservice%3A' + serviceName
+    headersDef = {'Authorization': accessToken, 'Content-Type': 'application/json', 'Accept': 'application/json'}
+    while True:
+        r = requests.get(url, headers=headersDef, verify=False)
+        print ( r.status_code )
+        if r.status_code == 200:
+            response = r.json()
+            if (len(response['items']) != 0):
+                break
+            else:
+                time.sleep(10)
+        else:
+            time.sleep(2)
+    serviceId = response['items'][0]['metadata']['iam_id']
+    return serviceId
+def mapServiceIdPolicies(serviceName, filepath, accessToken):
+    serviceId = getServiceId(serviceName, accessToken)
+    with open(filepath) as f:
+        fdata = f.read()
+        url = 'https://iam-pap:39001/acms/v1/scopes/n%252FNAMESPACE/service_ids/' + serviceId + '/policies'
+        headersDef = {'Authorization': accessToken, 'Content-Type': 'application/json', 'Accept': 'application/json'}
+        while True:
+            r = requests.post(url, data=fdata, headers=headersDef, verify='/app/cluster-ca/ca.crt')
+            if r.status_code == 201:
+                break
+            else:
+                time.sleep(2)
+def getApiKeyToken():
+    url = 'https://platform-auth-service:9443/iam/oidc/token'
+    apikey = os.environ.get('ICP_API_KEY')
+    payload = 'grant_type=urn%3Aibm%3Aparams%3Aoauth%3Agrant-type%3Aapikey&apikey=' + apikey + '&response_type=cloud_iam'
+    headersDef = {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'}
+    while True:
+        r = requests.post(url, data=payload, headers=headersDef, verify=False)
+        if r.status_code == 200:
+            break
+        else:
+            time.sleep(2)
+    response = r.json()
+    accessToken = response['access_token']
+    return accessToken
+def onboardToSecurity(iamServiceName, filePath):
+    accessToken = getApiKeyToken()
+    mapActionRoles(iamServiceName, filePath, accessToken)
+def onboardServiceIdPolicies(serviceName, filePath):
+    accessToken = getApiKeyToken()
+    mapServiceIdPolicies(serviceName, filePath, accessToken)
+def main():
+    # Any new service that is trying to onboard should append their service name and the mounted access policy file path to this list
+    #  serviceList=[{'serviceName':'elasticsearch-service','filePath':'/app/elasticsearch/action_role_elasticsearch.json'},
+    #  {'serviceName':'service-monitoring-service','filePath':'/app/monitoring/action_role_monitoring.json'},
+    #  {'serviceName':'new-service','filePath':'/app/monitoring/action_role_newservice.json'}]
+    serviceList = [
+        {'serviceName': 'elasticsearch-service', 'filePath': '/app/elasticsearch/action_role_elasticsearch.json'},
+        {'serviceName': 'service-monitoring-service', 'filePath': '/app/monitoring/action_role_monitoring.json'},
+        {'serviceName': 'helmapi-service', 'filePath': '/app/helmapi/action_role_helmapi.json'},
+        {'serviceName': 'helmrepo-service', 'filePath': '/app/helmrepo/action_role_helmrepo.json'},
+        {'serviceName': 'tiller-service', 'filePath': '/app/tillerservice/action_role_tillerservice.json'},
+        {'serviceName': 'kms', 'filePath': '/app/kms/action_role_kms.json'}]
+    for service in serviceList:
+        onboardToSecurity(service['serviceName'], service['filePath'])
+    #@posriniv - get back
+    #onboardServiceIdPolicies('tiller-service', '/app/tiller_serviceid_policies/tiller_serviceid_policies.json')
+if __name__ == "__main__":
+	main()
+`

@@ -204,7 +204,7 @@ func getJobNames(jobs []batchv1.Job) []string {
 func (r *ReconcileSecurityOnboarding) handleConfigMap(instance *operatorv1alpha1.SecurityOnboarding) (reconcile.Result, error) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	m := []string{"ElasticSearch", "HelmApi", "HelmRepo", "Kms", "Monitoring", "TillerService", "Tiller_Serviceid_Policies", "Onboard_Script"}
+	m := []string{"ElasticSearch", "HelmApi", "HelmRepo", "Kms", "Monitoring", "TillerService", "Tiller_Serviceid_Policies", "Onboard_Script", "Onboard_Py3_Script"}
 
 	foundErr := false
 	for _, ele := range m {
@@ -312,6 +312,8 @@ func getAccessPolicy(label string) (error, string) {
 		return nil, operatorv1alpha1.Tiller_Serviceid_Policies
 	} else if label == "Onboard_Script" {
 		return nil, operatorv1alpha1.Onboard_Script
+	} else if label == "Onboard_Py3_Script" {
+		return nil, operatorv1alpha1.Onboard_Py3_Script
 	} else {
 		return fmt.Errorf("Unknown label %s", label), ""
 	}
@@ -370,7 +372,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	//Create all the Volumes
-	strVolName := []string{"onboard-script", "elasticsearch-json", "monitoring-json", "helmapi-json", "helmrepo-json",
+	strVolName := []string{"onboard-script", "onboard-py3-script", "elasticsearch-json", "monitoring-json", "helmapi-json", "helmrepo-json",
 		"tillerservice-json", "tiller-serviceid-policies", "kms-json"}
 	resources := instance.Spec.Resources
 	if resources == nil {
@@ -449,7 +451,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 	tmpMounts := []corev1.VolumeMount{}
 	//Create all the VolumeMounts
 	volMounts := map[string]string{
-		"onboard-script":            "/app/scripts",
+		"onboard-py3-script":        "/app/scripts",
 		"elasticsearch-json":        "/app/elasticsearch",
 		"monitoring-json":           "/app/monitoring",
 		"helmapi-json":              "/app/helmapi",
@@ -510,7 +512,8 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 				Name:            "security-onboarding",
 				Image:           shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE"),
 				ImagePullPolicy: corev1.PullPolicy("Always"),
-				Command:         []string{"python", "/app/scripts/onboard-script.py"},
+				//Command:         []string{"python", "/app/scripts/onboard-script.py"},
+				Command: []string{"python", "/app/scripts/onboard-py3-script.py"},
 				SecurityContext: &corev1.SecurityContext{
 					Privileged:               &falseVar,
 					RunAsNonRoot:             &trueVar,

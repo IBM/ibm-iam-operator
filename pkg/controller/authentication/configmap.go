@@ -251,7 +251,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 				}
 
 				_, keyExists := currentConfigMap.Data["IS_OPENSHIFT_ENV"]
-				currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isOSEnv)
+				//currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isOSEnv)
 				if keyExists {
 					reqLogger.Info("Current configmap", "Current Value", currentConfigMap.Data["IS_OPENSHIFT_ENV"])
 					if currentConfigMap.Data["IS_OPENSHIFT_ENV"] != strconv.FormatBool(isOSEnv) {

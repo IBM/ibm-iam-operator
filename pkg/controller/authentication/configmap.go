@@ -101,7 +101,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 		isCNCFEnv = strings.EqualFold(clusterType, "cncf")
 		reqLogger.Info("Detected cluster type as", "Configmap.Namespace", instance.Namespace, "ConfigMap.Name", isCNCFEnv)
 	} else if !ok {
-		isCNCFEnv = (!instance.Spec.Config.IsOpenshiftEnv)
+		isCNCFEnv = (instance.Spec.Config.IsOpenshiftEnv)
 	}
 
 	// Creation the configmaps

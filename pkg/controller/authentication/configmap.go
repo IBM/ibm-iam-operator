@@ -45,6 +45,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
+	var isCNCFEnv bool
 	var newConfigMap *corev1.ConfigMap
 
 	// Checking Dependencies
@@ -93,12 +94,11 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 		return err
 	}
 
-	clusterType := globalConfigMap.Data["kubernetes_cluster_type"]
-	isCNCFEnv := strings.EqualFold(clusterType, "cncf")
-	if !ok {
-		reqLogger.Error(nil, "The configmap", globalConfigMapName, "doesn't contain cluster type")
-		*requeueResult = true
-		return nil
+	clusterType, ok := globalConfigMap.Data["kubernetes_cluster_type"]
+	reqLogger.Info("Reading cluster type from global cm", "Configmap.Namespace", instance.Namespace, "ClusterType", clusterType)
+	if ok {
+		isCNCFEnv = strings.EqualFold(clusterType, "cncf")
+		reqLogger.Info("Detected cluster type as", "Configmap.Namespace", instance.Namespace, "ConfigMap.Name", isCNCFEnv)
 	}
 
 	// Creation the configmaps
@@ -246,6 +246,13 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"] = newConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"]
 					cmUpdateRequired = true
 				}
+				if _, keyExists := currentConfigMap.Data["IS_OPENSHIFT_ENV"]; keyExists {
+					if isCNCFEnv {
+						currentConfigMap.Data["IS_OPENSHIFT_ENV"] = "false"
+					}
+					cmUpdateRequired = true
+				}
+
 				if cmUpdateRequired {
 					err = r.client.Update(context.TODO(), currentConfigMap)
 					if err != nil {

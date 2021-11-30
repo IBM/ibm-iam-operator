@@ -249,8 +249,8 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"] = newConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"]
 					cmUpdateRequired = true
 				}
+
 				_, keyExists := currentConfigMap.Data["IS_OPENSHIFT_ENV"]
-				currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isCNCFEnv)
 				if keyExists {
 					reqLogger.Info("Current configmap", "Current Value", currentConfigMap.Data["IS_OPENSHIFT_ENV"], "New Value", newConfigMap.Data["IS_OPENSHIFT_ENV"])
 					if currentConfigMap.Data["IS_OPENSHIFT_ENV"] != newConfigMap.Data["IS_OPENSHIFT_ENV"] {

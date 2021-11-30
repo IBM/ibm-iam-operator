@@ -100,6 +100,8 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	if ok {
 		isCNCFEnv = strings.EqualFold(clusterType, "cncf")
 		reqLogger.Info("Detected cluster type as", "Configmap.Namespace", instance.Namespace, "ConfigMap.Name", isCNCFEnv)
+	} else if !ok {
+		isCNCFEnv = (!instance.Spec.Config.IsOpenshiftEnv)
 	}
 
 	// Creation the configmaps
@@ -144,11 +146,8 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 						// Detect cluster type - cncf or openshift
 						// if global cm, ignore CR, and populate auth-idp with value from global
 						// if no global cm, take value from CR - NOT REQD.
-						if isCNCFEnv {
-							newConfigMap.Data["IS_OPENSHIFT_ENV"] = "false"
-						} else {
-							newConfigMap.Data["IS_OPENSHIFT_ENV"] = "true"
-						}
+						newConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isCNCFEnv)
+
 					} else {
 						//user specifies roksEnabled and roksURL, but not roksPrefix, then we set prefix to IAM# (consistent with previous release behavior)
 						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL != "https://roks.domain.name:443" && instance.Spec.Config.ROKSUserPrefix == "changeme" {
@@ -251,11 +250,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					cmUpdateRequired = true
 				}
 				if _, keyExists := currentConfigMap.Data["IS_OPENSHIFT_ENV"]; !keyExists {
-					if isCNCFEnv {
-						currentConfigMap.Data["IS_OPENSHIFT_ENV"] = "false"
-					} else {
-						currentConfigMap.Data["IS_OPENSHIFT_ENV"] = "true"
-					}
+					currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isCNCFEnv)
 					cmUpdateRequired = true
 				}
 

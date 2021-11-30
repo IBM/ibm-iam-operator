@@ -80,6 +80,27 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 		return nil
 	}
 
+	//Check cluster type
+	globalConfigMapName := "ibm-cpp-config"
+	globalConfigMap := &corev1.ConfigMap{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: globalConfigMapName, Namespace: instance.Namespace}, globalConfigMap)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Error(err, "The configmap ", globalConfigMapName, " is not created yet")
+			return err
+		}
+		reqLogger.Error(err, "Failed to get ConfigMap", globalConfigMapName)
+		return err
+	}
+
+	clusterType := globalConfigMap.Data["kubernetes_cluster_type"]
+	isCNCFEnv := strings.EqualFold(clusterType, "cncf")
+	if !ok {
+		reqLogger.Error(nil, "The configmap", globalConfigMapName, "doesn't contain cluster type")
+		*requeueResult = true
+		return nil
+	}
+
 	// Creation the configmaps
 	for index, configMap := range configMapList {
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: instance.Namespace}, currentConfigMap)
@@ -123,6 +144,12 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL != "https://roks.domain.name:443" && instance.Spec.Config.ROKSUserPrefix == "changeme" {
 							newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
 						}
+					}
+					// Detect cluster type - cncf or openshift
+					// if global cm, ignore CR, and populate auth-idp with value from global
+					// if no global cm, take value from CR - NOT REQD.
+					if isCNCFEnv {
+						newConfigMap.Data["IS_OPENSHIFT_ENV"] = "false"
 					}
 				}
 				reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)

@@ -84,6 +84,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	//Check cluster type
 	globalConfigMapName := "ibm-cpp-config"
 	globalConfigMap := &corev1.ConfigMap{}
+	reqLogger.Info("Query global cm", "Configmap.Namespace", instance.Namespace, "Global Configmap", globalConfigMapName)
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: globalConfigMapName, Namespace: instance.Namespace}, globalConfigMap)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -139,17 +140,20 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 								newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
 							}
 						}
+						reqLogger.Info("Adding new variable to configmap", "Configmap.Namespace", currentConfigMap.Namespace, "isCNCFEnv", isCNCFEnv)
+						// Detect cluster type - cncf or openshift
+						// if global cm, ignore CR, and populate auth-idp with value from global
+						// if no global cm, take value from CR - NOT REQD.
+						if isCNCFEnv {
+							newConfigMap.Data["IS_OPENSHIFT_ENV"] = "false"
+						} else {
+							newConfigMap.Data["IS_OPENSHIFT_ENV"] = "true"
+						}
 					} else {
 						//user specifies roksEnabled and roksURL, but not roksPrefix, then we set prefix to IAM# (consistent with previous release behavior)
 						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL != "https://roks.domain.name:443" && instance.Spec.Config.ROKSUserPrefix == "changeme" {
 							newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
 						}
-					}
-					// Detect cluster type - cncf or openshift
-					// if global cm, ignore CR, and populate auth-idp with value from global
-					// if no global cm, take value from CR - NOT REQD.
-					if isCNCFEnv {
-						newConfigMap.Data["IS_OPENSHIFT_ENV"] = "false"
 					}
 				}
 				reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
@@ -246,9 +250,11 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"] = newConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"]
 					cmUpdateRequired = true
 				}
-				if _, keyExists := currentConfigMap.Data["IS_OPENSHIFT_ENV"]; keyExists {
+				if _, keyExists := currentConfigMap.Data["IS_OPENSHIFT_ENV"]; !keyExists {
 					if isCNCFEnv {
 						currentConfigMap.Data["IS_OPENSHIFT_ENV"] = "false"
+					} else {
+						currentConfigMap.Data["IS_OPENSHIFT_ENV"] = "true"
 					}
 					cmUpdateRequired = true
 				}

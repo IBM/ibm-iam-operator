@@ -575,8 +575,16 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			Value: "https://kubernetes.default:443",
 		},
 		{
-			Name:  "IS_OPENSHIFT_ENV",
-			Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
+			Name: "IS_OPENSHIFT_ENV",
+			ValueFrom: &corev1.EnvVarSource{
+				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp",
+					},
+					Key: "IS_OPENSHIFT_ENV",
+				},
+			},
+			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
 		},
 		{
 			Name: "roksClientId",
@@ -883,8 +891,16 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			Value: "https://kubernetes.default:443",
 		},
 		{
-			Name:  "IS_OPENSHIFT_ENV",
-			Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
+			Name: "IS_OPENSHIFT_ENV",
+			ValueFrom: &corev1.EnvVarSource{
+				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp",
+					},
+					Key: "IS_OPENSHIFT_ENV",
+				},
+			},
+			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
 		},
 		{
 			Name: "roksClientId",

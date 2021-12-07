@@ -45,6 +45,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
+	var isOSEnv bool
 	var newConfigMap *corev1.ConfigMap
 
 	// Checking Dependencies
@@ -78,6 +79,29 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain proxy address")
 		*requeueResult = true
 		return nil
+	}
+
+	//Check cluster type
+	globalConfigMapName := "ibm-cpp-config"
+	globalConfigMap := &corev1.ConfigMap{}
+	reqLogger.Info("Query global cm", "Configmap.Namespace", instance.Namespace, "Global Configmap", globalConfigMapName)
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: globalConfigMapName, Namespace: instance.Namespace}, globalConfigMap)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Error(err, "The configmap ", globalConfigMapName, " is not created yet")
+			return err
+		}
+		reqLogger.Error(err, "Failed to get ConfigMap", globalConfigMapName)
+		return err
+	}
+
+	clusterType, ok := globalConfigMap.Data["kubernetes_cluster_type"]
+	reqLogger.Info("Reading cluster type from global cm", "Configmap.Namespace", instance.Namespace, "ClusterType", clusterType)
+	if ok {
+		isOSEnv = !strings.EqualFold(clusterType, "cncf")
+		reqLogger.Info("Detected cluster type as", "Configmap.Namespace", instance.Namespace, "ConfigMap.Name", isOSEnv)
+	} else if !ok {
+		isOSEnv = (instance.Spec.Config.IsOpenshiftEnv)
 	}
 
 	// Creation the configmaps
@@ -118,6 +142,12 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 								newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
 							}
 						}
+						reqLogger.Info("Adding new variable to configmap", "Configmap.Namespace", currentConfigMap.Namespace, "isOSEnv", isOSEnv)
+						// Detect cluster type - cncf or openshift
+						// if global cm, ignore CR, and populate auth-idp with value from global
+						// if no global cm, take value from CR - NOT REQD.
+						newConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isOSEnv)
+
 					} else {
 						//user specifies roksEnabled and roksURL, but not roksPrefix, then we set prefix to IAM# (consistent with previous release behavior)
 						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL != "https://roks.domain.name:443" && instance.Spec.Config.ROKSUserPrefix == "changeme" {
@@ -219,6 +249,19 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"] = newConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"]
 					cmUpdateRequired = true
 				}
+
+				_, keyExists := currentConfigMap.Data["IS_OPENSHIFT_ENV"]
+				//currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isOSEnv)
+				if keyExists {
+					reqLogger.Info("Current configmap", "Current Value", currentConfigMap.Data["IS_OPENSHIFT_ENV"])
+					if currentConfigMap.Data["IS_OPENSHIFT_ENV"] != strconv.FormatBool(isOSEnv) {
+						currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isOSEnv)
+					}
+				} else {
+					currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isOSEnv)
+				}
+				cmUpdateRequired = true
+
 				if cmUpdateRequired {
 					err = r.client.Update(context.TODO(), currentConfigMap)
 					if err != nil {

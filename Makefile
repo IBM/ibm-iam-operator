@@ -191,11 +191,6 @@ test-e2e: ## Run integration e2e tests with different options.
 	# @echo ... Running with the param ...
 	# - operator-sdk test local ./test/e2e --namespace=${NAMESPACE}
 
-coverage: ## Run code coverage test
-	@echo ... Code coverage test will be dealt with later
-	#@posriniv-getback
-	#@common/scripts/codecov.sh ${BUILD_LOCALLY}
-
 scorecard: ## Run scorecard test
 	@echo ... Running the scorecard test
 	- operator-sdk scorecard --verbose

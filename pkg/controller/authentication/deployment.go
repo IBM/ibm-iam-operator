@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Authentication, currentDeployment *appsv1.Deployment, requeueResult *bool) error {
+func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Authentication, currentDeployment *appsv1.Deployment, currentProviderDeployment *appsv1.Deployment, requeueResult *bool) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
@@ -75,12 +75,21 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 
 	// Check if this Deployment already exists
 	deployment := "auth-idp"
+	providerDeployment := "auth-idp-provider"
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: deployment, Namespace: instance.Namespace}, currentDeployment)
-	if err != nil {
-		if errors.IsNotFound(err) {
+	err1 := r.client.Get(context.TODO(), types.NamespacedName{Name: deployment, Namespace: instance.Namespace}, currentProviderDeployment)
+	if err != nil || err1 != nil {
+		if errors.IsNotFound(err) || errors.IsNotFound(err1) {
 			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", deployment)
-			reqLogger.Info("SAAS tenant configmap was found", "Creating deployment with value from configmap", saasTenantConfigMapName)
+			reqLogger.Info("SAAS tenant configmap was found", "Creating provider deployment with value from configmap", saasTenantConfigMapName)
+			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", providerDeployment)
+			newProviderDeployment := generateProviderDeploymentObject(instance, r.scheme, providerDeployment, icpConsoleURL, saasServiceIdCrn)
+			err = r.client.Create(context.TODO(), newProviderDeployment)
+			if err != nil {
+				return err
+			}
+			//managerDeployment := generateManagerDeploymentObject(instance, r.scheme, deployment, icpConsoleURL, saasServiceIdCrn)
 			newDeployment := generateDeploymentObject(instance, r.scheme, deployment, icpConsoleURL, saasServiceIdCrn)
 			err = r.client.Create(context.TODO(), newDeployment)
 			if err != nil {
@@ -274,6 +283,143 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 					},
 					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret),
 					Containers:     buildContainers(instance, auditImage, authServiceImage, identityProviderImage, identityManagerImage, syslogTlsPath, icpConsoleURL, saasCrnId),
+					InitContainers: buildInitContainers(mongoDBImage),
+				},
+			},
+		},
+	}
+	// Set SecretWatcher instance as the owner and controller
+	err := controllerutil.SetControllerReference(instance, idpDeployment, scheme)
+	if err != nil {
+		reqLogger.Error(err, "Failed to set owner for Deployment")
+		return nil
+	}
+	return idpDeployment
+}
+
+func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string, saasCrnId string) *appsv1.Deployment {
+
+	// Update the audit image for upgrade scenarios
+	if instance.Spec.AuditService.ImageName != res.AuditImageName {
+		instance.Spec.AuditService.ImageName = res.AuditImageName
+	}
+	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
+	identityProviderImage := shatag.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
+	mongoDBImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
+	auditImage := shatag.GetImageRef("AUDIT_SYSLOG_SERVICE_IMAGE")
+	replicas := instance.Spec.Replicas
+	syslogTlsPath := instance.Spec.AuditService.SyslogTlsPath
+	ldapCACert := instance.Spec.AuthService.LdapsCACert
+	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
+
+	idpDeployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deployment,
+			Namespace: instance.Namespace,
+			Labels:    map[string]string{"app": deployment},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app":       deployment,
+					"k8s-app":   deployment,
+					"component": deployment,
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app":                        deployment,
+						"k8s-app":                    deployment,
+						"component":                  deployment,
+						"app.kubernetes.io/instance": "auth-idp-provider",
+						"intent":                     "projected",
+					},
+					Annotations: map[string]string{
+						"scheduler.alpha.kubernetes.io/critical-pod": "",
+						"productName":                        "IBM Cloud Platform Common Services",
+						"productID":                          "068a62892a1e4db39641342e592daa25",
+						"productMetric":                      "FREE",
+						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
+					},
+				},
+				Spec: corev1.PodSpec{
+					TerminationGracePeriodSeconds: &seconds60,
+					ServiceAccountName:            serviceAccountName,
+					HostIPC:                       falseVar,
+					HostPID:                       falseVar,
+					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/zone",
+							WhenUnsatisfiable: corev1.ScheduleAnyway,
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"app": deployment,
+								},
+							},
+						},
+						{
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/region",
+							WhenUnsatisfiable: corev1.ScheduleAnyway,
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"app": deployment,
+								},
+							},
+						},
+					},
+					Affinity: &corev1.Affinity{
+						NodeAffinity: &corev1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+								NodeSelectorTerms: []corev1.NodeSelectorTerm{
+									{
+										MatchExpressions: []corev1.NodeSelectorRequirement{
+											{
+												Key:      "kubernetes.io/arch",
+												Operator: corev1.NodeSelectorOpIn,
+												Values:   []string{gorun.GOARCH},
+											},
+										},
+									},
+								},
+							},
+						},
+						PodAntiAffinity: &corev1.PodAntiAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+								corev1.WeightedPodAffinityTerm{
+									Weight: 100,
+									PodAffinityTerm: corev1.PodAffinityTerm{
+										TopologyKey: "kubernetes.io/hostname",
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												metav1.LabelSelectorRequirement{
+													Key:      "app",
+													Operator: metav1.LabelSelectorOpIn,
+													Values:   []string{"auth-idp-provider"},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					Tolerations: []corev1.Toleration{
+						{
+							Key:      "dedicated",
+							Operator: corev1.TolerationOpExists,
+							Effect:   corev1.TaintEffectNoSchedule,
+						},
+						{
+							Key:      "CriticalAddonsOnly",
+							Operator: corev1.TolerationOpExists,
+						},
+					},
+					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret),
+					Containers:     buildProviderContainers(instance, auditImage, identityProviderImage, syslogTlsPath, icpConsoleURL, saasCrnId),
 					InitContainers: buildInitContainers(mongoDBImage),
 				},
 			},

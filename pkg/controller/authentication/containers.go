@@ -1140,6 +1140,15 @@ func buildContainers(instance *operatorv1alpha1.Authentication, auditImage strin
 
 	return []corev1.Container{auditContainer, authServiceContainer, identityProviderContainer, identityManagerContainer}
 }
+func buildProviderContainers(instance *operatorv1alpha1.Authentication, auditImage string, identityProviderImage string, syslogTlsPath string, icpConsoleURL string, saasCrnId string) []corev1.Container {
+
+	auditResources := instance.Spec.AuditService.Resources
+	auditContainer := buildAuditContainer(auditImage, syslogTlsPath, auditResources)
+
+	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId)
+
+	return []corev1.Container{auditContainer, identityProviderContainer}
+}
 
 func buildIdpEnvVars(envVarList []string) []corev1.EnvVar {
 

@@ -178,7 +178,7 @@ func (r *ReconcileAuthentication) identityManagementService(instance *operatorv1
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-identity-management",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "auth-idp-manager"},
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
@@ -196,7 +196,7 @@ func (r *ReconcileAuthentication) identityManagementService(instance *operatorv1
 				},
 			},
 			Selector: map[string]string{
-				"k8s-app": "auth-idp",
+				"k8s-app": "auth-idp-manager",
 			},
 			Type:            "ClusterIP",
 			SessionAffinity: corev1.ServiceAffinityClientIP,

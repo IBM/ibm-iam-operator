@@ -164,6 +164,9 @@ func (r *ReconcileSecurityOnboarding) Reconcile(context context.Context, request
 
 	recResult, err = r.handleJob(instance)
 	if err != nil {
+		reqLogger.Error(err, "Failed to list jobs", "SecurityOnboarding.Namespace", instance.Namespace, "SecurityOnboarding.Name", instance.Name)
+		reqLogger.Info("job failed name=", recResult)
+		r.event.Eventf(instance, "Warning", "Onboarding Job failed", "Job dependencies not mey, please check troubleshooting document %s for reasons and solutions", recResult)
 		return recResult, err
 	}
 

@@ -51,7 +51,7 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "platform-identity-provider", Namespace: instance.Namespace}, currentService)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new service
-		identityProviderService := r.identityAuthProviderService(instance)
+		identityProviderService := r.identityProviderService(instance)
 		reqLogger.Info("Creating a new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-identity-provider")
 		err = r.client.Create(context.TODO(), identityProviderService)
 		if err != nil {
@@ -68,11 +68,11 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "platform-identity-provider-auth", Namespace: instance.Namespace}, currentService)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new service
-		identityProviderService := r.identityProviderService(instance)
-		reqLogger.Info("Creating a new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-identity-provider")
-		err = r.client.Create(context.TODO(), identityProviderService)
+		identityAuthProviderService := r.identityAuthProviderService(instance)
+		reqLogger.Info("Creating a new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-identity-provider-auth")
+		err = r.client.Create(context.TODO(), identityAuthProviderService)
 		if err != nil {
-			reqLogger.Error(err, "Failed to create new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-identity-provider")
+			reqLogger.Error(err, "Failed to create new Service", "Service.Namespace", instance.Namespace, "Service.Name", "platform-identity-provider-auth")
 			return err
 		}
 		// Service created successfully - return and requeue
@@ -213,7 +213,7 @@ func (r *ReconcileAuthentication) identityManagementService(instance *operatorv1
 
 }
 
-func (r *ReconcileAuthentication) identityProviderService(instance *operatorv1alpha1.Authentication) *corev1.Service {
+func (r *ReconcileAuthentication) identityAuthProviderService(instance *operatorv1alpha1.Authentication) *corev1.Service {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var redirectPort int32 = 9443
@@ -248,7 +248,7 @@ func (r *ReconcileAuthentication) identityProviderService(instance *operatorv1al
 
 }
 
-func (r *ReconcileAuthentication) identityAuthProviderService(instance *operatorv1alpha1.Authentication) *corev1.Service {
+func (r *ReconcileAuthentication) identityProviderService(instance *operatorv1alpha1.Authentication) *corev1.Service {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var idproviderPort int32 = 4300

@@ -125,17 +125,11 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 
 	if err2 != nil {
 		if errors.IsNotFound(err2) {
-			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", deployment)
+			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", managerDeployment)
 			reqLogger.Info("SAAS tenant configmap was found", "Creating provider deployment with value from configmap", saasTenantConfigMapName)
 			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", managerDeployment)
 			newManagerDeployment := generateManagerDeploymentObject(instance, r.scheme, managerDeployment, icpConsoleURL, saasServiceIdCrn)
 			err = r.client.Create(context.TODO(), newManagerDeployment)
-			if err != nil {
-				return err
-			}
-			//managerDeployment := generateManagerDeploymentObject(instance, r.scheme, deployment, icpConsoleURL, saasServiceIdCrn)
-			newDeployment := generateDeploymentObject(instance, r.scheme, deployment, icpConsoleURL, saasServiceIdCrn)
-			err = r.client.Create(context.TODO(), newDeployment)
 			if err != nil {
 				return err
 			}
@@ -145,9 +139,9 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 			return err
 		}
 	} else {
-		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
+		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentManagerDeployment.Namespace, "Deployment.Name", currentManagerDeployment.Name)
 		reqLogger.Info("SAAS tenant configmap was found", "Updating deployment with value from configmap", saasTenantConfigMapName)
-		ocwDep := generateDeploymentObject(instance, r.scheme, deployment, icpConsoleURL, saasServiceIdCrn)
+		ocwDep := generateDeploymentObject(instance, r.scheme, managerDeployment, icpConsoleURL, saasServiceIdCrn)
 		certmanagerLabel := "certmanager.k8s.io/time-restarted"
 		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
 			ocwDep.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val
@@ -157,9 +151,9 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 			ocwDep.Spec.Template.ObjectMeta.Annotations[nssAnnotation] = val
 		}
 		currentDeployment.Spec = ocwDep.Spec
-		err = r.client.Update(context.TODO(), currentDeployment)
+		err = r.client.Update(context.TODO(), currentManagerDeployment)
 		if err != nil {
-			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
+			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentManagerDeployment.Namespace, "Deployment.Name", currentManagerDeployment.Name)
 			return err
 		}
 	}

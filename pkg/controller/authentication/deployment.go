@@ -125,8 +125,8 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 
 	if err2 != nil {
 		if errors.IsNotFound(err2) {
-			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", managerDeployment)
-			reqLogger.Info("SAAS tenant configmap was found", "Creating provider deployment with value from configmap", saasTenantConfigMapName)
+			reqLogger.Info("Creating a new Manager Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", managerDeployment)
+			reqLogger.Info("SAAS tenant configmap was found", "Creating manager deployment with value from configmap", saasTenantConfigMapName)
 			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", managerDeployment)
 			newManagerDeployment := generateManagerDeploymentObject(instance, r.scheme, managerDeployment, icpConsoleURL, saasServiceIdCrn)
 			err = r.client.Create(context.TODO(), newManagerDeployment)

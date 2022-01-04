@@ -249,6 +249,12 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"] = newConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"]
 					cmUpdateRequired = true
 				}
+				if _, keyExists := currentConfigMap.Data["ADMIN_EMAIL"]; !keyExists {
+					reqLogger.Info("Updating an existing Configmap to add new variable for attribute mapping resource", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					newConfigMap = functionList[index](instance, r.scheme)
+					currentConfigMap.Data["ADMIN_EMAIL"] = newConfigMap.Data["ADMIN_EMAIL"]
+					cmUpdateRequired = true
+				}
 
 				_, keyExists := currentConfigMap.Data["IS_OPENSHIFT_ENV"]
 				//currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isOSEnv)
@@ -377,6 +383,7 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"SCIM_ASYNC_PARALLEL_LIMIT":          "100",
 			"SCIM_GET_DISPLAY_FOR_GROUP_USERS":   "true",
 			"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
+			"ADMIN_EMAIL":                        instance.Spec.Config.AdminEmail,
 		},
 	}
 

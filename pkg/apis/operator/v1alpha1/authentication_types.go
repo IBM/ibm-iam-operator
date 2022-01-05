@@ -109,6 +109,7 @@ type ConfigSpec struct {
 	SaasClientRedirectUrl       string `json:"saasClientRedirectUrl,omitempty"`
 	NONCEEnabled                bool   `json:"nonceEnabled"`
 	XFrameDomain                string `json:"xframeDomain,omitempty"`
+	AdminEmail                  string `json:"adminEmail,omitempty"`
 	PreferredLogin              string `json:"preferredLogin,omitempty"`
 	ROKSURL                     string `json:"roksURL"`
 	ROKSUserPrefix              string `json:"roksUserPrefix"`

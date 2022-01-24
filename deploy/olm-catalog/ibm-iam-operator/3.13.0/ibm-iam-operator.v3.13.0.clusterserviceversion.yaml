@@ -214,7 +214,6 @@ metadata:
               "isOpenshiftEnv": true,
               "nonceEnabled": true,
               "xframeDomain": "",
-              "adminEmail": "",
               "preferredLogin": "",
               "bootstrapUserId": "kubeadmin",
               "providerIssuerURL": "",

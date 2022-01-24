@@ -229,8 +229,6 @@ spec:
                     type: string
                   xframeDomain:
                     type: string
-                  adminEmail:
-                    type: string
                   attrMappingFromConfig:
                     type: boolean
                 required:

@@ -75,8 +75,8 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 
 	// Check if this Deployment already exists
 	deployment := "auth-idp"
-	providerDeployment := "auth-idp-provider"
-	managerDeployment := "auth-idp-manager"
+	providerDeployment := "platform-identity-provider"
+	managerDeployment := "platform-identity-manager"
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: deployment, Namespace: instance.Namespace}, currentDeployment)
 	err1 := r.client.Get(context.TODO(), types.NamespacedName{Name: providerDeployment, Namespace: instance.Namespace}, currentProviderDeployment)
@@ -371,7 +371,7 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 						"app":                        deployment,
 						"k8s-app":                    deployment,
 						"component":                  deployment,
-						"app.kubernetes.io/instance": "auth-idp-provider",
+						"app.kubernetes.io/instance": "platform-identity-provider",
 						"intent":                     "projected",
 					},
 					Annotations: map[string]string{
@@ -436,7 +436,7 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 												metav1.LabelSelectorRequirement{
 													Key:      "app",
 													Operator: metav1.LabelSelectorOpIn,
-													Values:   []string{"auth-idp-provider"},
+													Values:   []string{"platform-identity-provider"},
 												},
 											},
 										},
@@ -508,7 +508,7 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 						"app":                        deployment,
 						"k8s-app":                    deployment,
 						"component":                  deployment,
-						"app.kubernetes.io/instance": "auth-idp-manager",
+						"app.kubernetes.io/instance": "platform-identity-manager",
 						"intent":                     "projected",
 					},
 					Annotations: map[string]string{

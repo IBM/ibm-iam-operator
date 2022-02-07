@@ -17,7 +17,7 @@ metadata:
           },
           "spec": {
             "imageRegistry": "quay.io/opencloudio/icp-oidcclient-watcher",
-            "imageTagPostfix": "3.7.3",
+            "imageTagPostfix": "3.7.4",
             "operatorVersion": "0.14.1",
             "replicas": 1,
             "resources": {
@@ -33,7 +33,7 @@ metadata:
             "oidcInitAuthService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.7.3",
+              "imageTag": "3.7.4",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -48,7 +48,7 @@ metadata:
             "oidcInitIdentityProvider": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.7.3",
+              "imageTag": "3.7.4",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -63,7 +63,7 @@ metadata:
             "oidcInitIdentityManager": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.7.3",
+              "imageTag": "3.7.4",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -107,11 +107,11 @@ metadata:
             },
             "imageName": "iam-policy-decision",
             "imageRegistry": "quay.io/opencloudio",
-            "imageTag": "3.7.3",
+            "imageTag": "3.7.4",
             "initMongodb": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.7.3",
+              "imageTag": "3.7.4",
               "resources": {
                 "limits": {
                   "cpu": "100m",
@@ -168,7 +168,7 @@ metadata:
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.7.3",
+              "imageTag": "3.7.4",
               "ldapsCACert": "platform-auth-ldaps-ca-cert",
               "resources": {
                 "limits": {
@@ -185,7 +185,7 @@ metadata:
             "clientRegistration": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.7.3",
+              "imageTag": "3.7.4",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -233,7 +233,7 @@ metadata:
             "identityManager": {
               "imageName": "icp-identity-manager",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.7.3",
+              "imageTag": "3.7.4",
               "masterNodesList": "10.0.0.1",
               "resources": {
                 "limits": {
@@ -249,7 +249,7 @@ metadata:
             "identityProvider": {
               "imageName": "icp-identity-provider",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.7.3",
+              "imageTag": "3.7.4",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -264,7 +264,7 @@ metadata:
             "initMongodb": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.7.3",
+              "imageTag": "3.7.4",
               "resources": {
                 "limits": {
                   "cpu": "100m",
@@ -312,7 +312,7 @@ metadata:
             "papService": {
               "imageName": "iam-policy-administration",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.7.3",
+              "imageTag": "3.7.4",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -343,7 +343,7 @@ metadata:
               "excludeOperand": false
             },
             "imageRegistry": "quay.io/opencloudio/iam-policy-controller",
-            "imageTagPostfix": "3.7.3",
+            "imageTagPostfix": "3.7.4",
             "operatorVersion": "0.14.1",
             "replicas": 1,
             "resources": {
@@ -374,7 +374,7 @@ metadata:
               "excludeOperand": false
             },
             "imageRegistry": "quay.io/opencloudio/icp-secret-watcher",
-            "imageTagPostfix": "3.7.3",
+            "imageTagPostfix": "3.7.4",
             "operatorVersion": "0.14.1",
             "replicas": 1,
             "resources": {
@@ -404,7 +404,7 @@ metadata:
             "iamOnboarding": {
               "imageName": "icp-iam-onboarding",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.7.3",
+              "imageTag": "3.7.4",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -418,14 +418,14 @@ metadata:
             },
             "imageName": "icp-iam-onboarding",
             "imageRegistry": "quay.io/opencloudio",
-            "imageTag": "3.7.3",
+            "imageTag": "3.7.4",
             "impersonation": {
               "enableImpersonation": false
             },
             "initAuthService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.7.3",
+              "imageTag": "3.7.4",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -440,7 +440,7 @@ metadata:
             "initIdentityManager": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.7.3",
+              "imageTag": "3.7.4",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -455,7 +455,7 @@ metadata:
             "initIdentityProvider": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.7.3",
+              "imageTag": "3.7.4",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -470,7 +470,7 @@ metadata:
             "initPAPSpec": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.7.3",
+              "imageTag": "3.7.4",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -485,7 +485,7 @@ metadata:
             "initTokenService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.7.3",
+              "imageTag": "3.7.4",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -523,6 +523,9 @@ metadata:
                 "operands": [
                   {
                     "name": "ibm-mongodb-operator"
+                  },
+                  {
+                    "name": "cloud-native-postgresql"
                   },
                   {
                     "name": "ibm-cert-manager-operator"
@@ -582,7 +585,7 @@ metadata:
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
       the lifecycle of IAM services. With this operator, you can simply deploy and
       upgrade the IAM services
-    olm.skipRange: '<3.13.0'
+    olm.skipRange: '<3.16.0'
     repository: https://github.com/IBM/ibm-iam-operator
     support: IBM
   labels:
@@ -590,30 +593,30 @@ metadata:
     operatorframework.io/os.linux: supported
     operatorframework.io/arch.amd64: supported
     operatorframework.io/arch.ppc64le: supported
-  name: ibm-iam-operator.v3.13.0
+  name: ibm-iam-operator.v3.16.0
   namespace: placeholder
 spec:
   relatedImages:
     - name: IBM_IAM_OPERATOR_IMAGE
-      image: quay.io/opencloudio/ibm-iam-operator:3.13.0
+      image: quay.io/opencloudio/ibm-iam-operator:3.16.0
     - name: ICP_PLATFORM_AUTH_IMAGE
-      image: quay.io/opencloudio/icp-platform-auth:3.7.3
+      image: quay.io/opencloudio/icp-platform-auth:3.7.4
     - name: ICP_IDENTITY_PROVIDER_IMAGE
-      image: quay.io/opencloudio/icp-identity-provider:3.7.3
+      image: quay.io/opencloudio/icp-identity-provider:3.7.4
     - name: ICP_IDENTITY_MANAGER_IMAGE
-      image: quay.io/opencloudio/icp-identity-manager:3.7.3
+      image: quay.io/opencloudio/icp-identity-manager:3.7.4
     - name: IAM_POLICY_ADMINISTRATION_IMAGE
-      image: quay.io/opencloudio/iam-policy-administration:3.7.3
+      image: quay.io/opencloudio/iam-policy-administration:3.7.4
     - name: IAM_POLICY_DECISION_IMAGE
-      image: quay.io/opencloudio/iam-policy-decision:3.7.3
+      image: quay.io/opencloudio/iam-policy-decision:3.7.4
     - name: ICP_SECRET_WATCHER_IMAGE
-      image: quay.io/opencloudio/icp-secret-watcher:3.7.3
+      image: quay.io/opencloudio/icp-secret-watcher:3.7.4
     - name: ICP_OIDCCLIENT_WATCHER_IMAGE
-      image: quay.io/opencloudio/icp-oidcclient-watcher:3.7.3
+      image: quay.io/opencloudio/icp-oidcclient-watcher:3.7.4
     - name: IAM_POLICY_CONTROLLER_IMAGE
-      image: quay.io/opencloudio/iam-policy-controller:3.7.3
+      image: quay.io/opencloudio/iam-policy-controller:3.7.4
     - name: ICP_IAM_ONBOARDING_IMAGE
-      image: quay.io/opencloudio/icp-iam-onboarding:3.7.3
+      image: quay.io/opencloudio/icp-iam-onboarding:3.7.4
     - name: AUDIT_SYSLOG_SERVICE_IMAGE
       image: quay.io/opencloudio/audit-syslog-service:1.4.0
   apiservicedefinitions: {}
@@ -1513,6 +1516,7 @@ spec:
         - Linux on IBM Z and LinuxONE
 
     ## Operator versions
+     - 3.16.0
      - 3.13.0
      - 3.12.2
      - 3.12.1
@@ -1748,23 +1752,23 @@ spec:
                 - ibm-iam-operator
                 env:
                 - name: ICP_PLATFORM_AUTH_IMAGE
-                  value: quay.io/opencloudio/icp-platform-auth:3.7.3
+                  value: quay.io/opencloudio/icp-platform-auth:3.7.4
                 - name: ICP_IDENTITY_PROVIDER_IMAGE
-                  value: quay.io/opencloudio/icp-identity-provider:3.7.3
+                  value: quay.io/opencloudio/icp-identity-provider:3.7.4
                 - name: ICP_IDENTITY_MANAGER_IMAGE
-                  value: quay.io/opencloudio/icp-identity-manager:3.7.3
+                  value: quay.io/opencloudio/icp-identity-manager:3.7.4
                 - name: IAM_POLICY_ADMINISTRATION_IMAGE
-                  value: quay.io/opencloudio/iam-policy-administration:3.7.3
+                  value: quay.io/opencloudio/iam-policy-administration:3.7.4
                 - name: IAM_POLICY_DECISION_IMAGE
-                  value: quay.io/opencloudio/iam-policy-decision:3.7.3
+                  value: quay.io/opencloudio/iam-policy-decision:3.7.4
                 - name: ICP_SECRET_WATCHER_IMAGE
-                  value: quay.io/opencloudio/icp-secret-watcher:3.7.3
+                  value: quay.io/opencloudio/icp-secret-watcher:3.7.4
                 - name: ICP_OIDCCLIENT_WATCHER_IMAGE
-                  value: quay.io/opencloudio/icp-oidcclient-watcher:3.7.3
+                  value: quay.io/opencloudio/icp-oidcclient-watcher:3.7.4
                 - name: IAM_POLICY_CONTROLLER_IMAGE
-                  value: quay.io/opencloudio/iam-policy-controller:3.7.3
+                  value: quay.io/opencloudio/iam-policy-controller:3.7.4
                 - name: ICP_IAM_ONBOARDING_IMAGE
-                  value: quay.io/opencloudio/icp-iam-onboarding:3.7.3
+                  value: quay.io/opencloudio/icp-iam-onboarding:3.7.4
                 - name: AUDIT_SYSLOG_SERVICE_IMAGE
                   value: quay.io/opencloudio/audit-syslog-service:1.4.0
                 - name: WATCH_NAMESPACE
@@ -2039,5 +2043,5 @@ spec:
   minKubeVersion: 1.19.0
   provider:
     name: IBM
-  replaces: ibm-iam-operator.v3.12.2
-  version: 3.13.0
+  replaces: ibm-iam-operator.v3.13.0
+  version: 3.16.0

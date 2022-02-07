@@ -525,6 +525,9 @@ metadata:
                     "name": "ibm-mongodb-operator"
                   },
                   {
+                    "name": "cloud-native-postgresql"
+                  },
+                  {
                     "name": "ibm-cert-manager-operator"
                   },
                   {

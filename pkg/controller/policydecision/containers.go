@@ -210,6 +210,14 @@ func buildPdpContainer(pdpImage string, resources *corev1.ResourceRequirements) 
 				Value: "27017",
 			},
 			{
+				Name:  "PSQL_HOST",
+				Value: "cluster-psql-iam-rw",
+			},
+			{
+				Name:  "PSQL_PORT",
+				Value: "5432",
+			},
+			{
 				Name: "MONGO_USERNAME",
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
@@ -226,6 +234,28 @@ func buildPdpContainer(pdpImage string, resources *corev1.ResourceRequirements) 
 					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{
 							Name: "icp-mongodb-admin",
+						},
+						Key: "password",
+					},
+				},
+			},
+			{
+				Name: "PSQL_USERNAME",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "cluster-psql-iam-superuser",
+						},
+						Key: "username",
+					},
+				},
+			},
+			{
+				Name: "PSQL_PASSWORD",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "cluster-psql-iam-superuser",
 						},
 						Key: "password",
 					},

@@ -957,12 +957,38 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			},
 		},
 		{
+			Name: "PSQL_USERNAME",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key:                  "username",
+					LocalObjectReference: corev1.LocalObjectReference{Name: "cluster-psql-iam-superuser"},
+				},
+			},
+		},
+		{
+			Name: "PSQL_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key:                  "password",
+					LocalObjectReference: corev1.LocalObjectReference{Name: "cluster-psql-iam-superuser"},
+				},
+			},
+		},
+		{
 			Name:  "MONGO_HOST",
 			Value: "mongodb",
 		},
 		{
 			Name:  "MONGO_PORT",
 			Value: "27017",
+		},
+		{
+			Name:  "PSQL_HOST",
+			Value: "cluster-psql-iam-rw",
+		},
+		{
+			Name:  "PSQL_PORT",
+			Value: "5432",
 		},
 		{
 			Name:  "MONGO_AUTHSOURCE",

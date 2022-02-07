@@ -204,6 +204,28 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			},
 		},
 		{
+			Name: "PSQL_USERNAME",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "cluster-psql-iam-superuser",
+					},
+					Key: "username",
+				},
+			},
+		},
+		{
+			Name: "PSQL_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "cluster-psql-iam-superuser",
+					},
+					Key: "password",
+				},
+			},
+		},
+		{
 			Name: "POD_NAME",
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
@@ -228,6 +250,14 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 		{
 			Name:  "MONGO_PORT",
 			Value: "27017",
+		},
+		{
+			Name:  "PSQL_HOST",
+			Value: "cluster-psql-iam-rw",
+		},
+		{
+			Name:  "PSQL_PORT",
+			Value: "5432",
 		},
 
 		{
@@ -552,6 +582,28 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 				},
 			},
 		},
+		{
+			Name: "PSQL_USERNAME",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "cluster-psql-iam-superuser",
+					},
+					Key: "username",
+				},
+			},
+		},
+		{
+			Name: "PSQL_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "cluster-psql-iam-superuser",
+					},
+					Key: "password",
+				},
+			},
+		},
 
 		{
 			Name:  "MONGO_HOST",
@@ -560,6 +612,14 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		{
 			Name:  "MONGO_PORT",
 			Value: "27017",
+		},
+		{
+			Name:  "PSQL_HOST",
+			Value: "cluster-psql-iam-rw",
+		},
+		{
+			Name:  "PSQL_PORT",
+			Value: "5432",
 		},
 
 		{
@@ -872,6 +932,28 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 				},
 			},
 		},
+		{
+			Name: "PSQL_USERNAME",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "cluster-psql-iam-superuser",
+					},
+					Key: "username",
+				},
+			},
+		},
+		{
+			Name: "PSQL_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "cluster-psql-iam-superuser",
+					},
+					Key: "password",
+				},
+			},
+		},
 
 		{
 			Name:  "MONGO_HOST",
@@ -880,6 +962,14 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		{
 			Name:  "MONGO_PORT",
 			Value: "27017",
+		},
+		{
+			Name:  "PSQL_HOST",
+			Value: "cluster-psql-iam-rw",
+		},
+		{
+			Name:  "PSQL_PORT",
+			Value: "5432",
 		},
 
 		{

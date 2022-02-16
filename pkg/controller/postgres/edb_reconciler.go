@@ -1,0 +1,155 @@
+//
+// Copyright 2022 IBM Corporation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+package postgres
+
+import (
+	"context"
+	"os"
+
+	enterprisedbv1 "github.com/IBM/ibm-iam-operator/pkg/apis/postgresql/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	crmanager "sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
+)
+
+var log = logf.Log.WithName("controller_postgres")
+var EDBCRName = "cluster-psql-iam"
+
+/**
+* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
+* business logic.  Delete these comments after modifying this file.*
+ */
+
+// Add creates a new EDB Cluster Controller and adds it to the Manager. The Manager will set fields on the Controller
+// and Start it when the Manager is Started.
+func Add(mgr crmanager.Manager) error {
+	return add(mgr, newReconciler(mgr))
+}
+
+// newReconciler returns a new reconcile.Reconciler
+func newReconciler(mgr crmanager.Manager) reconcile.Reconciler {
+	return &ReconcileEDBPostgres{client: mgr.GetClient(), scheme: mgr.GetScheme()}
+}
+
+// add adds a new Controller to mgr with r as the reconcile.Reconciler
+func add(mgr crmanager.Manager, r reconcile.Reconciler) error {
+	// Create a new controller
+	c, err := controller.New("postgres-controller", mgr, controller.Options{Reconciler: r})
+	if err != nil {
+		return err
+	}
+	// Watch for changes to primary resource Cluster
+	err = c.Watch(&source.Kind{Type: &enterprisedbv1.Cluster{}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// blank assignment to verify that ReconcileEDBPostgres implements reconcile.Reconciler
+var _ reconcile.Reconciler = &ReconcileEDBPostgres{}
+
+// ReconcileEDBPostgres reconciles a EDB Cluster object
+type ReconcileEDBPostgres struct {
+	// This client, initialized using mgr.Client() above, is a split client
+	// that reads objects from the cache and writes to the apiserver
+	client client.Client
+	scheme *runtime.Scheme
+}
+
+// Reconcile reads that state of the cluster for a EDB CLuster object and makes changes based on the state read
+// and what is in the Cluster.Spec
+// TODO(user): Modify this Reconcile function to implement your Controller logic.
+// The Controller will requeue the Request to be processed again if the returned error is non-nil or
+// Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
+func (r *ReconcileEDBPostgres) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	reqLogger.Info("Reconciling EDB Cluster")
+	var requeueResult bool = false
+
+	// Check if this EDB Cluster CR already exists and create it if it doesn't
+	currentPostgresCluster := &enterprisedbv1.Cluster{}
+	err := r.handleEDBClusterCR(currentPostgresCluster, &requeueResult)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	if requeueResult {
+		return reconcile.Result{Requeue: true}, nil
+	}
+
+	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileEDBPostgres) handleEDBClusterCR(instance *enterprisedbv1.Cluster, requeueResult *bool) error {
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: EDBCRName, Namespace: instance.Namespace}, instance)
+	if err != nil && k8serrors.IsNotFound(err) {
+		// Define a new Cluster CR
+		edbClusterCR := r.edbPostgresCluster(instance)
+		reqLogger.Info("Creating a new EDB Cluster CR")
+		err = r.client.Create(context.TODO(), edbClusterCR)
+		if err != nil {
+			reqLogger.Error(err, "Failed to create EDB cluster CR "+EDBCRName)
+			return err
+		}
+		// Cluster CR created successfully - return and requeue
+		*requeueResult = true
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to get Postgres Cluster CR")
+		return err
+	}
+	return nil
+}
+
+func (r *ReconcileEDBPostgres) edbPostgresCluster(instance *enterprisedbv1.Cluster) *enterprisedbv1.Cluster {
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	edbCr := instance
+
+	edbCr.ObjectMeta.Name = EDBCRName
+	edbCr.ObjectMeta.Namespace = instance.Namespace
+	edbCr.ObjectMeta.Labels = map[string]string{"app": "security-iam"}
+	edbCr.Spec.Instances = 3
+	edbCr.Spec.Resources = &enterprisedbv1.Resources{
+		Requests: &enterprisedbv1.Requests{
+			Cpu:    "2",
+			Memory: "2048",
+		},
+		Limits: &enterprisedbv1.Limits{
+			Cpu:    "4",
+			Memory: "4096",
+		},
+	}
+	postgresImageOverride := os.Getenv("POSTGRES_IMAGE_OVERRIDE")
+	if postgresImageOverride != "" {
+		edbCr.Spec.ImageName = postgresImageOverride
+	}
+	// Set EDB Cluster instance as the owner and controller of the CR
+	err := controllerutil.SetControllerReference(instance, edbCr, r.scheme)
+	if err != nil {
+		reqLogger.Error(err, "Failed to set owner for Cluster CR")
+		return nil
+	}
+	return edbCr
+}

@@ -1,5 +1,5 @@
 //
-// Copyright 2020 IBM Corporation
+// Copyright 2022 IBM Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -126,6 +126,14 @@ func buildPapContainer(papImage string, resources *corev1.ResourceRequirements) 
 			{
 				Name:      "mongodb-ca-cert",
 				MountPath: "/certs/mongodb-ca",
+			},
+			{
+				Name:      "iam-postgres-server-cert",
+				MountPath: "/certs/postgres-server",
+			},
+			{
+				Name:      "iam-postgres-client-cert",
+				MountPath: "/certs/postgres-client",
 			},
 			{
 				Name:      "pap-cert",

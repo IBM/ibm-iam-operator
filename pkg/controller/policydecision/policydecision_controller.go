@@ -1,5 +1,5 @@
 //
-// Copyright 2020, 2021 IBM Corporation
+// Copyright 2020, 2022 IBM Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -664,6 +664,22 @@ func buildPdpVolumes() []corev1.Volume {
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "mongodb-root-ca-cert",
+				},
+			},
+		},
+		{
+			Name: "iam-postgres-server-cert",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "iam-postgres-server-cert",
+				},
+			},
+		},
+		{
+			Name: "iam-postgres-client-cert",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "iam-postgres-client-cert",
 				},
 			},
 		},

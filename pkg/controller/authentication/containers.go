@@ -1,4 +1,4 @@
-// Copyright 2020, 2021 IBM Corporation
+// Copyright 2020, 2022 IBM Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -411,6 +411,14 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 				MountPath: "/certs/mongodb-client",
 			},
 			{
+				Name:      "iam-postgres-server-cert",
+				MountPath: "/certs/postgres-server",
+			},
+			{
+				Name:      "iam-postgres-client-cert",
+				MountPath: "/certs/postgres-client",
+			},
+			{
 				Name:      "router-certs",
 				MountPath: "/certs/router-certs",
 			},
@@ -803,6 +811,14 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 				Name:      "mongodb-client-cert",
 				MountPath: "/certs/mongodb-client",
 			},
+			{
+				Name:      "iam-postgres-server-cert",
+				MountPath: "/certs/postgres-server",
+			},
+			{
+				Name:      "iam-postgres-client-cert",
+				MountPath: "/certs/postgres-client",
+			},
 		},
 		ReadinessProbe: &corev1.Probe{
 			Handler: corev1.Handler{
@@ -1185,6 +1201,14 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			{
 				Name:      "mongodb-client-cert",
 				MountPath: "/certs/mongodb-client",
+			},
+			{
+				Name:      "iam-postgres-server-cert",
+				MountPath: "/certs/postgres-server",
+			},
+			{
+				Name:      "iam-postgres-client-cert",
+				MountPath: "/certs/postgres-client",
 			},
 			{
 				Name:      "scim-ldap-attributes-mapping",

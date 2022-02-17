@@ -1,5 +1,5 @@
 //
-// Copyright 2020, 2021 IBM Corporation
+// Copyright 2020, 2022 IBM Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -777,6 +777,22 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			},
 		},
 		{
+			Name: "iam-postgres-server-cert",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "iam-postgres-server-cert",
+				},
+			},
+		},
+		{
+			Name: "iam-postgres-client-cert",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "iam-postgres-client-cert",
+				},
+			},
+		},
+		{
 			Name: "cluster-ca",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
@@ -1115,6 +1131,14 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					{
 						Name:      "mongodb-ca-cert",
 						MountPath: "/certs/mongodb-ca",
+					},
+					{
+						Name:      "iam-postgres-server-cert",
+						MountPath: "/certs/postgres-server",
+					},
+					{
+						Name:      "iam-postgres-client-cert",
+						MountPath: "/certs/postgres-client",
 					},
 					{
 						Name:      "auth-pdp-secret",

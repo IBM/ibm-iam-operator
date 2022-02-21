@@ -16,6 +16,8 @@
 package v1
 
 import (
+	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
+	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -198,5 +200,6 @@ type ClusterList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
+	PostgresSchemeBuilder.Register(&Cluster{}, &ClusterList{})
+	operatorv1alpha1.CertificateSchemeBuilder.Register(&certmgr.Certificate{}, &certmgr.CertificateList{})
 }

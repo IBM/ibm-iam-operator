@@ -14,17 +14,9 @@
 // limitations under the License.
 //
 
-package apis
-
-import (
-	"github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
-	v1 "github.com/IBM/ibm-iam-operator/pkg/apis/postgresql/v1"
-)
-
-func init() {
-	// Register the types with the Scheme so the components can map objects to GroupVersionKinds and back
-	AddToSchemes = append(AddToSchemes, v1.PostgresSchemeBuilder.AddToScheme)
-	AddToSchemes = append(AddToSchemes, v1alpha1.SchemeBuilder.AddToScheme)
-	AddToSchemes = append(AddToSchemes, v1alpha1.CertificateSchemeBuilder.AddToScheme)
-	AddToSchemes = append(AddToSchemes, v1alpha1.UserBuilder.AddToScheme)
-}
+// Package certmanager contains certmanager API versions.
+//
+// This file ensures Go source parsers acknowledge the certmanager package
+// and any child packages. It can be removed if any other Go source files are
+// added to this package.
+package postgresql

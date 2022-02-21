@@ -50,6 +50,18 @@ rules:
   - get
   - create
 - apiGroups:
+  - postgresql.k8s.enterprisedb.io
+  resources:
+  - clusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - apps
   resourceNames:
   - ibm-iam-operator

@@ -28,8 +28,8 @@ import (
 
 var (
 	// SchemeGroupVersion is group version used to register these objects
-	SchemeGroupVersion = schema.GroupVersion{Group: "postgresql.k8s.enterprisedb.io", Version: "v1"}
+	PostgresSchemeGroupVersion = schema.GroupVersion{Group: "postgresql.k8s.enterprisedb.io", Version: "v1"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
-	SchemeBuilder = &scheme.Builder{GroupVersion: SchemeGroupVersion}
+	PostgresSchemeBuilder = &scheme.Builder{GroupVersion: PostgresSchemeGroupVersion}
 )

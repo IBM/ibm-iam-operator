@@ -125,14 +125,26 @@ func (r *ReconcileEDBPostgres) Reconcile(ctx context.Context, request reconcile.
 	var requeueResult bool = false
 
 	// Check if this EDB Cluster CR already exists and create it if it doesn't
-	currentPostgresCluster := &enterprisedbv1.Cluster{}
-	err := r.handleEDBClusterCR(currentPostgresCluster, &requeueResult)
+	// expectedInstance := r.edbPostgresCluster(request.Namespace, EDBCRName)
+	instance := &enterprisedbv1.Cluster{}
+	reqLogger.Info(instance.Namespace, "is EDB Instance namespace")
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: EDBCRName, Namespace: instance.Namespace}, instance)
 	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			// Request object not found, could have been deleted after reconcile request.
+			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+			// Return and don't requeue
+			reqLogger.Info("EDB Cluster NotFound")
+			return reconcile.Result{}, nil
+		}
+		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
+	} else {
+		reqLogger.Info("EDB Cluster Found")
 	}
 	// Check if this Certificate already exists and create it if it doesn't
 	currentCertificate := &certmgr.Certificate{}
-	err = r.handleCertificate(currentPostgresCluster, currentCertificate, &requeueResult)
+	err = r.handleCertificate(instance, currentCertificate, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -164,8 +176,8 @@ func (r *ReconcileEDBPostgres) handleEDBClusterCR(instance *enterprisedbv1.Clust
 	return nil
 }
 
-func (r *ReconcileEDBPostgres) edbPostgresCluster(instance *enterprisedbv1.Cluster) *enterprisedbv1.Cluster {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+func (r *ReconcileEDBPostgres) edbPostgresCluster(namespace string, instanceName string) *enterprisedbv1.Cluster {
+	reqLogger := log.WithValues("Instance.Namespace", namespace, "Instance.Name", instanceName)
 	edbCr := instance
 
 	edbCr.ObjectMeta.Name = EDBCRName
@@ -182,10 +194,12 @@ func (r *ReconcileEDBPostgres) edbPostgresCluster(instance *enterprisedbv1.Clust
 			Memory: "4096",
 		},
 	}
-	edbCr.Spec.Certificates.ServerCASecret = iamPostgresServerCertificateValues.SecretName
-	edbCr.Spec.Certificates.ServerTLSSecret = iamPostgresServerCertificateValues.SecretName
-	edbCr.Spec.Certificates.ClientCASecret = iamPostgresClientCertificateValues.SecretName
-	edbCr.Spec.Certificates.ReplicationTLSSecret = iamPostgresClientCertificateValues.SecretName
+	edbCr.Spec.Certificates = &enterprisedbv1.Certificates{
+		ServerCASecret:       iamPostgresServerCertificateValues.SecretName,
+		ServerTLSSecret:      iamPostgresServerCertificateValues.SecretName,
+		ClientCASecret:       iamPostgresClientCertificateValues.SecretName,
+		ReplicationTLSSecret: iamPostgresClientCertificateValues.SecretName,
+	}
 	postgresImageOverride := os.Getenv("POSTGRES_IMAGE_OVERRIDE")
 	if postgresImageOverride != "" {
 		edbCr.Spec.ImageName = postgresImageOverride
@@ -202,50 +216,52 @@ func (r *ReconcileEDBPostgres) edbPostgresCluster(instance *enterprisedbv1.Clust
 func (r *ReconcileEDBPostgres) handleCertificate(instance *enterprisedbv1.Cluster, currentCertificate *certmgr.Certificate, needToRequeue *bool) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: iamPostgresServerCertificateValues.Name, Namespace: instance.Namespace}, currentCertificate)
+	serverCrt := iamPostgresServerCertificateValues.Name
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: serverCrt, Namespace: instance.Namespace}, currentCertificate)
 	if err != nil && k8serrors.IsNotFound(err) {
 		// Define a new Server certificate
-		newCertificate := r.certificateForEDBCluster(instance)
-		reqLogger.Info("Creating a new server Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", iamPostgresServerCertificateValues.Name)
+		newCertificate := r.certificateForEDBCluster(instance, serverCrt)
+		reqLogger.Info("EDB:: Creating a new server Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", serverCrt)
 		err = r.client.Create(context.TODO(), newCertificate)
 		if err != nil {
-			reqLogger.Error(err, "Failed to create new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", iamPostgresServerCertificateValues.Name)
+			reqLogger.Error(err, "EDB:: Failed to create new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", serverCrt)
 			return err
 		}
 		// Server Certificate created successfully - return and requeue
 		*needToRequeue = true
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get Server Certificate")
+		reqLogger.Error(err, "EDB:: Failed to get Server Certificate")
 		return err
 	}
-
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: iamPostgresClientCertificateValues.Name, Namespace: instance.Namespace}, currentCertificate)
+	reqLogger.Info("EDB:: Server cert is ALREADY PRESENT")
+	clientCrt := iamPostgresClientCertificateValues.Name
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: clientCrt, Namespace: instance.Namespace}, currentCertificate)
 	if err != nil && k8serrors.IsNotFound(err) {
 		// Define a new Client certificate
-		newCertificate := r.certificateForEDBClient(instance)
-		reqLogger.Info("Creating a new client Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", iamPostgresClientCertificateValues.Name)
+		newCertificate := r.certificateForEDBClient(instance, clientCrt)
+		reqLogger.Info("EDB:: Creating a new client Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", clientCrt)
 		err = r.client.Create(context.TODO(), newCertificate)
 		if err != nil {
-			reqLogger.Error(err, "Failed to create new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", iamPostgresClientCertificateValues.Name)
+			reqLogger.Error(err, "EDB:: Failed to create new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", clientCrt)
 			return err
 		}
 		// Client Certificate created successfully - return and requeue
 		*needToRequeue = true
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get Client Certificate")
+		reqLogger.Error(err, "EDB:: Failed to get Client Certificate")
 		return err
 	}
-
+	reqLogger.Info("EDB:: Client cert is ALREADY PRESENT")
 	return nil
 
 }
 
-func (r *ReconcileEDBPostgres) certificateForEDBCluster(instance *enterprisedbv1.Cluster) *certmgr.Certificate {
+func (r *ReconcileEDBPostgres) certificateForEDBCluster(instance *enterprisedbv1.Cluster, cert string) *certmgr.Certificate {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	edbServerCertificate := &certmgr.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      iamPostgresServerCertificateValues.Name,
+			Name:      cert,
 			Namespace: instance.Namespace,
 			Labels:    map[string]string{"app": "security-iam", "k8s.enterprisedb.io/reload": ""},
 		},
@@ -263,18 +279,18 @@ func (r *ReconcileEDBPostgres) certificateForEDBCluster(instance *enterprisedbv1
 	// Set Pap instance as the owner and controller of the Certificate
 	err := controllerutil.SetControllerReference(instance, edbServerCertificate, r.scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Certificate")
+		reqLogger.Error(err, "EDB:: Failed to set owner for Certificate")
 		return nil
 	}
 	return edbServerCertificate
 }
 
-func (r *ReconcileEDBPostgres) certificateForEDBClient(instance *enterprisedbv1.Cluster) *certmgr.Certificate {
+func (r *ReconcileEDBPostgres) certificateForEDBClient(instance *enterprisedbv1.Cluster, cert string) *certmgr.Certificate {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	edbClientCertificate := &certmgr.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      iamPostgresClientCertificateValues.Name,
+			Name:      cert,
 			Namespace: instance.Namespace,
 			Labels:    map[string]string{"app": "security-iam", "k8s.enterprisedb.io/reload": ""},
 		},
@@ -292,7 +308,7 @@ func (r *ReconcileEDBPostgres) certificateForEDBClient(instance *enterprisedbv1.
 	// Set Pap instance as the owner and controller of the Certificate
 	err := controllerutil.SetControllerReference(instance, edbClientCertificate, r.scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Certificate")
+		reqLogger.Error(err, "EDB:: Failed to set owner for Certificate")
 		return nil
 	}
 	return edbClientCertificate

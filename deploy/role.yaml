@@ -62,6 +62,12 @@ rules:
   - update
   - watch
 - apiGroups:
+  - postgresql.k8s.enterprisedb.io
+  resources:
+  - clusters/finalizers
+  verbs:
+  - update
+- apiGroups:
   - apps
   resourceNames:
   - ibm-iam-operator

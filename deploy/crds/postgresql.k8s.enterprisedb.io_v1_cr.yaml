@@ -8,3 +8,8 @@ spec:
   primaryUpdateStrategy: unsupervised
   storage:
     size: 2Gi
+  certificates:
+    clientCASecret: iam-postgres-client-cert
+    replicationTLSSecret: iam-postgres-client-cert
+    serverCASecret: iam-postgres-server-cert
+    serverTLSSecret: iam-postgres-server-cert

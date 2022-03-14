@@ -92,7 +92,7 @@ metadata:
             "auditService": {
               "imageName": "audit-syslog-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "1.0.8",
+              "imageTag": "1.7.0",
               "syslogTlsPath": "/etc/audit-tls",
               "resources": {
                 "limits": {
@@ -152,7 +152,7 @@ metadata:
             "auditService": {
               "imageName": "audit-syslog-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "1.0.8",
+              "imageTag": "1.7.0",
               "syslogTlsPath": "/etc/audit-tls",
               "resources": {
                 "limits": {
@@ -295,7 +295,7 @@ metadata:
             "auditService": {
               "imageName": "audit-syslog-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "1.0.8",
+              "imageTag": "1.7.0",
               "syslogTlsPath": "/etc/audit-tls",
               "resources": {
                 "limits": {
@@ -1768,7 +1768,7 @@ spec:
                 - name: ICP_IAM_ONBOARDING_IMAGE
                   value: quay.io/opencloudio/icp-iam-onboarding:3.7.5
                 - name: AUDIT_SYSLOG_SERVICE_IMAGE
-                  value: quay.io/opencloudio/audit-syslog-service:1.4.0
+                  value: quay.io/opencloudio/audit-syslog-service:1.7.0
                 - name: WATCH_NAMESPACE
                   valueFrom:
                     fieldRef:

@@ -33,11 +33,11 @@ func (r *ReconcileAuthentication) handleIngress(instance *operatorv1alpha1.Authe
 
 	ingressList := []string{"api-key", "explorer-idmgmt", "iam-token-redirect", "iam-token", "ibmid-ui-callback", "id-mgmt", "idmgmt-v2-api", "platform-auth-dir",
 		"platform-auth", "platform-id-auth-block", "platform-id-auth", "platform-id-provider", "platform-login", "platform-oidc-block", "platform-oidc", "platform-oidc-introspect",
-		"platform-oidc-keys", "platform-oidc-token-2", "platform-oidc-token", "service-id", "token-service-version", "saml-ui-callback", "version-idmgmt"}
+		"platform-oidc-keys", "platform-oidc-token-2", "platform-oidc-token", "service-id", "token-service-version", "saml-ui-callback", "version-idmgmt", "social-login-callback"}
 
 	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *net.Ingress{apiKeyIngress, explorerIdmgmtIngress, iamTokenRedirectIngress, iamTokenIngress, ibmidUiCallbackIngress, idMgmtIngress, idmgmtV2ApiIngress, platformAuthDirIngress,
 		platformAuthIngress, platformIdAuthBlockIngress, platformIdAuthIngress, platformIdProviderIngress, platformLoginIngress, platformOidcBlockIngress, platformOidcIngress, platformOidcIntrospectIngress,
-		platformOidcKeysIngress, platformOidcToken2Ingress, platformOidcTokenIngress, serviceIdIngress, tokenServiceVersionIngress, samlUiCallbackIngress, versionIdmgmtIngress}
+		platformOidcKeysIngress, platformOidcToken2Ingress, platformOidcTokenIngress, serviceIdIngress, tokenServiceVersionIngress, samlUiCallbackIngress, versionIdmgmtIngress, socialLoginCallbackIngress}
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
@@ -86,11 +86,11 @@ func (r *ReconcileAuthentication) handleIngress(instance *operatorv1alpha1.Authe
 func (r *ReconcileAuthentication) updateIngress(instance *operatorv1alpha1.Authentication, ingress string, currentIngress *net.Ingress) error {
 	ingressList := []string{"api-key", "explorer-idmgmt", "iam-token-redirect", "iam-token", "ibmid-ui-callback", "id-mgmt", "idmgmt-v2-api", "platform-auth-dir",
 		"platform-auth", "platform-id-auth-block", "platform-id-auth", "platform-id-provider", "platform-login", "platform-oidc-block", "platform-oidc", "platform-oidc-introspect",
-		"platform-oidc-keys", "platform-oidc-token-2", "platform-oidc-token", "service-id", "token-service-version", "saml-ui-callback", "version-idmgmt"}
+		"platform-oidc-keys", "platform-oidc-token-2", "platform-oidc-token", "service-id", "token-service-version", "saml-ui-callback", "version-idmgmt", "social-login-callback"}
 
 	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *net.Ingress{apiKeyIngress, explorerIdmgmtIngress, iamTokenRedirectIngress, iamTokenIngress, ibmidUiCallbackIngress, idMgmtIngress, idmgmtV2ApiIngress, platformAuthDirIngress,
 		platformAuthIngress, platformIdAuthBlockIngress, platformIdAuthIngress, platformIdProviderIngress, platformLoginIngress, platformOidcBlockIngress, platformOidcIngress, platformOidcIntrospectIngress,
-		platformOidcKeysIngress, platformOidcToken2Ingress, platformOidcTokenIngress, serviceIdIngress, tokenServiceVersionIngress, samlUiCallbackIngress, versionIdmgmtIngress}
+		platformOidcKeysIngress, platformOidcToken2Ingress, platformOidcTokenIngress, serviceIdIngress, tokenServiceVersionIngress, samlUiCallbackIngress, versionIdmgmtIngress, socialLoginCallbackIngress}
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	index := indexOf(ingress, ingressList)
 	currentIngress = functionList[index](instance, r.scheme)
@@ -1290,6 +1290,56 @@ func versionIdmgmtIngress(instance *operatorv1alpha1.Authentication, scheme *run
 											Name: "platform-identity-management",
 											Port: net.ServiceBackendPort{
 												Number: 4500,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Set Authentication instance as the owner and controller of the Ingress
+	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
+	if err != nil {
+		reqLogger.Error(err, "Failed to set owner for Ingress")
+		return nil
+	}
+	return newIngress
+
+}
+
+func socialLoginCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
+	pathType := net.PathType("ImplementationSpecific")
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	newIngress := &net.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "social-login-callback",
+			Namespace: instance.Namespace,
+			Labels:    map[string]string{"app": "auth-idp"},
+			Annotations: map[string]string{
+				"kubernetes.io/ingress.class":            "ibm-icp-management",
+				"icp.management.ibm.com/upstream-uri":    "/ibm/api/social-login",
+				"icp.management.ibm.com/secure-backends": "true",
+			},
+		},
+		Spec: net.IngressSpec{
+			Rules: []net.IngressRule{
+				{
+					IngressRuleValue: net.IngressRuleValue{
+						HTTP: &net.HTTPIngressRuleValue{
+							Paths: []net.HTTPIngressPath{
+								{
+									Path:     "/ibm/api/social-login",
+									PathType: &pathType,
+									Backend: net.IngressBackend{
+										Service: &net.IngressServiceBackend{
+											Name: "platform-auth-service",
+											Port: net.ServiceBackendPort{
+												Number: 9443,
 											},
 										},
 									},

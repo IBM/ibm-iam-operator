@@ -143,6 +143,27 @@ func (r *ReconcileSecretWatcher) Reconcile(context context.Context, request reco
 		return reconcile.Result{}, nil
 	}
 
+	//skip deploying secretwatcher in cncf
+	globalConfigMapName := "ibm-cpp-config"
+	globalConfigMap := &corev1.ConfigMap{}
+	reqLogger.Info("Query global cm", "Configmap.Namespace", SecretWatcher.Namespace, "Global Configmap", globalConfigMapName)
+	err = r.client.Get(context, types.NamespacedName{Name: globalConfigMapName, Namespace: SecretWatcher.Namespace}, globalConfigMap)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Error(err, "The configmap ", globalConfigMapName, " is not created yet")
+			return reconcile.Result{}, err
+		}
+		reqLogger.Error(err, "cncf Failed to get ConfigMap", globalConfigMapName)
+		return reconcile.Result{}, err
+	}
+
+	clusterType, ok := globalConfigMap.Data["kubernetes_cluster_type"]
+	reqLogger.Info("Reading cluster type from global cm", "Configmap.Namespace", SecretWatcher.Namespace, "ClusterType", clusterType)
+	if ok {
+		reqLogger.Info("The secretwatcher will not be deployed in cncf cluster")
+		return reconcile.Result{}, nil
+	} 
+
 	// Check if the deployment already exists, if not create a new one
 	instance := &appsv1.Deployment{}
 	err = r.client.Get(context, types.NamespacedName{Name: "secret-watcher", Namespace: SecretWatcher.Namespace}, instance)

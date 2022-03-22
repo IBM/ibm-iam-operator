@@ -144,6 +144,27 @@ func (r *ReconcilePolicyController) Reconcile(context context.Context, request r
 		return reconcile.Result{}, nil
 	}
 
+	//skip deploying secretwatcher in cncf
+	globalConfigMapName := "ibm-cpp-config"
+	globalConfigMap := &corev1.ConfigMap{}
+	reqLogger.Info("Query global cm", "Configmap.Namespace", request.Namespace, "Global Configmap", globalConfigMapName)
+	err := r.client.Get(context, types.NamespacedName{Name: globalConfigMapName, Namespace: request.Namespace}, globalConfigMap)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Error(err, "The configmap ", globalConfigMapName, " is not created yet")
+			return reconcile.Result{}, err
+		}
+		reqLogger.Error(err, "cncf Failed to get ConfigMap", globalConfigMapName)
+		return reconcile.Result{}, err
+	}
+
+	clusterType, ok := globalConfigMap.Data["kubernetes_cluster_type"]
+	reqLogger.Info("Reading cluster type from global cm", "Configmap.Namespace", request.Namespace, "ClusterType", clusterType)
+	if ok {
+		reqLogger.Info("The policycontroller will not be deployed in cncf cluster")
+		return reconcile.Result{}, nil
+	}
+
 	// Credit: kubebuilder book
 	finalizerName := "policycontroller.operator.ibm.com"
 	// Determine if the Policy Controller CR is going to be deleted

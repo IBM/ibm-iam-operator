@@ -228,6 +228,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["SCIM_LDAP_SEARCH_TIME_LIMIT"] = newConfigMap.Data["SCIM_LDAP_SEARCH_TIME_LIMIT"]
 					currentConfigMap.Data["SCIM_ASYNC_PARALLEL_LIMIT"] = newConfigMap.Data["SCIM_ASYNC_PARALLEL_LIMIT"]
 					currentConfigMap.Data["SCIM_GET_DISPLAY_FOR_GROUP_USERS"] = newConfigMap.Data["SCIM_GET_DISPLAY_FOR_GROUP_USERS"]
+					currentConfigMap.Data["SCIM_NESTED_GROUP_SEARCH"] = newConfigMap.Data["SCIM_NESTED_GROUP_SEARCH"]
 					cmUpdateRequired = true
 				}
 				if _, keyExists := currentConfigMap.Data["AUTH_SVC_LDAP_CONFIG_TIMEOUT"]; !keyExists {
@@ -376,6 +377,7 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"SCIM_LDAP_SEARCH_TIME_LIMIT":        "10",
 			"SCIM_ASYNC_PARALLEL_LIMIT":          "100",
 			"SCIM_GET_DISPLAY_FOR_GROUP_USERS":   "true",
+			"SCIM_NESTED_GROUP_SEARCH":           "false",
 			"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
 		},
 	}

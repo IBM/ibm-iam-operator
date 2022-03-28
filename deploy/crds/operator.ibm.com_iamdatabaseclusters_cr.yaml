@@ -1,0 +1,24 @@
+apiVersion: operator.ibm.com/v1alpha1
+kind: IAMDatabaseCluster
+metadata:
+  name: cluster-psql-iam
+  labels:
+    app.kubernetes.io/instance: ibm-iam-operator
+    app.kubernetes.io/managed-by: ibm-iam-operator
+    app.kubernetes.io/name: ibm-iam-operator
+spec:
+  # Add fields here
+  instances: 3
+  logLevel: info
+  storage:
+    volumeSize: '20Gi'
+    storageClass: ''
+  resources:
+    limits:
+      cpu: '4'
+      memory: 4096Mi
+    requests:
+      cpu: '2'
+      memory: 2048Mi
+  # backupEnabled: false
+  # restoreEnabled: false

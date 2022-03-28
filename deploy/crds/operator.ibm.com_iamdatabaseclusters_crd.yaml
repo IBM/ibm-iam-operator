@@ -1,0 +1,103 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: iamdatabaseclusters.operator.ibm.com
+  labels:
+    app.kubernetes.io/instance: ibm-iam-operator
+    app.kubernetes.io/managed-by: ibm-iam-operator
+    app.kubernetes.io/name: ibm-iam-operator
+spec:
+  group: operator.ibm.com
+  names:
+    kind: IAMDatabaseCluster
+    listKind: IAMDatabaseClusterList
+    plural: iamdatabaseclusters
+    singular: iamdatabasecluster
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: IAMDatabaseCluster is the Schema for the IAMDatabaseClusters API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: IAMDatabaseClusterSpec defines the desired state of IAMDatabaseCluster
+            properties:
+              databaseBackup:
+                description: These settings configure backups of the database
+                properties:
+                  credentials:
+                    description: this is the name of the Kubernetes secret that contains
+                      your S3 Access Key and S3 Access Key Secret that you created.
+                    type: string
+                  host:
+                    description: 'S3 endpoint e.g. endpointURL: ''https://s3.eu-de.cloud-object-storage.appdomain.cloud'''
+                    type: string
+                  path:
+                    description: 'S3 bucket and path''. e.g. destinationPath: ''s3://<bucket>/<path>'''
+                    type: string
+                type: object
+              databaseRestore:
+                description: settings of db restore
+                properties:
+                  backupName:
+                    description: backup name
+                    type: string
+                  name:
+                    description: restore name
+                    type: string
+                type: object
+              databaseVolumeClaimTemplate:
+                description: Database volume details
+                properties:
+                  storageClassName:
+                    type: string
+                  volumeSize:
+                    description: Resources represents the minimum resources the volume
+                      should have.
+                    type: string
+                type: object
+              dbClusterName:
+                description: DB Cluster Name
+                type: string
+              imagePullSecrets:
+                description: ImagePullSecrets is an optional list of references to
+                  secrets in the same namespace to use for pulling any of the images.
+                items:
+                  type: string
+                type: array
+                x-kubernetes-list-type: atomic
+              profile:
+                description: Deployment profile
+                type: string
+              version:
+                description: CustomResource version
+                type: string
+            type: object
+          status:
+            description: IAMDatabaseClusterStatus defines the observed state of IAMDatabaseCluster
+            properties:
+              phase:
+                description: Phase
+                type: string
+              state:
+                description: State
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

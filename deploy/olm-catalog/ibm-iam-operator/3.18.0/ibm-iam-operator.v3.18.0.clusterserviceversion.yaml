@@ -92,7 +92,7 @@ metadata:
             "auditService": {
               "imageName": "audit-syslog-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "1.7.0",
+              "imageTag": "1.8.0",
               "syslogTlsPath": "/etc/audit-tls",
               "resources": {
                 "limits": {
@@ -152,7 +152,7 @@ metadata:
             "auditService": {
               "imageName": "audit-syslog-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "1.7.0",
+              "imageTag": "1.8.0",
               "syslogTlsPath": "/etc/audit-tls",
               "resources": {
                 "limits": {
@@ -295,7 +295,7 @@ metadata:
             "auditService": {
               "imageName": "audit-syslog-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "1.7.0",
+              "imageTag": "1.8.0",
               "syslogTlsPath": "/etc/audit-tls",
               "resources": {
                 "limits": {
@@ -582,7 +582,7 @@ metadata:
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
       the lifecycle of IAM services. With this operator, you can simply deploy and
       upgrade the IAM services
-    olm.skipRange: '<3.17.0'
+    olm.skipRange: '<3.18.0'
     repository: https://github.com/IBM/ibm-iam-operator
     support: IBM
   labels:
@@ -590,12 +590,12 @@ metadata:
     operatorframework.io/os.linux: supported
     operatorframework.io/arch.amd64: supported
     operatorframework.io/arch.ppc64le: supported
-  name: ibm-iam-operator.v3.17.0
+  name: ibm-iam-operator.v3.18.0
   namespace: placeholder
 spec:
   relatedImages:
     - name: IBM_IAM_OPERATOR_IMAGE
-      image: quay.io/opencloudio/ibm-iam-operator:3.17.0
+      image: quay.io/opencloudio/ibm-iam-operator:3.18.0
     - name: ICP_PLATFORM_AUTH_IMAGE
       image: quay.io/opencloudio/icp-platform-auth:3.7.6
     - name: ICP_IDENTITY_PROVIDER_IMAGE
@@ -615,7 +615,7 @@ spec:
     - name: ICP_IAM_ONBOARDING_IMAGE
       image: quay.io/opencloudio/icp-iam-onboarding:3.7.6
     - name: AUDIT_SYSLOG_SERVICE_IMAGE
-      image: quay.io/opencloudio/audit-syslog-service:1.7.0
+      image: quay.io/opencloudio/audit-syslog-service:1.8.0
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
@@ -1769,7 +1769,7 @@ spec:
                 - name: ICP_IAM_ONBOARDING_IMAGE
                   value: quay.io/opencloudio/icp-iam-onboarding:3.7.6
                 - name: AUDIT_SYSLOG_SERVICE_IMAGE
-                  value: quay.io/opencloudio/audit-syslog-service:1.7.0
+                  value: quay.io/opencloudio/audit-syslog-service:1.8.0
                 - name: WATCH_NAMESPACE
                   valueFrom:
                     fieldRef:
@@ -2042,5 +2042,5 @@ spec:
   minKubeVersion: 1.19.0
   provider:
     name: IBM
-  replaces: ibm-iam-operator.v3.16.0
-  version: 3.17.0
+  replaces: ibm-iam-operator.v3.17.0
+  version: 3.18.0

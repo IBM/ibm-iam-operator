@@ -578,7 +578,7 @@ metadata:
     capabilities: Basic Install
     categories: Security
     certified: "false"
-    containerImage: quay.io/opencloudio/ibm-iam-operator:latest
+    containerImage: icr.io/cpopen/ibm-iam-operator:latest
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
       the lifecycle of IAM services. With this operator, you can simply deploy and
       upgrade the IAM services
@@ -595,27 +595,27 @@ metadata:
 spec:
   relatedImages:
     - name: IBM_IAM_OPERATOR_IMAGE
-      image: quay.io/opencloudio/ibm-iam-operator:3.18.0
+      image: icr.io/cpopen/ibm-iam-operator:3.18.0
     - name: ICP_PLATFORM_AUTH_IMAGE
-      image: quay.io/opencloudio/icp-platform-auth:3.7.6
+      image: icr.io/cpopen/cpfs/icp-platform-auth:3.7.6
     - name: ICP_IDENTITY_PROVIDER_IMAGE
-      image: quay.io/opencloudio/icp-identity-provider:3.7.6
+      image: icr.io/cpopen/cpfs/icp-identity-provider:3.7.6
     - name: ICP_IDENTITY_MANAGER_IMAGE
-      image: quay.io/opencloudio/icp-identity-manager:3.7.6
+      image: icr.io/cpopen/cpfs/icp-identity-manager:3.7.6
     - name: IAM_POLICY_ADMINISTRATION_IMAGE
-      image: quay.io/opencloudio/iam-policy-administration:3.7.6
+      image: icr.io/cpopen/cpfs/iam-policy-administration:3.7.6
     - name: IAM_POLICY_DECISION_IMAGE
-      image: quay.io/opencloudio/iam-policy-decision:3.7.6
+      image: icr.io/cpopen/cpfs/iam-policy-decision:3.7.6
     - name: ICP_SECRET_WATCHER_IMAGE
-      image: quay.io/opencloudio/icp-secret-watcher:3.7.6
+      image: icr.io/cpopen/cpfs/icp-secret-watcher:3.7.6
     - name: ICP_OIDCCLIENT_WATCHER_IMAGE
-      image: quay.io/opencloudio/icp-oidcclient-watcher:3.7.6
+      image: icr.io/cpopen/cpfs/icp-oidcclient-watcher:3.7.6
     - name: IAM_POLICY_CONTROLLER_IMAGE
-      image: quay.io/opencloudio/iam-policy-controller:3.7.6
+      image: icr.io/cpopen/cpfs/iam-policy-controller:3.7.6
     - name: ICP_IAM_ONBOARDING_IMAGE
-      image: quay.io/opencloudio/icp-iam-onboarding:3.7.6
+      image: icr.io/cpopen/cpfs/icp-iam-onboarding:3.7.6
     - name: AUDIT_SYSLOG_SERVICE_IMAGE
-      image: quay.io/opencloudio/audit-syslog-service:1.8.0
+      image: icr.io/cpopen/cpfs/audit-syslog-service:1.8.0
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
@@ -1751,25 +1751,25 @@ spec:
                 - ibm-iam-operator
                 env:
                 - name: ICP_PLATFORM_AUTH_IMAGE
-                  value: quay.io/opencloudio/icp-platform-auth:3.7.6
+                  value: icr.io/cpopen/cpfs/icp-platform-auth:3.7.6
                 - name: ICP_IDENTITY_PROVIDER_IMAGE
-                  value: quay.io/opencloudio/icp-identity-provider:3.7.6
+                  value: icr.io/cpopen/cpfs/icp-identity-provider:3.7.6
                 - name: ICP_IDENTITY_MANAGER_IMAGE
-                  value: quay.io/opencloudio/icp-identity-manager:3.7.6
+                  value: icr.io/cpopen/cpfs/icp-identity-manager:3.7.6
                 - name: IAM_POLICY_ADMINISTRATION_IMAGE
-                  value: quay.io/opencloudio/iam-policy-administration:3.7.6
+                  value: icr.io/cpopen/cpfs/iam-policy-administration:3.7.6
                 - name: IAM_POLICY_DECISION_IMAGE
-                  value: quay.io/opencloudio/iam-policy-decision:3.7.6
+                  value: icr.io/cpopen/cpfs/iam-policy-decision:3.7.6
                 - name: ICP_SECRET_WATCHER_IMAGE
-                  value: quay.io/opencloudio/icp-secret-watcher:3.7.6
+                  value: icr.io/cpopen/cpfs/icp-secret-watcher:3.7.6
                 - name: ICP_OIDCCLIENT_WATCHER_IMAGE
-                  value: quay.io/opencloudio/icp-oidcclient-watcher:3.7.6
+                  value: icr.io/cpopen/cpfs/icp-oidcclient-watcher:3.7.6
                 - name: IAM_POLICY_CONTROLLER_IMAGE
-                  value: quay.io/opencloudio/iam-policy-controller:3.7.6
+                  value: icr.io/cpopen/cpfs/iam-policy-controller:3.7.6
                 - name: ICP_IAM_ONBOARDING_IMAGE
-                  value: quay.io/opencloudio/icp-iam-onboarding:3.7.6
+                  value: icr.io/cpopen/cpfs/icp-iam-onboarding:3.7.6
                 - name: AUDIT_SYSLOG_SERVICE_IMAGE
-                  value: quay.io/opencloudio/audit-syslog-service:1.8.0
+                  value: icr.io/cpopen/cpfs/audit-syslog-service:1.8.0
                 - name: WATCH_NAMESPACE
                   valueFrom:
                     fieldRef:
@@ -1780,7 +1780,7 @@ spec:
                       fieldPath: metadata.name
                 - name: OPERATOR_NAME
                   value: ibm-iam-operator
-                image: quay.io/opencloudio/ibm-iam-operator:latest
+                image: icr.io/cpopen/ibm-iam-operator:latest
                 imagePullPolicy: Always
                 name: ibm-iam-operator
                 resources:

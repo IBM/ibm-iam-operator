@@ -6,5 +6,6 @@ trustedRegistries:
   - gcr.io
   - docker.io
   - quay.io
+  - icr.io
   - registry.access.redhat.com
   - hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com

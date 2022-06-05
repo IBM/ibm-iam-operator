@@ -575,7 +575,7 @@ metadata:
           }
         }
       ]
-    capabilities: Basic Install
+    capabilities: Seamless Upgrades
     categories: Security
     certified: "false"
     containerImage: icr.io/cpopen/ibm-iam-operator:3.19.0

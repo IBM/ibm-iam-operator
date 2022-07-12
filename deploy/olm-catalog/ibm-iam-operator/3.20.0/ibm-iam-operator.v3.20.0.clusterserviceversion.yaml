@@ -2044,5 +2044,4 @@ spec:
   minKubeVersion: 1.19.0
   provider:
     name: IBM
-  replaces: ibm-iam-operator.v3.19.0
   version: 3.20.0

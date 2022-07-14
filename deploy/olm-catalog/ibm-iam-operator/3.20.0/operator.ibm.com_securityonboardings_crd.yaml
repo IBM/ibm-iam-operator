@@ -7,7 +7,6 @@ metadata:
     app.kubernetes.io/managed-by: ibm-iam-operator
     app.kubernetes.io/name: ibm-iam-operator
 spec:
-  x-kubernetes-preserve-unknown-fields: true
   group: operator.ibm.com
   names:
     kind: SecurityOnboarding
@@ -35,6 +34,7 @@ spec:
           metadata:
             type: object
           spec:
+            x-kubernetes-preserve-unknown-fields: true
             description: SecurityOnboardingSpec defines the desired state of SecurityOnboarding
             properties:
               iamOnboarding:

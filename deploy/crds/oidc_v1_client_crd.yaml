@@ -7,7 +7,6 @@ metadata:
     app.kubernetes.io/name: ibm-iam-operator
   name: clients.oidc.security.ibm.com
 spec:
-  x-kubernetes-preserve-unknown-fields: true
   conversion:
     strategy: None
   group: oidc.security.ibm.com

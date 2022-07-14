@@ -33,6 +33,7 @@ spec:
           metadata:
             type: object
           spec:
+            x-kubernetes-preserve-unknown-fields: true
             description: AuthenticationSpec defines the desired state of Authentication
             properties:
               auditService:

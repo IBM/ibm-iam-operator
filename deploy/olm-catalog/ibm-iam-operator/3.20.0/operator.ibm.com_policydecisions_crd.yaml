@@ -33,6 +33,7 @@ spec:
           metadata:
             type: object
           spec:
+            x-kubernetes-preserve-unknown-fields: true
             description: PolicyDecisionSpec defines the desired state of PolicyDecision
             properties:
               auditService:

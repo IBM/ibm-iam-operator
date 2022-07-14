@@ -34,6 +34,7 @@ spec:
           metadata:
             type: object
           spec:
+            x-kubernetes-preserve-unknown-fields: true
             description: SecurityOnboardingSpec defines the desired state of SecurityOnboarding
             properties:
               iamOnboarding:

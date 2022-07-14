@@ -33,6 +33,7 @@ spec:
           metadata:
             type: object
           spec:
+            x-kubernetes-preserve-unknown-fields: true
             description: OIDCClientWatcherSpec defines the desired state of OIDCClientWatcher
             properties:
               imageRegistry:

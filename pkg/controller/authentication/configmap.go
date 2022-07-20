@@ -228,6 +228,11 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["SCIM_LDAP_SEARCH_TIME_LIMIT"] = newConfigMap.Data["SCIM_LDAP_SEARCH_TIME_LIMIT"]
 					currentConfigMap.Data["SCIM_ASYNC_PARALLEL_LIMIT"] = newConfigMap.Data["SCIM_ASYNC_PARALLEL_LIMIT"]
 					currentConfigMap.Data["SCIM_GET_DISPLAY_FOR_GROUP_USERS"] = newConfigMap.Data["SCIM_GET_DISPLAY_FOR_GROUP_USERS"]
+					cmUpdateRequired = true
+				}
+				if _, keyExists := currentConfigMap.Data["SCIM_AUTH_CACHE_MAX_SIZE"]; !keyExists {
+					reqLogger.Info("Updating an existing Configmap to add new SCIM variables", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					newConfigMap = functionList[index](instance, r.scheme)
 					currentConfigMap.Data["SCIM_AUTH_CACHE_MAX_SIZE"] = newConfigMap.Data["SCIM_AUTH_CACHE_MAX_SIZE"]
 					currentConfigMap.Data["SCIM_AUTH_CACHE_TTL_VALUE"] = newConfigMap.Data["SCIM_AUTH_CACHE_TTL_VALUE"]
 					cmUpdateRequired = true

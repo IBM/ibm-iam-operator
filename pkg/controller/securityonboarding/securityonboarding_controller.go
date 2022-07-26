@@ -910,7 +910,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		},
 		{
 			Name:            "init-mongodb",
-			Image:           mongoDBImage,
+			Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
 			ImagePullPolicy: corev1.PullAlways,
 			Command: []string{
 				"bash",

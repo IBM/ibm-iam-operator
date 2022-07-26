@@ -615,6 +615,156 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 
 }
 
+tmpEnvs := []corev1.EnvVar{
+	{
+		Name: "DEFAULT_ADMIN_USER",
+		ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				Key:                  "admin_username",
+				LocalObjectReference: corev1.LocalObjectReference{Name: "platform-auth-idp-credentials"},
+			},
+		},
+	},
+	{
+		Name: "AUDIT_ENABLED",
+		ValueFrom: &corev1.EnvVarSource{
+			ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+				Key:                  "AUDIT_ENABLED",
+				LocalObjectReference: corev1.LocalObjectReference{Name: "auth-pdp"},
+			},
+		},
+	},
+	{
+		Name: "DEFAULT_ADMIN_PASSWORD",
+		ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				Key:                  "admin_password",
+				LocalObjectReference: corev1.LocalObjectReference{Name: "platform-auth-idp-credentials"},
+			},
+		},
+	},
+	{
+		Name: "POD_NAME",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.name",
+			},
+		},
+	},
+	{
+		Name: "POD_NAMESPACE",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.namespace",
+			},
+		},
+	},
+	{
+		Name: "CLUSTER_NAME",
+		ValueFrom: &corev1.EnvVarSource{
+			ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+				Key:                  "CLUSTER_NAME",
+				LocalObjectReference: corev1.LocalObjectReference{Name: "platform-auth-idp"},
+			},
+		},
+	},
+	{
+		Name: "IBM_CLOUD_SAAS",
+		ValueFrom: &corev1.EnvVarSource{
+			ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+				Key:                  "IBM_CLOUD_SAAS",
+				LocalObjectReference: corev1.LocalObjectReference{Name: "platform-auth-idp"},
+			},
+		},
+	},
+	{
+		Name:  "MONGO_DB",
+		Value: "platform-db",
+	},
+	{
+		Name:  "MONGO_COLLECTION",
+		Value: "iam",
+	},
+	{
+		Name: "MONGO_USERNAME",
+		ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				Key:                  "user",
+				LocalObjectReference: corev1.LocalObjectReference{Name: "icp-mongodb-admin"},
+			},
+		},
+	},
+	{
+		Name: "MONGO_PASSWORD",
+		ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				Key:                  "password",
+				LocalObjectReference: corev1.LocalObjectReference{Name: "icp-mongodb-admin"},
+			},
+		},
+	},
+	{
+		Name:  "MONGO_HOST",
+		Value: "mongodb",
+	},
+	{
+		Name:  "MONGO_PORT",
+		Value: "27017",
+	},
+	{
+		Name:  "MONGO_AUTHSOURCE",
+		Value: "admin",
+	},
+	{
+		Name:  "CF_DB_NAME",
+		Value: "security-data",
+	},
+	{
+		Name:  "DB_NAME",
+		Value: "platform-db",
+	},
+	{
+		Name:  "CAMS_PDP_URL",
+		Value: "https://iam-pdp:7998",
+	},
+	{
+		Name:  "IAM_TOKEN_SERVICE_URL",
+		Value: "https://platform-auth-service:9443",
+	},
+	{
+		Name:  "IDENTITY_PROVIDER_URL",
+		Value: "https://platform-identity-provider:4300",
+	},
+	{
+		Name:  "IAM_PAP_URL",
+		Value: "https://iam-pap:39001",
+	},
+	{
+		Name: "NAMESPACE",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.namespace",
+			},
+		},
+	},
+	{
+		Name: "DEFAULT_TTL",
+		ValueFrom: &corev1.EnvVarSource{
+			ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+				Key:                  "PDP_REDIS_CACHE_DEFAULT_TTL",
+				LocalObjectReference: corev1.LocalObjectReference{Name: "platform-auth-idp"},
+			},
+		},
+	},
+	{
+		Name:  "WORKERS",
+		Value: "15",
+	},
+}
+
 func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *ReconcileSecurityOnboarding) (*batchv1.Job, bool, error) {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
@@ -656,9 +806,9 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			},
 		},
 		{
-			Name:            "init-identity-provider",
-			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-provider:4300 | grep '200 OK'; do sleep 3; done;"},
-			Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
+			Name:            "init-identity-provider-test",
+			Command:         []string{"python", "/app/acs_utils/build/init-identity-provider-test.py"},
+			Image:           shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE"),
 			ImagePullPolicy: corev1.PullPolicy("Always"),
 			VolumeMounts: []corev1.VolumeMount{
 				{
@@ -675,14 +825,8 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			Resources: corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu200,
-					corev1.ResourceMemory: *memory256},
-				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
-			},
+			Resources: *resources,
+			Env:       tmpEnvs,
 		},
 		{
 			Name:            "init-identity-manager",
@@ -760,6 +904,33 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 				Limits: map[corev1.ResourceName]resource.Quantity{
 					corev1.ResourceCPU:    *cpu200,
 					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
+		},
+		{
+			Name:            "init-mongodb",
+			Image:           mongoDBImage,
+			ImagePullPolicy: corev1.PullAlways,
+			Command: []string{
+				"bash",
+				"-c",
+				"until </dev/tcp/mongodb/27017 ; do sleep 5; done;",
+			},
+			SecurityContext: &corev1.SecurityContext{
+				Privileged:               &falseVar,
+				RunAsNonRoot:             &trueVar,
+				ReadOnlyRootFilesystem:   &trueVar,
+				AllowPrivilegeEscalation: &falseVar,
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+			},
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
 				Requests: map[corev1.ResourceName]resource.Quantity{
 					corev1.ResourceCPU:    *cpu100,
 					corev1.ResourceMemory: *memory128},
@@ -866,155 +1037,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		},
 	}
 
-	tmpEnvs := []corev1.EnvVar{
-		{
-			Name: "DEFAULT_ADMIN_USER",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					Key:                  "admin_username",
-					LocalObjectReference: corev1.LocalObjectReference{Name: "platform-auth-idp-credentials"},
-				},
-			},
-		},
-		{
-			Name: "AUDIT_ENABLED",
-			ValueFrom: &corev1.EnvVarSource{
-				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-					Key:                  "AUDIT_ENABLED",
-					LocalObjectReference: corev1.LocalObjectReference{Name: "auth-pdp"},
-				},
-			},
-		},
-		{
-			Name: "DEFAULT_ADMIN_PASSWORD",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					Key:                  "admin_password",
-					LocalObjectReference: corev1.LocalObjectReference{Name: "platform-auth-idp-credentials"},
-				},
-			},
-		},
-		{
-			Name: "POD_NAME",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "metadata.name",
-				},
-			},
-		},
-		{
-			Name: "POD_NAMESPACE",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "metadata.namespace",
-				},
-			},
-		},
-		{
-			Name: "CLUSTER_NAME",
-			ValueFrom: &corev1.EnvVarSource{
-				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-					Key:                  "CLUSTER_NAME",
-					LocalObjectReference: corev1.LocalObjectReference{Name: "platform-auth-idp"},
-				},
-			},
-		},
-		{
-			Name: "IBM_CLOUD_SAAS",
-			ValueFrom: &corev1.EnvVarSource{
-				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-					Key:                  "IBM_CLOUD_SAAS",
-					LocalObjectReference: corev1.LocalObjectReference{Name: "platform-auth-idp"},
-				},
-			},
-		},
-		{
-			Name:  "MONGO_DB",
-			Value: "platform-db",
-		},
-		{
-			Name:  "MONGO_COLLECTION",
-			Value: "iam",
-		},
-		{
-			Name: "MONGO_USERNAME",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					Key:                  "user",
-					LocalObjectReference: corev1.LocalObjectReference{Name: "icp-mongodb-admin"},
-				},
-			},
-		},
-		{
-			Name: "MONGO_PASSWORD",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					Key:                  "password",
-					LocalObjectReference: corev1.LocalObjectReference{Name: "icp-mongodb-admin"},
-				},
-			},
-		},
-		{
-			Name:  "MONGO_HOST",
-			Value: "mongodb",
-		},
-		{
-			Name:  "MONGO_PORT",
-			Value: "27017",
-		},
-		{
-			Name:  "MONGO_AUTHSOURCE",
-			Value: "admin",
-		},
-		{
-			Name:  "CF_DB_NAME",
-			Value: "security-data",
-		},
-		{
-			Name:  "DB_NAME",
-			Value: "platform-db",
-		},
-		{
-			Name:  "CAMS_PDP_URL",
-			Value: "https://iam-pdp:7998",
-		},
-		{
-			Name:  "IAM_TOKEN_SERVICE_URL",
-			Value: "https://platform-auth-service:9443",
-		},
-		{
-			Name:  "IDENTITY_PROVIDER_URL",
-			Value: "https://platform-identity-provider:4300",
-		},
-		{
-			Name:  "IAM_PAP_URL",
-			Value: "https://iam-pap:39001",
-		},
-		{
-			Name: "NAMESPACE",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "metadata.namespace",
-				},
-			},
-		},
-		{
-			Name: "DEFAULT_TTL",
-			ValueFrom: &corev1.EnvVarSource{
-				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-					Key:                  "PDP_REDIS_CACHE_DEFAULT_TTL",
-					LocalObjectReference: corev1.LocalObjectReference{Name: "platform-auth-idp"},
-				},
-			},
-		},
-		{
-			Name:  "WORKERS",
-			Value: "15",
-		},
-	}
+
 
 	if instance.Spec.Config.EnableImpersonation {
 		tmpEnvs = append(tmpEnvs, corev1.EnvVar{

@@ -31,7 +31,7 @@ IMAGE_BUILD_OPTS=--build-arg "VCS_REF=$(GIT_COMMIT_ID)" --build-arg "VCS_URL=$(G
 # Image URL to use all building/pushing image targets;
 # Use your own docker registry and image name for dev/test by overridding the IMG and REGISTRY environment variable.
 IMG ?= ibm-iam-operator
-REGISTRY ?= "hyc-cloud-private-integration-docker-local.artifactory.swg-devops.com/ibmcom"
+REGISTRY ?= hyc-cloud-private-integration-docker-local.artifactory.swg-devops.com/ibmcom
 CSV_VERSION ?= 3.20.0
 
 QUAY_USERNAME ?=
@@ -146,7 +146,7 @@ endif
 
 build:
 	@echo "Building the ibm-iam-operator binary"
-	@CGO_ENABLED=0 go build -o build/_output/bin/$(IMG) ./cmd/manager
+	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/_output/bin/$(IMG) ./cmd/manager
 	@strip $(STRIP_FLAGS) build/_output/bin/$(IMG)
 
 build-image: build $(CONFIG_DOCKER_TARGET)

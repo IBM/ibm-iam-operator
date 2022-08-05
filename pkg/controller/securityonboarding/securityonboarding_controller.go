@@ -631,241 +631,6 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		}
 	}
 
-	tmpInitContainers := []corev1.Container{
-		{
-			Name:            "init-auth-service",
-			Command:         []string{"sh", "-c", "sleep 75; until curl -k -i -fsS https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration | grep '200 OK'; do sleep 3; done;"},
-			Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
-			ImagePullPolicy: corev1.PullPolicy("Always"),
-			SecurityContext: &corev1.SecurityContext{
-				Privileged:               &falseVar,
-				RunAsNonRoot:             &trueVar,
-				ReadOnlyRootFilesystem:   &trueVar,
-				AllowPrivilegeEscalation: &falseVar,
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"ALL"},
-				},
-			},
-			Resources: corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu200,
-					corev1.ResourceMemory: *memory256},
-				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
-			},
-		},
-		{
-			Name:            "init-identity-provider",
-			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-provider:4300 | grep '200 OK'; do sleep 3; done;"},
-			Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
-			ImagePullPolicy: corev1.PullPolicy("Always"),
-			VolumeMounts: []corev1.VolumeMount{
-				{
-					Name:      "cluster-ca",
-					MountPath: "/certs",
-				},
-			},
-			SecurityContext: &corev1.SecurityContext{
-				Privileged:               &falseVar,
-				RunAsNonRoot:             &trueVar,
-				ReadOnlyRootFilesystem:   &trueVar,
-				AllowPrivilegeEscalation: &falseVar,
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"ALL"},
-				},
-			},
-			Resources: corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu200,
-					corev1.ResourceMemory: *memory256},
-				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
-			},
-		},
-		{
-			Name:            "init-identity-manager",
-			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-management:4500 | grep '200 OK'; do sleep 3; done;"},
-			Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
-			ImagePullPolicy: corev1.PullPolicy("Always"),
-			VolumeMounts: []corev1.VolumeMount{
-				{
-					Name:      "cluster-ca",
-					MountPath: "/certs",
-				},
-			},
-			SecurityContext: &corev1.SecurityContext{
-				Privileged:               &falseVar,
-				RunAsNonRoot:             &trueVar,
-				ReadOnlyRootFilesystem:   &trueVar,
-				AllowPrivilegeEscalation: &falseVar,
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"ALL"},
-				},
-			},
-			Resources: corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu200,
-					corev1.ResourceMemory: *memory256},
-				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
-			},
-		},
-		{
-			Name:            "init-token-service",
-			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-auth-service:9443/iam/oidc/keys | grep '200 OK'; do sleep 3; done;"},
-			Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
-			ImagePullPolicy: corev1.PullPolicy("Always"),
-			SecurityContext: &corev1.SecurityContext{
-				Privileged:               &falseVar,
-				RunAsNonRoot:             &trueVar,
-				ReadOnlyRootFilesystem:   &trueVar,
-				AllowPrivilegeEscalation: &falseVar,
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"ALL"},
-				},
-			},
-			Resources: corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu200,
-					corev1.ResourceMemory: *memory256},
-				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
-			},
-		},
-		{
-			Name:            "init-pap",
-			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://iam-pap:39001/v1/health | grep '200 OK'; do sleep 3; done;"},
-			Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
-			ImagePullPolicy: corev1.PullPolicy("Always"),
-			VolumeMounts: []corev1.VolumeMount{
-				{
-					Name:      "cluster-ca",
-					MountPath: "/certs",
-				},
-			},
-			SecurityContext: &corev1.SecurityContext{
-				Privileged:               &falseVar,
-				RunAsNonRoot:             &trueVar,
-				ReadOnlyRootFilesystem:   &trueVar,
-				AllowPrivilegeEscalation: &falseVar,
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"ALL"},
-				},
-			},
-			Resources: corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu200,
-					corev1.ResourceMemory: *memory256},
-				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
-			},
-		},
-	}
-	var mode1, mode2, mode3, mode4 int32 = 420, 420, 420, 420
-	tmpVolumes := []corev1.Volume{
-		{
-			Name: "mongodb-ca-cert",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: "mongodb-root-ca-cert",
-				},
-			},
-		},
-		{
-			Name: "cluster-ca",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: "cs-ca-certificate-secret",
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "tls.key",
-							Path: "ca.key",
-						},
-						{
-							Key:  "tls.crt",
-							Path: "ca.crt",
-						},
-					},
-					DefaultMode: &mode1,
-				},
-			},
-		},
-		{
-			Name: "auth-pdp-secret",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: "auth-pdp-secret",
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "tls.key",
-							Path: "ca.key",
-						},
-						{
-							Key:  "tls.crt",
-							Path: "ca.crt",
-						},
-					},
-					DefaultMode: &mode2,
-				},
-			},
-		},
-		{
-			Name: "shared",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{
-					Medium: "",
-				},
-			},
-		},
-		{
-			Name: "logrotate",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "auth-pdp",
-					},
-					DefaultMode: &mode3,
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "logrotate",
-							Path: "audit",
-						},
-					},
-				},
-			},
-		},
-		{
-			Name: "logrotate-conf",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "auth-pdp",
-					},
-					DefaultMode: &mode4,
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "logrotate-conf",
-							Path: "logrotate.conf",
-						},
-					},
-				},
-			},
-		},
-		{
-			Name: "mongodb-client-cert",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: "icp-mongodb-client-cert",
-				},
-			},
-		},
-	}
-
 	tmpEnvs := []corev1.EnvVar{
 		{
 			Name: "DEFAULT_ADMIN_USER",
@@ -1015,6 +780,281 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			Value: "15",
 		},
 	}
+	
+	tmpInitContainers := []corev1.Container{
+		{
+			Name:            "init-auth-service",
+			Command:         []string{"sh", "-c", "sleep 75; until curl -k -i -fsS https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration | grep '200 OK'; do sleep 3; done;"},
+			Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
+			ImagePullPolicy: corev1.PullPolicy("Always"),
+			SecurityContext: &corev1.SecurityContext{
+				Privileged:               &falseVar,
+				RunAsNonRoot:             &trueVar,
+				ReadOnlyRootFilesystem:   &trueVar,
+				AllowPrivilegeEscalation: &falseVar,
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+			},
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
+		},
+		{
+			Name:            "init-identity-provider",
+			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-provider:4300 | grep '200 OK'; do sleep 3; done;"},
+			Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
+			ImagePullPolicy: corev1.PullPolicy("Always"),
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "cluster-ca",
+					MountPath: "/certs",
+				},
+			},
+			SecurityContext: &corev1.SecurityContext{
+				Privileged:               &falseVar,
+				RunAsNonRoot:             &trueVar,
+				ReadOnlyRootFilesystem:   &trueVar,
+				AllowPrivilegeEscalation: &falseVar,
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+			},
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
+		},
+		{
+			Name:            "init-identity-manager",
+			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-management:4500 | grep '200 OK'; do sleep 3; done;"},
+			Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
+			ImagePullPolicy: corev1.PullPolicy("Always"),
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "cluster-ca",
+					MountPath: "/certs",
+				},
+			},
+			SecurityContext: &corev1.SecurityContext{
+				Privileged:               &falseVar,
+				RunAsNonRoot:             &trueVar,
+				ReadOnlyRootFilesystem:   &trueVar,
+				AllowPrivilegeEscalation: &falseVar,
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+			},
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
+		},
+		{
+			Name:            "init-token-service",
+			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-auth-service:9443/iam/oidc/keys | grep '200 OK'; do sleep 3; done;"},
+			Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
+			ImagePullPolicy: corev1.PullPolicy("Always"),
+			SecurityContext: &corev1.SecurityContext{
+				Privileged:               &falseVar,
+				RunAsNonRoot:             &trueVar,
+				ReadOnlyRootFilesystem:   &trueVar,
+				AllowPrivilegeEscalation: &falseVar,
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+			},
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
+		},
+		{
+			Name:            "init-pap",
+			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://iam-pap:39001/v1/health | grep '200 OK'; do sleep 3; done;"},
+			Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
+			ImagePullPolicy: corev1.PullPolicy("Always"),
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "cluster-ca",
+					MountPath: "/certs",
+				},
+			},
+			SecurityContext: &corev1.SecurityContext{
+				Privileged:               &falseVar,
+				RunAsNonRoot:             &trueVar,
+				ReadOnlyRootFilesystem:   &trueVar,
+				AllowPrivilegeEscalation: &falseVar,
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+			},
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu200,
+					corev1.ResourceMemory: *memory256},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
+		},
+		{
+			Name:            "endpoints-test",
+			Command:         []string{"python", "/app/acs_utils/build/init-endpoints-test.py"},
+			Image:           shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE"),
+			ImagePullPolicy: corev1.PullPolicy("Always"),
+			SecurityContext: &corev1.SecurityContext{
+				Privileged:               &falseVar,
+				RunAsNonRoot:             &trueVar,
+				ReadOnlyRootFilesystem:   &trueVar,
+				AllowPrivilegeEscalation: &falseVar,
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+			},
+			Resources: *resources,
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "mongodb-ca-cert",
+					MountPath: "/certs/mongodb-ca",
+				},
+				{
+					Name:      "auth-pdp-secret",
+					MountPath: "/certs/auth-pdp",
+				},
+				{
+					Name:      "cluster-ca",
+					MountPath: "/certs",
+				},
+				{
+					Name:      "shared",
+					MountPath: "/app/logs/audit",
+				},
+				{
+					Name:      "mongodb-client-cert",
+					MountPath: "/certs/mongodb-client",
+				},
+			},
+			Env: tmpEnvs,
+		},
+	}
+	var mode1, mode2, mode3, mode4 int32 = 420, 420, 420, 420
+	tmpVolumes := []corev1.Volume{
+		{
+			Name: "mongodb-ca-cert",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "mongodb-root-ca-cert",
+				},
+			},
+		},
+		{
+			Name: "cluster-ca",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "cs-ca-certificate-secret",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "tls.key",
+							Path: "ca.key",
+						},
+						{
+							Key:  "tls.crt",
+							Path: "ca.crt",
+						},
+					},
+					DefaultMode: &mode1,
+				},
+			},
+		},
+		{
+			Name: "auth-pdp-secret",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "auth-pdp-secret",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "tls.key",
+							Path: "ca.key",
+						},
+						{
+							Key:  "tls.crt",
+							Path: "ca.crt",
+						},
+					},
+					DefaultMode: &mode2,
+				},
+			},
+		},
+		{
+			Name: "shared",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					Medium: "",
+				},
+			},
+		},
+		{
+			Name: "logrotate",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "auth-pdp",
+					},
+					DefaultMode: &mode3,
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "logrotate",
+							Path: "audit",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "logrotate-conf",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "auth-pdp",
+					},
+					DefaultMode: &mode4,
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "logrotate-conf",
+							Path: "logrotate.conf",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "mongodb-client-cert",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "icp-mongodb-client-cert",
+				},
+			},
+		},
+	}
+
 
 	if instance.Spec.Config.EnableImpersonation {
 		tmpEnvs = append(tmpEnvs, corev1.EnvVar{

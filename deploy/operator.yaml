@@ -62,7 +62,7 @@ spec:
             - name: ICP_IAM_ONBOARDING_IMAGE
               value: hyc-cloud-private-scratch-docker-local.artifactory.swg-devops.com/ibmcom/icp-iam-onboarding-amd64:8c04137
             - name: AUDIT_SYSLOG_SERVICE_IMAGE
-              value: icr.io/cpopen/cpfs/audit-syslog-service:1.8.0
+              value: icr.io/cpopen/cpfs/audit-syslog-service@sha256:efc7014f285445acdc3899953629a14aa7ec291abf2d50c8f9dac0f082f35600
             - name: WATCH_NAMESPACE
               valueFrom:
                 fieldRef:

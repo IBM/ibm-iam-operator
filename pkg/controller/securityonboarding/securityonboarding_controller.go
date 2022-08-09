@@ -805,8 +805,8 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			},
 		},
 		{
-			Name:            "init-identity-provider-test",
-			Command:         []string{"python", "/app/acs_utils/build/init-identity-provider-test.py"},
+			Name:            "endpoints-test",
+			Command:         []string{"python", "/app/acs_utils/build/init-endpoints-test.py"},
 			Image:           shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE"),
 			ImagePullPolicy: corev1.PullPolicy("Always"),
 			VolumeMounts: []corev1.VolumeMount{

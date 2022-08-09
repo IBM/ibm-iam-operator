@@ -60,7 +60,7 @@ spec:
             - name: IAM_POLICY_CONTROLLER_IMAGE
               value: icr.io/cpopen/cpfs/iam-policy-controller:3.7.8
             - name: ICP_IAM_ONBOARDING_IMAGE
-              value: icr.io/cpopen/cpfs/icp-iam-onboarding:3.8.0
+              value: hyc-cloud-private-scratch-docker-local.artifactory.swg-devops.com/ibmcom/icp-iam-onboarding-amd64:8c04137
             - name: AUDIT_SYSLOG_SERVICE_IMAGE
               value: icr.io/cpopen/cpfs/audit-syslog-service:1.8.0
             - name: WATCH_NAMESPACE

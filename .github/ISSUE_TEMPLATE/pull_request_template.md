@@ -17,6 +17,8 @@ Must be answered or mark as NA or provide justification
 - [ ] This change requires a documentation update
 - [ ] This change requires an OSSC approval
 - [ ] This change requires a copyright update
+- [ ] Release version bumpup
+
 
 ## How Has This Been Tested?
 

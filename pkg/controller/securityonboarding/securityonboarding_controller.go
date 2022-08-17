@@ -1158,7 +1158,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		if currentJob.Spec.Template.Spec.Containers[0].Image != shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE") {
 			return currentJob, true, fmt.Errorf("Job %v already exists.", "iam-onboarding")
 		}
-		if currentJob.Status.Conditions[0].Type != "Complete" {
+		if currentJob.Status.Conditions[0].Type == "Failed" {
 			return currentJob, true, fmt.Errorf("Job %v Failed thus restart.", "iam-onboarding")
 		}
 		return currentJob, false, fmt.Errorf("Job %v already exists.", "iam-onboarding")

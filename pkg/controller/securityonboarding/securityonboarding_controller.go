@@ -780,7 +780,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			Value: "15",
 		},
 	}
-	
+
 	tmpInitContainers := []corev1.Container{
 		{
 			Name:            "init-auth-service",
@@ -1055,7 +1055,6 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		},
 	}
 
-
 	if instance.Spec.Config.EnableImpersonation {
 		tmpEnvs = append(tmpEnvs, corev1.EnvVar{
 			Name:  "ENABLE_IMPERSONATION",
@@ -1158,6 +1157,9 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 	if err == nil {
 		if currentJob.Spec.Template.Spec.Containers[0].Image != shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE") {
 			return currentJob, true, fmt.Errorf("Job %v already exists.", "iam-onboarding")
+		}
+		if currentJob.Status.Conditions[0].Type != "Complete" {
+			return currentJob, true, fmt.Errorf("Job %v Failed thus restart.", "iam-onboarding")
 		}
 		return currentJob, false, fmt.Errorf("Job %v already exists.", "iam-onboarding")
 	}

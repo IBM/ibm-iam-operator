@@ -341,6 +341,7 @@ func (r *ReconcileSecurityOnboarding) handleJob(instance *operatorv1alpha1.Secur
 			reqLogger.Info("Successfully created Job", "Job.Namespace", instance.Namespace, "Job.Name", "security-onboarding")
 		}
 	} else if restartRequired {
+		reqLogger.Info("Restart required for securityOnboardJob")
 		err = r.client.Delete(context.TODO(), securityOnboardJob)
 		if err != nil {
 			reqLogger.Error(err, "Failed to delete job", "Job.Namespace", instance.Namespace, "Job.Name", "security-onboarding")
@@ -355,7 +356,8 @@ func (r *ReconcileSecurityOnboarding) handleJob(instance *operatorv1alpha1.Secur
 	foundErr2 := false
 	iamJobExists := false
 	if err != nil {
-		reqLogger.Info("Failed to create iam-onboarding Job, exists already ", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
+		reqLogger.Info("The err from IAMOnboardJob is ")
+		reqLogger.Info(err.Error())
 		iamJobExists = true
 	}
 
@@ -368,6 +370,7 @@ func (r *ReconcileSecurityOnboarding) handleJob(instance *operatorv1alpha1.Secur
 			reqLogger.Info("Successfully created Job", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
 		}
 	} else if restartRequired {
+		reqLogger.Info("Restart required for iamOnboardJob")
 		err = r.client.Delete(context.TODO(), iamOnboardJob)
 		if err != nil {
 			reqLogger.Error(err, "Failed to delete job", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
@@ -1158,7 +1161,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 		if currentJob.Spec.Template.Spec.Containers[0].Image != shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE") {
 			return currentJob, true, fmt.Errorf("Job %v already exists.", "iam-onboarding")
 		}
-		if currentJob.Status.Conditions[0].Type == "Failed" {
+		if currentJob.Status.Conditions != nil && currentJob.Status.Conditions[0].Type == "Failed" {
 			return currentJob, true, fmt.Errorf("Job %v Failed thus restart.", "iam-onboarding")
 		}
 		return currentJob, false, fmt.Errorf("Job %v already exists.", "iam-onboarding")

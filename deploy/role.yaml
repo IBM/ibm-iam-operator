@@ -12,6 +12,7 @@ rules:
   - ""
   resources:
   - pods
+  - pods/log
   - services
   - services/finalizers
   - endpoints

@@ -361,8 +361,8 @@ func (r *ReconcileSecurityOnboarding) handleJob(instance *operatorv1alpha1.Secur
 	foundErr2 := false
 	iamJobExists := false
 	if err != nil {
-		reqLogger.Info("The err from IAMOnboardJob is ")
-		reqLogger.Info(err.Error())
+		reqLogger.Info("Failed to create iam-onboarding Job, ", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
+		reqLogger.Info("The err from IAMOnboardJob is ", err.Error())
 		iamJobExists = true
 	}
 
@@ -375,7 +375,7 @@ func (r *ReconcileSecurityOnboarding) handleJob(instance *operatorv1alpha1.Secur
 			reqLogger.Info("Successfully created Job", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
 		}
 	} else if restartRequired {
-		reqLogger.Info("Restart required for iamOnboardJob")
+		reqLogger.Info("Restart required for iamOnboardJob ", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
 		err = r.client.Delete(context.TODO(), iamOnboardJob)
 		if err != nil {
 			reqLogger.Error(err, "Failed to delete job", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
@@ -924,8 +924,8 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			},
 		},
 		{
-			Name:            "endpoints-test",
-			Command:         []string{"python", "/app/acs_utils/build/init-endpoints-test.py"},
+			Name:            "init-token-validation",
+			Command:         []string{"python", "/app/acs_utils/build/init_token_validation.py"},
 			Image:           shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE"),
 			ImagePullPolicy: corev1.PullPolicy("Always"),
 			SecurityContext: &corev1.SecurityContext{
@@ -1164,65 +1164,71 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "iam-onboarding", Namespace: instance.Namespace}, currentJob)
 	if err == nil {
 		if currentJob.Status.Conditions != nil && currentJob.Status.Conditions[0].Type == "Failed" {
-			reqLogger.Info("Inside job failed condition")
-			config, _ := rest.InClusterConfig()
-			clientset, _ := kubernetes.NewForConfig(config)
-			events, _ := clientset.CoreV1().Events(instance.Namespace).List(context.TODO(), metav1.ListOptions{FieldSelector: "involvedObject.name=iam-onboarding", TypeMeta: metav1.TypeMeta{Kind: "Job"}})
-			if len(events.Items) > 2 {
-				reqLogger.Info("The event from failed iam-onboarding job is ")
-				reqLogger.Info(events.Items[len(events.Items)-3].Message)
-				r, _ := regexp.Compile(":\\s?(.*)")
-				matches := r.FindAllString(events.Items[len(events.Items)-3].Message, -1)
-				if len(matches) > 0 {
-					pod_name := strings.TrimSpace(strings.Split(matches[0], ":")[1])
-					reqLogger.Info("IAM Onboarding failed pod name is ", pod_name)
-					_, err = clientset.CoreV1().Pods(instance.Namespace).Get(context.TODO(), pod_name, metav1.GetOptions{})
-					if errors.IsNotFound(err) {
-						reqLogger.Info("Pod iam-onboarding not found in %v namespace\n", instance.Namespace)
-					} else if statusError, isStatus := err.(*errors.StatusError); isStatus {
-						reqLogger.Info("Error getting pod %v\n", statusError.ErrStatus.Message)
-					} else if err != nil {
-						reqLogger.Info("The error getting pod ", err.Error())
-					} else {
-						reqLogger.Info("Found iam-onboarding pod in %v namespace\n", instance.Namespace)
-						count := int64(50)
-						podLogOpts := corev1.PodLogOptions{
-							Follow:    true,
-							TailLines: &count,
-						}
-						req := clientset.CoreV1().Pods(instance.Namespace).GetLogs(pod_name, &podLogOpts)
-						podLogs, err2 := req.Stream(context.TODO())
-						if err2 != nil {
-							reqLogger.Info("error in opening stream ", err2.Error())
+			reqLogger.Info("Inside job failed condition ", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
+			config, err := rest.InClusterConfig()
+			if err == nil {
+				clientset, err := kubernetes.NewForConfig(config)
+				if err == nil {
+					events, err := clientset.CoreV1().Events(instance.Namespace).List(context.TODO(), metav1.ListOptions{FieldSelector: "involvedObject.name=iam-onboarding", TypeMeta: metav1.TypeMeta{Kind: "Job"}})
+					if err == nil {
+						if len(events.Items) > 2 {
+							reqLogger.Info("The event from failed iam-onboarding job is ", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
+							reqLogger.Info(events.Items[len(events.Items)-3].Message)
+							r, _ := regexp.Compile(":\\s?(.*)")
+							matches := r.FindAllString(events.Items[len(events.Items)-3].Message, -1)
+							if len(matches) > 0 {
+								pod_name := strings.TrimSpace(strings.Split(matches[0], ":")[1])
+								reqLogger.Info("IAM Onboarding failed pod name is ", pod_name, "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
+								_, err = clientset.CoreV1().Pods(instance.Namespace).Get(context.TODO(), pod_name, metav1.GetOptions{})
+								if errors.IsNotFound(err) {
+									reqLogger.Info("Pod iam-onboarding not found in %v namespace\n", instance.Namespace, "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
+								} else if statusError, isStatus := err.(*errors.StatusError); isStatus {
+									reqLogger.Info("Error getting pod %v\n", statusError.ErrStatus.Message, "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
+								} else if err != nil {
+									reqLogger.Info("The error getting pod ", err.Error(), "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
+								} else {
+									reqLogger.Info("Found iam-onboarding pod in %v namespace\n", instance.Namespace)
+									count := int64(50)
+									podLogOpts := corev1.PodLogOptions{
+										Follow:    true,
+										TailLines: &count,
+									}
+									req := clientset.CoreV1().Pods(instance.Namespace).GetLogs(pod_name, &podLogOpts)
+									podLogs, err2 := req.Stream(context.TODO())
+									if err2 != nil {
+										reqLogger.Info("error in opening stream ", err2.Error(), "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
+									} else {
+										defer podLogs.Close()
+										reqLogger.Info("Get logs for the iam-onboarding pod ", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
+										buf := new(bytes.Buffer)
+										_, err2 = io.Copy(buf, podLogs)
+										if err2 != nil {
+											reqLogger.Info("error in copy information from podLogs to buf")
+										}
+										pod_logs := strings.Split(buf.String(), "\n")
+										reqLogger.Info(" The last few lines are ")
+										start_index := 0
+										end_index := len(pod_logs)
+										if end_index > 10 {
+											start_index = end_index - 10
+										}
+										for i := start_index; i < end_index; i++ {
+											reqLogger.Info(pod_logs[i])
+										}
+									}
+									reqLogger.Info("Done reading iam-onboarding logs ", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
+								}
+							} else {
+								reqLogger.Info("Couldn't get pod's name from iam-onboarding job's event ", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
+							}
 						} else {
-							defer podLogs.Close()
-							reqLogger.Info("Get logs for the iam-onboarding pod ")
-							buf := new(bytes.Buffer)
-							_, err2 = io.Copy(buf, podLogs)
-							if err2 != nil {
-								reqLogger.Info("error in copy information from podLogs to buf")
-							}
-							pod_logs := strings.Split(buf.String(), "\n")
-							reqLogger.Info(" The last few lines are ")
-							start_index := 0
-							end_index := len(pod_logs)
-							if end_index > 10 {
-								start_index = end_index - 10
-							}
-							for i := start_index; i < end_index; i++ {
-								reqLogger.Info(pod_logs[i])
-							}
-
+							reqLogger.Info("Couldn't fetch event from failed iam-onboarding job ", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
 						}
-						reqLogger.Info("Done reading iam-onboarding logs\n")
 					}
-
-				} else {
-					reqLogger.Info("Couldn't get pod's name from iam-onboarding job's event ")
 				}
-			} else {
-				reqLogger.Info("Couldn't fetch event from failed iam-onboarding job ")
+
 			}
+
 			return currentJob, true, fmt.Errorf("Job %v Failed thus restart.", "iam-onboarding")
 		}
 		if currentJob.Spec.Template.Spec.Containers[0].Image != shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE") {

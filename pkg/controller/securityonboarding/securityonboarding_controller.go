@@ -918,8 +918,8 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			},
 		},
 		{
-			Name:            "endpoints-test",
-			Command:         []string{"python", "/app/acs_utils/build/init-endpoints-test.py"},
+			Name:            "init-token-validation",
+			Command:         []string{"python", "/app/acs_utils/build/init_token_validation.py"},
 			Image:           shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE"),
 			ImagePullPolicy: corev1.PullPolicy("Always"),
 			SecurityContext: &corev1.SecurityContext{
@@ -1161,7 +1161,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			return currentJob, true, fmt.Errorf("Job %v already exists.", "iam-onboarding")
 		}
 		if currentJob.Status.Conditions != nil && currentJob.Status.Conditions[0].Type == "Failed" {
-			return currentJob, true, fmt.Errorf("Job %v Failed thus restart.", "iam-onboarding")
+			return currentJob, true, fmt.Errorf("Job %v Failed thus restart the job.", "iam-onboarding")
 		}
 		return currentJob, false, fmt.Errorf("Job %v already exists.", "iam-onboarding")
 	}

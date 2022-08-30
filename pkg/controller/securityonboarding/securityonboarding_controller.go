@@ -341,7 +341,7 @@ func (r *ReconcileSecurityOnboarding) handleJob(instance *operatorv1alpha1.Secur
 			reqLogger.Info("Successfully created Job", "Job.Namespace", instance.Namespace, "Job.Name", "security-onboarding")
 		}
 	} else if restartRequired {
-		reqLogger.Info("Restart required for securityOnboardJob")
+		reqLogger.Info("Restart required for securityOnboardJob", "Job.Namespace", instance.Namespace, "Job.Name", "security-onboarding")
 		err = r.client.Delete(context.TODO(), securityOnboardJob)
 		if err != nil {
 			reqLogger.Error(err, "Failed to delete job", "Job.Namespace", instance.Namespace, "Job.Name", "security-onboarding")
@@ -356,8 +356,7 @@ func (r *ReconcileSecurityOnboarding) handleJob(instance *operatorv1alpha1.Secur
 	foundErr2 := false
 	iamJobExists := false
 	if err != nil {
-		reqLogger.Info("The err from IAMOnboardJob is ")
-		reqLogger.Info(err.Error())
+		reqLogger.Info("The err from IAMOnboardJob is ",err.Error() , " Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding") )
 		iamJobExists = true
 	}
 
@@ -370,7 +369,7 @@ func (r *ReconcileSecurityOnboarding) handleJob(instance *operatorv1alpha1.Secur
 			reqLogger.Info("Successfully created Job", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")
 		}
 	} else if restartRequired {
-		reqLogger.Info("Restart required for iamOnboardJob")
+		reqLogger.Info("Restart required for iamOnboardJob ", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding"))
 		err = r.client.Delete(context.TODO(), iamOnboardJob)
 		if err != nil {
 			reqLogger.Error(err, "Failed to delete job", "Job.Namespace", instance.Namespace, "Job.Name", "iam-onboarding")

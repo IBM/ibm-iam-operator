@@ -186,6 +186,10 @@ spec:
                     type: string
                   defaultAdminUser:
                     type: string
+                  scimAdminPassword:
+                    type: string
+                  scimAdminUser:
+                    type: string
                   enableImpersonation:
                     type: boolean
                   fipsEnabled:
@@ -240,6 +244,8 @@ spec:
                 - clusterName
                 - defaultAdminPassword
                 - defaultAdminUser
+                - scimAdminPassword
+                - scimAdminUser
                 - enableImpersonation
                 - fipsEnabled
                 - icpPort

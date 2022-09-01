@@ -31,6 +31,7 @@ import (
 var rule2 = `^([a-zA-Z0-9]){32,}$`
 var rule3 = `^([a-zA-Z0-9]){16,}$`
 var adminPassword = generateRandomString(rule2)
+var scimAdminPassword = generateRandomString(rule2)
 var encryptionKey = generateRandomString(rule2)
 var wlpClientRegistrationSecret = generateRandomString(rule2)
 var encryptionIV = generateRandomString(rule3)
@@ -42,8 +43,10 @@ func generateSecretData(instance *operatorv1alpha1.Authentication, wlpClientID s
 			"certificate": []byte(""),
 		},
 		"platform-auth-idp-credentials": {
-			"admin_username": []byte(instance.Spec.Config.DefaultAdminUser),
-			"admin_password": []byte(adminPassword),
+			"admin_username":      []byte(instance.Spec.Config.DefaultAdminUser),
+			"admin_password":      []byte(adminPassword),
+			"scim_admin_username": []byte(instance.Spec.Config.ScimAdminUser),
+			"scim_admin_password": []byte(scimAdminPassword),
 		},
 		"platform-auth-idp-encryption": {
 			"ENCRYPTION_KEY": []byte(encryptionKey),
@@ -55,6 +58,7 @@ func generateSecretData(instance *operatorv1alpha1.Authentication, wlpClientID s
 		"oauth-client-secret": {
 			"WLP_CLIENT_REGISTRATION_SECRET": []byte(wlpClientRegistrationSecret),
 			"DEFAULT_ADMIN_USER":             []byte(instance.Spec.Config.DefaultAdminUser),
+			"SCIM_ADMIN_USER":                []byte(instance.Spec.Config.ScimAdminUser),
 		},
 		"platform-oidc-credentials": {
 			"WLP_CLIENT_ID":                     []byte(wlpClientID),

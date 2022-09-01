@@ -50,6 +50,24 @@ func (r *ReconcileAuthentication) handleUser(instance *operatorv1alpha1.Authenti
 		return err
 	}
 
+	scimadminuser := instance.Spec.Config.ScimAdminUser
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: scimadminuser, Namespace: ""}, currentUser)
+	if err != nil && errors.IsNotFound(err) {
+		// Define a new User
+		newScimUser := generateUserObject(instance, r.scheme, scimadminuser)
+		reqLogger.Info("Creating a new scimadminuser", "User.Namespace", instance.Namespace, "User.Name", scimadminuser)
+		err = r.client.Create(context.TODO(), newScimUser)
+		if err != nil {
+			reqLogger.Error(err, "Failed to create new scimadminuser", "User.Namespace", instance.Namespace, "User.Name", scimadminuser)
+			return err
+		}
+		// User created successfully - return and requeue
+		*requeueResult = true
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to get scimadminuser")
+		return err
+	}
+
 	return nil
 
 }

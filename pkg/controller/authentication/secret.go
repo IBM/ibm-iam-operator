@@ -58,7 +58,6 @@ func generateSecretData(instance *operatorv1alpha1.Authentication, wlpClientID s
 		"oauth-client-secret": {
 			"WLP_CLIENT_REGISTRATION_SECRET": []byte(wlpClientRegistrationSecret),
 			"DEFAULT_ADMIN_USER":             []byte(instance.Spec.Config.DefaultAdminUser),
-			"SCIM_ADMIN_USER":                []byte(instance.Spec.Config.ScimAdminUser),
 		},
 		"platform-oidc-credentials": {
 			"WLP_CLIENT_ID":                     []byte(wlpClientID),

@@ -558,6 +558,9 @@ metadata:
               "public-auth-creds": {
                 "secret" : "platform-auth-idp-credentials"
               },
+              "public-scim-creds": {
+                "secret" : "platform-auth-scim-credentials"
+              },
               "public-auth-cert": {
                 "secret" : "platform-auth-secret"
               },

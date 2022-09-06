@@ -88,6 +88,8 @@ spec:
     clusterName: "mycluster"
     defaultAdminPassword: "password"
     defaultAdminUser: "admin"
+    scimAdminPassword: "scimpassword"
+    scimAdminUser: "scimadmin"
     enableImpersonation: false
     fipsEnabled: true
     icpPort: 8443

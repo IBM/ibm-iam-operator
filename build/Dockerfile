@@ -22,7 +22,7 @@ COPY build/_output/bin/ibm-iam-operator ${OPERATOR}
 COPY build/bin /usr/local/bin
 RUN  /usr/local/bin/user_setup
 
-# copy licenses
+# copy license
 RUN mkdir /licenses
 COPY LICENSE /licenses
 

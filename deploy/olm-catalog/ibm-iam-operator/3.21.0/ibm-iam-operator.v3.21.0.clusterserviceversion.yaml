@@ -343,7 +343,7 @@ metadata:
               "excludeOperand": false
             },
             "imageRegistry": "quay.io/opencloudio/iam-policy-controller",
-            "imageTagPostfix": "3.7.10",
+            "imageTagPostfix": "3.7.11",
             "operatorVersion": "0.14.1",
             "replicas": 1,
             "resources": {
@@ -374,7 +374,7 @@ metadata:
               "excludeOperand": false
             },
             "imageRegistry": "quay.io/opencloudio/icp-secret-watcher",
-            "imageTagPostfix": "3.7.10",
+            "imageTagPostfix": "3.7.11",
             "operatorVersion": "0.14.1",
             "replicas": 1,
             "resources": {
@@ -607,11 +607,11 @@ spec:
     - name: IAM_POLICY_DECISION_IMAGE
       image: icr.io/cpopen/cpfs/iam-policy-decision:3.9.0
     - name: ICP_SECRET_WATCHER_IMAGE
-      image: icr.io/cpopen/cpfs/icp-secret-watcher:3.7.10
+      image: icr.io/cpopen/cpfs/icp-secret-watcher:3.7.11
     - name: ICP_OIDCCLIENT_WATCHER_IMAGE
       image: icr.io/cpopen/cpfs/icp-oidcclient-watcher:3.9.0
     - name: IAM_POLICY_CONTROLLER_IMAGE
-      image: icr.io/cpopen/cpfs/iam-policy-controller:3.7.10
+      image: icr.io/cpopen/cpfs/iam-policy-controller:3.7.11
     - name: ICP_IAM_ONBOARDING_IMAGE
       image: icr.io/cpopen/cpfs/icp-iam-onboarding:3.9.0
     - name: AUDIT_SYSLOG_SERVICE_IMAGE
@@ -1764,11 +1764,11 @@ spec:
                 - name: IAM_POLICY_DECISION_IMAGE
                   value: icr.io/cpopen/cpfs/iam-policy-decision:3.9.0
                 - name: ICP_SECRET_WATCHER_IMAGE
-                  value: icr.io/cpopen/cpfs/icp-secret-watcher:3.7.10
+                  value: icr.io/cpopen/cpfs/icp-secret-watcher:3.7.11
                 - name: ICP_OIDCCLIENT_WATCHER_IMAGE
                   value: icr.io/cpopen/cpfs/icp-oidcclient-watcher:3.9.0
                 - name: IAM_POLICY_CONTROLLER_IMAGE
-                  value: icr.io/cpopen/cpfs/iam-policy-controller:3.7.10
+                  value: icr.io/cpopen/cpfs/iam-policy-controller:3.7.11
                 - name: ICP_IAM_ONBOARDING_IMAGE
                   value: icr.io/cpopen/cpfs/icp-iam-onboarding:3.9.0
                 - name: AUDIT_SYSLOG_SERVICE_IMAGE

@@ -285,24 +285,24 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 	}
 
 	// Check if this ClusterRole already exists and create it if it doesn't
-	currentClusterRole := &rbacv1.ClusterRole{}
-	err = r.handleClusterRole(instance, currentClusterRole, &requeueResult)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
+	//currentClusterRole := &rbacv1.ClusterRole{}
+	//err = r.handleClusterRole(instance, currentClusterRole, &requeueResult)
+	//if err != nil {
+	//	return reconcile.Result{}, err
+	//	}
 
 	// Check if this ClusterRole already exists and create it if it doesn't
-	currentClusterRoleBinding := &rbacv1.ClusterRoleBinding{}
-	err = r.handleClusterRoleBinding(instance, currentClusterRoleBinding, &requeueResult)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
+	//currentClusterRoleBinding := &rbacv1.ClusterRoleBinding{}
+	//err = r.handleClusterRoleBinding(instance, currentClusterRoleBinding, &requeueResult)
+	//if err != nil {
+	//	return reconcile.Result{}, err
+	//}
 
-	currentWebhook := &reg.MutatingWebhookConfiguration{}
-	err = r.handleWebhook(instance, currentWebhook, &requeueResult)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
+	//currentWebhook := &reg.MutatingWebhookConfiguration{}
+	//err = r.handleWebhook(instance, currentWebhook, &requeueResult)
+	//if err != nil {
+	//	return reconcile.Result{}, err
+	//}
 
 	// Check if this Deployment already exists and create it if it doesn't
 	currentDeployment := &appsv1.Deployment{}
@@ -329,10 +329,10 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 // The clusterrole, clusterrolebinding and User resources created by Authentication
 func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1alpha1.Authentication) error {
 
-	crMap := generateCRData()
-	crbMap := generateCRBData("dummy", "dummy")
+	//crMap := generateCRData()
+	//crbMap := generateCRBData("dummy", "dummy")
 	userName := instance.Spec.Config.DefaultAdminUser
-	csCfgAnnotationName := res.GetCsConfigAnnotation(instance.Namespace)
+	//csCfgAnnotationName := res.GetCsConfigAnnotation(instance.Namespace)
 
 	// These code changes handles all use cases:
 	// - fresh install in saas or on-prem mode and
@@ -347,7 +347,7 @@ func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1al
 	}
 
 	// Remove multiple deployment common-service/config annotation
-	for crName := range crMap {
+	/*for crName := range crMap {
 		if err := removeCsAnnotationFromCR(r.client, crName, csCfgAnnotationName); err != nil {
 			return err
 		}
@@ -356,24 +356,24 @@ func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1al
 		if err := removeCsAnnotationFromCRB(r.client, crbName, csCfgAnnotationName); err != nil {
 			return err
 		}
-	}
+	} */
 
 	log.V(0).Info("Wait for 2 seconds.")
 	time.Sleep(time.Second * 2)
 
 	// Finally check and remove Cluster Role
-	for crName := range crMap {
-		if err := removeCR(r.client, crName); err != nil {
-			return err
-		}
-	}
+	//	for crName := range crMap {
+	//		if err := removeCR(r.client, crName); err != nil {
+	//			return err
+	//		}
+	//	}
 
 	// Remove Cluster Role Binding
-	for crbName := range crbMap {
-		if err := removeCRB(r.client, crbName); err != nil {
-			return err
-		}
-	}
+	//for crbName := range crbMap {
+	//		if err := removeCRB(r.client, crbName); err != nil {
+	//			return err
+	//		}
+	//	}
 
 	log.V(0).Info("Wait for 2 seconds.")
 	time.Sleep(time.Second * 2)
@@ -386,9 +386,9 @@ func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1al
 
 	// Remove Webhook
 
-	if err := removeWebhook(r.client, webhook); err != nil {
-		return err
-	}
+	//if err := removeWebhook(r.client, webhook); err != nil {
+	//	return err
+	//}
 
 	return nil
 }

@@ -24,7 +24,6 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
-	res "github.com/IBM/ibm-iam-operator/pkg/resources"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -178,15 +177,16 @@ func (r *ReconcileOIDCClientWatcher) Reconcile(contect context.Context, request 
 		return recResult, err
 	}
 
-	currentClusterRole := &rbacv1.ClusterRole{}
-	recResult, err = r.handleClusterRole(instance, currentClusterRole)
-	if err != nil {
-		return recResult, err
-	}
+	//currentClusterRole := &rbacv1.ClusterRole{}
+	//recResult, err = r.handleClusterRole(instance, currentClusterRole)
+	//if err != nil {
+	//		return recResult, err
+	//	}
 
 	return reconcile.Result{}, nil
 }
 
+/*
 func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha1.OIDCClientWatcher, currentClusterRole *rbacv1.ClusterRole) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	csCfgAnnotationName := res.GetCsConfigAnnotation(instance.Namespace)
@@ -195,7 +195,7 @@ func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Define admin cluster role
-			adminClusterRole := r.adminClusterRoleForOIDCClientWatcher(instance)
+			//adminClusterRole := r.adminClusterRoleForOIDCClientWatcher(instance)
 
 			// Add multiple deployment common-service/config annotation
 			if len(adminClusterRole.ObjectMeta.Annotations) == 0 {
@@ -281,7 +281,7 @@ func (r *ReconcileOIDCClientWatcher) handleClusterRole(instance *operatorv1alpha
 	}
 
 	return reconcile.Result{Requeue: true}, nil
-}
+} */
 
 func (r *ReconcileOIDCClientWatcher) handleDeployment(instance *operatorv1alpha1.OIDCClientWatcher, currentDeployment *appsv1.Deployment) (reconcile.Result, error) {
 
@@ -363,6 +363,7 @@ func (r *ReconcileOIDCClientWatcher) handleDeployment(instance *operatorv1alpha1
 
 }
 
+/*
 func (r *ReconcileOIDCClientWatcher) adminClusterRoleForOIDCClientWatcher(instance *operatorv1alpha1.OIDCClientWatcher) *rbacv1.ClusterRole {
 	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	adminClusterRole := &rbacv1.ClusterRole{
@@ -388,9 +389,9 @@ func (r *ReconcileOIDCClientWatcher) adminClusterRoleForOIDCClientWatcher(instan
 	if err != nil {
 		reqLogger.Error(err, "Failed to set owner for admin Cluster Role")
 		return nil
-	}*/
+	}
 	return adminClusterRole
-}
+} */
 
 func (r *ReconcileOIDCClientWatcher) operatorClusterRoleForOIDCClientWatcher(instance *operatorv1alpha1.OIDCClientWatcher) *rbacv1.ClusterRole {
 	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
@@ -859,25 +860,25 @@ func getPodNames(pods []corev1.Pod) []string {
 // The clusterrole and custom resource definitions created by OIDC Client Watcher
 func (r *ReconcileOIDCClientWatcher) deleteExternalResources(instance *operatorv1alpha1.OIDCClientWatcher) error {
 
-	crList := []string{"icp-oidc-client-operate-aggregate", "icp-oidc-client-admin-aggregate"}
-	csCfgAnnotationName := res.GetCsConfigAnnotation(instance.Namespace)
+	//	crList := []string{"icp-oidc-client-operate-aggregate", "icp-oidc-client-admin-aggregate"}
+	//	csCfgAnnotationName := res.GetCsConfigAnnotation(instance.Namespace)
 
 	// Remove multiple deployment common-service/config annotation
-	for _, cr := range crList {
+	/*for _, cr := range crList {
 		if err := removeCsAnnotationFromCR(r.client, cr, csCfgAnnotationName); err != nil {
 			return err
 		}
-	}
+	} */
 
 	log.V(0).Info("Wait for 2 seconds.")
 	time.Sleep(time.Second * 2)
 
 	// Finally check and remove Cluster Role
-	for _, cr := range crList {
+	/*for _, cr := range crList {
 		if err := removeCR(r.client, cr); err != nil {
 			return err
 		}
-	}
+	} */
 
 	return nil
 }
@@ -903,7 +904,7 @@ func removeString(slice []string, s string) (result []string) {
 }
 
 // Functions to remove cluster scoped resources
-
+/*
 func removeCsAnnotationFromCR(client client.Client, crName string, csCfgAnnotationName string) error {
 	// Remove common-service/config annotation
 	clusterRole := &rbacv1.ClusterRole{}
@@ -927,8 +928,8 @@ func removeCsAnnotationFromCR(client client.Client, crName string, csCfgAnnotati
 		return err
 	}
 	return nil
-}
-
+} */
+/*
 func removeCR(client client.Client, crName string) error {
 	// Delete Clusterrole
 	clusterRole := &rbacv1.ClusterRole{}
@@ -946,4 +947,4 @@ func removeCR(client client.Client, crName string) error {
 		return err
 	}
 	return nil
-}
+} */

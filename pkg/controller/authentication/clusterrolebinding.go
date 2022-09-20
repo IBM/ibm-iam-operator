@@ -120,7 +120,7 @@ func generateCRBData(defaultAdminUser string, oidcIssuerURL string) map[string]C
 
 }
 
-func (r *ReconcileAuthentication) handleClusterRoleBinding(instance *operatorv1alpha1.Authentication, currentClusterRoleBinding *rbacv1.ClusterRoleBinding, requeueResult *bool) error {
+func (r *ReconcileAuthentication) handleClusterRoleBinding(instance *operatorv1alpha1.Authentication, currentClusterRoleBinding *rbacv1.RoleBinding, requeueResult *bool) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
@@ -132,9 +132,11 @@ func (r *ReconcileAuthentication) handleClusterRoleBinding(instance *operatorv1a
 
 	for clusterRoleBinding, crbValue := range crbData {
 		err = r.client.Get(context.Background(), types.NamespacedName{Name: clusterRoleBinding, Namespace: ""}, currentClusterRoleBinding)
+		reqLogger.Info("CHECKING FOR CRB", "clusterRoleBinding.Name", clusterRoleBinding, crbValue)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				// Define a new clusterRoleBinding
+				reqLogger.Info("Creating a new clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding)
 				newClusterRoleBinding := createClusterRoleBinding(clusterRoleBinding, crbValue)
 
 				// Add multiple deployment common-service/config annotation
@@ -160,6 +162,7 @@ func (r *ReconcileAuthentication) handleClusterRoleBinding(instance *operatorv1a
 			}
 		} else {
 			// Add multiple deployment common-service/config annotation
+			reqLogger.Info("UPDATING clusterRoleBinding", "clusterRoleBinding.Name", clusterRoleBinding, crbData)
 			if len(currentClusterRoleBinding.ObjectMeta.Annotations) == 0 {
 				currentClusterRoleBinding.ObjectMeta.Annotations = map[string]string{
 					csCfgAnnotationName: "true",
@@ -182,10 +185,11 @@ func (r *ReconcileAuthentication) handleClusterRoleBinding(instance *operatorv1a
 	return nil
 }
 
-func createClusterRoleBinding(clusterRoleBinding string, data CRBData) *rbacv1.ClusterRoleBinding {
-	newClusterRoleBinding := &rbacv1.ClusterRoleBinding{
+func createClusterRoleBinding(clusterRoleBinding string, data CRBData) *rbacv1.RoleBinding {
+	newClusterRoleBinding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterRoleBinding,
+			Namespace: "ibm-common-services",
 			Labels: map[string]string{
 				"app": "auth-idp",
 			},
@@ -193,7 +197,7 @@ func createClusterRoleBinding(clusterRoleBinding string, data CRBData) *rbacv1.C
 		Subjects: getSubjects(data.Subject),
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "ClusterRole",
+			Kind:     "Role",
 			Name:     data.RoleName,
 		},
 	}

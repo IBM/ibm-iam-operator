@@ -285,14 +285,14 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 	}
 
 	// Check if this ClusterRole already exists and create it if it doesn't
-	currentClusterRole := &rbacv1.ClusterRole{}
+	currentClusterRole := &rbacv1.Role{}
 	err = r.handleClusterRole(instance, currentClusterRole, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
 	// Check if this ClusterRole already exists and create it if it doesn't
-	currentClusterRoleBinding := &rbacv1.ClusterRoleBinding{}
+	currentClusterRoleBinding := &rbacv1.RoleBinding{}
 	err = r.handleClusterRoleBinding(instance, currentClusterRoleBinding, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err

@@ -44,7 +44,7 @@ func generateCRData() map[string]CRData {
 			Rules: []rbacv1.PolicyRule{
 				{
 					APIGroups: []string{"rbac.authorization.k8s.io"},
-					Resources: []string{"clusterrolebindings"},
+					Resources: []string{"clusterrolebindings", "rolebindings"},
 					Verbs:     adminVerbs,
 				},
 				{
@@ -67,7 +67,7 @@ func generateCRData() map[string]CRData {
 				},
 				{
 					APIGroups: []string{"rbac.authorization.k8s.io"},
-					Resources: []string{"clusterrolebindings"},
+					Resources: []string{"clusterrolebindings", "rolebindings"},
 					Verbs:     adminVerbs,
 				},
 				{
@@ -105,7 +105,7 @@ func generateCRData() map[string]CRData {
 				},
 				{
 					APIGroups: []string{"rbac.authorization.k8s.io"},
-					Resources: []string{"clusterrolebindings"},
+					Resources: []string{"clusterrolebindings", "rolebindings"},
 					Verbs:     adminVerbs,
 				},
 				{
@@ -232,7 +232,7 @@ func getPolicyRules(verbs []string) []rbacv1.PolicyRule {
 	}
 }
 
-func (r *ReconcileAuthentication) handleClusterRole(instance *operatorv1alpha1.Authentication, currentClusterRole *rbacv1.ClusterRole, requeueResult *bool) error {
+func (r *ReconcileAuthentication) handleClusterRole(instance *operatorv1alpha1.Authentication, currentClusterRole *rbacv1.Role, requeueResult *bool) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
@@ -242,6 +242,7 @@ func (r *ReconcileAuthentication) handleClusterRole(instance *operatorv1alpha1.A
 
 	for clusterRole := range crData {
 		err = r.client.Get(context.Background(), types.NamespacedName{Name: clusterRole, Namespace: ""}, currentClusterRole)
+		reqLogger.Info("Creating a new ClusterRole", "ClusterRole.Name", err)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				// Define a new ClusterRole
@@ -256,11 +257,12 @@ func (r *ReconcileAuthentication) handleClusterRole(instance *operatorv1alpha1.A
 					newClusterRole.ObjectMeta.Annotations[csCfgAnnotationName] = "true"
 				}
 
-				reqLogger.Info("Creating a new ClusterRole", "ClusterRole.Name", clusterRole)
 				err = r.client.Create(context.TODO(), newClusterRole)
 				if err != nil {
-					reqLogger.Error(err, "Failed to create new ClusterRole", "ClusterRole.Name", clusterRole)
-					return err
+					if errors.IsNotFound(err) {
+						reqLogger.Error(err, "Failed to create new ClusterRole", "ClusterRole.Name", clusterRole)
+						return err
+					}
 				}
 				// ClusterRole created successfully - return and requeue
 				*requeueResult = true
@@ -293,14 +295,15 @@ func (r *ReconcileAuthentication) handleClusterRole(instance *operatorv1alpha1.A
 	return nil
 }
 
-func createClusterRole(clusterRole string, data CRData) *rbacv1.ClusterRole {
-	newClusterRole := &rbacv1.ClusterRole{
+func createClusterRole(clusterRole string, data CRData) *rbacv1.Role {
+	newClusterRole := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterRole,
+			Namespace: "ibm-common-services",
 		},
 		Rules: data.Rules,
 	}
-	if data.MatchLabels != nil {
+	/*if data.MatchLabels != nil {
 		newClusterRole.AggregationRule = &rbacv1.AggregationRule{
 			ClusterRoleSelectors: []metav1.LabelSelector{
 				{
@@ -308,7 +311,7 @@ func createClusterRole(clusterRole string, data CRData) *rbacv1.ClusterRole {
 				},
 			},
 		}
-	}
+	}*/
 	if data.Labels != nil {
 		newClusterRole.ObjectMeta.Labels = data.Labels
 	}

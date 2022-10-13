@@ -5,7 +5,7 @@
 **[![Go Report Card](https://goreportcard.com/badge/github.com/IBM/ibm-iam-operator)](https://goreportcard.com/report/github.com/IBM/ibm-iam-operator)**
 
 
-The `ibm-iam-operator` installs the IBM Cloud Platform Common Services Identity and access management (IAM) service.
+The `ibm-iam-operator` installs the IBM Cloud Platform Common Services Identity and Access management (IAM) service. 
 
 **Important:** Do not install this operator directly. Install this operator only by using the IBM Common Service Operator. For more information about installing the IBM Common Service Operator operator, see [Installer documentation](http://ibm.biz/cpcs_opinstall) (https://www.ibm.com/support/knowledgecenter/SSHKN6/kc_welcome_cs.html).
 
@@ -141,7 +141,9 @@ Complete the following steps:
 
 ## SecurityContextConstraints Requirements
 
-The IAM operator service does not support running under the OpenShift Container Platform default restricted security context constraints.
+The IBM IAM operator service supports running with the OpenShift Container Platform default restricted Security Context Constraints (SCCs).
+
+For more information about the OpenShift Container Platform Security Context Constraints, see [Managing Security Context Constraints.](https://docs.openshift.com/container-platform/4.3/authentication/managing-security-context-constraints.html)
 
 ## PodSecurityPolicy Requirements
 

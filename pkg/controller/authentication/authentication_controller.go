@@ -26,11 +26,11 @@ import (
 	res "github.com/IBM/ibm-iam-operator/pkg/resources"
 	userv1 "github.com/openshift/api/user/v1"
 	regen "github.com/zach-klippenstein/goregen"
-	reg "k8s.io/api/admissionregistration/v1beta1"
+	reg "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	net "k8s.io/api/networking/v1beta1"
+	net "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -191,7 +192,7 @@ type ReconcileAuthentication struct {
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-func (r *ReconcileAuthentication) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileAuthentication) Reconcile(contect context.Context, request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling Authentication")
 	var requeueResult bool = false
@@ -340,6 +341,9 @@ func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1al
 	if instance.Spec.Config.IBMCloudSaas {
 		// in saas mode
 		webhook = webhook + "-" + instance.Namespace
+	} else if instance.Spec.Config.OnPremMultipleDeploy {
+		// multiple deployment in on-prem mode
+		webhook = webhook + "-" + instance.Namespace
 	}
 
 	// Remove multiple deployment common-service/config annotation
@@ -421,7 +425,6 @@ func isOidcAdminBindingCRBExists(client client.Client) bool {
 	return true
 }
 
-
 func removeCsAnnotationFromCR(client client.Client, crName string, csCfgAnnotationName string) error {
 	// Remove common-service/config annotation
 	clusterRole := &rbacv1.ClusterRole{}
@@ -431,7 +434,7 @@ func removeCsAnnotationFromCR(client client.Client, crName string, csCfgAnnotati
 	} else if err == nil {
 		if len(clusterRole.ObjectMeta.Annotations) > 0 {
 			if _, ok := clusterRole.ObjectMeta.Annotations[csCfgAnnotationName]; ok {
-				delete(clusterRole.ObjectMeta.Annotations, csCfgAnnotationName);
+				delete(clusterRole.ObjectMeta.Annotations, csCfgAnnotationName)
 				if err = client.Update(context.Background(), clusterRole); err != nil {
 					// if error, retry second time to avoid manual deletion after uninstall
 					if err2 := client.Update(context.Background(), clusterRole); err2 != nil {
@@ -447,7 +450,6 @@ func removeCsAnnotationFromCR(client client.Client, crName string, csCfgAnnotati
 	return nil
 }
 
-
 func removeCsAnnotationFromCRB(client client.Client, crbName string, csCfgAnnotationName string) error {
 	// Remove common-service/config annotation
 	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
@@ -457,7 +459,7 @@ func removeCsAnnotationFromCRB(client client.Client, crbName string, csCfgAnnota
 	} else if err == nil {
 		if len(clusterRoleBinding.ObjectMeta.Annotations) > 0 {
 			if _, ok := clusterRoleBinding.ObjectMeta.Annotations[csCfgAnnotationName]; ok {
-				delete(clusterRoleBinding.ObjectMeta.Annotations, csCfgAnnotationName);
+				delete(clusterRoleBinding.ObjectMeta.Annotations, csCfgAnnotationName)
 				if err = client.Update(context.Background(), clusterRoleBinding); err != nil {
 					// if error, retry second time to avoid manual deletion after uninstall
 					if err2 := client.Update(context.Background(), clusterRoleBinding); err2 != nil {
@@ -472,7 +474,6 @@ func removeCsAnnotationFromCRB(client client.Client, crbName string, csCfgAnnota
 	}
 	return nil
 }
-
 
 func removeCR(client client.Client, crName string) error {
 	// Delete Clusterrole
@@ -492,7 +493,6 @@ func removeCR(client client.Client, crName string) error {
 	}
 	return nil
 }
-
 
 func removeCRB(client client.Client, crbName string) error {
 	// Delete ClusterRoleBinding
@@ -519,7 +519,6 @@ func removeCRB(client client.Client, crbName string) error {
 	}
 	return nil
 }
-
 
 func removeUser(client client.Client, userName string) error {
 	// Delete User

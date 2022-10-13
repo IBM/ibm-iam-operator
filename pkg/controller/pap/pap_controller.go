@@ -28,12 +28,11 @@ import (
 	res "github.com/IBM/ibm-iam-operator/pkg/resources"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	net "k8s.io/api/networking/v1beta1"
+	net "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -229,7 +228,7 @@ type ReconcilePap struct {
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-func (r *ReconcilePap) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcilePap) Reconcile(context context.Context, request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling Pap")
 
@@ -238,7 +237,7 @@ func (r *ReconcilePap) Reconcile(request reconcile.Request) (reconcile.Result, e
 
 	// Fetch the Pap instance
 	instance := &operatorv1alpha1.Pap{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	err := r.client.Get(context, request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -535,9 +534,9 @@ func (r *ReconcilePap) configMapForPap(instance *operatorv1alpha1.Pap) *corev1.C
 			Labels:    map[string]string{"app": iamPapServiceValues.PodName},
 		},
 		Data: map[string]string{
-			"AUDIT_ENABLED": "false",
-			"AUDIT_DETAIL":  "false",
-			"SYSLOG_TLS_PATH":  instance.Spec.AuditService.SyslogTlsPath,
+			"AUDIT_ENABLED":   "false",
+			"AUDIT_DETAIL":    "false",
+			"SYSLOG_TLS_PATH": instance.Spec.AuditService.SyslogTlsPath,
 			"logrotate-conf": "\n # rotate log files weekly\ndaily\n\n# use the syslog group by " +
 				"default, since this is the owning group # of /var/log/syslog.\n#su root syslog\n\n# " +
 				"keep 4 weeks worth of backlogs\nrotate 4\n\n# create new (empty) log files after " +
@@ -558,7 +557,7 @@ func (r *ReconcilePap) configMapForPap(instance *operatorv1alpha1.Pap) *corev1.C
 }
 
 func (r *ReconcilePap) ingressForPap(instance *operatorv1alpha1.Pap) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	papIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -578,11 +577,14 @@ func (r *ReconcilePap) ingressForPap(instance *operatorv1alpha1.Pap) *net.Ingres
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/iam-pap/",
+									Path:     "/iam-pap/",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: iamPapServiceValues.Name,
-										ServicePort: intstr.IntOrString{
-											IntVal: iamPapServiceValues.Port,
+										Service: &net.IngressServiceBackend{
+											Name: "iam-pap",
+											Port: net.ServiceBackendPort{
+												Number: 39001,
+											},
 										},
 									},
 								},
@@ -610,7 +612,7 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 	if instance.Spec.AuditService.ImageName != res.AuditImageName {
 		instance.Spec.AuditService.ImageName = res.AuditImageName
 	}
-	
+
 	reqLogger := log.WithValues("deploymentForPap", "Entry", "instance.Name", instance.Name)
 	papImage := shatag.GetImageRef("IAM_POLICY_ADMINISTRATION_IMAGE")
 	auditImage := shatag.GetImageRef("AUDIT_SYSLOG_SERVICE_IMAGE")
@@ -656,8 +658,8 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 					HostPID:                       falseVar,
 					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 						{
-							MaxSkew: 1,
-							TopologyKey: "topology.kubernetes.io/zone",
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/zone",
 							WhenUnsatisfiable: corev1.ScheduleAnyway,
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -666,8 +668,8 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 							},
 						},
 						{
-							MaxSkew: 1,
-							TopologyKey: "topology.kubernetes.io/region",
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/region",
 							WhenUnsatisfiable: corev1.ScheduleAnyway,
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -676,7 +678,7 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 							},
 						},
 					},
-					ServiceAccountName:            serviceAccountName,
+					ServiceAccountName: serviceAccountName,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
@@ -782,11 +784,11 @@ func buildPapVolumes() []corev1.Volume {
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "audit-server-certs",
-					Optional: &trueVar,
+					Optional:   &trueVar,
 				},
 			},
 		},
-		{			
+		{
 			Name: "audit-ingest",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{

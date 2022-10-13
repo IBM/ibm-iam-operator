@@ -96,14 +96,14 @@ func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authen
 				}
 				// Secret created successfully - return and requeue
 				*requeueResult = true
-			} else{
+			} else {
 				reqLogger.Error(err, "Failed to get Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
 				return err
 			}
 		} else {
 			secretUpdateRequired := false
 			if secret == "platform-auth-idp-encryption" {
-				if _,keyExists := currentSecret.Data["ENCRYPTION_IV"]; !keyExists{
+				if _, keyExists := currentSecret.Data["ENCRYPTION_IV"]; !keyExists {
 					reqLogger.Info("Updating an existing Secret", "Secret.Namespace", currentSecret.Namespace, "Secret.Name", currentSecret.Name)
 					newSecret := generateSecretObject(instance, r.scheme, secret, secretData[secret])
 					currentSecret.Data["ENCRYPTION_IV"] = newSecret.Data["ENCRYPTION_IV"]

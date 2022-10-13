@@ -1,5 +1,5 @@
 #
-# Copyright 2020 IBM Corporation
+# Copyright 2020, 2021 IBM Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,11 +16,12 @@
 
 FROM alpine as builder
 
-RUN wget -O /qemu-s390x-static https://github.com/multiarch/qemu-user-static/releases/latest/download/qemu-s390x-static
+RUN wget -O /qemu-s390x-static https://github.com/multiarch/qemu-user-static/releases/download/v5.2.0-2/qemu-s390x-static
 
 RUN chmod +x /qemu-s390x-static
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal@sha256:f1c6d887cda1d9dc7f40bcb237e7eef3c5db1674fd156290061cd3cecba290cc
+FROM hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/build-images/ubi8-minimal:latest-s390x
+
 ARG VCS_REF
 ARG VCS_URL
 

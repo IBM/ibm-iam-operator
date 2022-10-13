@@ -105,6 +105,7 @@ type ConfigSpec struct {
 	FIPSEnabled                 bool   `json:"fipsEnabled"`
 	ROKSEnabled                 bool   `json:"roksEnabled"`
 	IBMCloudSaas                bool   `json:"ibmCloudSaas,omitempty"`
+	OnPremMultipleDeploy        bool   `json:"onPremMultipleDeploy,omitempty"`
 	SaasClientRedirectUrl       string `json:"saasClientRedirectUrl,omitempty"`
 	NONCEEnabled                bool   `json:"nonceEnabled"`
 	XFrameDomain                string `json:"xframeDomain,omitempty"`
@@ -118,6 +119,7 @@ type ConfigSpec struct {
 	ClaimsMap                   string `json:"claimsMap,omitempty"`
 	ScopeClaim                  string `json:"scopeClaim,omitempty"`
 	OIDCIssuerURL               string `json:"oidcIssuerURL"`
+	AttrMappingFromConfig       bool   `json:"attrMappingFromConfig,omitempty"`
 }
 
 // AuthenticationStatus defines the observed state of Authentication

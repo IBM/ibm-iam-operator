@@ -42,9 +42,10 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	configMapList := []string{"platform-auth-idp", "registration-script", "oauth-client-map", "registration-json"}
 
 	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{r.authIdpConfigMap, registrationScriptConfigMap}
-        isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
+	isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
+	var isOSEnv bool
 	var newConfigMap *corev1.ConfigMap
 
 	// Checking Dependencies
@@ -80,6 +81,29 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 		return nil
 	}
 
+	//Check cluster type
+	globalConfigMapName := "ibm-cpp-config"
+	globalConfigMap := &corev1.ConfigMap{}
+	reqLogger.Info("Query global cm", "Configmap.Namespace", instance.Namespace, "Global Configmap", globalConfigMapName)
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: globalConfigMapName, Namespace: instance.Namespace}, globalConfigMap)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Error(err, "The configmap ", globalConfigMapName, " is not created yet")
+			return err
+		}
+		reqLogger.Error(err, "Failed to get ConfigMap", globalConfigMapName)
+		return err
+	}
+
+	clusterType, ok := globalConfigMap.Data["kubernetes_cluster_type"]
+	reqLogger.Info("Reading cluster type from global cm", "Configmap.Namespace", instance.Namespace, "ClusterType", clusterType)
+	if ok {
+		isOSEnv = !strings.EqualFold(clusterType, "cncf")
+		reqLogger.Info("Detected cluster type as", "Configmap.Namespace", instance.Namespace, "ConfigMap.Name", isOSEnv)
+	} else if !ok {
+		isOSEnv = (instance.Spec.Config.IsOpenshiftEnv)
+	}
+
 	// Creation the configmaps
 	for index, configMap := range configMapList {
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: instance.Namespace}, currentConfigMap)
@@ -103,11 +127,11 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 							newConfigMap.Data["ROKS_ENABLED"] = "true"
 							newConfigMap.Data["ROKS_URL"] = issuer
 							if instance.Spec.Config.ROKSUserPrefix == "changeme" { //we change it to empty prefix, that's the new default in 3.5
-								if (isPublicCloud) {
+								if isPublicCloud {
 									newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
-						                } else {
-								newConfigMap.Data["ROKS_USER_PREFIX"] = ""
-							        }
+								} else {
+									newConfigMap.Data["ROKS_USER_PREFIX"] = ""
+								}
 							} else { // user specifies prefix but does not specify roksEnabled and roksURL we take the user provided prefix
 								newConfigMap.Data["ROKS_USER_PREFIX"] = instance.Spec.Config.ROKSUserPrefix
 							}
@@ -118,6 +142,12 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 								newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
 							}
 						}
+						reqLogger.Info("Adding new variable to configmap", "Configmap.Namespace", currentConfigMap.Namespace, "isOSEnv", isOSEnv)
+						// Detect cluster type - cncf or openshift
+						// if global cm, ignore CR, and populate auth-idp with value from global
+						// if no global cm, take value from CR - NOT REQD.
+						newConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isOSEnv)
+
 					} else {
 						//user specifies roksEnabled and roksURL, but not roksPrefix, then we set prefix to IAM# (consistent with previous release behavior)
 						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL != "https://roks.domain.name:443" && instance.Spec.Config.ROKSUserPrefix == "changeme" {
@@ -200,6 +230,18 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["SCIM_GET_DISPLAY_FOR_GROUP_USERS"] = newConfigMap.Data["SCIM_GET_DISPLAY_FOR_GROUP_USERS"]
 					cmUpdateRequired = true
 				}
+				if _, keyExists := currentConfigMap.Data["SCIM_AUTH_CACHE_MAX_SIZE"]; !keyExists {
+					reqLogger.Info("Updating an existing Configmap to add new SCIM variables", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					newConfigMap = functionList[index](instance, r.scheme)
+					currentConfigMap.Data["SCIM_AUTH_CACHE_MAX_SIZE"] = newConfigMap.Data["SCIM_AUTH_CACHE_MAX_SIZE"]
+					cmUpdateRequired = true
+				}
+				if _, keyExists := currentConfigMap.Data["SCIM_AUTH_CACHE_TTL_VALUE"]; !keyExists {
+					reqLogger.Info("Updating an existing Configmap to add new SCIM variables", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					newConfigMap = functionList[index](instance, r.scheme)
+					currentConfigMap.Data["SCIM_AUTH_CACHE_TTL_VALUE"] = newConfigMap.Data["SCIM_AUTH_CACHE_TTL_VALUE"]
+					cmUpdateRequired = true
+				}
 				if _, keyExists := currentConfigMap.Data["AUTH_SVC_LDAP_CONFIG_TIMEOUT"]; !keyExists {
 					reqLogger.Info("Updating an existing Configmap to add new variable for auth-service LDAP configuration timeout", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.scheme)
@@ -213,6 +255,25 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["SAAS_CLIENT_REDIRECT_URL"] = newConfigMap.Data["SAAS_CLIENT_REDIRECT_URL"]
 					cmUpdateRequired = true
 				}
+				if _, keyExists := currentConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"]; !keyExists {
+					reqLogger.Info("Updating an existing Configmap to add new variable for attribute mapping resource", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					newConfigMap = functionList[index](instance, r.scheme)
+					currentConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"] = newConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"]
+					cmUpdateRequired = true
+				}
+
+				_, keyExists := currentConfigMap.Data["IS_OPENSHIFT_ENV"]
+				//currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isOSEnv)
+				if keyExists {
+					reqLogger.Info("Current configmap", "Current Value", currentConfigMap.Data["IS_OPENSHIFT_ENV"])
+					if currentConfigMap.Data["IS_OPENSHIFT_ENV"] != strconv.FormatBool(isOSEnv) {
+						currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isOSEnv)
+					}
+				} else {
+					currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isOSEnv)
+				}
+				cmUpdateRequired = true
+
 				if cmUpdateRequired {
 					err = r.client.Update(context.TODO(), currentConfigMap)
 					if err != nil {
@@ -234,10 +295,10 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 	isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
 	bootStrapUserId := instance.Spec.Config.BootstrapUserId
 	roksUserPrefix := instance.Spec.Config.ROKSUserPrefix
-	if (len(bootStrapUserId) > 0 && strings.EqualFold(bootStrapUserId, "kubeadmin") && isPublicCloud) {
+	if len(bootStrapUserId) > 0 && strings.EqualFold(bootStrapUserId, "kubeadmin") && isPublicCloud {
 		bootStrapUserId = ""
 	}
-	if (isPublicCloud) {
+	if isPublicCloud {
 		roksUserPrefix = "IAM#"
 	}
 	newConfigMap := &corev1.ConfigMap{
@@ -279,6 +340,7 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"NONCE_ENABLED":                      strconv.FormatBool(instance.Spec.Config.NONCEEnabled),
 			"ROKS_ENABLED":                       strconv.FormatBool(instance.Spec.Config.ROKSEnabled),
 			"IBM_CLOUD_SAAS":                     strconv.FormatBool(instance.Spec.Config.IBMCloudSaas),
+			"ATTR_MAPPING_FROM_CONFIG":           strconv.FormatBool(instance.Spec.Config.AttrMappingFromConfig),
 			"SAAS_CLIENT_REDIRECT_URL":           instance.Spec.Config.SaasClientRedirectUrl,
 			"ROKS_URL":                           instance.Spec.Config.ROKSURL,
 			"ROKS_USER_PREFIX":                   roksUserPrefix,
@@ -326,6 +388,8 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"SCIM_LDAP_SEARCH_TIME_LIMIT":        "10",
 			"SCIM_ASYNC_PARALLEL_LIMIT":          "100",
 			"SCIM_GET_DISPLAY_FOR_GROUP_USERS":   "true",
+			"SCIM_AUTH_CACHE_MAX_SIZE":   			  "1000",
+			"SCIM_AUTH_CACHE_TTL_VALUE":   			  "60",
 			"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
 		},
 	}
@@ -418,11 +482,11 @@ func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, icpConsoleU
 }
 
 // Check if hosted on IBM Cloud
-func isPublicCloud(client client.Client, namespace string , configMap string) bool {
+func isPublicCloud(client client.Client, namespace string, configMap string) bool {
 	currentConfigMap := &corev1.ConfigMap{}
 	err := client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: namespace}, currentConfigMap)
 	if err != nil {
-		log.V(1).Info("Error getting configmap", configMap)
+		log.Info("Error getting configmap", configMap)
 		return false
 	} else if err == nil {
 		host := currentConfigMap.Data["cluster_kube_apiserver_host"]

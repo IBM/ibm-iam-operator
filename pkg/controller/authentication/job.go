@@ -96,12 +96,12 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 					},
 				},
 				Spec: corev1.PodSpec{
-					HostIPC:            false,
-					HostPID:            false,
+					HostIPC: false,
+					HostPID: false,
 					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 						{
-							MaxSkew: 1,
-							TopologyKey: "topology.kubernetes.io/zone",
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/zone",
 							WhenUnsatisfiable: corev1.ScheduleAnyway,
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -110,8 +110,8 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 							},
 						},
 						{
-							MaxSkew: 1,
-							TopologyKey: "topology.kubernetes.io/region",
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/region",
 							WhenUnsatisfiable: corev1.ScheduleAnyway,
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{

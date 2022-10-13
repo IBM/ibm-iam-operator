@@ -18,6 +18,7 @@ package authentication
 
 import (
 	"context"
+
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	userv1 "github.com/openshift/api/user/v1"
 	"k8s.io/apimachinery/pkg/api/errors"

@@ -19,25 +19,25 @@ package authentication
 import (
 	"context"
 	"strings"
+
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
-	net "k8s.io/api/networking/v1beta1"
+	net "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func (r *ReconcileAuthentication) handleIngress(instance *operatorv1alpha1.Authentication, currentIngress *net.Ingress, requeueResult *bool) error {
 
-	ingressList := []string{"api-key", "explorer-idmgmt", "iam-token-redirect", "iam-token", "ibmid-ui-callback", "id-mgmt", "idmgmt-v2-api", "platform-auth-dir",
+	ingressList := []string{"api-key", "iam-token-redirect", "iam-token", "ibmid-ui-callback", "id-mgmt", "idmgmt-v2-api", "platform-auth-dir",
 		"platform-auth", "platform-id-auth-block", "platform-id-auth", "platform-id-provider", "platform-login", "platform-oidc-block", "platform-oidc", "platform-oidc-introspect",
-		"platform-oidc-keys", "platform-oidc-token-2", "platform-oidc-token", "service-id", "token-service-version", "saml-ui-callback", "version-idmgmt"}
+		"platform-oidc-keys", "platform-oidc-token-2", "platform-oidc-token", "service-id", "token-service-version", "saml-ui-callback", "version-idmgmt", "social-login-callback"}
 
-	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *net.Ingress{apiKeyIngress, explorerIdmgmtIngress, iamTokenRedirectIngress, iamTokenIngress, ibmidUiCallbackIngress, idMgmtIngress, idmgmtV2ApiIngress, platformAuthDirIngress,
+	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *net.Ingress{apiKeyIngress, iamTokenRedirectIngress, iamTokenIngress, ibmidUiCallbackIngress, idMgmtIngress, idmgmtV2ApiIngress, platformAuthDirIngress,
 		platformAuthIngress, platformIdAuthBlockIngress, platformIdAuthIngress, platformIdProviderIngress, platformLoginIngress, platformOidcBlockIngress, platformOidcIngress, platformOidcIntrospectIngress,
-		platformOidcKeysIngress, platformOidcToken2Ingress, platformOidcTokenIngress, serviceIdIngress, tokenServiceVersionIngress, samlUiCallbackIngress, versionIdmgmtIngress}
+		platformOidcKeysIngress, platformOidcToken2Ingress, platformOidcTokenIngress, serviceIdIngress, tokenServiceVersionIngress, samlUiCallbackIngress, versionIdmgmtIngress, socialLoginCallbackIngress}
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
@@ -53,22 +53,62 @@ func (r *ReconcileAuthentication) handleIngress(instance *operatorv1alpha1.Authe
 				reqLogger.Error(err, "Failed to create new Ingress", "Ingress.Namespace", instance.Namespace, "Ingress.Name", ingress)
 				return err
 			}
-			// Ingress created successfully - return and requeue
+			// Ingress created successfully - return and requeue, just sets the pointer to true
 			*requeueResult = true
 		} else if err != nil {
 			reqLogger.Error(err, "Failed to get Ingress")
 			return err
-		}
-
+		} /*else {
+			reqLogger.Info("Ingress exists and should be updated", "Ingress.Namespace", instance.Namespace, "Ingress.Name", ingress)
+			err := r.updateIngress(instance, ingress, currentIngress)
+			if err != nil {
+				reqLogger.Error(err, "Failed to get Ingress")
+				return err
+			}
+			// Ingress updated successfully - return and requeue
+			*requeueResult = true
+		}*/
 	}
 
 	return nil
 
 }
 
-func apiKeyIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
+/*func indexOf(element string, data []string) int {
+	for k, v := range data {
+		if element == v {
+			return k
+		}
+	}
+	return -1 //not found.
+}
 
+func (r *ReconcileAuthentication) updateIngress(instance *operatorv1alpha1.Authentication, ingress string, currentIngress *net.Ingress) error {
+	ingressList := []string{"api-key", "explorer-idmgmt", "iam-token-redirect", "iam-token", "ibmid-ui-callback", "id-mgmt", "idmgmt-v2-api", "platform-auth-dir",
+		"platform-auth", "platform-id-auth-block", "platform-id-auth", "platform-id-provider", "platform-login", "platform-oidc-block", "platform-oidc", "platform-oidc-introspect",
+		"platform-oidc-keys", "platform-oidc-token-2", "platform-oidc-token", "service-id", "token-service-version", "saml-ui-callback", "version-idmgmt", "social-login-callback"}
+
+	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *net.Ingress{apiKeyIngress, explorerIdmgmtIngress, iamTokenRedirectIngress, iamTokenIngress, ibmidUiCallbackIngress, idMgmtIngress, idmgmtV2ApiIngress, platformAuthDirIngress,
+		platformAuthIngress, platformIdAuthBlockIngress, platformIdAuthIngress, platformIdProviderIngress, platformLoginIngress, platformOidcBlockIngress, platformOidcIngress, platformOidcIntrospectIngress,
+		platformOidcKeysIngress, platformOidcToken2Ingress, platformOidcTokenIngress, serviceIdIngress, tokenServiceVersionIngress, samlUiCallbackIngress, versionIdmgmtIngress, socialLoginCallbackIngress}
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	index := indexOf(ingress, ingressList)
+	currentIngress = functionList[index](instance, r.scheme)
+	currentIngress.ObjectMeta.ManagedFields = nil
+	reqLogger.Info("Get API version", "Ingress.Namespace", instance.Namespace, "API Version", currentIngress.ManagedFields)
+	err := r.client.Update(context.TODO(), currentIngress)
+	if err != nil {
+		reqLogger.Error(err, "Failed to create new Ingress", "Ingress.Namespace", instance.Namespace, "Ingress.Name", currentIngress)
+		return err
+	}
+	reqLogger.Info("Updated existing Ingress successfully", "Ingress.Namespace", instance.Namespace, "Ingress.Name", currentIngress)
+	return nil
+
+}*/
+
+func apiKeyIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	pathType := net.PathType("ImplementationSpecific")
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "api-key",
@@ -87,62 +127,14 @@ func apiKeyIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Sc
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/apikeys",
+									Path:     "/apikeys",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-auth-service",
-										ServicePort: intstr.IntOrString{
-											IntVal: 9443,
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// Set Authentication instance as the owner and controller of the Ingress
-	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
-	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Ingress")
-		return nil
-	}
-	return newIngress
-
-}
-
-func explorerIdmgmtIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	newIngress := &net.Ingress{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "explorer-idmgmt",
-			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
-			Annotations: map[string]string{
-				"kubernetes.io/ingress.class":            "ibm-icp-management",
-				"icp.management.ibm.com/secure-backends": "true",
-				"icp.management.ibm.com/configuration-snippet": `
-					if ($request_uri ~* "/idmgmt/(.*)") {
-						proxy_pass https://$proxy_upstream_name/$1;
-					}
-					`,
-			},
-		},
-		Spec: net.IngressSpec{
-			Rules: []net.IngressRule{
-				{
-					IngressRuleValue: net.IngressRuleValue{
-						HTTP: &net.HTTPIngressRuleValue{
-							Paths: []net.HTTPIngressPath{
-								{
-									Path: "/idmgmt/explorer/",
-									Backend: net.IngressBackend{
-										ServiceName: "platform-identity-management",
-										ServicePort: intstr.IntOrString{
-											IntVal: 4500,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-auth-service",
+											Port: net.ServiceBackendPort{
+												Number: 9443,
+											},
 										},
 									},
 								},
@@ -165,7 +157,7 @@ func explorerIdmgmtIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 }
 
 func iamTokenRedirectIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -185,11 +177,14 @@ func iamTokenRedirectIngress(instance *operatorv1alpha1.Authentication, scheme *
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/iam-token/oidc/",
+									Path:     "/iam-token/oidc/",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-auth-service",
-										ServicePort: intstr.IntOrString{
-											IntVal: 9443,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-auth-service",
+											Port: net.ServiceBackendPort{
+												Number: 9443,
+											},
 										},
 									},
 								},
@@ -212,7 +207,7 @@ func iamTokenRedirectIngress(instance *operatorv1alpha1.Authentication, scheme *
 }
 
 func iamTokenIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -232,11 +227,14 @@ func iamTokenIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/iam-token/",
+									Path:     "/iam-token/",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-auth-service",
-										ServicePort: intstr.IntOrString{
-											IntVal: 9443,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-auth-service",
+											Port: net.ServiceBackendPort{
+												Number: 9443,
+											},
 										},
 									},
 								},
@@ -259,7 +257,7 @@ func iamTokenIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.
 }
 
 func ibmidUiCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -279,11 +277,14 @@ func ibmidUiCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *r
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/oidcclient/redirect/ICP_IBMID",
+									Path:     "/oidcclient/redirect/ICP_IBMID",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-auth-service",
-										ServicePort: intstr.IntOrString{
-											IntVal: 9443,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-auth-service",
+											Port: net.ServiceBackendPort{
+												Number: 9443,
+											},
 										},
 									},
 								},
@@ -306,7 +307,7 @@ func ibmidUiCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *r
 }
 
 func idMgmtIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -331,11 +332,14 @@ func idMgmtIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Sc
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/idmgmt/",
+									Path:     "/idmgmt/",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-identity-management",
-										ServicePort: intstr.IntOrString{
-											IntVal: 4500,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-identity-management",
+											Port: net.ServiceBackendPort{
+												Number: 4500,
+											},
 										},
 									},
 								},
@@ -358,7 +362,7 @@ func idMgmtIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Sc
 }
 
 func idmgmtV2ApiIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -379,11 +383,14 @@ func idmgmtV2ApiIngress(instance *operatorv1alpha1.Authentication, scheme *runti
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/idmgmt/identity/api/v2/teams/resources",
+									Path:     "/idmgmt/identity/api/v2/teams/resources",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-identity-management",
-										ServicePort: intstr.IntOrString{
-											IntVal: 4500,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-identity-management",
+											Port: net.ServiceBackendPort{
+												Number: 4500,
+											},
 										},
 									},
 								},
@@ -406,7 +413,7 @@ func idmgmtV2ApiIngress(instance *operatorv1alpha1.Authentication, scheme *runti
 }
 
 func platformAuthDirIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -426,11 +433,14 @@ func platformAuthDirIngress(instance *operatorv1alpha1.Authentication, scheme *r
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/authdir/",
+									Path:     "/authdir/",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-auth-service",
-										ServicePort: intstr.IntOrString{
-											IntVal: 3100,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-auth-service",
+											Port: net.ServiceBackendPort{
+												Number: 3100,
+											},
 										},
 									},
 								},
@@ -453,7 +463,7 @@ func platformAuthDirIngress(instance *operatorv1alpha1.Authentication, scheme *r
 }
 
 func platformAuthIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -483,11 +493,14 @@ func platformAuthIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/v1/auth/",
+									Path:     "/v1/auth/",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-identity-provider",
-										ServicePort: intstr.IntOrString{
-											IntVal: 4300,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-identity-provider",
+											Port: net.ServiceBackendPort{
+												Number: 4300,
+											},
 										},
 									},
 								},
@@ -510,7 +523,7 @@ func platformAuthIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 }
 
 func platformIdAuthBlockIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -532,11 +545,14 @@ func platformIdAuthBlockIngress(instance *operatorv1alpha1.Authentication, schem
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/idauth/oidc/endpoint",
+									Path:     "/idauth/oidc/endpoint",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "default-http-backend",
-										ServicePort: intstr.IntOrString{
-											IntVal: 80,
+										Service: &net.IngressServiceBackend{
+											Name: "default-http-backend",
+											Port: net.ServiceBackendPort{
+												Number: 80,
+											},
 										},
 									},
 								},
@@ -559,7 +575,7 @@ func platformIdAuthBlockIngress(instance *operatorv1alpha1.Authentication, schem
 }
 
 func platformIdAuthIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -579,11 +595,14 @@ func platformIdAuthIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/idauth",
+									Path:     "/idauth",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-auth-service",
-										ServicePort: intstr.IntOrString{
-											IntVal: 9443,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-auth-service",
+											Port: net.ServiceBackendPort{
+												Number: 9443,
+											},
 										},
 									},
 								},
@@ -606,7 +625,7 @@ func platformIdAuthIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 }
 
 func platformIdProviderIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -614,10 +633,10 @@ func platformIdProviderIngress(instance *operatorv1alpha1.Authentication, scheme
 			Namespace: instance.Namespace,
 			Labels:    map[string]string{"app": "auth-idp"},
 			Annotations: map[string]string{
-				"kubernetes.io/ingress.class":            "ibm-icp-management",
-				"icp.management.ibm.com/secure-backends": "true",
-				"icp.management.ibm.com/rewrite-target":  "/",
-				"icp.management.ibm.com/authz-type":      "rbac",
+				"kubernetes.io/ingress.class":                  "ibm-icp-management",
+				"icp.management.ibm.com/secure-backends":       "true",
+				"icp.management.ibm.com/rewrite-target":        "/",
+				"icp.management.ibm.com/authz-type":            "rbac",
 				"icp.management.ibm.com/configuration-snippet": "\n            limit_req zone=management-ingress-rps-100 burst=20 nodelay;",
 			},
 		},
@@ -628,11 +647,14 @@ func platformIdProviderIngress(instance *operatorv1alpha1.Authentication, scheme
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/idprovider/",
+									Path:     "/idprovider/",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-identity-provider",
-										ServicePort: intstr.IntOrString{
-											IntVal: 4300,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-identity-provider",
+											Port: net.ServiceBackendPort{
+												Number: 4300,
+											},
 										},
 									},
 								},
@@ -655,7 +677,7 @@ func platformIdProviderIngress(instance *operatorv1alpha1.Authentication, scheme
 }
 
 func platformLoginIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -682,11 +704,14 @@ func platformLoginIngress(instance *operatorv1alpha1.Authentication, scheme *run
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/login",
+									Path:     "/login",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-identity-provider",
-										ServicePort: intstr.IntOrString{
-											IntVal: 4300,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-identity-provider",
+											Port: net.ServiceBackendPort{
+												Number: 4300,
+											},
 										},
 									},
 								},
@@ -709,7 +734,7 @@ func platformLoginIngress(instance *operatorv1alpha1.Authentication, scheme *run
 }
 
 func platformOidcBlockIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -731,11 +756,14 @@ func platformOidcBlockIngress(instance *operatorv1alpha1.Authentication, scheme 
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/oidc/endpoint",
+									Path:     "/oidc/endpoint",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "default-http-backend",
-										ServicePort: intstr.IntOrString{
-											IntVal: 80,
+										Service: &net.IngressServiceBackend{
+											Name: "default-http-backend",
+											Port: net.ServiceBackendPort{
+												Number: 80,
+											},
 										},
 									},
 								},
@@ -760,11 +788,12 @@ func platformOidcBlockIngress(instance *operatorv1alpha1.Authentication, scheme 
 func platformOidcIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var xframeDomain string
-	if (instance.Spec.Config.XFrameDomain != "") {
-		xframeDomain = strings.Join([]string{"'ALLOW-FROM ", instance.Spec.Config.XFrameDomain, "'"}, "")		
+	if instance.Spec.Config.XFrameDomain != "" {
+		xframeDomain = strings.Join([]string{"'ALLOW-FROM ", instance.Spec.Config.XFrameDomain, "'"}, "")
 	} else {
 		xframeDomain = "'SAMEORIGIN'"
 	}
+	pathType := net.PathType("ImplementationSpecific")
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-oidc",
@@ -778,7 +807,7 @@ func platformOidcIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 				   add_header 'Access-Control-Allow-Origin' 'https://127.0.0.1';
 				   add_header 'Access-Control-Allow-Credentials' 'false' always;
 				   add_header 'Access-Control-Allow-Methods' 'GET, POST, HEAD' always;
-				   add_header 'X-Frame-Options' ` +xframeDomain+ ` always;
+				   add_header 'X-Frame-Options' ` + xframeDomain + ` always;
 				   add_header 'X-Content-Type-Options' 'nosniff' always;
 				   add_header 'X-XSS-Protection' '1' always;
 				   add_header 'Access-Control-Allow-Headers' 'Accept,Authorization,Cache-Control,Content-Type,DNT,If-Modified-Since,Keep-Alive,Origin,User-Agent,X-Requested-With' always;
@@ -796,11 +825,14 @@ func platformOidcIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/oidc",
+									Path:     "/oidc",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-auth-service",
-										ServicePort: intstr.IntOrString{
-											IntVal: 9443,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-auth-service",
+											Port: net.ServiceBackendPort{
+												Number: 9443,
+											},
 										},
 									},
 								},
@@ -823,7 +855,7 @@ func platformOidcIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 }
 
 func platformOidcIntrospectIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -844,11 +876,14 @@ func platformOidcIntrospectIngress(instance *operatorv1alpha1.Authentication, sc
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/oidc/introspect",
+									Path:     "/oidc/introspect",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-auth-service",
-										ServicePort: intstr.IntOrString{
-											IntVal: 9443,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-auth-service",
+											Port: net.ServiceBackendPort{
+												Number: 9443,
+											},
 										},
 									},
 								},
@@ -871,7 +906,7 @@ func platformOidcIntrospectIngress(instance *operatorv1alpha1.Authentication, sc
 }
 
 func platformOidcKeysIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -892,11 +927,14 @@ func platformOidcKeysIngress(instance *operatorv1alpha1.Authentication, scheme *
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/oidc/keys",
+									Path:     "/oidc/keys",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-auth-service",
-										ServicePort: intstr.IntOrString{
-											IntVal: 9443,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-auth-service",
+											Port: net.ServiceBackendPort{
+												Number: 9443,
+											},
 										},
 									},
 								},
@@ -919,7 +957,7 @@ func platformOidcKeysIngress(instance *operatorv1alpha1.Authentication, scheme *
 }
 
 func platformOidcToken2Ingress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -939,11 +977,14 @@ func platformOidcToken2Ingress(instance *operatorv1alpha1.Authentication, scheme
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{ // @posriniv - double check the route
-									Path: "/oidc/token",
+									Path:     "/oidc/token",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-auth-service",
-										ServicePort: intstr.IntOrString{
-											IntVal: 9443,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-auth-service",
+											Port: net.ServiceBackendPort{
+												Number: 9443,
+											},
 										},
 									},
 								},
@@ -966,7 +1007,7 @@ func platformOidcToken2Ingress(instance *operatorv1alpha1.Authentication, scheme
 }
 
 func platformOidcTokenIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -987,11 +1028,14 @@ func platformOidcTokenIngress(instance *operatorv1alpha1.Authentication, scheme 
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/oidc/token",
+									Path:     "/oidc/token",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-auth-service",
-										ServicePort: intstr.IntOrString{
-											IntVal: 9443,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-auth-service",
+											Port: net.ServiceBackendPort{
+												Number: 9443,
+											},
 										},
 									},
 								},
@@ -1014,7 +1058,7 @@ func platformOidcTokenIngress(instance *operatorv1alpha1.Authentication, scheme 
 }
 
 func serviceIdIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1034,11 +1078,14 @@ func serviceIdIngress(instance *operatorv1alpha1.Authentication, scheme *runtime
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/serviceids",
+									Path:     "/serviceids",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-auth-service",
-										ServicePort: intstr.IntOrString{
-											IntVal: 9443,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-auth-service",
+											Port: net.ServiceBackendPort{
+												Number: 9443,
+											},
 										},
 									},
 								},
@@ -1061,7 +1108,7 @@ func serviceIdIngress(instance *operatorv1alpha1.Authentication, scheme *runtime
 }
 
 func tokenServiceVersionIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1081,11 +1128,14 @@ func tokenServiceVersionIngress(instance *operatorv1alpha1.Authentication, schem
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/v1",
+									Path:     "/v1",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-auth-service",
-										ServicePort: intstr.IntOrString{
-											IntVal: 9443,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-auth-service",
+											Port: net.ServiceBackendPort{
+												Number: 9443,
+											},
 										},
 									},
 								},
@@ -1108,7 +1158,7 @@ func tokenServiceVersionIngress(instance *operatorv1alpha1.Authentication, schem
 }
 
 func samlUiCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1128,11 +1178,14 @@ func samlUiCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/ibm/saml20/defaultSP/acs",
+									Path:     "/ibm/saml20/defaultSP/acs",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-auth-service",
-										ServicePort: intstr.IntOrString{
-											IntVal: 9443,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-auth-service",
+											Port: net.ServiceBackendPort{
+												Number: 9443,
+											},
 										},
 									},
 								},
@@ -1155,7 +1208,7 @@ func samlUiCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 }
 
 func versionIdmgmtIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-
+	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1176,11 +1229,64 @@ func versionIdmgmtIngress(instance *operatorv1alpha1.Authentication, scheme *run
 						HTTP: &net.HTTPIngressRuleValue{
 							Paths: []net.HTTPIngressPath{
 								{
-									Path: "/idmgmt/identity/api/v1/",
+									Path:     "/idmgmt/identity/api/v1/",
+									PathType: &pathType,
 									Backend: net.IngressBackend{
-										ServiceName: "platform-identity-management",
-										ServicePort: intstr.IntOrString{
-											IntVal: 4500,
+										Service: &net.IngressServiceBackend{
+											Name: "platform-identity-management",
+											Port: net.ServiceBackendPort{
+												Number: 4500,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Set Authentication instance as the owner and controller of the Ingress
+	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
+	if err != nil {
+		reqLogger.Error(err, "Failed to set owner for Ingress")
+		return nil
+	}
+	return newIngress
+
+}
+
+func socialLoginCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
+	pathType := net.PathType("ImplementationSpecific")
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	newIngress := &net.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "social-login-callback",
+			Namespace: instance.Namespace,
+			Labels:    map[string]string{"app": "auth-idp"},
+			Annotations: map[string]string{
+				"kubernetes.io/ingress.class":            "ibm-icp-management",
+				"icp.management.ibm.com/upstream-uri":    "/ibm/api/social-login",
+				"icp.management.ibm.com/secure-backends": "true",
+			},
+		},
+		Spec: net.IngressSpec{
+			Rules: []net.IngressRule{
+				{
+					IngressRuleValue: net.IngressRuleValue{
+						HTTP: &net.HTTPIngressRuleValue{
+							Paths: []net.HTTPIngressPath{
+								{
+									Path:     "/ibm/api/social-login",
+									PathType: &pathType,
+									Backend: net.IngressBackend{
+										Service: &net.IngressServiceBackend{
+											Name: "platform-auth-service",
+											Port: net.ServiceBackendPort{
+												Number: 9443,
+											},
 										},
 									},
 								},

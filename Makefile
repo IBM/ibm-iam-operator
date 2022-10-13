@@ -24,11 +24,15 @@ TARGET_GOARCH=amd64
 
 # The namespcethat operator will be deployed in
 NAMESPACE=ibm-common-services
+GIT_COMMIT_ID=$(shell git rev-parse --short HEAD)
+GIT_REMOTE_URL=$(shell git config --get remote.origin.url)
+IMAGE_BUILD_OPTS=--build-arg "VCS_REF=$(GIT_COMMIT_ID)" --build-arg "VCS_URL=$(GIT_REMOTE_URL)"
 
 # Image URL to use all building/pushing image targets;
 # Use your own docker registry and image name for dev/test by overridding the IMG and REGISTRY environment variable.
 IMG ?= ibm-iam-operator
 REGISTRY ?= "hyc-cloud-private-integration-docker-local.artifactory.swg-devops.com/ibmcom"
+
 CSV_VERSION ?= 4.0.0
 
 QUAY_USERNAME ?=
@@ -148,7 +152,7 @@ build:
 
 build-image: build $(CONFIG_DOCKER_TARGET)
 	$(eval ARCH := $(shell uname -m|sed 's/x86_64/amd64/'))
-	docker build -t $(REGISTRY)/$(IMG)-$(ARCH):$(VERSION) -f build/Dockerfile .
+	docker build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-$(ARCH):$(VERSION) -f build/Dockerfile .
 	@\rm -f build/_output/bin/ibm-iam-operator
 	@if [ $(BUILD_LOCALLY) -ne 1 ] && [ "$(ARCH)" = "amd64" ]; then docker push $(REGISTRY)/$(IMG)-$(ARCH):$(VERSION); fi
 
@@ -158,7 +162,7 @@ ifeq ($(LOCAL_OS),Linux)
 ifeq ($(LOCAL_ARCH),x86_64)
 	GOOS=linux GOARCH=ppc64le CGO_ENABLED=0 go build -o build/_output/bin/ibm-iam-operator-ppc64le ./cmd/manager
 	docker run --rm --privileged multiarch/qemu-user-static:register --reset
-	docker build -t $(REGISTRY)/$(IMG)-ppc64le:$(VERSION) -f build/Dockerfile.ppc64le .
+	docker build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-ppc64le:$(VERSION) -f build/Dockerfile.ppc64le .
 	@\rm -f build/_output/bin/ibm-iam-operator-ppc64le
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then docker push $(REGISTRY)/$(IMG)-ppc64le:$(VERSION); fi
 endif
@@ -170,7 +174,7 @@ ifeq ($(LOCAL_OS),Linux)
 ifeq ($(LOCAL_ARCH),x86_64)
 	GOOS=linux GOARCH=s390x CGO_ENABLED=0 go build -o build/_output/bin/ibm-iam-operator-s390x ./cmd/manager
 	docker run --rm --privileged multiarch/qemu-user-static:register --reset
-	docker build -t $(REGISTRY)/$(IMG)-s390x:$(VERSION) -f build/Dockerfile.s390x .
+	docker build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-s390x:$(VERSION) -f build/Dockerfile.s390x .
 	@\rm -f build/_output/bin/ibm-iam-operator-s390x
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then docker push $(REGISTRY)/$(IMG)-s390x:$(VERSION); fi
 endif
@@ -187,11 +191,6 @@ test-e2e: ## Run integration e2e tests with different options.
 	- operator-sdk test local ./test/e2e --verbose --up-local --namespace=${NAMESPACE}
 	# @echo ... Running with the param ...
 	# - operator-sdk test local ./test/e2e --namespace=${NAMESPACE}
-
-coverage: ## Run code coverage test
-	@echo ... Code coverage test will be dealt with later
-	#@posriniv-getback
-	#@common/scripts/codecov.sh ${BUILD_LOCALLY}
 
 scorecard: ## Run scorecard test
 	@echo ... Running the scorecard test

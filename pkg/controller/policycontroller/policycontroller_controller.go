@@ -19,9 +19,8 @@ package policycontroller
 import (
 	"context"
 	"reflect"
-	"time"
-
 	gorun "runtime"
+	"time"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
@@ -119,13 +118,13 @@ type ReconcilePolicyController struct {
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-func (r *ReconcilePolicyController) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcilePolicyController) Reconcile(context context.Context, request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling PolicyController")
 
 	// Fetch the PolicyController instance
 	instance := &operatorv1alpha1.PolicyController{}
-	recErr := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	recErr := r.client.Get(context, request.NamespacedName, instance)
 	if recErr != nil {
 		if errors.IsNotFound(recErr) {
 			// Request object not instance, could have been deleted after reconcile request.
@@ -152,7 +151,7 @@ func (r *ReconcilePolicyController) Reconcile(request reconcile.Request) (reconc
 		// Object not being deleted, but add our finalizer so we know to remove this object later when it is going to be deleted
 		if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
-			if err := r.client.Update(context.Background(), instance); err != nil {
+			if err := r.client.Update(context, instance); err != nil {
 				log.Error(err, "Error adding the finalizer to the CR")
 				return reconcile.Result{}, err
 			}
@@ -167,7 +166,7 @@ func (r *ReconcilePolicyController) Reconcile(request reconcile.Request) (reconc
 			}
 
 			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
-			if err := r.client.Update(context.Background(), instance); err != nil {
+			if err := r.client.Update(context, instance); err != nil {
 				log.Error(err, "Error updating the CR to remove the finalizer")
 				return reconcile.Result{}, err
 			}
@@ -640,7 +639,6 @@ func (r *ReconcilePolicyController) deleteExternalResources(instance *operatorv1
 
 	// Remove multiple deployment common-service/config annotation
 
-
 	if err := removeCsAnnotationFromCR(r.client, crName, csCfgAnnotationName); err != nil {
 		return err
 	}
@@ -698,7 +696,7 @@ func removeCsAnnotationFromCR(client client.Client, crName string, csCfgAnnotati
 	} else if err == nil {
 		if len(clusterRole.ObjectMeta.Annotations) > 0 {
 			if _, ok := clusterRole.ObjectMeta.Annotations[csCfgAnnotationName]; ok {
-				delete(clusterRole.ObjectMeta.Annotations, csCfgAnnotationName);
+				delete(clusterRole.ObjectMeta.Annotations, csCfgAnnotationName)
 				if err = client.Update(context.Background(), clusterRole); err != nil {
 					// if error, retry second time to avoid manual deletion after uninstall
 					if err2 := client.Update(context.Background(), clusterRole); err2 != nil {
@@ -723,7 +721,7 @@ func removeCsAnnotationFromCRB(client client.Client, crbName string, csCfgAnnota
 	} else if err == nil {
 		if len(clusterRoleBinding.ObjectMeta.Annotations) > 0 {
 			if _, ok := clusterRoleBinding.ObjectMeta.Annotations[csCfgAnnotationName]; ok {
-				delete(clusterRoleBinding.ObjectMeta.Annotations, csCfgAnnotationName);
+				delete(clusterRoleBinding.ObjectMeta.Annotations, csCfgAnnotationName)
 				if err = client.Update(context.Background(), clusterRoleBinding); err != nil {
 					// if error, retry second time to avoid manual deletion after uninstall
 					if err2 := client.Update(context.Background(), clusterRoleBinding); err2 != nil {

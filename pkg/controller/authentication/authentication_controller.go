@@ -285,7 +285,7 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 	}
 
 	// Check if this ClusterRole already exists and create it if it doesn't
-	currentClusterRole := &rbacv1.Role{}
+	/*currentClusterRole := &rbacv1.Role{}
 	err = r.handleClusterRole(instance, currentClusterRole, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -296,7 +296,7 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 	err = r.handleClusterRoleBinding(instance, currentClusterRoleBinding, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
-	}
+	}*/
 
 	currentWebhook := &reg.MutatingWebhookConfiguration{}
 	err = r.handleWebhook(instance, currentWebhook, &requeueResult)

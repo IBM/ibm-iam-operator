@@ -417,7 +417,7 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 
 	var icpConsoleURLFinal string
 	const apiRegistrationPath = "/auth/liberty/callback"
-    reqLogger.Info("ICP console url for registrationJsonConfigMap ",icpConsoleURL)
+	reqLogger.Info("ICP console url for registrationJsonConfigMap ", icpConsoleURL)
 	parseConsoleURL := strings.Split(icpConsoleURL, ":")
 	if len(parseConsoleURL) > 1 {
 		if parseConsoleURL[1] == "443" {
@@ -429,8 +429,7 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 		icpConsoleURLFinal = "\"https://" + parseConsoleURL[0] + apiRegistrationPath + "\""
 	}
 	tempRegistrationJson = strings.ReplaceAll(tempRegistrationJson, "ICP_REGISTRATION_CONSOLE_URL", icpConsoleURLFinal)
-    reqLogger.Info("Updated ICP console redirect url for registrationJson  ",	tempRegistrationJson = strings.ReplaceAll(tempRegistrationJson, "ICP_REGISTRATION_CONSOLE_URL", icpConsoleURLFinal)
-)
+	reqLogger.Info("Updated ICP console redirect url for registrationJson  ", ICP_REGISTRATION_CONSOLE_URL)
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "registration-json",

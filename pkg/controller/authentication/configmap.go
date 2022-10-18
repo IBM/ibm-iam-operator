@@ -429,7 +429,7 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 		icpConsoleURLFinal = "\"https://" + parseConsoleURL[0] + apiRegistrationPath + "\""
 	}
 	tempRegistrationJson = strings.ReplaceAll(tempRegistrationJson, "ICP_REGISTRATION_CONSOLE_URL", icpConsoleURLFinal)
-	reqLogger.Info("Updated ICP console redirect url for registrationJson  ", ICP_REGISTRATION_CONSOLE_URL)
+	reqLogger.Info("Updated ICP console redirect url for registrationJson  ", icpConsoleURLFinal)
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "registration-json",

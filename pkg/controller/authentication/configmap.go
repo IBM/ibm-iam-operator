@@ -423,7 +423,7 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 		if parseConsoleURL[1] == "443" {
 			icpConsoleURLFinal = "\"https://" + parseConsoleURL[0] + apiRegistrationPath + "\",\"https://" + icpConsoleURL + apiRegistrationPath + "\""
 		} else {
-			icpConsoleURLFinal = "\"https://" + parseConsoleURL[0] + apiRegistrationPath + "\""
+			icpConsoleURLFinal = "\"https://" + icpConsoleURL + apiRegistrationPath + "\""
 		}
 	} else {
 		icpConsoleURLFinal = "\"https://" + parseConsoleURL[0] + apiRegistrationPath + "\""

@@ -17,7 +17,7 @@ metadata:
           },
           "spec": {
             "imageRegistry": "quay.io/opencloudio/icp-oidcclient-watcher",
-            "imageTagPostfix": "3.9.0",
+            "imageTagPostfix": "3.10.0",
             "operatorVersion": "0.14.1",
             "replicas": 1,
             "resources": {
@@ -33,7 +33,7 @@ metadata:
             "oidcInitAuthService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.9.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -48,7 +48,7 @@ metadata:
             "oidcInitIdentityProvider": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.9.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -63,7 +63,7 @@ metadata:
             "oidcInitIdentityManager": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.9.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -107,11 +107,11 @@ metadata:
             },
             "imageName": "iam-policy-decision",
             "imageRegistry": "quay.io/opencloudio",
-            "imageTag": "3.9.0",
+            "imageTag": "3.10.0",
             "initMongodb": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.9.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "100m",
@@ -168,7 +168,7 @@ metadata:
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.9.0",
+              "imageTag": "3.10.0",
               "ldapsCACert": "platform-auth-ldaps-ca-cert",
               "resources": {
                 "limits": {
@@ -185,7 +185,7 @@ metadata:
             "clientRegistration": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.9.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -205,8 +205,6 @@ metadata:
               "clusterName": "mycluster",
               "defaultAdminPassword": "password",
               "defaultAdminUser": "admin",
-              "scimAdminPassword": "scimpassword",
-              "scimAdminUser": "scimadmin",
               "enableImpersonation": false,
               "fipsEnabled": true,
               "ibmCloudSaas": false,
@@ -235,7 +233,7 @@ metadata:
             "identityManager": {
               "imageName": "icp-identity-manager",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.9.0",
+              "imageTag": "3.10.0",
               "masterNodesList": "10.0.0.1",
               "resources": {
                 "limits": {
@@ -251,7 +249,7 @@ metadata:
             "identityProvider": {
               "imageName": "icp-identity-provider",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.9.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -266,7 +264,7 @@ metadata:
             "initMongodb": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.9.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "100m",
@@ -314,7 +312,7 @@ metadata:
             "papService": {
               "imageName": "iam-policy-administration",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.9.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -345,7 +343,7 @@ metadata:
               "excludeOperand": false
             },
             "imageRegistry": "quay.io/opencloudio/iam-policy-controller",
-            "imageTagPostfix": "3.7.11",
+            "imageTagPostfix": "3.7.12",
             "operatorVersion": "0.14.1",
             "replicas": 1,
             "resources": {
@@ -376,7 +374,7 @@ metadata:
               "excludeOperand": false
             },
             "imageRegistry": "quay.io/opencloudio/icp-secret-watcher",
-            "imageTagPostfix": "3.7.11",
+            "imageTagPostfix": "3.7.12",
             "operatorVersion": "0.14.1",
             "replicas": 1,
             "resources": {
@@ -406,7 +404,7 @@ metadata:
             "iamOnboarding": {
               "imageName": "icp-iam-onboarding",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.9.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -420,14 +418,14 @@ metadata:
             },
             "imageName": "icp-iam-onboarding",
             "imageRegistry": "quay.io/opencloudio",
-            "imageTag": "3.9.0",
+            "imageTag": "3.10.0",
             "impersonation": {
               "enableImpersonation": false
             },
             "initAuthService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.9.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -442,7 +440,7 @@ metadata:
             "initIdentityManager": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.9.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -457,7 +455,7 @@ metadata:
             "initIdentityProvider": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.9.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -472,7 +470,7 @@ metadata:
             "initPAPSpec": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.9.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -487,7 +485,7 @@ metadata:
             "initTokenService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.9.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -558,9 +556,6 @@ metadata:
               "public-auth-creds": {
                 "secret" : "platform-auth-idp-credentials"
               },
-              "public-scim-creds": {
-                "secret" : "platform-auth-scim-credentials"
-              },
               "public-auth-cert": {
                 "secret" : "platform-auth-secret"
               },
@@ -583,11 +578,11 @@ metadata:
     capabilities: Seamless Upgrades
     categories: Security
     certified: "false"
-    containerImage: icr.io/cpopen/ibm-iam-operator:3.21.0
+    containerImage: icr.io/cpopen/ibm-iam-operator:3.22.0
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
       the lifecycle of IAM services. With this operator, you can simply deploy and
       upgrade the IAM services
-    olm.skipRange: '<3.21.0'
+    olm.skipRange: '<3.22.0'
     repository: https://github.com/IBM/ibm-iam-operator
     support: IBM
   labels:
@@ -595,30 +590,30 @@ metadata:
     operatorframework.io/os.linux: supported
     operatorframework.io/arch.amd64: supported
     operatorframework.io/arch.ppc64le: supported
-  name: ibm-iam-operator.v3.21.0
+  name: ibm-iam-operator.v3.22.0
   namespace: placeholder
 spec:
   relatedImages:
     - name: IBM_IAM_OPERATOR_IMAGE
-      image: icr.io/cpopen/ibm-iam-operator:3.21.0
+      image: icr.io/cpopen/ibm-iam-operator:3.22.0
     - name: ICP_PLATFORM_AUTH_IMAGE
-      image: icr.io/cpopen/cpfs/icp-platform-auth:3.9.0
+      image: icr.io/cpopen/cpfs/icp-platform-auth:3.10.0
     - name: ICP_IDENTITY_PROVIDER_IMAGE
-      image: icr.io/cpopen/cpfs/icp-identity-provider:3.9.0
+      image: icr.io/cpopen/cpfs/icp-identity-provider:3.10.0
     - name: ICP_IDENTITY_MANAGER_IMAGE
-      image: icr.io/cpopen/cpfs/icp-identity-manager:3.9.0
+      image: icr.io/cpopen/cpfs/icp-identity-manager:3.10.0
     - name: IAM_POLICY_ADMINISTRATION_IMAGE
-      image: icr.io/cpopen/cpfs/iam-policy-administration:3.9.0
+      image: icr.io/cpopen/cpfs/iam-policy-administration:3.10.0
     - name: IAM_POLICY_DECISION_IMAGE
-      image: icr.io/cpopen/cpfs/iam-policy-decision:3.9.0
+      image: icr.io/cpopen/cpfs/iam-policy-decision:3.10.0
     - name: ICP_SECRET_WATCHER_IMAGE
-      image: icr.io/cpopen/cpfs/icp-secret-watcher:3.7.11
+      image: icr.io/cpopen/cpfs/icp-secret-watcher:3.7.12
     - name: ICP_OIDCCLIENT_WATCHER_IMAGE
-      image: icr.io/cpopen/cpfs/icp-oidcclient-watcher:3.9.0
+      image: icr.io/cpopen/cpfs/icp-oidcclient-watcher:3.10.0
     - name: IAM_POLICY_CONTROLLER_IMAGE
-      image: icr.io/cpopen/cpfs/iam-policy-controller:3.7.11
+      image: icr.io/cpopen/cpfs/iam-policy-controller:3.7.12
     - name: ICP_IAM_ONBOARDING_IMAGE
-      image: icr.io/cpopen/cpfs/icp-iam-onboarding:3.9.0
+      image: icr.io/cpopen/cpfs/icp-iam-onboarding:3.10.0
     - name: AUDIT_SYSLOG_SERVICE_IMAGE
       image: icr.io/cpopen/cpfs/audit-syslog-service:1.8.0
   apiservicedefinitions: {}
@@ -1518,6 +1513,7 @@ spec:
         - Linux on IBM Z and LinuxONE
 
     ## Operator versions
+     - 3.22.0
      - 3.21.0
      - 3.20.0
      - 3.19.0
@@ -1759,23 +1755,23 @@ spec:
                 - ibm-iam-operator
                 env:
                 - name: ICP_PLATFORM_AUTH_IMAGE
-                  value: icr.io/cpopen/cpfs/icp-platform-auth:3.9.0
+                  value: icr.io/cpopen/cpfs/icp-platform-auth:3.10.0
                 - name: ICP_IDENTITY_PROVIDER_IMAGE
-                  value: icr.io/cpopen/cpfs/icp-identity-provider:3.9.0
+                  value: icr.io/cpopen/cpfs/icp-identity-provider:3.10.0
                 - name: ICP_IDENTITY_MANAGER_IMAGE
-                  value: icr.io/cpopen/cpfs/icp-identity-manager:3.9.0
+                  value: icr.io/cpopen/cpfs/icp-identity-manager:3.10.0
                 - name: IAM_POLICY_ADMINISTRATION_IMAGE
-                  value: icr.io/cpopen/cpfs/iam-policy-administration:3.9.0
+                  value: icr.io/cpopen/cpfs/iam-policy-administration:3.10.0
                 - name: IAM_POLICY_DECISION_IMAGE
-                  value: icr.io/cpopen/cpfs/iam-policy-decision:3.9.0
+                  value: icr.io/cpopen/cpfs/iam-policy-decision:3.10.0
                 - name: ICP_SECRET_WATCHER_IMAGE
-                  value: icr.io/cpopen/cpfs/icp-secret-watcher:3.7.11
+                  value: icr.io/cpopen/cpfs/icp-secret-watcher:3.7.12
                 - name: ICP_OIDCCLIENT_WATCHER_IMAGE
-                  value: icr.io/cpopen/cpfs/icp-oidcclient-watcher:3.9.0
+                  value: icr.io/cpopen/cpfs/icp-oidcclient-watcher:3.10.0
                 - name: IAM_POLICY_CONTROLLER_IMAGE
-                  value: icr.io/cpopen/cpfs/iam-policy-controller:3.7.11
+                  value: icr.io/cpopen/cpfs/iam-policy-controller:3.7.12
                 - name: ICP_IAM_ONBOARDING_IMAGE
-                  value: icr.io/cpopen/cpfs/icp-iam-onboarding:3.9.0
+                  value: icr.io/cpopen/cpfs/icp-iam-onboarding:3.10.0
                 - name: AUDIT_SYSLOG_SERVICE_IMAGE
                   value: icr.io/cpopen/cpfs/audit-syslog-service:1.8.0
                 - name: WATCH_NAMESPACE
@@ -1788,7 +1784,7 @@ spec:
                       fieldPath: metadata.name
                 - name: OPERATOR_NAME
                   value: ibm-iam-operator
-                image: icr.io/cpopen/ibm-iam-operator:3.21.0
+                image: icr.io/cpopen/ibm-iam-operator:3.22.0
                 imagePullPolicy: Always
                 name: ibm-iam-operator
                 resources:
@@ -2050,4 +2046,4 @@ spec:
   minKubeVersion: 1.19.0
   provider:
     name: IBM
-  version: 3.21.0
+  version: 3.22.0

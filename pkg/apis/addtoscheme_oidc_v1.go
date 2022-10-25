@@ -13,8 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package version
 
-var (
-	Version = "4.0.0"
+package apis
+
+import (
+	v1 "github.com/IBM/ibm-iam-operator/pkg/apis/oidc/v1"
 )
+
+func init() {
+	// Register the types with the Scheme so the components can map objects to GroupVersionKinds and back
+	AddToSchemes = append(AddToSchemes, v1.SchemeBuilder.AddToScheme)
+}

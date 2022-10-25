@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package version
 
-var (
-	Version = "4.0.0"
-)
+// Package v1 contains API Schema definitions for the oidc v1 API group
+// +k8s:deepcopy-gen=package,register
+// +groupName=oidc.security.ibm.com
+package v1

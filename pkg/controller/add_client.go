@@ -13,8 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package version
 
-var (
-	Version = "4.0.0"
+package controller
+
+import (
+	"github.com/IBM/ibm-iam-operator/pkg/controller/client"
 )
+
+func init() {
+	// AddToManagerFuncs is a list of functions to create controllers and add them to a manager.
+	AddToManagerFuncs = append(AddToManagerFuncs, client.Add)
+}

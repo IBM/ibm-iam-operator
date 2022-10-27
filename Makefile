@@ -146,7 +146,7 @@ endif
 
 build:
 	@echo "Building the ibm-iam-operator binary"
-	@CGO_ENABLED=0 GOOS=linux go build -o build/_output/bin/$(IMG) ./cmd/manager
+	@CGO_ENABLED=0 go build -o build/_output/bin/$(IMG) ./cmd/manager
 	@strip $(STRIP_FLAGS) build/_output/bin/$(IMG)
 
 build-image: build $(CONFIG_DOCKER_TARGET)

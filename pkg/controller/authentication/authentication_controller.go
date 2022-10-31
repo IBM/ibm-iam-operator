@@ -329,8 +329,6 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 // The clusterrole, clusterrolebinding and User resources created by Authentication
 func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1alpha1.Authentication) error {
 
-	//crMap := generateCRData()
-	//crbMap := generateCRBData("dummy", "dummy")
 	userName := instance.Spec.Config.DefaultAdminUser
 	//csCfgAnnotationName := res.GetCsConfigAnnotation(instance.Namespace)
 
@@ -346,34 +344,8 @@ func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1al
 		webhook = webhook + "-" + instance.Namespace
 	}
 
-	// Remove multiple deployment common-service/config annotation
-	/*for crName := range crMap {
-		if err := removeCsAnnotationFromCR(r.client, crName, csCfgAnnotationName); err != nil {
-			return err
-		}
-	}
-	for crbName := range crbMap {
-		if err := removeCsAnnotationFromCRB(r.client, crbName, csCfgAnnotationName); err != nil {
-			return err
-		}
-	} */
-
 	log.V(0).Info("Wait for 2 seconds.")
 	time.Sleep(time.Second * 2)
-
-	// Finally check and remove Cluster Role
-	/* for crName := range crMap {
-		if err := removeCR(r.client, crName); err != nil {
-			return err
-		}
-	}
-
-	// Remove Cluster Role Binding
-	for crbName := range crbMap {
-		if err := removeCRB(r.client, crbName); err != nil {
-			return err
-		}
-	} */
 
 	log.V(0).Info("Wait for 2 seconds.")
 	time.Sleep(time.Second * 2)
@@ -383,13 +355,6 @@ func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1al
 	if err := removeUser(r.client, userName); err != nil {
 		return err
 	}
-
-	// Remove Webhook
-	/*
-		if err := removeWebhook(r.client, webhook); err != nil {
-			return err
-		}
-	*/
 	return nil
 }
 

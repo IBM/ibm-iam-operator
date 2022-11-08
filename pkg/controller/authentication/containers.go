@@ -689,6 +689,28 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 				},
 			},
 		},
+	        {
+			Name: "SCIM_ADMIN_USER",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-scim-credentials",
+					},
+					Key: "scim_admin_username",
+				},
+			},
+		},
+		{
+			Name: "SCIM_ADMIN_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-scim-credentials",
+					},
+					Key: "scim_admin_password",
+				},
+			},
+		},
 		{
 			Name:  "IAM_PAP_URL",
 			Value: "https://iam-pap:39001",

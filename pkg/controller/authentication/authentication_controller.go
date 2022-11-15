@@ -26,7 +26,6 @@ import (
 	res "github.com/IBM/ibm-iam-operator/pkg/resources"
 	userv1 "github.com/openshift/api/user/v1"
 	regen "github.com/zach-klippenstein/goregen"
-	reg "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -284,26 +283,6 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 		return reconcile.Result{}, err
 	}
 
-	// Check if this ClusterRole already exists and create it if it doesn't
-	/*currentClusterRole := &rbacv1.Role{}
-	err = r.handleClusterRole(instance, currentClusterRole, &requeueResult)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-
-	// Check if this ClusterRole already exists and create it if it doesn't
-	currentClusterRoleBinding := &rbacv1.RoleBinding{}
-	err = r.handleClusterRoleBinding(instance, currentClusterRoleBinding, &requeueResult)
-	if err != nil {
-		return reconcile.Result{}, err
-	}*/
-
-	currentWebhook := &reg.MutatingWebhookConfiguration{}
-	err = r.handleWebhook(instance, currentWebhook, &requeueResult)
-	if err != nil {
-		return reconcile.Result{}, err
-	} */
-
 	// Check if this Deployment already exists and create it if it doesn't
 	currentDeployment := &appsv1.Deployment{}
 	err = r.handleDeployment(instance, currentDeployment, &requeueResult)
@@ -330,19 +309,6 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1alpha1.Authentication) error {
 
 	userName := instance.Spec.Config.DefaultAdminUser
-	//csCfgAnnotationName := res.GetCsConfigAnnotation(instance.Namespace)
-
-	// These code changes handles all use cases:
-	// - fresh install in saas or on-prem mode and
-	// - upgrade on older releases in on-prem mode
-	webhook := "namespace-admission-config"
-	if instance.Spec.Config.IBMCloudSaas {
-		// in saas mode
-		webhook = webhook + "-" + instance.Namespace
-	} else if instance.Spec.Config.OnPremMultipleDeploy {
-		// multiple deployment in on-prem mode
-		webhook = webhook + "-" + instance.Namespace
-	}
 
 	log.V(0).Info("Wait for 2 seconds.")
 	time.Sleep(time.Second * 2)
@@ -498,23 +464,6 @@ func removeUser(client client.Client, userName string) error {
 				log.V(1).Info("Error deleting user", "name", userName, "error message", err)
 				return err
 			}
-		}
-	} else {
-		return err
-	}
-	return nil
-}
-
-func removeWebhook(client client.Client, webhookName string) error {
-	// Delete Webhook
-	webhook := &reg.MutatingWebhookConfiguration{}
-	if err := client.Get(context.Background(), types.NamespacedName{Name: webhookName, Namespace: ""}, webhook); err != nil && errors.IsNotFound(err) {
-		log.V(1).Info("Error getting webhook", webhookName, err)
-		return nil
-	} else if err == nil {
-		if err = client.Delete(context.Background(), webhook); err != nil {
-			log.V(1).Info("Error deleting webhook", "name", webhookName, "error message", err)
-			return err
 		}
 	} else {
 		return err

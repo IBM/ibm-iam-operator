@@ -15,5 +15,5 @@
 # limitations under the License.
 
 # Launches fmt and lint checks
-#make lint-all
-make lint-scripts
+make lint-all
+#make lint-scripts

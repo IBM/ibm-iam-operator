@@ -25,6 +25,7 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	res "github.com/IBM/ibm-iam-operator/pkg/resources"
 	userv1 "github.com/openshift/api/user/v1"
+	clientv1 "github.com/openshift/api/oauth/v1"
 	regen "github.com/zach-klippenstein/goregen"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -290,11 +291,20 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 		return reconcile.Result{}, err
 	}
 
+	// do this only if OSAUTH_ENABLED is set
 	// Check if this User already exists and create it if it doesn't
-	currentUser := &userv1.User{}
-	err = r.handleUser(instance, currentUser, &requeueResult)
-	if err != nil {
-		return reconcile.Result{}, err
+	if (instance.Spec.Config.OSAuthEnabled && instance.Spec.Config.OSAuthEnabled == true) {
+		currentUser := &userv1.User{}
+		err = r.handleUser(instance, currentUser, &requeueResult)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+
+		currentClient := &clientv1.OAuthClient{}
+		err = r.handleClient(instance, currentClient, wlpClientID, wlpClientSecret, &requeueResult)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
 	}
 
 	if requeueResult {

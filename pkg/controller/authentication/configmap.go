@@ -211,6 +211,17 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["MONGO_POOL_MAX_SIZE"] = newConfigMap.Data["MONGO_POOL_MAX_SIZE"]
 					cmUpdateRequired = true
 				}
+				if _, keyExists := currentConfigMap.Data["ROKS_ENABLED"]; keyExists {
+					newConfigMap = functionList[index](instance, r.scheme)
+					if currentConfigMap.Data["ROKS_ENABLED"] == "true" {
+						reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+						reqLogger.Info("Updating OS auth enabled", "New flag value is ", newConfigMap.Data["ROKS_ENABLED"])
+						currentConfigMap.Data["OSAUTH_ENABLED"] = newConfigMap.Data["ROKS_ENABLED"]
+					} else {
+						currentConfigMap.Data["OSAUTH_ENABLED"] = strconv.FormatBool(instance.Spec.Config.OSAuthEnabled)
+					}
+					cmUpdateRequired = true
+				}
 				if _, keyExists := currentConfigMap.Data["OS_TOKEN_LENGTH"]; keyExists {
 					if currentConfigMap.Data["OS_TOKEN_LENGTH"] == "45" {
 						newConfigMap = functionList[index](instance, r.scheme)
@@ -339,6 +350,7 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"FIPS_ENABLED":                       strconv.FormatBool(instance.Spec.Config.FIPSEnabled),
 			"NONCE_ENABLED":                      strconv.FormatBool(instance.Spec.Config.NONCEEnabled),
 			"ROKS_ENABLED":                       strconv.FormatBool(instance.Spec.Config.ROKSEnabled),
+			"OSAUTH_ENABLED":                     strconv.FormatBool(instance.Spec.Config.OSAuthEnabled),
 			"IBM_CLOUD_SAAS":                     strconv.FormatBool(instance.Spec.Config.IBMCloudSaas),
 			"ATTR_MAPPING_FROM_CONFIG":           strconv.FormatBool(instance.Spec.Config.AttrMappingFromConfig),
 			"SAAS_CLIENT_REDIRECT_URL":           instance.Spec.Config.SaasClientRedirectUrl,

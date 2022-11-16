@@ -261,64 +261,6 @@ func (r *ReconcilePolicyController) handleDeployment(instance *operatorv1alpha1.
 
 }
 
-func (r *ReconcilePolicyController) clusterRoleForPolicyController(instance *operatorv1alpha1.PolicyController) *rbacv1.ClusterRole {
-	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	clusterRole := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "iam-policy-controller-role",
-			Labels: map[string]string{
-				"app": "iam-policy-controller",
-			},
-		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{"grc-mcmpolicy.ibm.com"},
-				Resources: []string{"Iampolicies", "namespaces"},
-				Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
-			},
-		},
-	}
-
-	// Set PolicyController instance as the owner and controller of the Cluster Role
-	/*err := controllerutil.SetControllerReference(instance, clusterRole, r.scheme)
-	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for ClusterRole")
-		return nil
-	}*/
-	return clusterRole
-}
-
-func (r *ReconcilePolicyController) clusterRoleBindingForPolicyController(instance *operatorv1alpha1.PolicyController) *rbacv1.ClusterRoleBinding {
-	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	clusRoleBinding := &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "iam-policy-controller-rolebinding",
-			Labels: map[string]string{
-				"app": "iam-policy-controller",
-			},
-		},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "ClusterRole",
-			Name:     "iam-policy-controller-role",
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind:      "ServiceAccount",
-				Name:      "default",
-				Namespace: "system",
-			},
-		},
-	}
-	// Set PolicyController instance as the owner and controller of the ClusterRoleBinding
-	/*err := controllerutil.SetControllerReference(instance, clusRoleBinding, r.scheme)
-	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for ClusterRoleBinding")
-		return nil
-	}*/
-	return clusRoleBinding
-}
-
 // deploymentForPolicyController returns a IAM PolicyController Deployment object
 func (r *ReconcilePolicyController) deploymentForPolicyController(instance *operatorv1alpha1.PolicyController) *appsv1.Deployment {
 	reqLogger := log.WithValues("deploymentForPolicyController", "Entry", "instance.Name", instance.Name)

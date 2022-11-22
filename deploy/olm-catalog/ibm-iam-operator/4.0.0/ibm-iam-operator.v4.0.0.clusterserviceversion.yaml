@@ -89,22 +89,6 @@ metadata:
             "name": "example-policydecision"
           },
           "spec": {
-            "auditService": {
-              "imageName": "audit-syslog-service",
-              "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "1.8.0",
-              "syslogTlsPath": "/etc/audit-tls",
-              "resources": {
-                "limits": {
-                  "cpu": "200m",
-                  "memory": "256Mi"
-                },
-                "requests": {
-                  "cpu": "10m",
-                  "memory": "100Mi"
-                }
-              }
-            },
             "imageName": "iam-policy-decision",
             "imageRegistry": "quay.io/opencloudio",
             "imageTag": "3.10.0",
@@ -149,22 +133,6 @@ metadata:
             "name": "example-authentication"
           },
           "spec": {
-            "auditService": {
-              "imageName": "audit-syslog-service",
-              "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "1.8.0",
-              "syslogTlsPath": "/etc/audit-tls",
-              "resources": {
-                "limits": {
-                  "cpu": "100m",
-                  "memory": "128Mi"
-                },
-                "requests": {
-                  "cpu": "10m",
-                  "memory": "100Mi"
-                }
-              }
-            },
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
@@ -291,22 +259,6 @@ metadata:
             "name": "example-pap"
           },
           "spec": {
-            "auditService": {
-              "imageName": "audit-syslog-service",
-              "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "1.8.0",
-              "syslogTlsPath": "/etc/audit-tls",
-              "resources": {
-                "limits": {
-                  "cpu": "200m",
-                  "memory": "200Mi"
-                },
-                "requests": {
-                  "cpu": "20m",
-                  "memory": "20Mi"
-                }
-              }
-            },
             "operatorVersion": "0.14.1",
             "papService": {
               "imageName": "iam-policy-administration",
@@ -580,8 +532,6 @@ spec:
       image: quay.io/opencloudio/icp-oidcclient-watcher@sha256:87b80b342fb8523b1ff96eded391446d3ce578e2148369a2826c82c9a657ad28
     - name: icp-iam-onboarding
       image: quay.io/opencloudio/icp-iam-onboarding@sha256:f52fb8fcb76005274887996e29f97720bd18324f20f1742f32e4b04f87935d25
-    - name: audit-syslog-service
-      image: quay.io/opencloudio/audit-syslog-service@sha256:232d0407440b3b051d612a6ce48d4c92e1859cc94c3170b0450bde069b838e42
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
@@ -676,11 +626,6 @@ spec:
       - description: A list defines the catalog information for operator version.
         displayName: OperatorVersion
         path: operatorVersion
-        x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:text'
-      - description: A list defines the catalog information for audit service.
-        displayName: AuditService
-        path: auditService
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
       - description: A list defines the catalog information for auth service.
@@ -927,11 +872,6 @@ spec:
         path: replicas
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
-      - description: A list defines the catalog information for audit service.
-        displayName: AuditService
-        path: auditService
-        x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:text'
       - description: A list defines the catalog information for operator version.
         displayName: OperatorVersion
         path: operatorVersion
@@ -1173,11 +1113,6 @@ spec:
       - description: A list defines the catalog information for replicas.
         displayName: replicas
         path: replicas
-        x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:text'
-      - description: A list defines the catalog information for audit service.
-        displayName: auditService
-        path: auditService
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
       - description: A list defines the catalog information for image name.
@@ -1571,8 +1506,6 @@ spec:
                   value: quay.io/opencloudio/icp-oidcclient-watcher:3.10.0
                 - name: ICP_IAM_ONBOARDING_IMAGE
                   value: quay.io/opencloudio/icp-iam-onboarding:3.10.0
-                - name: AUDIT_SYSLOG_SERVICE_IMAGE
-                  value: quay.io/opencloudio/audit-syslog-service:1.8.0
                 - name: WATCH_NAMESPACE
                   valueFrom:
                     fieldRef:

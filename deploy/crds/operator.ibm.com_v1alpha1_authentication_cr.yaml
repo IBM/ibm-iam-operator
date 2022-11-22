@@ -9,18 +9,6 @@ metadata:
 spec:
   operatorVersion: "0.14.1"
   replicas: 1
-  auditService: 
-    imageRegistry: "quay.io/opencloudio"
-    imageName: "audit-syslog-service"
-    imageTag: "1.0.5"
-    syslogTlsPath: "/etc/audit-tls"
-    resources:
-      limits:
-        cpu: 100m
-        memory: 128Mi
-      requests:
-        cpu: 10m
-        memory: 100Mi
   authService:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"

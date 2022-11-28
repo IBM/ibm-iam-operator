@@ -222,6 +222,7 @@ metadata:
               "oidcIssuerURL": "https://127.0.0.1:443/idauth/oidc/endpoint/OP",
               "openshiftPort": 443,
               "roksEnabled": true,
+              "osAuthEnabled": false,
               "roksURL": "https://roks.domain.name:443",
               "roksUserPrefix": "changeme",
               "saasClientRedirectUrl": "",

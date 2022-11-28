@@ -290,13 +290,6 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 		return reconcile.Result{}, err
 	}
 
-	// Check if this User already exists and create it if it doesn't
-	currentUser := &userv1.User{}
-	err = r.handleUser(instance, currentUser, &requeueResult)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-
 	if requeueResult {
 		return reconcile.Result{Requeue: true}, nil
 	}

@@ -211,15 +211,10 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["MONGO_POOL_MAX_SIZE"] = newConfigMap.Data["MONGO_POOL_MAX_SIZE"]
 					cmUpdateRequired = true
 				}
-				if _, keyExists := currentConfigMap.Data["ROKS_ENABLED"]; keyExists {
+				if _, keyExists := currentConfigMap.Data["OSAUTH_ENABLED"]; !keyExists {
+					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.scheme)
-					if currentConfigMap.Data["ROKS_ENABLED"] == "true" {
-						reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-						reqLogger.Info("Updating OS auth enabled", "New flag value is ", newConfigMap.Data["ROKS_ENABLED"])
-						currentConfigMap.Data["OSAUTH_ENABLED"] = newConfigMap.Data["ROKS_ENABLED"]
-					} else {
-						currentConfigMap.Data["OSAUTH_ENABLED"] = strconv.FormatBool(instance.Spec.Config.OSAuthEnabled)
-					}
+					currentConfigMap.Data["OSAUTH_ENABLED"] = newConfigMap.Data["OSAUTH_ENABLED"]
 					cmUpdateRequired = true
 				}
 				if _, keyExists := currentConfigMap.Data["OS_TOKEN_LENGTH"]; keyExists {

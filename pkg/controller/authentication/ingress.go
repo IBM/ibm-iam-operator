@@ -32,11 +32,11 @@ import (
 func (r *ReconcileAuthentication) handleIngress(instance *operatorv1alpha1.Authentication, currentIngress *net.Ingress, requeueResult *bool) error {
 
 	ingressList := []string{"api-key", "iam-token-redirect", "iam-token", "ibmid-ui-callback", "id-mgmt", "idmgmt-v2-api", "platform-auth-dir",
-		"platform-auth", "platform-id-auth-block", "platform-id-auth", "platform-id-provider", "platform-login", "platform-oidc-block", "platform-oidc", "platform-oidc-introspect",
+		"platform-auth", "platform-id-auth-block", "platform-id-auth", "platform-id-provider", "platform-login", "platform-oidc-block", "platform-oidc", "platform-jmx", "platform-oidc-introspect",
 		"platform-oidc-keys", "platform-oidc-token-2", "platform-oidc-token", "service-id", "token-service-version", "saml-ui-callback", "version-idmgmt", "social-login-callback"}
 
 	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *net.Ingress{apiKeyIngress, iamTokenRedirectIngress, iamTokenIngress, ibmidUiCallbackIngress, idMgmtIngress, idmgmtV2ApiIngress, platformAuthDirIngress,
-		platformAuthIngress, platformIdAuthBlockIngress, platformIdAuthIngress, platformIdProviderIngress, platformLoginIngress, platformOidcBlockIngress, platformOidcIngress, platformOidcIntrospectIngress,
+		platformAuthIngress, platformIdAuthBlockIngress, platformIdAuthIngress, platformIdProviderIngress, platformLoginIngress, platformOidcBlockIngress, platformOidcIngress, platformJMXIngress, platformOidcIntrospectIngress,
 		platformOidcKeysIngress, platformOidcToken2Ingress, platformOidcTokenIngress, serviceIdIngress, tokenServiceVersionIngress, samlUiCallbackIngress, versionIdmgmtIngress, socialLoginCallbackIngress}
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
@@ -826,6 +826,75 @@ func platformOidcIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 							Paths: []net.HTTPIngressPath{
 								{
 									Path:     "/oidc",
+									PathType: &pathType,
+									Backend: net.IngressBackend{
+										Service: &net.IngressServiceBackend{
+											Name: "platform-auth-service",
+											Port: net.ServiceBackendPort{
+												Number: 9443,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Set Authentication instance as the owner and controller of the Ingress
+	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
+	if err != nil {
+		reqLogger.Error(err, "Failed to set owner for Ingress")
+		return nil
+	}
+	return newIngress
+
+}
+
+func platformJMXIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	var xframeDomain string
+	if instance.Spec.Config.XFrameDomain != "" {
+		xframeDomain = strings.Join([]string{"'ALLOW-FROM ", instance.Spec.Config.XFrameDomain, "'"}, "")
+	} else {
+		xframeDomain = "'SAMEORIGIN'"
+	}
+	pathType := net.PathType("ImplementationSpecific")
+	newIngress := &net.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "platform-jmx",
+			Namespace: instance.Namespace,
+			Labels:    map[string]string{"app": "auth-idp"},
+			Annotations: map[string]string{
+				"kubernetes.io/ingress.class":              "ibm-icp-management",
+				"icp.management.ibm.com/secure-backends":   "true",
+				"icp.management.ibm.com/proxy-buffer-size": "64k",
+				"icp.management.ibm.com/configuration-snippet": `
+				   add_header 'Access-Control-Allow-Origin' 'https://127.0.0.1';
+				   add_header 'Access-Control-Allow-Credentials' 'false' always;
+				   add_header 'Access-Control-Allow-Methods' 'GET, POST, HEAD' always;
+				   add_header 'X-Frame-Options' ` + xframeDomain + ` always;
+				   add_header 'X-Content-Type-Options' 'nosniff' always;
+				   add_header 'X-XSS-Protection' '1' always;
+				   add_header 'Access-Control-Allow-Headers' 'Accept,Authorization,Cache-Control,Content-Type,DNT,If-Modified-Since,Keep-Alive,Origin,User-Agent,X-Requested-With' always;
+				   if ($request_uri !~ .*call_proxy.*) {
+				      error_page 401 @401;
+				   }
+				   proxy_intercept_errors on;
+                    `,
+			},
+		},
+		Spec: net.IngressSpec{
+			Rules: []net.IngressRule{
+				{
+					IngressRuleValue: net.IngressRuleValue{
+						HTTP: &net.HTTPIngressRuleValue{
+							Paths: []net.HTTPIngressPath{
+								{
+									Path:     "/IBMJMXConnectorREST",
 									PathType: &pathType,
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{

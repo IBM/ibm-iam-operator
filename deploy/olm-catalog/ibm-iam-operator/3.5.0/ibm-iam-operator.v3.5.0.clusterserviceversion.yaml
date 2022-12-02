@@ -74,7 +74,7 @@ metadata:
               "clusterInternalAddress": "10.0.0.1",
               "clusterName": "mycluster",
               "defaultAdminPassword": "password",
-              "defaultAdminUser": "admin",
+              "defaultAdminUser": "cpadmin",
               "enableImpersonation": false,
               "fipsEnabled": true,
               "icpPort": 8443,

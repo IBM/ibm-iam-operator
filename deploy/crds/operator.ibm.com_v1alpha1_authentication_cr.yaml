@@ -87,7 +87,7 @@ spec:
     clusterInternalAddress: "10.0.0.1"
     clusterName: "mycluster"
     defaultAdminPassword: "password"
-    defaultAdminUser: "admin"
+    defaultAdminUser: "cpadmin"
     scimAdminPassword: "scimpassword"
     scimAdminUser: "scimadmin"
     enableImpersonation: false

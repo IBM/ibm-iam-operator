@@ -159,12 +159,12 @@ func (r *ReconcileClient) invokeRegistration(oidcreg *securityv1.Client, request
 	req, _ := http.NewRequest(requestType, requestUrl, bytes.NewBuffer([]byte(payload)))
 	req.Header.Set("Content-Type", "application/json")
 	req.SetBasicAuth(oauthAdmin, clientRegistrationSecret)
-	//caCert, err := ioutil.ReadFile("/certs/ca.crt")
-	//if err != nil {
-	//	return nil, err
-	//}
+	caCert, err := ioutil.ReadFile("/certs/ca.crt")
+	if err != nil {
+		return nil, err
+	}
 	caCertPool := x509.NewCertPool()
-	//caCertPool.AppendCertsFromPEM(caCert)
+	caCertPool.AppendCertsFromPEM(caCert)
 	transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: caCertPool}}
 	client := &http.Client{Transport: transport}
   resp, err := client.Do(req)

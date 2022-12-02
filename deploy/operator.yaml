@@ -38,7 +38,7 @@ spec:
       containers:
         - name: ibm-iam-operator
           # Replace this with the built image name
-          image: quay.io/rwhundle/ibm-iam-operator:4.0.0
+          image: icr.io/cpopen/ibm-iam-operator:4.0.0
           command:
           - ibm-iam-operator
           imagePullPolicy: Always
@@ -46,9 +46,9 @@ spec:
             - name: ICP_PLATFORM_AUTH_IMAGE
               value: icr.io/cpopen/cpfs/icp-platform-auth:3.10.0
             - name: ICP_IDENTITY_PROVIDER_IMAGE
-              value: icr.io/cpopen/cpfs/icp-identity-provider:3.10.0
+              value: icr.io/cpopen/cpfs/icp-identity-provider:4.0.0
             - name: ICP_IDENTITY_MANAGER_IMAGE
-              value: icr.io/cpopen/cpfs/icp-identity-manager:3.10.0
+              value: icr.io/cpopen/cpfs/icp-identity-manager:4.0.0
             - name: IAM_POLICY_ADMINISTRATION_IMAGE
               value: icr.io/cpopen/cpfs/iam-policy-administration:3.10.0
             - name: IAM_POLICY_DECISION_IMAGE
@@ -87,16 +87,16 @@ spec:
               - ALL
             privileged: false
             readOnlyRootFilesystem: true
-            volumeMounts:
-            - mountPath: /certs
-              name: cluster-ca-cert
-          volumes:
-            - name: cluster-ca-cert
-              secret:
-                defaultMode: 420
-                items:
-                - key: tls.key
-                  path: ca.key
-                - key: tls.crt
-                  path: ca.crt
-                secretName: cs-ca-certificate-secret
+          volumeMounts:
+          - mountPath: /certs
+            name: cluster-ca-cert
+      volumes:
+        - name: cluster-ca-cert
+          secret:
+            defaultMode: 420
+            items:
+            - key: tls.key
+              path: ca.key
+            - key: tls.crt
+              path: ca.crt
+            secretName: cs-ca-certificate-secret

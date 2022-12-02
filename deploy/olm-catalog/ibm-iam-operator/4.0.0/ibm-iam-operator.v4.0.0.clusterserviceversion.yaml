@@ -17,7 +17,7 @@ metadata:
           },
           "spec": {
             "imageRegistry": "quay.io/opencloudio/icp-oidcclient-watcher",
-            "imageTagPostfix": "4.0.0",
+            "imageTagPostfix": "3.10.0",
             "operatorVersion": "0.14.1",
             "replicas": 1,
             "resources": {
@@ -33,7 +33,7 @@ metadata:
             "oidcInitAuthService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4.0.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -48,7 +48,7 @@ metadata:
             "oidcInitIdentityProvider": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4.0.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -92,7 +92,7 @@ metadata:
             "auditService": {
               "imageName": "audit-syslog-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "1.0.7",
+              "imageTag": "1.8.0",
               "syslogTlsPath": "/etc/audit-tls",
               "resources": {
                 "limits": {
@@ -107,11 +107,11 @@ metadata:
             },
             "imageName": "iam-policy-decision",
             "imageRegistry": "quay.io/opencloudio",
-            "imageTag": "4.0.0",
+            "imageTag": "3.10.0",
             "initMongodb": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4.0.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "100m",
@@ -152,7 +152,7 @@ metadata:
             "auditService": {
               "imageName": "audit-syslog-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "1.0.7",
+              "imageTag": "1.8.0",
               "syslogTlsPath": "/etc/audit-tls",
               "resources": {
                 "limits": {
@@ -168,7 +168,7 @@ metadata:
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4.0.0",
+              "imageTag": "3.10.0",
               "ldapsCACert": "platform-auth-ldaps-ca-cert",
               "resources": {
                 "limits": {
@@ -185,7 +185,7 @@ metadata:
             "clientRegistration": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4.0.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -222,6 +222,7 @@ metadata:
               "oidcIssuerURL": "https://127.0.0.1:443/idauth/oidc/endpoint/OP",
               "openshiftPort": 443,
               "roksEnabled": true,
+              "osAuthEnabled": false,
               "roksURL": "https://roks.domain.name:443",
               "roksUserPrefix": "changeme",
               "saasClientRedirectUrl": "",
@@ -263,7 +264,7 @@ metadata:
             "initMongodb": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4.0.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "100m",
@@ -294,7 +295,7 @@ metadata:
             "auditService": {
               "imageName": "audit-syslog-service",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "1.0.7",
+              "imageTag": "1.8.0",
               "syslogTlsPath": "/etc/audit-tls",
               "resources": {
                 "limits": {
@@ -311,7 +312,7 @@ metadata:
             "papService": {
               "imageName": "iam-policy-administration",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4.0.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -342,7 +343,7 @@ metadata:
               "excludeOperand": false
             },
             "imageRegistry": "quay.io/opencloudio/icp-secret-watcher",
-            "imageTagPostfix": "4.0.0",
+            "imageTagPostfix": "3.7.12",
             "operatorVersion": "0.14.1",
             "replicas": 1,
             "resources": {
@@ -372,7 +373,7 @@ metadata:
             "iamOnboarding": {
               "imageName": "icp-iam-onboarding",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4.0.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -386,14 +387,14 @@ metadata:
             },
             "imageName": "icp-iam-onboarding",
             "imageRegistry": "quay.io/opencloudio",
-            "imageTag": "4.0.0",
+            "imageTag": "3.10.0",
             "impersonation": {
               "enableImpersonation": false
             },
             "initAuthService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4.0.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -438,7 +439,7 @@ metadata:
             "initPAPSpec": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4.0.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -453,7 +454,7 @@ metadata:
             "initTokenService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4.0.0",
+              "imageTag": "3.10.0",
               "resources": {
                 "limits": {
                   "cpu": "200m",
@@ -1520,160 +1521,6 @@ spec:
     mediatype: "image/png"
   install:
     spec:
-      clusterPermissions:
-      - rules:
-        - apiGroups:
-          - ""
-          resources:
-          #the namespaces are being watched by the oidcclientwatcher
-          - namespaces
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        # used in identity manager
-        - apiGroups:
-          - rbac.authorization.k8s.io
-          resources:
-          - clusterroles
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-          - escalate
-          - bind
-        - apiGroups:
-          - authorization.openshift.io
-          resources:
-          - clusterrolebindings
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        # Used by oidcclient-watcher
-        - apiGroups:
-          - rbac.authorization.k8s.io
-          resources:
-          - clusterrolebindings
-          - clusterrolebindings/finalizers
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        # fetch users call is used in identity manager
-        - apiGroups:
-          - user.openshift.io
-          resources:
-          - users
-          - groups
-          - identities
-          verbs:
-          - create
-          - get
-          - list
-          - patch
-          - update
-          - watch
-          - delete
-        # token allocation is used in identity provider
-        - apiGroups:
-          - oauth.openshift.io
-          resources:
-          - oauthaccesstokens
-          - oauthclients
-          verbs:
-          - create
-          - get
-          - list
-          - patch
-          - update
-          - watch
-          - delete
-        # this is used by iam poliy controller
-        - apiGroups:
-          - iam.policies.ibm.com
-          resources:
-          - iampolicies
-          verbs:
-          - create
-          - get
-          - list
-          - patch
-          - update
-          - watch
-          - delete
-        serviceAccountName: ibm-iam-operand-restricted
-      - rules:
-        - apiGroups:
-          - admissionregistration.k8s.io
-          resources:
-          - mutatingwebhookconfigurations
-          #iam.hooks.securityenforcement.admission.cloud.ibm.com used by oidcclient-watcher
-          verbs:
-          - get
-          - list
-          - watch
-          - create
-          - update
-          - patch
-          - delete
-          # Investigate further whether we can avoid the creation of clusteroles and clusterrolbeindings
-        - apiGroups:
-          - rbac.authorization.k8s.io
-          resources:
-          - clusterroles
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-          - escalate
-          - bind
-        - apiGroups:
-          - rbac.authorization.k8s.io
-          resources:
-          - clusterrolebindings
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - user.openshift.io
-          resources:
-          - users
-          # The default admin user has to be created
-          verbs:
-          - create
-          - get
-          - list
-          - patch
-          - update
-          - watch
-          - delete
-        serviceAccountName: ibm-iam-operator
       deployments:
       - name: ibm-iam-operator
         spec:
@@ -1710,23 +1557,23 @@ spec:
                 - ibm-iam-operator
                 env:
                 - name: ICP_PLATFORM_AUTH_IMAGE
-                  value: quay.io/opencloudio/icp-platform-auth:4.0.0
+                  value: quay.io/opencloudio/icp-platform-auth:3.10.0
                 - name: ICP_IDENTITY_PROVIDER_IMAGE
                   value: quay.io/opencloudio/icp-identity-provider:4.0.0
                 - name: ICP_IDENTITY_MANAGER_IMAGE
                   value: quay.io/opencloudio/icp-identity-manager:4.0.0
                 - name: IAM_POLICY_ADMINISTRATION_IMAGE
-                  value: quay.io/opencloudio/iam-policy-administration:4.0.0
+                  value: quay.io/opencloudio/iam-policy-administration:3.10.0
                 - name: IAM_POLICY_DECISION_IMAGE
-                  value: quay.io/opencloudio/iam-policy-decision:4.0.0
+                  value: quay.io/opencloudio/iam-policy-decision:3.10.0
                 - name: ICP_SECRET_WATCHER_IMAGE
-                  value: quay.io/opencloudio/icp-secret-watcher:4.0.0
+                  value: quay.io/opencloudio/icp-secret-watcher:3.7.12
                 - name: ICP_OIDCCLIENT_WATCHER_IMAGE
-                  value: quay.io/opencloudio/icp-oidcclient-watcher:4.0.0
+                  value: quay.io/opencloudio/icp-oidcclient-watcher:3.10.0
                 - name: ICP_IAM_ONBOARDING_IMAGE
-                  value: quay.io/opencloudio/icp-iam-onboarding:4.0.0
+                  value: quay.io/opencloudio/icp-iam-onboarding:3.10.0
                 - name: AUDIT_SYSLOG_SERVICE_IMAGE
-                  value: quay.io/opencloudio/audit-syslog-service:1.0.7
+                  value: quay.io/opencloudio/audit-syslog-service:1.8.0
                 - name: WATCH_NAMESPACE
                   valueFrom:
                     fieldRef:
@@ -1755,6 +1602,16 @@ spec:
                   privileged: false
                   readOnlyRootFilesystem: true
               serviceAccountName: ibm-iam-operator
+              volumes:
+              - name: cluster-ca-cert
+                secret:
+                  defaultMode: 420
+                  items:
+                  - key: tls.key
+                    path: ca.key
+                  - key: tls.crt
+                    path: ca.crt
+                  secretName: cs-ca-certificate-secret
       permissions:
       - rules:
         - apiGroups:

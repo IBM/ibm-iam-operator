@@ -1,7 +1,7 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: paps.operator.ibm.com
+  name: oidcclientwatchers.operator.ibm.com
   labels:
     app.kubernetes.io/instance: ibm-iam-operator
     app.kubernetes.io/managed-by: ibm-iam-operator
@@ -9,16 +9,16 @@ metadata:
 spec:
   group: operator.ibm.com
   names:
-    kind: Pap
-    listKind: PapList
-    plural: paps
-    singular: pap
+    kind: OIDCClientWatcher
+    listKind: OIDCClientWatcherList
+    plural: oidcclientwatchers
+    singular: oidcclientwatcher
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Pap is the Schema for the paps API
+        description: OIDCClientWatcher is the Schema for the oidcclientwatchers API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -34,9 +34,13 @@ spec:
             type: object
           spec:
             x-kubernetes-preserve-unknown-fields: true
-            description: PapSpec defines the desired state of Pap
+            description: OIDCClientWatcherSpec defines the desired state of OIDCClientWatcher
             properties:
-              auditService:
+              imageRegistry:
+                type: string
+              imageTagPostfix:
+                type: string
+              oidcInitAuthService:
                 properties:
                   imageName:
                     type: string
@@ -71,12 +75,78 @@ spec:
                           to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                         type: object
                     type: object
-                  syslogTlsPath:
+                type: object
+              oidcInitIdentityManager:
+                properties:
+                  imageName:
                     type: string
-                required:
-                - imageName
-                - imageRegistry
-                - imageTag
+                  imageRegistry:
+                    type: string
+                  imageTag:
+                    type: string
+                  resources:
+                    description: ResourceRequirements describes the compute resource
+                      requirements.
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: 'Limits describes the maximum amount of compute
+                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: 'Requests describes the minimum amount of compute
+                          resources required. If Requests is omitted for a container,
+                          it defaults to Limits if that is explicitly specified, otherwise
+                          to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                        type: object
+                    type: object
+                type: object
+              oidcInitIdentityProvider:
+                properties:
+                  imageName:
+                    type: string
+                  imageRegistry:
+                    type: string
+                  imageTag:
+                    type: string
+                  resources:
+                    description: ResourceRequirements describes the compute resource
+                      requirements.
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: 'Limits describes the maximum amount of compute
+                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: 'Requests describes the minimum amount of compute
+                          resources required. If Requests is omitted for a container,
+                          it defaults to Limits if that is explicitly specified, otherwise
+                          to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                        type: object
+                    type: object
                 type: object
               operatorVersion:
                 description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -84,59 +154,40 @@ spec:
                   modifying this file Add custom validation using kubebuilder tags:
                   https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html'
                 type: string
-              papService:
-                description: PapServiceSpec defined the desired state of PapService
-                  Container
-                properties:
-                  imageName:
-                    type: string
-                  imageRegistry:
-                    type: string
-                  imageTag:
-                    type: string
-                  resources:
-                    description: ResourceRequirements describes the compute resource
-                      requirements.
-                    properties:
-                      limits:
-                        additionalProperties:
-                          anyOf:
-                          - type: integer
-                          - type: string
-                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                          x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
-                        type: object
-                      requests:
-                        additionalProperties:
-                          anyOf:
-                          - type: integer
-                          - type: string
-                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                          x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
-                        type: object
-                    type: object
-                required:
-                - imageName
-                - imageRegistry
-                - imageTag
-                type: object
               replicas:
                 format: int32
                 type: integer
+              resources:
+                description: ResourceRequirements describes the compute resource requirements.
+                properties:
+                  limits:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: 'Limits describes the maximum amount of compute resources
+                      allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                    type: object
+                  requests:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: 'Requests describes the minimum amount of compute
+                      resources required. If Requests is omitted for a container,
+                      it defaults to Limits if that is explicitly specified, otherwise
+                      to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                    type: object
+                type: object
             required:
-            - auditService
-            - operatorVersion
-            - papService
             - replicas
             type: object
           status:
-            description: PapStatus defines the observed state of Pap
+            description: OIDCClientWatcherStatus defines the observed state of OIDCClientWatcher
             properties:
               nodes:
                 description: 'INSERT ADDITIONAL STATUS FIELD - define observed state

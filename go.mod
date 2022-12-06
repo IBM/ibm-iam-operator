@@ -68,6 +68,7 @@ require (
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b // indirect
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6 // indirect
 	golang.org/x/sys v0.0.0-20201112073958-5cba982894dd // indirect
+	golang.org/x/term v0.0.0-20201117132131-f5c789dd3221 // indirect
 	golang.org/x/text v0.3.3 // indirect
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e // indirect
 	gomodules.xyz/jsonpatch/v2 v2.1.0 // indirect
@@ -83,12 +84,15 @@ require (
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.0.3 // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect
+
 )
 
 // Pinned to kubernetes-1.16.2
 replace (
+	github.com/dgrijalva/jwt-go => github.com/dgrijalva/jwt-go/v4 v4.0.0-preview1
 	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.5.1
 	github.com/prometheus-operator/prometheus-operator => github.com/prometheus-operator/prometheus-operator v0.38.0 // indirect
+	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20201216223049-8b5274cf687f
 	k8s.io/api => k8s.io/api v0.19.10
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.19.10
 	k8s.io/apimachinery => k8s.io/apimachinery v0.19.10

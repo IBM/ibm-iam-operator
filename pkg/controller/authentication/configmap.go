@@ -211,6 +211,12 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["MONGO_POOL_MAX_SIZE"] = newConfigMap.Data["MONGO_POOL_MAX_SIZE"]
 					cmUpdateRequired = true
 				}
+				if _, keyExists := currentConfigMap.Data["OSAUTH_ENABLED"]; !keyExists {
+					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					newConfigMap = functionList[index](instance, r.scheme)
+					currentConfigMap.Data["OSAUTH_ENABLED"] = newConfigMap.Data["OSAUTH_ENABLED"]
+					cmUpdateRequired = true
+				}
 				if _, keyExists := currentConfigMap.Data["OS_TOKEN_LENGTH"]; keyExists {
 					if currentConfigMap.Data["OS_TOKEN_LENGTH"] == "45" {
 						newConfigMap = functionList[index](instance, r.scheme)
@@ -228,6 +234,18 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["SCIM_LDAP_SEARCH_TIME_LIMIT"] = newConfigMap.Data["SCIM_LDAP_SEARCH_TIME_LIMIT"]
 					currentConfigMap.Data["SCIM_ASYNC_PARALLEL_LIMIT"] = newConfigMap.Data["SCIM_ASYNC_PARALLEL_LIMIT"]
 					currentConfigMap.Data["SCIM_GET_DISPLAY_FOR_GROUP_USERS"] = newConfigMap.Data["SCIM_GET_DISPLAY_FOR_GROUP_USERS"]
+					cmUpdateRequired = true
+				}
+				if _, keyExists := currentConfigMap.Data["SCIM_AUTH_CACHE_MAX_SIZE"]; !keyExists {
+					reqLogger.Info("Updating an existing Configmap to add new SCIM variables", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					newConfigMap = functionList[index](instance, r.scheme)
+					currentConfigMap.Data["SCIM_AUTH_CACHE_MAX_SIZE"] = newConfigMap.Data["SCIM_AUTH_CACHE_MAX_SIZE"]
+					cmUpdateRequired = true
+				}
+				if _, keyExists := currentConfigMap.Data["SCIM_AUTH_CACHE_TTL_VALUE"]; !keyExists {
+					reqLogger.Info("Updating an existing Configmap to add new SCIM variables", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					newConfigMap = functionList[index](instance, r.scheme)
+					currentConfigMap.Data["SCIM_AUTH_CACHE_TTL_VALUE"] = newConfigMap.Data["SCIM_AUTH_CACHE_TTL_VALUE"]
 					cmUpdateRequired = true
 				}
 				if _, keyExists := currentConfigMap.Data["AUTH_SVC_LDAP_CONFIG_TIMEOUT"]; !keyExists {
@@ -327,6 +345,7 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"FIPS_ENABLED":                       strconv.FormatBool(instance.Spec.Config.FIPSEnabled),
 			"NONCE_ENABLED":                      strconv.FormatBool(instance.Spec.Config.NONCEEnabled),
 			"ROKS_ENABLED":                       strconv.FormatBool(instance.Spec.Config.ROKSEnabled),
+			"OSAUTH_ENABLED":                     strconv.FormatBool(instance.Spec.Config.OSAuthEnabled),
 			"IBM_CLOUD_SAAS":                     strconv.FormatBool(instance.Spec.Config.IBMCloudSaas),
 			"ATTR_MAPPING_FROM_CONFIG":           strconv.FormatBool(instance.Spec.Config.AttrMappingFromConfig),
 			"SAAS_CLIENT_REDIRECT_URL":           instance.Spec.Config.SaasClientRedirectUrl,
@@ -376,6 +395,8 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"SCIM_LDAP_SEARCH_TIME_LIMIT":        "10",
 			"SCIM_ASYNC_PARALLEL_LIMIT":          "100",
 			"SCIM_GET_DISPLAY_FOR_GROUP_USERS":   "true",
+			"SCIM_AUTH_CACHE_MAX_SIZE":   			  "1000",
+			"SCIM_AUTH_CACHE_TTL_VALUE":   			  "60",
 			"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
 		},
 	}

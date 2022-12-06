@@ -302,6 +302,17 @@ func buildPdpContainer(pdpImage string, resources *corev1.ResourceRequirements) 
 				},
 			},
 			{
+				Name: "OSAUTH_ENABLED",
+				ValueFrom: &corev1.EnvVarSource{
+					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "platform-auth-idp",
+						},
+						Key: "OSAUTH_ENABLED",
+					},
+				},
+			},
+			{
 				Name: "AUDIT_LOG_PATH",
 				ValueFrom: &corev1.EnvVarSource{
 					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{

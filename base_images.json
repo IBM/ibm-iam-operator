@@ -7,7 +7,7 @@
         "destStage": "edge",
         "destNamespace": "build-images",
         "destImage": "ubi8",
-        "tag": "8.5-200",
+        "tag": "8.6-943",
         "updatePackages": []
     },
     {
@@ -18,43 +18,41 @@
         "destStage": "edge",
         "destNamespace": "build-images",
         "destImage": "ubi8-minimal",
-        "tag": "8.5-204",
+        "tag": "8.6-941",
         "updatePackages": []
     },
     {
         "imageType": "external",
-        "sourceRepo": "registry.access.redhat.com",
-        "sourceNamespace": "ubi7",
-        "sourceImage": "ubi",
+        "sourceRepo": "quay.io",
+        "sourceNamespace": "operator-framework",
+        "sourceImage": "helm-operator",
         "destStage": "edge",
         "destNamespace": "build-images",
-        "destImage": "ubi7",
-        "tag": "7.9-516",
-        "updatePackages": []
-    },
-    {
-        "imageType": "external",
-        "sourceRepo": "registry.access.redhat.com",
-        "sourceNamespace": "ubi7",
-        "sourceImage": "ubi-minimal",
-        "destStage": "edge",
-        "destNamespace": "build-images",
-        "destImage": "ubi7-minimal",
-        "tag": "7.9-503",
+        "destImage": "helm-operator",
+        "tag": "v1.23.0",
         "updatePackages": []
     },
     {
         "imageType": "node",
         "sourceImage": "ubi8-minimal",
-        "sourceTag": "8.5-204",
-        "destImage": "node-dubnium-ubi8-minimal",
-        "nodeVersion": "10.24.1"
-    },
-    {
-        "imageType": "node",
-        "sourceImage": "ubi8-minimal",
-        "sourceTag": "8.5-204",
+        "sourceTag": "8.6-941",
         "destImage": "node-fermium-ubi8-minimal",
-        "nodeVersion": "14.18.1"
+        "nodeVersion": "14.20.1"
+    },
+    {
+        "imageType": "node",
+        "sourceImage": "ubi8-minimal",
+        "sourceTag": "8.6-941",
+        "destImage": "node-fermium-npm8-ubi8-minimal",
+        "nodeVersion": "14.20.1",
+        "npmVersion": "8"
+    },
+    {
+        "imageType": "node",
+        "sourceImage": "ubi8-minimal",
+        "sourceTag": "8.6-941",
+        "destImage": "node-v16-ubi8-minimal",
+        "nodeVersion": "16.17.1"
     }
+    
 ]

@@ -65,7 +65,7 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 		return err
 	}
 
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "platform-identity-provider-auth", Namespace: instance.Namespace}, currentService)
+	/*err = r.client.Get(context.TODO(), types.NamespacedName{Name: "platform-identity-provider-auth", Namespace: instance.Namespace}, currentService)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new service
 		identityAuthProviderService := r.identityAuthProviderService(instance)
@@ -80,7 +80,7 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Service")
 		return err
-	}
+	}*/
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "platform-identity-management", Namespace: instance.Namespace}, currentService)
 	if err != nil && errors.IsNotFound(err) {
@@ -178,7 +178,7 @@ func (r *ReconcileAuthentication) identityManagementService(instance *operatorv1
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-identity-management",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp-manager"},
+			Labels:    map[string]string{"app": "platform-identity-manager"},
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
@@ -196,7 +196,7 @@ func (r *ReconcileAuthentication) identityManagementService(instance *operatorv1
 				},
 			},
 			Selector: map[string]string{
-				"k8s-app": "auth-idp-manager",
+				"k8s-app": "platform-identity-manager",
 			},
 			Type:            "ClusterIP",
 			SessionAffinity: corev1.ServiceAffinityClientIP,
@@ -257,7 +257,7 @@ func (r *ReconcileAuthentication) identityProviderService(instance *operatorv1al
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-identity-provider",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp-provider"},
+			Labels:    map[string]string{"app": "platform-identity-provider"},
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
@@ -267,7 +267,7 @@ func (r *ReconcileAuthentication) identityProviderService(instance *operatorv1al
 				},
 			},
 			Selector: map[string]string{
-				"k8s-app": "auth-idp-provider",
+				"k8s-app": "platform-identity-provider",
 			},
 			Type:            "ClusterIP",
 			SessionAffinity: corev1.ServiceAffinityClientIP,

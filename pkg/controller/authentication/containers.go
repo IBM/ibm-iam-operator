@@ -632,7 +632,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		},
 		{
 			Name:  "IDMGMT_KUBEDNS_NAME",
-			Value: "127.0.0.1",
+			Value: "platform-identity-management",
 		},
 		{
 			Name: "OAUTH2_CLIENT_REGISTRATION_SECRET",
@@ -673,7 +673,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		},
 		{
 			Name:  "IAM_OIDC_TOKEN_SERVICE_URL",
-			Value: "https://127.0.0.1:9443/iam",
+			Value: "https://platform-auth-service:9443/iam",
 		},
 		{
 			Name:  "MASTER_HOST",
@@ -948,11 +948,11 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		},
 		{
 			Name:  "IDPROVIDER_KUBEDNS_NAME",
-			Value: "https://127.0.0.1",
+			Value: "https://platform-identity-provider",
 		},
 		{
 			Name:  "IAM_TOKEN_SERVICE_URL",
-			Value: "https://127.0.0.1:9443",
+			Value: "https://platform-auth-service:9443",
 		},
 		{
 			Name:  "MASTER_NODES_LIST",
@@ -1062,7 +1062,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 	}
 
 	return corev1.Container{
-		Name:            "platform-identity-manager",
+		Name:            "platform-identity-management",
 		Image:           identityManagerImage,
 		ImagePullPolicy: corev1.PullAlways,
 		SecurityContext: &corev1.SecurityContext{

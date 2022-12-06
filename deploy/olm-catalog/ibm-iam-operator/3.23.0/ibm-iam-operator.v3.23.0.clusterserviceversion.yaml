@@ -1,0 +1,2055 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "OIDCClientWatcher",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/instance": "ibm-iam-operator",
+              "app.kubernetes.io/managed-by": "ibm-iam-operator",
+              "app.kubernetes.io/name": "ibm-iam-operator"
+            },
+            "name": "example-oidcclientwatcher"
+          },
+          "spec": {
+            "imageRegistry": "quay.io/opencloudio/icp-oidcclient-watcher",
+            "imageTagPostfix": "3.11.0",
+            "operatorVersion": "0.14.1",
+            "replicas": 1,
+            "resources": {
+              "limits": {
+                "cpu": "200m",
+                "memory": "256Mi"
+              },
+              "requests": {
+                "cpu": "10m",
+                "memory": "16Mi"
+              }
+            },
+            "oidcInitAuthService": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.11.0",
+              "resources": {
+                "limits": {
+                  "cpu": "200m",
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "128M"
+                }
+              }
+            },
+            "oidcInitIdentityProvider": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.11.0",
+              "resources": {
+                "limits": {
+                  "cpu": "200m",
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "128M"
+                }
+              }
+            },
+            "oidcInitIdentityManager": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.11.0",
+              "resources": {
+                "limits": {
+                  "cpu": "200m",
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "128M"
+                }
+              }
+            }
+          }
+        },
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "PolicyDecision",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/instance": "ibm-iam-operator",
+              "app.kubernetes.io/managed-by": "ibm-iam-operator",
+              "app.kubernetes.io/name": "ibm-iam-operator"
+            },
+            "name": "example-policydecision"
+          },
+          "spec": {
+            "auditService": {
+              "imageName": "audit-syslog-service",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "1.8.0",
+              "syslogTlsPath": "/etc/audit-tls",
+              "resources": {
+                "limits": {
+                  "cpu": "200m",
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "10m",
+                  "memory": "100Mi"
+                }
+              }
+            },
+            "imageName": "iam-policy-decision",
+            "imageRegistry": "quay.io/opencloudio",
+            "imageTag": "3.11.0",
+            "initMongodb": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.11.0",
+              "resources": {
+                "limits": {
+                  "cpu": "100m",
+                  "memory": "128Mi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "128Mi"
+                }
+              }
+            },
+            "operatorVersion": "0.14.1",
+            "replicas": 1,
+            "resources": {
+              "limits": {
+                "cpu": "200m",
+                "memory": "256Mi"
+              },
+              "requests": {
+                "cpu": "20m",
+                "memory": "100Mi"
+              }
+            }
+          }
+        },
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "Authentication",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/instance": "ibm-iam-operator",
+              "app.kubernetes.io/managed-by": "ibm-iam-operator",
+              "app.kubernetes.io/name": "ibm-iam-operator"
+            },
+            "name": "example-authentication"
+          },
+          "spec": {
+            "auditService": {
+              "imageName": "audit-syslog-service",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "1.8.0",
+              "syslogTlsPath": "/etc/audit-tls",
+              "resources": {
+                "limits": {
+                  "cpu": "100m",
+                  "memory": "128Mi"
+                },
+                "requests": {
+                  "cpu": "10m",
+                  "memory": "100Mi"
+                }
+              }
+            },
+            "authService": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.11.0",
+              "ldapsCACert": "platform-auth-ldaps-ca-cert",
+              "resources": {
+                "limits": {
+                  "cpu": "1000m",
+                  "memory": "1Gi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "350Mi"
+                }
+              },
+              "routerCertSecret": "route-tls-secret"
+            },
+            "clientRegistration": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.11.0",
+              "resources": {
+                "limits": {
+                  "cpu": "1000m",
+                  "memory": "1Gi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "128Mi"
+                }
+              }
+            },
+            "config": {
+              "authUniqueHosts": "internal-ip1 internal-ip2 mycluster.icp",
+              "clusterCADomain": "mycluster.icp",
+              "clusterExternalAddress": "10.0.0.1",
+              "clusterInternalAddress": "10.0.0.1",
+              "clusterName": "mycluster",
+              "defaultAdminPassword": "password",
+              "defaultAdminUser": "admin",
+              "scimAdminPassword": "scimpassword",
+              "scimAdminUser": "scimadmin",
+              "enableImpersonation": false,
+              "fipsEnabled": true,
+              "ibmCloudSaas": false,
+              "onPremMultipleDeploy": false,
+              "icpPort": 8443,
+              "installType": "fresh",
+              "isOpenshiftEnv": true,
+              "nonceEnabled": true,
+              "xframeDomain": "",
+              "preferredLogin": "",
+              "bootstrapUserId": "kubeadmin",
+              "providerIssuerURL": "",
+              "claimsSupported": "name,family_name,display_name,given_name,preferred_username",
+              "claimsMap": "name=\"givenName\" family_name=\"givenName\" given_name=\"givenName\" preferred_username=\"displayName\" display_name=\"displayName\"",
+              "scopeClaim": "profile=\"name,family_name,display_name,given_name,preferred_username\"",
+              "oidcIssuerURL": "https://127.0.0.1:443/idauth/oidc/endpoint/OP",
+              "openshiftPort": 443,
+              "roksEnabled": true,
+              "roksURL": "https://roks.domain.name:443",
+              "roksUserPrefix": "changeme",
+              "saasClientRedirectUrl": "",
+              "wlpClientID": "4444be3a738841016ab76d71b650e836",
+              "wlpClientRegistrationSecret": "f1362ca4d20b8389af2d1ea68042c9af",
+              "wlpClientSecret": "aa73bf39752053bf723d1143fb4cf8a2"
+            },
+            "identityManager": {
+              "imageName": "icp-identity-manager",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.11.0",
+              "masterNodesList": "10.0.0.1",
+              "resources": {
+                "limits": {
+                  "cpu": "1000m",
+                  "memory": "1Gi"
+                },
+                "requests": {
+                  "cpu": "50m",
+                  "memory": "150Mi"
+                }
+              }
+            },
+            "identityProvider": {
+              "imageName": "icp-identity-provider",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.11.0",
+              "resources": {
+                "limits": {
+                  "cpu": "1000m",
+                  "memory": "1Gi"
+                },
+                "requests": {
+                  "cpu": "50m",
+                  "memory": "150Mi"
+                }
+              }
+            },
+            "initMongodb": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.11.0",
+              "resources": {
+                "limits": {
+                  "cpu": "100m",
+                  "memory": "128Mi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "128Mi"
+                }
+              }
+            },
+            "operatorVersion": "0.14.1",
+            "replicas": 1
+          }
+        },
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "Pap",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/instance": "ibm-iam-operator",
+              "app.kubernetes.io/managed-by": "ibm-iam-operator",
+              "app.kubernetes.io/name": "ibm-iam-operator"
+            },
+            "name": "example-pap"
+          },
+          "spec": {
+            "auditService": {
+              "imageName": "audit-syslog-service",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "1.8.0",
+              "syslogTlsPath": "/etc/audit-tls",
+              "resources": {
+                "limits": {
+                  "cpu": "200m",
+                  "memory": "200Mi"
+                },
+                "requests": {
+                  "cpu": "20m",
+                  "memory": "20Mi"
+                }
+              }
+            },
+            "operatorVersion": "0.14.1",
+            "papService": {
+              "imageName": "iam-policy-administration",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.11.0",
+              "resources": {
+                "limits": {
+                  "cpu": "1000m",
+                  "memory": "1Gi"
+                },
+                "requests": {
+                  "cpu": "50m",
+                  "memory": "200Mi"
+                }
+              }
+            },
+            "replicas": 1
+          }
+        },
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "PolicyController",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/instance": "ibm-iam-operator",
+              "app.kubernetes.io/managed-by": "ibm-iam-operator",
+              "app.kubernetes.io/name": "ibm-iam-operator"
+            },
+            "name": "policycontroller-deployment"
+          },
+          "spec": {
+            "config": {
+              "excludeOperand": false
+            },
+            "imageRegistry": "quay.io/opencloudio/iam-policy-controller",
+            "imageTagPostfix": "3.7.15",
+            "operatorVersion": "0.14.1",
+            "replicas": 1,
+            "resources": {
+              "limits": {
+                "cpu": "200m",
+                "memory": "384Mi"
+              },
+              "requests": {
+                "cpu": "100m",
+                "memory": "128Mi"
+              }
+            }
+          }
+        },
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "SecretWatcher",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/instance": "ibm-iam-operator",
+              "app.kubernetes.io/managed-by": "ibm-iam-operator",
+              "app.kubernetes.io/name": "ibm-iam-operator"
+            },
+            "name": "secretwatcher-deployment"
+          },
+          "spec": {
+            "config": {
+              "excludeOperand": false
+            },
+            "imageRegistry": "quay.io/opencloudio/icp-secret-watcher",
+            "imageTagPostfix": "3.7.15",
+            "operatorVersion": "0.14.1",
+            "replicas": 1,
+            "resources": {
+              "limits": {
+                "cpu": "200m",
+                "memory": "512Mi"
+              },
+              "requests": {
+                "cpu": "50m",
+                "memory": "64Mi"
+              }
+            }
+          }
+        },
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "SecurityOnboarding",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/instance": "ibm-iam-operator",
+              "app.kubernetes.io/managed-by": "ibm-iam-operator",
+              "app.kubernetes.io/name": "ibm-iam-operator"
+            },
+            "name": "example-securityonboarding"
+          },
+          "spec": {
+            "iamOnboarding": {
+              "imageName": "icp-iam-onboarding",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.11.0",
+              "resources": {
+                "limits": {
+                  "cpu": "200m",
+                  "memory": "1024Mi"
+                },
+                "requests": {
+                  "cpu": "20m",
+                  "memory": "64M"
+                }
+              }
+            },
+            "imageName": "icp-iam-onboarding",
+            "imageRegistry": "quay.io/opencloudio",
+            "imageTag": "3.11.0",
+            "impersonation": {
+              "enableImpersonation": false
+            },
+            "initAuthService": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.11.0",
+              "resources": {
+                "limits": {
+                  "cpu": "200m",
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "128M"
+                }
+              }
+            },
+            "initIdentityManager": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.11.0",
+              "resources": {
+                "limits": {
+                  "cpu": "200m",
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "128M"
+                }
+              }
+            },
+            "initIdentityProvider": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.11.0",
+              "resources": {
+                "limits": {
+                  "cpu": "200m",
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "128M"
+                }
+              }
+            },
+            "initPAPSpec": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.11.0",
+              "resources": {
+                "limits": {
+                  "cpu": "200m",
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "128M"
+                }
+              }
+            },
+            "initTokenService": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "3.11.0",
+              "resources": {
+                "limits": {
+                  "cpu": "200m",
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "128M"
+                }
+              }
+            },
+            "operatorVersion": "0.14.1",
+            "replicas": 1,
+            "resources": {
+              "limits": {
+                "cpu": "200m",
+                "memory": "512Mi"
+              },
+              "requests": {
+                "cpu": "20m",
+                "memory": "64Mi"
+              }
+            }
+          }
+        },
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "OperandRequest",
+          "metadata": {
+            "name": "ibm-iam-request"
+          },
+          "spec": {
+            "requests": [
+              {
+                "operands": [
+                  {
+                    "name": "ibm-mongodb-operator"
+                  },
+                  {
+                    "name": "ibm-cert-manager-operator"
+                  },
+                  {
+                    "name": "ibm-management-ingress-operator"
+                  },
+                  {
+                    "name": "ibm-ingress-nginx-operator"
+                  }
+                ],
+                "registry": "common-service"
+              }
+            ]
+          }
+        },
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "OperandBindInfo",
+          "metadata": {
+            "name": "ibm-iam-bindinfo"
+          },
+          "spec": {
+            "operand": "ibm-iam-operator",
+            "registry": "common-service",
+            "description": "Binding information that should be accessible to iam adopters",
+            "bindings": {
+              "public-oidc-creds": {
+                "secret": "platform-oidc-credentials"
+              },
+              "public-auth-creds": {
+                "secret" : "platform-auth-idp-credentials"
+              },
+              "public-scim-creds": {
+                "secret" : "platform-auth-scim-credentials"
+              },
+              "public-auth-cert": {
+                "secret" : "platform-auth-secret"
+              },
+              "public-cam-secret": {
+                "secret" : "oauth-client-secret"
+              },
+              "protected-zen-serviceid": {
+                "secret" : "zen-serviceid-apikey-secret"
+              },
+              "public-cam-map": {
+                "configmap" : "oauth-client-map"
+              },
+              "public-auth-config": {
+                "configmap" : "platform-auth-idp"
+              }
+            }
+          }
+        }
+      ]
+    capabilities: Seamless Upgrades
+    categories: Security
+    certified: "false"
+    containerImage: icr.io/cpopen/ibm-iam-operator:3.23.0
+    description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
+      the lifecycle of IAM services. With this operator, you can simply deploy and
+      upgrade the IAM services
+    olm.skipRange: '<3.23.0'
+    repository: https://github.com/IBM/ibm-iam-operator
+    support: IBM
+  labels:
+    operatorframework.io/arch.s390x: supported
+    operatorframework.io/os.linux: supported
+    operatorframework.io/arch.amd64: supported
+    operatorframework.io/arch.ppc64le: supported
+  name: ibm-iam-operator.v3.23.0
+  namespace: placeholder
+spec:
+  relatedImages:
+    - name: IBM_IAM_OPERATOR_IMAGE
+      image: icr.io/cpopen/ibm-iam-operator:3.23.0
+    - name: ICP_PLATFORM_AUTH_IMAGE
+      image: icr.io/cpopen/cpfs/icp-platform-auth:3.11.0
+    - name: ICP_IDENTITY_PROVIDER_IMAGE
+      image: icr.io/cpopen/cpfs/icp-identity-provider:3.11.0
+    - name: ICP_IDENTITY_MANAGER_IMAGE
+      image: icr.io/cpopen/cpfs/icp-identity-manager:3.11.0
+    - name: IAM_POLICY_ADMINISTRATION_IMAGE
+      image: icr.io/cpopen/cpfs/iam-policy-administration:3.11.0
+    - name: IAM_POLICY_DECISION_IMAGE
+      image: icr.io/cpopen/cpfs/iam-policy-decision:3.11.0
+    - name: ICP_SECRET_WATCHER_IMAGE
+      image: icr.io/cpopen/cpfs/icp-secret-watcher:3.7.15
+    - name: ICP_OIDCCLIENT_WATCHER_IMAGE
+      image: icr.io/cpopen/cpfs/icp-oidcclient-watcher:3.11.0
+    - name: IAM_POLICY_CONTROLLER_IMAGE
+      image: icr.io/cpopen/cpfs/iam-policy-controller:3.7.15
+    - name: ICP_IAM_ONBOARDING_IMAGE
+      image: icr.io/cpopen/cpfs/icp-iam-onboarding:3.11.0
+    - name: AUDIT_SYSLOG_SERVICE_IMAGE
+      image: icr.io/cpopen/cpfs/audit-syslog-service:1.8.0
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: Authentication is the schema for the authentications API. Documentation For additional details regarding install parameters check https://ibm.biz/icpfs39install. License By installing this product you accept the license terms https://ibm.biz/icpfs39license 
+      kind: Authentication
+      name: authentications.operator.ibm.com
+      displayName: Authentication
+      resources:
+        - kind: secrets
+          name: ''
+          version: v1
+        - kind: mutatingwebhookconfigurations
+          name: ''
+          version: v1beta1
+        - kind: paps
+          name: ''
+          version: v1alpha1
+        - kind: clusterroles
+          name: ''
+          version: v1
+        - kind: clusterrolebindings
+          name: ''
+          version: v1
+        - kind: policycontrollers
+          name: ''
+          version: v1alpha1
+        - kind: ingresses
+          name: ''
+          version: v1beta1
+        - kind: securityonboardings
+          name: ''
+          version: v1alpha1
+        - kind: customresourcedefinitions
+          name: ''
+          version: v1beta1
+        - kind: policydecisions
+          name: ''
+          version: v1alpha1
+        - kind: secretwatchers
+          name: ''
+          version: v1alpha1
+        - kind: servicemonitors
+          name: ''
+          version: v1
+        - kind: authentications
+          name: ''
+          version: v1alpha1
+        - kind: Pods
+          name: ''
+          version: v1
+        - kind: statefulsets
+          name: ''
+          version: v1
+        - kind: services
+          name: ''
+          version: v1
+        - kind: persistentvolumeclaims
+          name: ''
+          version: v1
+        - kind: Jobs
+          name: ''
+          version: v1
+        - kind: configmaps
+          name: ''
+          version: v1
+        - kind: certificates
+          name: ''
+          version: v1alpha1
+        - kind: deployments
+          name: ''
+          version: v1
+        - kind: oidcclientwatchers
+          name: ''
+          version: v1alpha1
+        - kind: users
+          name: ''
+          version: v1
+        - kind: replicasets
+          name: ''
+          version: v1
+      specDescriptors:
+      - description: A list defines the catalog information for operators.
+        displayName: Operators
+        path: operators
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for identity manager.
+        displayName: identityManager
+        path: identityManager
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for operator version.
+        displayName: OperatorVersion
+        path: operatorVersion
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for audit service.
+        displayName: AuditService
+        path: auditService
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for auth service.
+        displayName: authService
+        path: authService
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for identity provider.
+        displayName: identityProvider
+        path: identityProvider
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for init mongodb.
+        displayName: initMongodb
+        path: initMongodb
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for replicas.
+        displayName: Replicas
+        path: replicas
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for client registration.
+        displayName: ClientRegistration
+        path: clientRegistration
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for config.
+        displayName: Config
+        path: config
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      statusDescriptors:
+      - description: The status of operators.
+        displayName: Operator Status
+        path: OperatorsStatus
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of nodes.
+        displayName: Node Status
+        path: nodes
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      version: v1alpha1
+    - description: OIDCClientWatcher is the schema for the oidcclientwatchers API. Documentation For additional details regarding install parameters check https://ibm.biz/icpfs39install. License By installing this product you accept the license terms https://ibm.biz/icpfs39license
+      kind: OIDCClientWatcher
+      name: oidcclientwatchers.operator.ibm.com
+      displayName: OIDCClientWatcher
+      resources:
+        - kind: secrets
+          name: ''
+          version: v1
+        - kind: mutatingwebhookconfigurations
+          name: ''
+          version: v1beta1
+        - kind: clusterroles
+          name: ''
+          version: v1
+        - kind: clusterrolebindings
+          name: ''
+          version: v1
+        - kind: paps
+          name: ''
+          version: v1alpha1
+        - kind: policycontrollers
+          name: ''
+          version: v1alpha1
+        - kind: ingresses
+          name: ''
+          version: v1beta1
+        - kind: securityonboardings
+          name: ''
+          version: v1alpha1
+        - kind: customresourcedefinitions
+          name: ''
+          version: v1beta1
+        - kind: policydecisions
+          name: ''
+          version: v1alpha1
+        - kind: secretwatchers
+          name: ''
+          version: v1alpha1
+        - kind: authentications
+          name: ''
+          version: v1alpha1
+        - kind: Pods
+          name: ''
+          version: v1
+        - kind: statefulsets
+          name: ''
+          version: v1
+        - kind: services
+          name: ''
+          version: v1
+        - kind: persistentvolumeclaims
+          name: ''
+          version: v1
+        - kind: Jobs
+          name: ''
+          version: v1
+        - kind: configmaps
+          name: ''
+          version: v1
+        - kind: certificates
+          name: ''
+          version: v1alpha1
+        - kind: deployments
+          name: ''
+          version: v1
+        - kind: oidcclientwatchers
+          name: ''
+          version: v1alpha1
+        - kind: users
+          name: ''
+          version: v1
+        - kind: replicasets
+          name: ''
+          version: v1
+        - kind: securityonboardings
+          name: ''
+          version: v1alpha1
+        - kind: servicemonitors
+          name: ''
+          version: v1
+      specDescriptors:
+      - description: A list defines the catalog information for operators.
+        displayName: Operators
+        path: operators
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image registry.
+        displayName: imageRegistry
+        path: imageRegistry
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image tag postfix.
+        displayName: imageTagPostfix
+        path: imageTagPostfix
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for operator version.
+        displayName: operatorVersion
+        path: operatorVersion
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for replicas.
+        displayName: Replicas
+        path: replicas
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for resources.
+        displayName: Resources
+        path: resources
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      statusDescriptors:
+      - description: The status of operators.
+        displayName: Operator Status
+        path: OperatorsStatus
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of nodes.
+        displayName: Node Status
+        path: nodes
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      version: v1alpha1
+    - description: Pap is the schema for the paps API. Documentation For additional details regarding install parameters check https://ibm.biz/icpfs39install. License By installing this product you accept the license terms https://ibm.biz/icpfs39license
+      kind: Pap
+      name: paps.operator.ibm.com
+      displayName: Pap
+      resources:
+        - kind: secrets
+          name: ''
+          version: v1
+        - kind: paps
+          name: ''
+          version: v1alpha1
+        - kind: policycontrollers
+          name: ''
+          version: v1alpha1
+        - kind: ingresses
+          name: ''
+          version: v1beta1
+        - kind: securityonboardings
+          name: ''
+          version: v1alpha1
+        - kind: customresourcedefinitions
+          name: ''
+          version: v1beta1
+        - kind: policydecisions
+          name: ''
+          version: v1alpha1
+        - kind: secretwatchers
+          name: ''
+          version: v1alpha1
+        - kind: servicemonitors
+          name: ''
+          version: v1
+        - kind: authentications
+          name: ''
+          version: v1alpha1
+        - kind: Pods
+          name: ''
+          version: v1
+        - kind: statefulsets
+          name: ''
+          version: v1
+        - kind: services
+          name: ''
+          version: v1
+        - kind: persistentvolumeclaims
+          name: ''
+          version: v1
+        - kind: Jobs
+          name: ''
+          version: v1
+        - kind: configmaps
+          name: ''
+          version: v1
+        - kind: certificates
+          name: ''
+          version: v1alpha1
+        - kind: deployments
+          name: ''
+          version: v1
+        - kind: oidcclientwatchers
+          name: ''
+          version: v1alpha1
+        - kind: users
+          name: ''
+          version: v1
+        - kind: replicasets
+          name: ''
+          version: v1
+      specDescriptors:
+      - description: A list defines the catalog information for operators.
+        displayName: Operators
+        path: operators
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for replicas.
+        displayName: Replicas
+        path: replicas
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for audit service.
+        displayName: AuditService
+        path: auditService
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for operator version.
+        displayName: OperatorVersion
+        path: operatorVersion
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for pap service.
+        displayName: PapService
+        path: papService
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      statusDescriptors:
+      - description: The status of operators.
+        displayName: Operator Status
+        path: OperatorsStatus
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of nodes.
+        displayName: Node Status
+        path: nodes
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      version: v1alpha1
+    - description: PolicyController is the schema for the policycontrollers API. Documentation For additional details regarding install parameters check https://ibm.biz/icpfs39install. License By installing this product you accept the license terms https://ibm.biz/icpfs39license
+      kind: PolicyController
+      name: policycontrollers.operator.ibm.com
+      displayName: PolicyController
+      resources:
+        - kind: secrets
+          name: ''
+          version: v1
+        - kind: clusterroles
+          name: ''
+          version: v1
+        - kind: clusterrolebindings
+          name: ''
+          version: v1
+        - kind: paps
+          name: ''
+          version: v1alpha1
+        - kind: policycontrollers
+          name: ''
+          version: v1alpha1
+        - kind: ingresses
+          name: ''
+          version: v1beta1
+        - kind: securityonboardings
+          name: ''
+          version: v1alpha1
+        - kind: customresourcedefinitions
+          name: ''
+          version: v1beta1
+        - kind: policydecisions
+          name: ''
+          version: v1alpha1
+        - kind: secretwatchers
+          name: ''
+          version: v1alpha1
+        - kind: servicemonitors
+          name: ''
+          version: v1
+        - kind: authentications
+          name: ''
+          version: v1alpha1
+        - kind: Pods
+          name: ''
+          version: v1
+        - kind: statefulsets
+          name: ''
+          version: v1
+        - kind: services
+          name: ''
+          version: v1
+        - kind: persistentvolumeclaims
+          name: ''
+          version: v1
+        - kind: Jobs
+          name: ''
+          version: v1
+        - kind: configmaps
+          name: ''
+          version: v1
+        - kind: certificates
+          name: ''
+          version: v1alpha1
+        - kind: deployments
+          name: ''
+          version: v1
+        - kind: oidcclientwatchers
+          name: ''
+          version: v1alpha1
+        - kind: users
+          name: ''
+          version: v1
+        - kind: replicasets
+          name: ''
+          version: v1
+      specDescriptors:
+      - description: A list defines the catalog information for operators.
+        displayName: Operators
+        path: operators
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image registry.
+        displayName: imageRegistry
+        path: imageRegistry
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image tag postfix.
+        displayName: imageTagPostfix
+        path: imageTagPostfix
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for operator version.
+        displayName: operatorVersion
+        path: operatorVersion
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for replicas.
+        displayName: Replicas
+        path: replicas
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for resources.
+        displayName: Resources
+        path: resources
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      statusDescriptors:
+      - description: The status of operators.
+        displayName: Operator Status
+        path: OperatorsStatus
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of nodes.
+        displayName: Node Status
+        path: nodes
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      version: v1alpha1
+    - description: PolicyDecision is the schema for the policydecisions API. Documentation For additional details regarding install parameters check https://ibm.biz/icpfs39install. License By installing this product you accept the license terms https://ibm.biz/icpfs39license
+      kind: PolicyDecision
+      name: policydecisions.operator.ibm.com
+      displayName: PolicyDecision
+      resources:
+        - kind: secrets
+          name: ''
+          version: v1
+        - kind: paps
+          name: ''
+          version: v1alpha1
+        - kind: policycontrollers
+          name: ''
+          version: v1alpha1
+        - kind: ingresses
+          name: ''
+          version: v1beta1
+        - kind: securityonboardings
+          name: ''
+          version: v1alpha1
+        - kind: customresourcedefinitions
+          name: ''
+          version: v1beta1
+        - kind: policydecisions
+          name: ''
+          version: v1alpha1
+        - kind: secretwatchers
+          name: ''
+          version: v1alpha1
+        - kind: servicemonitors
+          name: ''
+          version: v1
+        - kind: authentications
+          name: ''
+          version: v1alpha1
+        - kind: Pods
+          name: ''
+          version: v1
+        - kind: statefulsets
+          name: ''
+          version: v1
+        - kind: services
+          name: ''
+          version: v1
+        - kind: persistentvolumeclaims
+          name: ''
+          version: v1
+        - kind: Jobs
+          name: ''
+          version: v1
+        - kind: configmaps
+          name: ''
+          version: v1
+        - kind: certificates
+          name: ''
+          version: v1alpha1
+        - kind: deployments
+          name: ''
+          version: v1
+        - kind: oidcclientwatchers
+          name: ''
+          version: v1alpha1
+        - kind: users
+          name: ''
+          version: v1
+        - kind: replicasets
+          name: ''
+          version: v1
+      specDescriptors:
+      - description: A list defines the catalog information for operators.
+        displayName: Operators
+        path: operators
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image registry.
+        displayName: imageRegistry
+        path: imageRegistry
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image tag.
+        displayName: imageTag
+        path: imageTag
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for resources.
+        displayName: Resources
+        path: resources
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for init mongodb.
+        displayName: initMongodb
+        path: initMongodb
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for operator version.
+        displayName: operatorVersion
+        path: operatorVersion
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for replicas.
+        displayName: replicas
+        path: replicas
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for audit service.
+        displayName: auditService
+        path: auditService
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image name.
+        displayName: imageName
+        path: imageName
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      statusDescriptors:
+      - description: The status of operators.
+        displayName: Operator Status
+        path: OperatorsStatus
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of nodes.
+        displayName: Node Status
+        path: nodes
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      version: v1alpha1
+    - description: SecretWatcher is the schema for the secretwatchers API. Documentation For additional details regarding install parameters check https://ibm.biz/icpfs39install. License By installing this product you accept the license terms https://ibm.biz/icpfs39license
+      kind: SecretWatcher
+      name: secretwatchers.operator.ibm.com
+      displayName: SecretWatcher
+      resources:
+        - kind: secrets
+          name: ''
+          version: v1
+        - kind: paps
+          name: ''
+          version: v1alpha1
+        - kind: policycontrollers
+          name: ''
+          version: v1alpha1
+        - kind: ingresses
+          name: ''
+          version: v1beta1
+        - kind: securityonboardings
+          name: ''
+          version: v1alpha1
+        - kind: customresourcedefinitions
+          name: ''
+          version: v1beta1
+        - kind: policydecisions
+          name: ''
+          version: v1alpha1
+        - kind: secretwatchers
+          name: ''
+          version: v1alpha1
+        - kind: servicemonitors
+          name: ''
+          version: v1
+        - kind: authentications
+          name: ''
+          version: v1alpha1
+        - kind: Pods
+          name: ''
+          version: v1
+        - kind: statefulsets
+          name: ''
+          version: v1
+        - kind: services
+          name: ''
+          version: v1
+        - kind: persistentvolumeclaims
+          name: ''
+          version: v1
+        - kind: Jobs
+          name: ''
+          version: v1
+        - kind: configmaps
+          name: ''
+          version: v1
+        - kind: certificates
+          name: ''
+          version: v1alpha1
+        - kind: deployments
+          name: ''
+          version: v1
+        - kind: oidcclientwatchers
+          name: ''
+          version: v1alpha1
+        - kind: users
+          name: ''
+          version: v1
+        - kind: replicasets
+          name: ''
+          version: v1
+      specDescriptors:
+      - description: A list defines the catalog information for operators.
+        displayName: Operators
+        path: operators
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image registry.
+        displayName: imageRegistry
+        path: imageRegistry
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image tag postfix.
+        displayName: imageTagPostfix
+        path: imageTagPostfix
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for operator version.
+        displayName: operatorVersion
+        path: operatorVersion
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for replicas.
+        displayName: Replicas
+        path: replicas
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for resources.
+        displayName: Resources
+        path: resources
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      statusDescriptors:
+      - description: The status of operators.
+        displayName: Operator Status
+        path: OperatorsStatus
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      - description: The status of nodes.
+        displayName: Node Status
+        path: nodes
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podStatuses
+      version: v1alpha1
+    - description: SecurityOnboarding is the schema for the securityonboardings API. Documentation For additional details regarding install parameters check https://ibm.biz/icpfs39install. License By installing this product you accept the license terms https://ibm.biz/icpfs39license
+      kind: SecurityOnboarding
+      name: securityonboardings.operator.ibm.com
+      displayName: SecurityOnboarding
+      resources:
+        - kind: secrets
+          name: ''
+          version: v1
+        - kind: paps
+          name: ''
+          version: v1alpha1
+        - kind: policycontrollers
+          name: ''
+          version: v1alpha1
+        - kind: ingresses
+          name: ''
+          version: v1beta1
+        - kind: securityonboardings
+          name: ''
+          version: v1alpha1
+        - kind: customresourcedefinitions
+          name: ''
+          version: v1beta1
+        - kind: policydecisions
+          name: ''
+          version: v1alpha1
+        - kind: secretwatchers
+          name: ''
+          version: v1alpha1
+        - kind: servicemonitors
+          name: ''
+          version: v1
+        - kind: authentications
+          name: ''
+          version: v1alpha1
+        - kind: Pods
+          name: ''
+          version: v1
+        - kind: statefulsets
+          name: ''
+          version: v1
+        - kind: services
+          name: ''
+          version: v1
+        - kind: persistentvolumeclaims
+          name: ''
+          version: v1
+        - kind: Jobs
+          name: ''
+          version: v1
+        - kind: configmaps
+          name: ''
+          version: v1
+        - kind: certificates
+          name: ''
+          version: v1alpha1
+        - kind: deployments
+          name: ''
+          version: v1
+        - kind: oidcclientwatchers
+          name: ''
+          version: v1alpha1
+        - kind: users
+          name: ''
+          version: v1
+        - kind: replicasets
+          name: ''
+          version: v1
+      specDescriptors:
+      - description: A list defines the catalog information for operators.
+        displayName: Operators
+        path: operators
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image name.
+        displayName: imageName
+        path: imageName
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for impersonation.
+        displayName: impersonation
+        path: impersonation
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for init identity manager.
+        displayName: initIdentityManager
+        path: initIdentityManager
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for replicas.
+        displayName: Replicas
+        path: replicas
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for iam onboarding.
+        displayName: iamOnboarding
+        path: iamOnboarding
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image registry.
+        displayName: imageRegistry
+        path: imageRegistry
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for image tag.
+        displayName: imageTag
+        path: imageTag
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for resources.
+        displayName: Resources
+        path: resources
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for init auth service.
+        displayName: initAuthService
+        path: initAuthService
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for init identity provider.
+        displayName: initIdentityProvider
+        path: initIdentityProvider
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for init pap spec.
+        displayName: initPAPSpec
+        path: initPAPSpec
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for init token service.
+        displayName: initTokenService
+        path: initTokenService
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for operator version.
+        displayName: operatorVersion
+        path: operatorVersion
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      statusDescriptors:
+      - description: The status of operators.
+        displayName: Operator Status
+        path: OperatorsStatus
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:podStatuses'
+      - description: The status of pod names.
+        displayName: PodNames Status
+        path: podNames
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:podStatuses'
+      version: v1alpha1
+  description: |-
+    The `ibm-iam-operator` installs the IBM Cloud Platform Common Services Identity and access management (IAM) service.
+
+    **Important:** Do not install this operator directly. Install this operator only by using the IBM Common Service Operator. For more information about installing this operator and other Common Services operators, see [Installer documentation](http://ibm.biz/cpcs_opinstall). Additionally, you can exit this panel and navigate to the IBM Common Services tile in OperatorHub to learn more about the operator. If you are using the operator as part of an IBM Cloud Pak, see the documentation for that IBM Cloud Pak to learn more about how to install and use the operator service. For more information about IBM Cloud Paks, see [IBM Cloud Paks that use Common Services](http://ibm.biz/cpcs_cloudpaks).
+
+    You can use the `ibm-iam-operator` to install the authentication and authorization services for the IBM Cloud Platform Common Services.
+
+    With these services, you can configure security for IBM Cloud Platform Common Services, IBM Certified Containers (IBM products), or IBM Cloud Paks that are installed.
+
+    For more information about the available IBM Cloud Platform Common Services, see the [IBM Knowledge Center](http://ibm.biz/cpcsdocs).
+
+    ## Supported platforms
+
+     - Red Hat OpenShift Container Platform 4.3 or newer installed on one of the following platforms:
+
+        - Linux x86_64
+        - Linux on Power (ppc64le)
+        - Linux on IBM Z and LinuxONE
+
+    ## Operator versions
+     - 3.23.0
+     - 3.22.0
+     - 3.21.0
+     - 3.20.0
+     - 3.19.0
+     - 3.18.0
+     - 3.17.0
+     - 3.16.0
+     - 3.13.0
+     - 3.12.2
+     - 3.12.1
+     - 3.11.2
+     - 3.10.0
+     - 3.9.1
+     - 3.9.0
+     - 3.8.2
+     - 3.8.1
+     - 3.8.0
+     - 3.7.5
+     - 3.7.4
+     - 3.7.3
+     - 3.7.3
+     - 3.7.1
+     - 3.7.0
+     - 3.7.1
+     - 3.6.5
+     - 3.6.4
+     - 3.6.3
+     - 3.6.2
+     - 3.6.0
+        - With this version, support for OpenShift 4.3 is added.
+     - 3.5.0
+
+    ## Prerequisites
+
+    Before you install this operator, you need to first install the operator dependencies and prerequisites:
+
+    - For the list of operator dependencies, see the IBM Knowledge Center [Common Services dependencies documentation](http://ibm.biz/cpcs_opdependencies).
+
+    - For the list of prerequisites for installing the operator, see the IBM Knowledge Center [Preparing to install services documentation](http://ibm.biz/cpcs_opinstprereq).
+
+    ## Documentation
+
+    To install the operator by using the IBM Common Services Operator, follow the installation and configuration instructions that are in the IBM Knowledge Center.
+
+    - If you are using the operator as part of an IBM Cloud Pak, see the documentation for that IBM Cloud Pak [IBM Cloud Paks that use Common Services](http://ibm.biz/cpcs_cloudpaks).
+    - If you are using the operator with an IBM Containerized Software, see the IBM Cloud Platform Common Services Knowledge Center [Installer documentation](http://ibm.biz/cpcs_opinstall).
+  displayName: IBM IAM
+  icon:
+  - base64data: "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"
+    mediatype: "image/png"
+  install:
+    spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          #the namespaces are being watched by the oidcclientwatcher
+          - namespaces
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        # used in identity manager
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterroles
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+          - escalate
+          - bind
+        - apiGroups:
+          - authorization.openshift.io
+          resources:
+          - clusterrolebindings
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        # Used by oidcclient-watcher
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterrolebindings
+          - clusterrolebindings/finalizers
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        # fetch users call is used in identity manager
+        - apiGroups:
+          - user.openshift.io
+          resources:
+          - users
+          - groups
+          - identities
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+          - delete
+        # token allocation is used in identity provider
+        - apiGroups:
+          - oauth.openshift.io
+          resources:
+          - oauthaccesstokens
+          - oauthclients
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+          - delete
+        # this is used by iam poliy controller
+        - apiGroups:
+          - iam.policies.ibm.com
+          resources:
+          - iampolicies
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+          - delete
+        serviceAccountName: ibm-iam-operand-restricted
+      - rules:
+        - apiGroups:
+          - admissionregistration.k8s.io
+          resources:
+          - mutatingwebhookconfigurations
+          #iam.hooks.securityenforcement.admission.cloud.ibm.com used by oidcclient-watcher
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+          # Investigate further whether we can avoid the creation of clusteroles and clusterrolbeindings
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterroles
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+          - escalate
+          - bind
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterrolebindings
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - user.openshift.io
+          resources:
+          - users
+          # The default admin user has to be created
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+          - delete
+        serviceAccountName: ibm-iam-operator
+      deployments:
+      - name: ibm-iam-operator
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              name: ibm-iam-operator
+          strategy: {}
+          template:
+            metadata:
+              annotations:
+                productID: 068a62892a1e4db39641342e592daa25
+                productMetric: FREE
+                productName: IBM Cloud Platform Common Services
+              labels:
+                app.kubernetes.io/instance: ibm-iam-operator
+                app.kubernetes.io/managed-by: ibm-iam-operator
+                app.kubernetes.io/name: ibm-iam-operator
+                name: ibm-iam-operator
+            spec:
+              affinity:
+                nodeAffinity:
+                  requiredDuringSchedulingIgnoredDuringExecution:
+                    nodeSelectorTerms:
+                    - matchExpressions:
+                      - key: kubernetes.io/arch
+                        operator: In
+                        values:
+                        - amd64
+                        - ppc64le
+                        - s390x
+              containers:
+              - command:
+                - ibm-iam-operator
+                env:
+                - name: ICP_PLATFORM_AUTH_IMAGE
+                  value: icr.io/cpopen/cpfs/icp-platform-auth:3.11.0
+                - name: ICP_IDENTITY_PROVIDER_IMAGE
+                  value: icr.io/cpopen/cpfs/icp-identity-provider:3.11.0
+                - name: ICP_IDENTITY_MANAGER_IMAGE
+                  value: icr.io/cpopen/cpfs/icp-identity-manager:3.11.0
+                - name: IAM_POLICY_ADMINISTRATION_IMAGE
+                  value: icr.io/cpopen/cpfs/iam-policy-administration:3.11.0
+                - name: IAM_POLICY_DECISION_IMAGE
+                  value: icr.io/cpopen/cpfs/iam-policy-decision:3.11.0
+                - name: ICP_SECRET_WATCHER_IMAGE
+                  value: icr.io/cpopen/cpfs/icp-secret-watcher:3.7.15
+                - name: ICP_OIDCCLIENT_WATCHER_IMAGE
+                  value: icr.io/cpopen/cpfs/icp-oidcclient-watcher:3.11.0
+                - name: IAM_POLICY_CONTROLLER_IMAGE
+                  value: icr.io/cpopen/cpfs/iam-policy-controller:3.7.15
+                - name: ICP_IAM_ONBOARDING_IMAGE
+                  value: icr.io/cpopen/cpfs/icp-iam-onboarding:3.11.0
+                - name: AUDIT_SYSLOG_SERVICE_IMAGE
+                  value: icr.io/cpopen/cpfs/audit-syslog-service:1.8.0
+                - name: WATCH_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.annotations['olm.targetNamespaces']
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: OPERATOR_NAME
+                  value: ibm-iam-operator
+                image: icr.io/cpopen/ibm-iam-operator:3.23.0
+                imagePullPolicy: Always
+                name: ibm-iam-operator
+                resources:
+                  limits:
+                    cpu: 25m
+                    memory: 320Mi
+                  requests:
+                    cpu: 10m
+                    memory: 80Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
+                  privileged: false
+                  readOnlyRootFilesystem: true
+              serviceAccountName: ibm-iam-operator
+      permissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          - services
+          - services/finalizers
+          - endpoints
+          - persistentvolumeclaims
+          - events
+          - configmaps
+          - secrets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - daemonsets
+          - replicasets
+          - statefulsets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        # used by oidcclient watcher
+        - apiGroups:
+          - oidc.security.ibm.com
+          resources:
+          - clients
+          - clients/finalizers
+          - clients/status
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - roles
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - rolebindings
+          - rolebindings/finalizers
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        # this is used by iam poliy controller
+        - apiGroups:
+          - iam.policies.ibm.com
+          resources:
+          - iampolicies
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+          - delete
+        # this is used by identity provider to create/delete rolebinding for zen user
+        - apiGroups:
+          - authorization.openshift.io
+          resources:
+          - rolebindings
+          - rolebindings/finalizers
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        serviceAccountName: ibm-iam-operand-restricted
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          - services
+          - services/finalizers
+          - endpoints
+          - persistentvolumeclaims
+          - events
+          - configmaps
+          - secrets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - daemonsets
+          - replicasets
+          - statefulsets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          verbs:
+          - get
+          - create
+        - apiGroups:
+          - apps
+          resourceNames:
+          - ibm-iam-operator
+          resources:
+          - deployments/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - get
+        - apiGroups:
+          - apps
+          resources:
+          - replicasets
+          - deployments
+          verbs:
+          - get
+        - apiGroups:
+          - operator.ibm.com
+          resources:
+          - '*'
+          - policydecisions
+          - oidcclientwatchers
+          - authentications
+          - policycontrollers
+          - paps
+          - securityonboardings
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - certmanager.k8s.io
+          resources:
+          - '*'
+          - certificates
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - networking.k8s.io
+          resources:
+          - '*'
+          - ingresses
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - batch
+          resources:
+          - jobs
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        serviceAccountName: ibm-iam-operator
+    strategy: deployment
+  installModes:
+  - supported: true
+    type: OwnNamespace
+  - supported: true
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - IBM
+  - Cloud
+  maintainers:
+  - email: support@ibm.com
+    name: IBM Support
+  maturity: stable
+  minKubeVersion: 1.19.0
+  provider:
+    name: IBM
+  version: 3.23.0

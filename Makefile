@@ -76,7 +76,7 @@ install: ## Install all resources (CR/CRD's, RBCA and Operator)
 	- oc apply -f deploy/crds/operator.ibm.com_secretwatchers_crd.yaml
 	- oc apply -f deploy/crds/operator.ibm.com_securityonboardings_crd.yaml
 	- oc apply -f deploy/crds/iam.policies_v1alpha1_iampolicy.yaml
-	- oc apply -f deploy/crds/oidc_v1_client_crd.yaml
+	- oc apply -f deploy/crds/oidc.security.ibm.com_clients_crd.yaml
 	@echo ....... Applying RBAC .......
 	- oc apply -f deploy/service_account.yaml -n ${NAMESPACE}
 	- oc apply -f deploy/role.yaml -n ${NAMESPACE}
@@ -109,7 +109,7 @@ uninstall: ## Uninstall all that all performed in the $ make install
 	- oc delete -f deploy/crds/operator.ibm.com_policydecisions_crd.yaml
 	- oc delete -f deploy/crds/operator.ibm.com_secretwatchers_crd.yaml
 	- oc delete -f deploy/crds/operator.ibm.com_securityonboardings_crd.yaml
-	- oc delete -f deploy/crds/oidc_v1_client_crd.yaml
+	- oc delete -f deploy/crds/oidc.security.ibm.com_clients_crd.yaml
 	@echo ....... Deleting Rules and Service Account .......
 	- oc delete -f deploy/role_binding.yaml -n ${NAMESPACE}
 	- oc delete -f deploy/service_account.yaml -n ${NAMESPACE}

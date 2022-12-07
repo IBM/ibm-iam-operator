@@ -67,7 +67,6 @@ spec:
               zenProductNameUrl:
                 type: string
             required:
-            - clientId
             - oidcLibertyClient
             - secret
             type: object

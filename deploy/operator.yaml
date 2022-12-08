@@ -55,8 +55,6 @@ spec:
               value: icr.io/cpopen/cpfs/iam-policy-decision:3.10.0
             - name: ICP_SECRET_WATCHER_IMAGE
               value: icr.io/cpopen/cpfs/icp-secret-watcher:3.7.12
-            - name: ICP_OIDCCLIENT_WATCHER_IMAGE
-              value: icr.io/cpopen/cpfs/icp-oidcclient-watcher:3.10.0
             - name: IAM_POLICY_CONTROLLER_IMAGE
               value: icr.io/cpopen/cpfs/iam-policy-controller:3.7.12
             - name: ICP_IAM_ONBOARDING_IMAGE

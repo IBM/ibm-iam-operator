@@ -573,7 +573,7 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 												metav1.LabelSelectorRequirement{
 													Key:      "app",
 													Operator: metav1.LabelSelectorOpIn,
-													Values:   []string{"auth-idp-provider"},
+													Values:   []string{"platform-identity-management"},
 												},
 											},
 										},

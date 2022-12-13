@@ -631,7 +631,7 @@ func platformIdProviderIngress(instance *operatorv1alpha1.Authentication, scheme
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-id-provider",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "platform-id-provider"},
+			Labels:    map[string]string{"app": "platform-identity-provider"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":                  "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends":       "true",

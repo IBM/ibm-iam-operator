@@ -313,7 +313,7 @@ func idMgmtIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Sc
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "id-mgmt",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-identity-management"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/authz-type":      "rbac",
@@ -469,7 +469,7 @@ func platformAuthIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-auth",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-identity-provider"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":              "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends":   "true",

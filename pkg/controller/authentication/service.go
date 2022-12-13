@@ -133,6 +133,7 @@ func (r *ReconcileAuthentication) platformAuthService(instance *operatorv1alpha1
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var authPort int32 = 9443
+	var dirPort int32 = 3100
 	platformAuthService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-auth-service",
@@ -145,6 +146,10 @@ func (r *ReconcileAuthentication) platformAuthService(instance *operatorv1alpha1
 					Name: "p9443",
 					Port: authPort,
 				},
+				{
+ 					Name: "p3100",
+ 					Port: dirPort,
+ 				},
 			},
 			Selector: map[string]string{
 				"k8s-app": "auth-idp",

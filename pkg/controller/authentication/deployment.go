@@ -74,7 +74,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	}
 
 	// Check if this Deployment already exists
-	deployment := "auth-idp"
+	deployment := "platform-auth-service"
 	providerDeployment := "platform-identity-provider"
 	managerDeployment := "platform-identity-management"
 
@@ -234,7 +234,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 						"app":                        deployment,
 						"k8s-app":                    deployment,
 						"component":                  deployment,
-						"app.kubernetes.io/instance": "auth-idp",
+						"app.kubernetes.io/instance": "platform-auth-service",
 						"intent":                     "projected",
 					},
 					Annotations: map[string]string{
@@ -299,7 +299,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 												metav1.LabelSelectorRequirement{
 													Key:      "app",
 													Operator: metav1.LabelSelectorOpIn,
-													Values:   []string{"auth-idp"},
+													Values:   []string{"platform-auth-service"},
 												},
 											},
 										},

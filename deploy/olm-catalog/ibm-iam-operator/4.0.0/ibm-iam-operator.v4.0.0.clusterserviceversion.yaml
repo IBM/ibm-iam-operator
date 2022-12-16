@@ -1433,38 +1433,10 @@ spec:
           - patch
           - update
           - watch
-        # used by oidcclient watcher
-        - apiGroups:
-          - oidc.security.ibm.com
-          resources:
-          - clients
-          - clients/finalizers
-          - clients/status
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
         - apiGroups:
           - rbac.authorization.k8s.io
           resources:
           - roles
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - rbac.authorization.k8s.io
-          resources:
-          - rolebindings
-          - rolebindings/finalizers
           verbs:
           - create
           - delete
@@ -1528,6 +1500,20 @@ spec:
           - daemonsets
           - replicasets
           - statefulsets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - oidc.security.ibm.com
+          resources:
+          - clients
+          - clients/finalizers
+          - clients/status
           verbs:
           - create
           - delete

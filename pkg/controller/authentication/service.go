@@ -252,7 +252,6 @@ func (r *ReconcileAuthentication) identityProviderService(instance *operatorv1al
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var idproviderPort int32 = 4300
-	//var redirectPort int32 = 9443
 	identityProviderService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-identity-provider",

@@ -35,7 +35,6 @@ type PolicyDecisionSpec struct {
 	ImageRegistry   string                       `json:"imageRegistry"`
 	ImageName       string                       `json:"imageName"`
 	ImageTag        string                       `json:"imageTag"`
-	AuditService    AuditServiceSpec             `json:"auditService"`
 	InitMongodb     InitMongodbSpec              `json:"initMongodb"`
 	Resources       *corev1.ResourceRequirements `json:"resources,omitempty"`
 }

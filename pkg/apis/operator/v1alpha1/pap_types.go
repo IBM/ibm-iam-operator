@@ -30,10 +30,9 @@ type PapSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
-	OperatorVersion string           `json:"operatorVersion"`
-	Replicas        int32            `json:"replicas"`
-	PapService      PapServiceSpec   `json:"papService"`
-	AuditService    AuditServiceSpec `json:"auditService"`
+	OperatorVersion string         `json:"operatorVersion"`
+	Replicas        int32          `json:"replicas"`
+	PapService      PapServiceSpec `json:"papService"`
 }
 
 // PapServiceSpec defined the desired state of PapService Container

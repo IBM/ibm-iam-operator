@@ -213,7 +213,7 @@ func iamTokenIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "iam-token",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends": "true",
@@ -368,7 +368,7 @@ func idmgmtV2ApiIngress(instance *operatorv1alpha1.Authentication, scheme *runti
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "idmgmt-v2-api",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-identity-management"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":              "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends":   "true",
@@ -479,7 +479,7 @@ func platformIdAuthBlockIngress(instance *operatorv1alpha1.Authentication, schem
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-id-auth-block",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":              "ibm-icp-management",
 				"icp.management.ibm.com/location-modifier": "=",
@@ -748,7 +748,7 @@ func platformOidcIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-oidc",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":              "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends":   "true",
@@ -963,7 +963,7 @@ func platformOidcTokenIngress(instance *operatorv1alpha1.Authentication, scheme 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-oidc-token",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":              "ibm-icp-management",
 				"icp.management.ibm.com/upstream-uri":      "/iam/oidc/token/",
@@ -1064,7 +1064,7 @@ func tokenServiceVersionIngress(instance *operatorv1alpha1.Authentication, schem
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "token-service-version",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/rewrite-target":  "/v1",

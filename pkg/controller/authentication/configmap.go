@@ -410,7 +410,7 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "registration-json",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 		},
 		Data: map[string]string{
 			"platform-oidc-registration.json": tempRegistrationJson,
@@ -433,7 +433,7 @@ func registrationScriptConfigMap(instance *operatorv1alpha1.Authentication, sche
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "registration-script",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 		},
 		Data: map[string]string{
 			"register-client.sh": registerClientScript,

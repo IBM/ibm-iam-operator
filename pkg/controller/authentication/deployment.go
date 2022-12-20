@@ -125,16 +125,6 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	reqLogger.Info("CS??? get pod names")
 	podNames := getPodNames(podList.Items)
 
-	// Update status.Nodes if needed
-	if !reflect.DeepEqual(podNames, instance.Status.Nodes) {
-		instance.Status.Nodes = podNames
-		reqLogger.Info("CS??? put pod names in status")
-		err := r.client.Status().Update(context.TODO(), instance)
-		if err != nil {
-			reqLogger.Error(err, "Failed to update Authentication status")
-			return err
-		}
-	}
 	// Deployment already exists - don't requeue
 	reqLogger.Info("Skip reconcile: Deployment already exists", "Deployment.Namespace", instance.Namespace, "Deployment.Name", deployment)
 
@@ -186,17 +176,10 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	}
 	reqLogger.Info("CS??? get pod names")
 	podNamesMgr := getPodNames(podListMgr.Items)
-
-	// Update status.Nodes if needed
-	if !reflect.DeepEqual(podNamesMgr, instance.Status.Nodes) {
-		instance.Status.Nodes = podNames
-		reqLogger.Info("CS??? put pod names in status")
-		err := r.client.Status().Update(context.TODO(), instance)
-		if err != nil {
-			reqLogger.Error(err, "Failed to update Authentication status")
-			return err
-		}
+	for _, pod := range podNamesMgr {
+		podNames = append(podNames, pod)
 	}
+
 	// Deployment already exists - don't requeue
 	reqLogger.Info("Skip reconcile: Manager deployment already exists", "Deployment.Namespace", instance.Namespace, "Deployment.Name", managerDeployment)
 	// reconcile provider
@@ -248,10 +231,14 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	}
 	reqLogger.Info("CS??? get pod names")
 	podNamesProv := getPodNames(podListProv.Items)
-
+	for _, pod := range podNamesProv {
+		podNames = append(podNames, pod)
+	}
+	// Deployment already exists - don't requeue
+	reqLogger.Info("Final pod names", "Pod names:", podNames)
 	// Update status.Nodes if needed
-	if !reflect.DeepEqual(podNamesProv, instance.Status.Nodes) {
-		instance.Status.Nodes = podNamesProv
+	if !reflect.DeepEqual(podNames, instance.Status.Nodes) {
+		instance.Status.Nodes = podNames
 		reqLogger.Info("CS??? put pod names in status")
 		err := r.client.Status().Update(context.TODO(), instance)
 		if err != nil {
@@ -263,7 +250,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	reqLogger.Info("Skip reconcile: Provider deployment already exists", "Deployment.Namespace", instance.Namespace, "Deployment.Name", providerDeployment)
 	return nil
 
-}
+	}
 
 func getPodNames(pods []corev1.Pod) []string {
 	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")

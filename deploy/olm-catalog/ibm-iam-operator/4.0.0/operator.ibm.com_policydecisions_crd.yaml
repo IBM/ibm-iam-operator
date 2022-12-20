@@ -36,6 +36,48 @@ spec:
             x-kubernetes-preserve-unknown-fields: true
             description: PolicyDecisionSpec defines the desired state of PolicyDecision
             properties:
+              auditService:
+                properties:
+                  imageName:
+                    type: string
+                  imageRegistry:
+                    type: string
+                  imageTag:
+                    type: string
+                  resources:
+                    description: ResourceRequirements describes the compute resource
+                      requirements.
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: 'Limits describes the maximum amount of compute
+                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: 'Requests describes the minimum amount of compute
+                          resources required. If Requests is omitted for a container,
+                          it defaults to Limits if that is explicitly specified, otherwise
+                          to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                        type: object
+                    type: object
+                  syslogTlsPath:
+                    type: string
+                required:
+                - imageName
+                - imageRegistry
+                - imageTag
+                type: object
               imageName:
                 type: string
               imageRegistry:
@@ -118,6 +160,7 @@ spec:
                     type: object
                 type: object
             required:
+            - auditService
             - imageName
             - imageRegistry
             - imageTag

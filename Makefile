@@ -109,7 +109,6 @@ uninstall: ## Uninstall all that all performed in the $ make install
 	- oc delete -f deploy/crds/operator.ibm.com_policydecisions_crd.yaml
 	- oc delete -f deploy/crds/operator.ibm.com_secretwatchers_crd.yaml
 	- oc delete -f deploy/crds/operator.ibm.com_securityonboardings_crd.yaml
-	- oc delete -f deploy/crds/iam.policies_v1alpha1_iampolicy.yaml
 	- oc delete -f deploy/crds/oidc.security.ibm.com_clients_crd.yaml
 	@echo ....... Deleting Rules and Service Account .......
 	- oc delete -f deploy/role_binding.yaml -n ${NAMESPACE}
@@ -145,7 +144,7 @@ endif
 
 build:
 	@echo "Building the ibm-iam-operator binary"
-	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/_output/bin/$(IMG) ./cmd/manager
+	@CGO_ENABLED=0 go build -o build/_output/bin/$(IMG) ./cmd/manager
 	@strip $(STRIP_FLAGS) build/_output/bin/$(IMG)
 
 build-image: build $(CONFIG_DOCKER_TARGET)

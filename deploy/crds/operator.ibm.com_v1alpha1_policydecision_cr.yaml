@@ -8,6 +8,18 @@ metadata:
     app.kubernetes.io/managed-by: ibm-iam-operator
     app.kubernetes.io/name: ibm-iam-operator
 spec:
+  auditService:
+    imageRegistry: "quay.io/opencloudio"
+    imageName: "audit-syslog-service"
+    imageTag: "1.0.5"
+    syslogTlsPath: "/etc/audit-tls"
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 10m
+        memory: 100Mi
   imageRegistry: "quay.io/opencloudio"
   imageName: "iam-policy-decision"
   imageTag: "3.3.4"

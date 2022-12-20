@@ -31,11 +31,11 @@ import (
 
 func (r *ReconcileAuthentication) handleIngress(instance *operatorv1alpha1.Authentication, currentIngress *net.Ingress, requeueResult *bool) error {
 
-	ingressList := []string{"api-key", "iam-token-redirect", "iam-token", "ibmid-ui-callback", "id-mgmt", "idmgmt-v2-api", "platform-auth-dir",
+	ingressList := []string{"api-key", "iam-token-redirect", "iam-token", "ibmid-ui-callback", "id-mgmt", "idmgmt-v2-api",
 		"platform-auth", "platform-id-auth-block", "platform-id-auth", "platform-id-provider", "platform-login", "platform-oidc-block", "platform-oidc", "platform-oidc-introspect",
 		"platform-oidc-keys", "platform-oidc-token-2", "platform-oidc-token", "service-id", "token-service-version", "saml-ui-callback", "version-idmgmt", "social-login-callback"}
 
-	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *net.Ingress{apiKeyIngress, iamTokenRedirectIngress, iamTokenIngress, ibmidUiCallbackIngress, idMgmtIngress, idmgmtV2ApiIngress, platformAuthDirIngress,
+	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *net.Ingress{apiKeyIngress, iamTokenRedirectIngress, iamTokenIngress, ibmidUiCallbackIngress, idMgmtIngress, idmgmtV2ApiIngress,
 		platformAuthIngress, platformIdAuthBlockIngress, platformIdAuthIngress, platformIdProviderIngress, platformLoginIngress, platformOidcBlockIngress, platformOidcIngress, platformOidcIntrospectIngress,
 		platformOidcKeysIngress, platformOidcToken2Ingress, platformOidcTokenIngress, serviceIdIngress, tokenServiceVersionIngress, samlUiCallbackIngress, versionIdmgmtIngress, socialLoginCallbackIngress}
 
@@ -113,7 +113,7 @@ func apiKeyIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Sc
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "api-key",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends": "true",
@@ -163,7 +163,7 @@ func iamTokenRedirectIngress(instance *operatorv1alpha1.Authentication, scheme *
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "iam-token-redirect",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends": "true",
@@ -213,7 +213,7 @@ func iamTokenIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "iam-token",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends": "true",
@@ -263,7 +263,7 @@ func ibmidUiCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *r
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "ibmid-ui-callback",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends": "true",
@@ -313,7 +313,7 @@ func idMgmtIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Sc
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "id-mgmt",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-identity-management"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/authz-type":      "rbac",
@@ -368,7 +368,7 @@ func idmgmtV2ApiIngress(instance *operatorv1alpha1.Authentication, scheme *runti
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "idmgmt-v2-api",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-identity-management"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":              "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends":   "true",
@@ -412,56 +412,6 @@ func idmgmtV2ApiIngress(instance *operatorv1alpha1.Authentication, scheme *runti
 
 }
 
-func platformAuthDirIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-	pathType := net.PathType("ImplementationSpecific")
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	newIngress := &net.Ingress{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "platform-auth-dir",
-			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
-			Annotations: map[string]string{
-				"kubernetes.io/ingress.class":            "ibm-icp-management",
-				"icp.management.ibm.com/secure-backends": "true",
-				"icp.management.ibm.com/rewrite-target":  "/",
-			},
-		},
-		Spec: net.IngressSpec{
-			Rules: []net.IngressRule{
-				{
-					IngressRuleValue: net.IngressRuleValue{
-						HTTP: &net.HTTPIngressRuleValue{
-							Paths: []net.HTTPIngressPath{
-								{
-									Path:     "/authdir/",
-									PathType: &pathType,
-									Backend: net.IngressBackend{
-										Service: &net.IngressServiceBackend{
-											Name: "platform-auth-service",
-											Port: net.ServiceBackendPort{
-												Number: 3100,
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// Set Authentication instance as the owner and controller of the Ingress
-	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
-	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Ingress")
-		return nil
-	}
-	return newIngress
-
-}
-
 func platformAuthIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
 	pathType := net.PathType("ImplementationSpecific")
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
@@ -469,7 +419,7 @@ func platformAuthIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-auth",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-identity-provider"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":              "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends":   "true",
@@ -529,7 +479,7 @@ func platformIdAuthBlockIngress(instance *operatorv1alpha1.Authentication, schem
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-id-auth-block",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":              "ibm-icp-management",
 				"icp.management.ibm.com/location-modifier": "=",
@@ -581,7 +531,7 @@ func platformIdAuthIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-id-auth",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends": "true",
@@ -631,7 +581,7 @@ func platformIdProviderIngress(instance *operatorv1alpha1.Authentication, scheme
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-id-provider",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-identity-provider"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":                  "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends":       "true",
@@ -683,7 +633,7 @@ func platformLoginIngress(instance *operatorv1alpha1.Authentication, scheme *run
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-login",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":              "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends":   "true",
@@ -740,7 +690,7 @@ func platformOidcBlockIngress(instance *operatorv1alpha1.Authentication, scheme 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-oidc-block",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":              "ibm-icp-management",
 				"icp.management.ibm.com/location-modifier": "=",
@@ -798,7 +748,7 @@ func platformOidcIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-oidc",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":              "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends":   "true",
@@ -861,7 +811,7 @@ func platformOidcIntrospectIngress(instance *operatorv1alpha1.Authentication, sc
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-oidc-introspect",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":              "ibm-icp-management",
 				"icp.management.ibm.com/location-modifier": "=",
@@ -912,7 +862,7 @@ func platformOidcKeysIngress(instance *operatorv1alpha1.Authentication, scheme *
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-oidc-keys",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":              "ibm-icp-management",
 				"icp.management.ibm.com/location-modifier": "=",
@@ -963,7 +913,7 @@ func platformOidcToken2Ingress(instance *operatorv1alpha1.Authentication, scheme
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-oidc-token-2",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/upstream-uri":    "/iam/oidc/token/",
@@ -1013,7 +963,7 @@ func platformOidcTokenIngress(instance *operatorv1alpha1.Authentication, scheme 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-oidc-token",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":              "ibm-icp-management",
 				"icp.management.ibm.com/upstream-uri":      "/iam/oidc/token/",
@@ -1064,7 +1014,7 @@ func serviceIdIngress(instance *operatorv1alpha1.Authentication, scheme *runtime
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "service-id",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/rewrite-target":  "/serviceids",
@@ -1114,7 +1064,7 @@ func tokenServiceVersionIngress(instance *operatorv1alpha1.Authentication, schem
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "token-service-version",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/rewrite-target":  "/v1",
@@ -1164,7 +1114,7 @@ func samlUiCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "saml-ui-callback",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/upstream-uri":    "/ibm/saml20/defaultSP/acs",
@@ -1214,7 +1164,7 @@ func versionIdmgmtIngress(instance *operatorv1alpha1.Authentication, scheme *run
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "version-idmgmt",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-identity-management"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":              "ibm-icp-management",
 				"icp.management.ibm.com/upstream-uri":      "/identity/api/v1/",
@@ -1265,7 +1215,7 @@ func socialLoginCallbackIngress(instance *operatorv1alpha1.Authentication, schem
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "social-login-callback",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/upstream-uri":    "/ibm/api/social-login",

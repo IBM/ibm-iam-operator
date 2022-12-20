@@ -284,7 +284,9 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 
 	// Check if this Deployment already exists and create it if it doesn't
 	currentDeployment := &appsv1.Deployment{}
-	err = r.handleDeployment(instance, currentDeployment, &requeueResult)
+	currentProviderDeployment := &appsv1.Deployment{}
+	currentManagerDeployment := &appsv1.Deployment{}
+	err = r.handleDeployment(instance, currentDeployment, currentProviderDeployment, currentManagerDeployment, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
 	}

@@ -135,7 +135,7 @@ func (r *ReconcileAuthentication) platformAuthService(instance *operatorv1alpha1
  				},
 			},
 			Selector: map[string]string{
-				"k8s-app": "auth-idp",
+				"k8s-app": "platform-auth-service",
 			},
 			Type:            "ClusterIP",
 			SessionAffinity: corev1.ServiceAffinityClientIP,

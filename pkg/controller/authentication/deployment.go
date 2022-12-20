@@ -78,18 +78,11 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	managerDeployment := "platform-identity-management"
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: deployment, Namespace: instance.Namespace}, currentDeployment)
-	err1 := r.client.Get(context.TODO(), types.NamespacedName{Name: providerDeployment, Namespace: instance.Namespace}, currentProviderDeployment)
-	if err != nil || err1 != nil {
-		if errors.IsNotFound(err) || errors.IsNotFound(err1) {
+	if err != nil {
+		if errors.IsNotFound(err) {
 			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", deployment)
 			reqLogger.Info("SAAS tenant configmap was found", "Creating provider deployment with value from configmap", saasTenantConfigMapName)
-			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", providerDeployment)
-			newProviderDeployment := generateProviderDeploymentObject(instance, r.scheme, providerDeployment, icpConsoleURL, saasServiceIdCrn)
-			err = r.client.Create(context.TODO(), newProviderDeployment)
-			if err != nil {
-				return err
-			}
-			//managerDeployment := generateManagerDeploymentObject(instance, r.scheme, deployment, icpConsoleURL, saasServiceIdCrn)
+			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", currentDeployment)
 			newDeployment := generateDeploymentObject(instance, r.scheme, deployment, icpConsoleURL, saasServiceIdCrn)
 			err = r.client.Create(context.TODO(), newDeployment)
 			if err != nil {
@@ -103,16 +96,16 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	} else {
 		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
 		reqLogger.Info("SAAS tenant configmap was found", "Updating deployment with value from configmap", saasTenantConfigMapName)
-		ocwDep := generateDeploymentObject(instance, r.scheme, deployment, icpConsoleURL, saasServiceIdCrn)
+		authDep := generateDeploymentObject(instance, r.scheme, deployment, icpConsoleURL, saasServiceIdCrn)
 		certmanagerLabel := "certmanager.k8s.io/time-restarted"
 		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
-			ocwDep.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val
+			authDep.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val
 		}
 		nssAnnotation := "nss.ibm.com/namespaceList"
 		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Annotations[nssAnnotation]; ok {
-			ocwDep.Spec.Template.ObjectMeta.Annotations[nssAnnotation] = val
+			authDep.Spec.Template.ObjectMeta.Annotations[nssAnnotation] = val
 		}
-		currentDeployment.Spec = ocwDep.Spec
+		currentDeployment.Spec = authDep.Spec
 		err = r.client.Update(context.TODO(), currentDeployment)
 		if err != nil {
 			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)
@@ -120,47 +113,10 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 		}
 	}
 
-	err2 := r.client.Get(context.TODO(), types.NamespacedName{Name: managerDeployment, Namespace: instance.Namespace}, currentManagerDeployment)
-
-	if err2 != nil {
-		if errors.IsNotFound(err2) {
-			reqLogger.Info("Creating a new Manager Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", managerDeployment)
-			reqLogger.Info("SAAS tenant configmap was found", "Creating manager deployment with value from configmap", saasTenantConfigMapName)
-			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", managerDeployment)
-			newManagerDeployment := generateManagerDeploymentObject(instance, r.scheme, managerDeployment, icpConsoleURL, saasServiceIdCrn)
-			err = r.client.Create(context.TODO(), newManagerDeployment)
-			if err != nil {
-				return err
-			}
-			// Deployment created successfully - return and requeue
-			*requeueResult = true
-		} else {
-			return err
-		}
-	} else {
-		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentManagerDeployment.Namespace, "Deployment.Name", currentManagerDeployment.Name)
-		reqLogger.Info("SAAS tenant configmap was found", "Updating deployment with value from configmap", saasTenantConfigMapName)
-		ocwDep := generateDeploymentObject(instance, r.scheme, managerDeployment, icpConsoleURL, saasServiceIdCrn)
-		certmanagerLabel := "certmanager.k8s.io/time-restarted"
-		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
-			ocwDep.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val
-		}
-		nssAnnotation := "nss.ibm.com/namespaceList"
-		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Annotations[nssAnnotation]; ok {
-			ocwDep.Spec.Template.ObjectMeta.Annotations[nssAnnotation] = val
-		}
-		currentDeployment.Spec = ocwDep.Spec
-		err = r.client.Update(context.TODO(), currentManagerDeployment)
-		if err != nil {
-			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentManagerDeployment.Namespace, "Deployment.Name", currentManagerDeployment.Name)
-			return err
-		}
-	}
-
 	podList := &corev1.PodList{}
 	listOpts := []client.ListOption{
 		client.InNamespace(instance.Namespace),
-		client.MatchingLabels(map[string]string{"k8s-app": deployment, "app": providerDeployment}),
+		client.MatchingLabels(map[string]string{"k8s-app": deployment}),
 	}
 	if err = r.client.List(context.TODO(), podList, listOpts...); err != nil {
 		reqLogger.Error(err, "Failed to list pods", "Authentication.Namespace", instance.Namespace, "Authentication.Name", deployment)
@@ -181,6 +137,130 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	}
 	// Deployment already exists - don't requeue
 	reqLogger.Info("Skip reconcile: Deployment already exists", "Deployment.Namespace", instance.Namespace, "Deployment.Name", deployment)
+
+	reqLogger.Info("Reconcile: Looking for deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", currentManagerDeployment)
+	err2 := r.client.Get(context.TODO(), types.NamespacedName{Name: managerDeployment, Namespace: instance.Namespace}, currentManagerDeployment)
+	if err2 != nil {
+		if errors.IsNotFound(err2) {
+			reqLogger.Info("Creating a new Manager Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", currentManagerDeployment)
+			reqLogger.Info("SAAS tenant configmap was found", "Creating manager deployment with value from configmap", saasTenantConfigMapName)
+			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", managerDeployment)
+			newManagerDeployment := generateManagerDeploymentObject(instance, r.scheme, managerDeployment, icpConsoleURL, saasServiceIdCrn)
+			err = r.client.Create(context.TODO(), newManagerDeployment)
+			if err != nil {
+				return err
+			}
+			// Deployment created successfully - return and requeue
+			*requeueResult = true
+		} else {
+			return err
+		}
+	} else {
+		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentManagerDeployment.Namespace, "Deployment.Name", currentManagerDeployment.Name)
+		reqLogger.Info("SAAS tenant configmap was found", "Updating deployment with value from configmap", saasTenantConfigMapName)
+		ocwDep := generateManagerDeploymentObject(instance, r.scheme, managerDeployment, icpConsoleURL, saasServiceIdCrn)
+		certmanagerLabel := "certmanager.k8s.io/time-restarted"
+		if val, ok := currentManagerDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
+			ocwDep.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val
+		}
+		nssAnnotation := "nss.ibm.com/namespaceList"
+		if val, ok := currentManagerDeployment.Spec.Template.ObjectMeta.Annotations[nssAnnotation]; ok {
+			ocwDep.Spec.Template.ObjectMeta.Annotations[nssAnnotation] = val
+		}
+		currentManagerDeployment.Spec = ocwDep.Spec
+		err = r.client.Update(context.TODO(), currentManagerDeployment)
+		if err != nil {
+			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentManagerDeployment.Namespace, "Deployment.Name", currentManagerDeployment.Name)
+			return err
+		}
+	}
+
+	podListMgr := &corev1.PodList{}
+	listOptsMgr := []client.ListOption{
+		client.InNamespace(instance.Namespace),
+		client.MatchingLabels(map[string]string{"k8s-app": managerDeployment}),
+	}
+	if err = r.client.List(context.TODO(), podListMgr, listOptsMgr...); err != nil {
+		reqLogger.Error(err, "Failed to list pods", "Authentication.Namespace", instance.Namespace, "Authentication.Name", managerDeployment)
+		return err
+	}
+	reqLogger.Info("CS??? get pod names")
+	podNamesMgr := getPodNames(podListMgr.Items)
+
+	// Update status.Nodes if needed
+	if !reflect.DeepEqual(podNamesMgr, instance.Status.Nodes) {
+		instance.Status.Nodes = podNames
+		reqLogger.Info("CS??? put pod names in status")
+		err := r.client.Status().Update(context.TODO(), instance)
+		if err != nil {
+			reqLogger.Error(err, "Failed to update Authentication status")
+			return err
+		}
+	}
+	// Deployment already exists - don't requeue
+	reqLogger.Info("Skip reconcile: Manager deployment already exists", "Deployment.Namespace", instance.Namespace, "Deployment.Name", managerDeployment)
+	// reconcile provider
+	reqLogger.Info("Reconcile: Looking for deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", currentProviderDeployment)
+	err3 := r.client.Get(context.TODO(), types.NamespacedName{Name: providerDeployment, Namespace: instance.Namespace}, currentProviderDeployment)
+	if err3 != nil {
+		if errors.IsNotFound(err3) {
+			reqLogger.Info("Creating a new Manager Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", providerDeployment)
+			reqLogger.Info("SAAS tenant configmap was found", "Creating manager deployment with value from configmap", saasTenantConfigMapName)
+			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", providerDeployment)
+			newProviderDeployment := generateProviderDeploymentObject(instance, r.scheme, providerDeployment, icpConsoleURL, saasServiceIdCrn)
+			err = r.client.Create(context.TODO(), newProviderDeployment)
+			if err != nil {
+				return err
+			}
+			// Deployment created successfully - return and requeue
+			*requeueResult = true
+		} else {
+			return err
+		}
+	} else {
+		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentManagerDeployment.Namespace, "Deployment.Name", currentManagerDeployment.Name)
+		reqLogger.Info("SAAS tenant configmap was found", "Updating deployment with value from configmap", saasTenantConfigMapName)
+		provDep := generateProviderDeploymentObject(instance, r.scheme, providerDeployment, icpConsoleURL, saasServiceIdCrn)
+		certmanagerLabel := "certmanager.k8s.io/time-restarted"
+		if val, ok := currentManagerDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
+			provDep.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val
+		}
+		nssAnnotation := "nss.ibm.com/namespaceList"
+		if val, ok := currentProviderDeployment.Spec.Template.ObjectMeta.Annotations[nssAnnotation]; ok {
+			provDep.Spec.Template.ObjectMeta.Annotations[nssAnnotation] = val
+		}
+		currentProviderDeployment.Spec = provDep.Spec
+		err = r.client.Update(context.TODO(), currentProviderDeployment)
+		if err != nil {
+			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentProviderDeployment.Namespace, "Deployment.Name", currentProviderDeployment.Name)
+			return err
+		}
+	}
+
+	podListProv := &corev1.PodList{}
+	listOptsProv := []client.ListOption{
+		client.InNamespace(instance.Namespace),
+		client.MatchingLabels(map[string]string{"k8s-app": providerDeployment}),
+	}
+	if err = r.client.List(context.TODO(), podListProv, listOptsProv...); err != nil {
+		reqLogger.Error(err, "Failed to list pods", "Authentication.Namespace", instance.Namespace, "Authentication.Name", providerDeployment)
+		return err
+	}
+	reqLogger.Info("CS??? get pod names")
+	podNamesProv := getPodNames(podListProv.Items)
+
+	// Update status.Nodes if needed
+	if !reflect.DeepEqual(podNamesProv, instance.Status.Nodes) {
+		instance.Status.Nodes = podNamesProv
+		reqLogger.Info("CS??? put pod names in status")
+		err := r.client.Status().Update(context.TODO(), instance)
+		if err != nil {
+			reqLogger.Error(err, "Failed to update Authentication status")
+			return err
+		}
+	}
+	// Deployment already exists - don't requeue
+	reqLogger.Info("Skip reconcile: Provider deployment already exists", "Deployment.Namespace", instance.Namespace, "Deployment.Name", providerDeployment)
 	return nil
 
 }

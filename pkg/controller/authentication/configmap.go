@@ -311,7 +311,7 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-auth-idp",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 		},
 		Data: map[string]string{
 			"BASE_AUTH_URL":               "/v1",
@@ -421,7 +421,7 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "registration-json",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 		},
 		Data: map[string]string{
 			"platform-oidc-registration.json": tempRegistrationJson,
@@ -444,7 +444,7 @@ func registrationScriptConfigMap(instance *operatorv1alpha1.Authentication, sche
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "registration-script",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 		},
 		Data: map[string]string{
 			"register-client.sh": registerClientScript,
@@ -468,7 +468,7 @@ func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, icpConsoleU
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "oauth-client-map",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 		},
 		Data: map[string]string{
 			"MASTER_IP":         icpConsoleURL,

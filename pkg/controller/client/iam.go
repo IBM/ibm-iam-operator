@@ -14,10 +14,11 @@
 // limitations under the License.
 //
 
-package utils
+package client
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -27,13 +28,10 @@ import (
 	"os"
 	"strings"
 	"time"
-)
 
-const (
-	GetType    = "GET"
-	PostType   = "POST"
-	PutType    = "PUT"
-	DeleteType = "DELETE"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type TokenInfo struct {
@@ -46,6 +44,7 @@ type TokenInfo struct {
 }
 
 func generateAuthPayload() string {
+  // TODO Figure out where this is set in a ConfigMap
 	defaultAdmin := os.Getenv("DEFAULT_ADMIN_USER")
 	defaultAdminPassword := os.Getenv("DEFAULT_ADMIN_PASSWORD")
 
@@ -66,10 +65,42 @@ func getTokenInfoFromResponse(response *http.Response) (*TokenInfo, error) {
 	}
 }
 
+// getValueFromConfigMap returns the value stored at the provided key in the provided ConfigMap.
+// If the ConfigMap's Data field is empty, the provided Kubernetes client will be used to query the cluster for a
+// ConfigMap resource with a matching Name and Namespace. Produces an error if the ConfigMap's ObjectMeta has unset Name
+// or Namespace values or if the key provided is not found in the ConfigMap's Data field.
+func getValueFromConfigMap(k8sClient k8sclient.Client, configMap *corev1.ConfigMap, key string) (value string, err error) {
+  if configMap.Data == nil {
+    var (
+      configMapName string
+      configMapNamespace string
+    )
+    configMapName = configMap.GetName()
+    configMapNamespace = configMap.GetNamespace()
+    if configMapName == "" {
+      err = fmt.Errorf("provided ConfigMap must have a name but did not have one")
+      return
+    } else if configMapNamespace == "" {
+      err = fmt.Errorf("provided ConfigMap must have a namespace but did not have one")
+      return
+    } else {
+      err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: configMapName, Namespace: configMapNamespace}, configMap)
+      if err != nil {
+        return
+      } 
+    }
+  }
+  if value, ok := configMap.Data[key]; ok {
+    return value, nil
+  } else {
+    err = fmt.Errorf("key %q not found in ConfigMap %q", key, configMap.GetName())
+  }
+  return
+}
+
 // Returns auth tokens to make IAM calls
-func GetAuthnTokens() (*TokenInfo, error) {
-	authProviderUrl := os.Getenv("IDENTITY_PROVIDER_URL")
-	requestUrl := strings.Join([]string{authProviderUrl, "/v1/auth/identitytoken"}, "")
+func GetAuthnTokens(identityProviderURL string) (*TokenInfo, error) {
+	requestUrl := strings.Join([]string{identityProviderURL, "/v1/auth/identitytoken"}, "")
 	payload := generateAuthPayload()
 	req, _ := http.NewRequest("POST", requestUrl, bytes.NewBuffer([]byte(payload)))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8")
@@ -118,15 +149,12 @@ func GetAuthnTokens() (*TokenInfo, error) {
 }
 
 //Invoke an IAM API.  This function will obtain the required token before calling
-func InvokeIamApi(requestType string, requestUrl string, payload string) (*http.Response, error) {
-	tokenInfo, err2 := GetAuthnTokens()
+func InvokeIamApi(identityProviderURL string, requestType string, requestUrl string, payload string) (*http.Response, error) {
+	tokenInfo, err2 := GetAuthnTokens(identityProviderURL)
 	if err2 != nil {
 		return nil, err2
 	}
 	bearer := strings.Join([]string{"Bearer ", tokenInfo.AccessToken}, "")
-	//log.Printf("GOT AUTH TOKEN bearer token: %s", bearer)
-	//log.Printf("requestType:%s requestUrl:%s", requestType, requestUrl)
-
 	req, _ := http.NewRequest(requestType, requestUrl, bytes.NewBuffer([]byte(payload)))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", bearer)

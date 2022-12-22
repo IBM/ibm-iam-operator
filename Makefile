@@ -153,29 +153,28 @@ build-image: build $(CONFIG_DOCKER_TARGET)
 	@\rm -f build/_output/bin/ibm-iam-operator
 	@if [ $(BUILD_LOCALLY) -ne 1 ] && [ "$(ARCH)" = "amd64" ]; then docker push $(REGISTRY)/$(IMG)-$(ARCH):$(VERSION); fi
 
+build-image-amd64: build $(CONFIG_DOCKER_TARGET)
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/_output/bin/ibm-iam-operator-amd64 ./cmd/manager
+	docker run --rm --privileged multiarch/qemu-user-static:register --reset
+	docker build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-amd64:$(VERSION) -f build/Dockerfile .
+	@\rm -f build/_output/bin/ibm-iam-operator-amd64
+	@if [ $(BUILD_LOCALLY) -ne 1 ]; then docker push $(REGISTRY)/$(IMG)-$(ARCH):$(VERSION); fi
+
 # runs on amd64 machine
 build-image-ppc64le: $(CONFIG_DOCKER_TARGET)
-ifeq ($(LOCAL_OS),Linux)
-ifeq ($(LOCAL_ARCH),x86_64)
 	GOOS=linux GOARCH=ppc64le CGO_ENABLED=0 go build -o build/_output/bin/ibm-iam-operator-ppc64le ./cmd/manager
 	docker run --rm --privileged multiarch/qemu-user-static:register --reset
 	docker build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-ppc64le:$(VERSION) -f build/Dockerfile.ppc64le .
 	@\rm -f build/_output/bin/ibm-iam-operator-ppc64le
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then docker push $(REGISTRY)/$(IMG)-ppc64le:$(VERSION); fi
-endif
-endif
 
 # runs on amd64 machine
 build-image-s390x: $(CONFIG_DOCKER_TARGET)
-ifeq ($(LOCAL_OS),Linux)
-ifeq ($(LOCAL_ARCH),x86_64)
 	GOOS=linux GOARCH=s390x CGO_ENABLED=0 go build -o build/_output/bin/ibm-iam-operator-s390x ./cmd/manager
 	docker run --rm --privileged multiarch/qemu-user-static:register --reset
 	docker build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-s390x:$(VERSION) -f build/Dockerfile.s390x .
 	@\rm -f build/_output/bin/ibm-iam-operator-s390x
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then docker push $(REGISTRY)/$(IMG)-s390x:$(VERSION); fi
-endif
-endif
 
 ##@ Test
 
@@ -195,15 +194,11 @@ scorecard: ## Run scorecard test
 
 ##@ Release
 
-images: build-image build-image-ppc64le build-image-s390x
-ifeq ($(LOCAL_OS),Linux)
-ifeq ($(LOCAL_ARCH),x86_64)
+images: build-image-amd64 build-image-ppc64le build-image-s390x
 	@curl -L -o /tmp/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.3/manifest-tool-linux-amd64
 	@chmod +x /tmp/manifest-tool
 	/tmp/manifest-tool push from-args --platforms linux/amd64,linux/ppc64le,linux/s390x --template $(REGISTRY)/$(IMG)-ARCH:$(VERSION) --target $(REGISTRY)/$(IMG) --ignore-missing
 	/tmp/manifest-tool push from-args --platforms linux/amd64,linux/ppc64le,linux/s390x --template $(REGISTRY)/$(IMG)-ARCH:$(VERSION) --target $(REGISTRY)/$(IMG):$(VERSION) --ignore-missing
-endif
-endif
 
 csv: ## Push CSV package to the catalog
 	@RELEASE=${CSV_VERSION} common/scripts/push-csv.sh

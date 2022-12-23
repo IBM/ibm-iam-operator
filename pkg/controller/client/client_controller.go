@@ -247,7 +247,6 @@ func (r *ReconcileClient) processOidcRegistration(ctx context.Context, reqLogger
 	var errReg, errSecret, errOauthClient, errZen error
 	var isDeleteEvent, clientIdExists bool
 
-  // TODO Replace with platform-auth-idp ConfigMap lookup
 	isRoksEnabled, err := r.GetROKSEnabled()
   if err != nil {
     return err
@@ -261,18 +260,15 @@ func (r *ReconcileClient) processOidcRegistration(ctx context.Context, reqLogger
 	} else {
 		clientCreds := &ClientCredentials{}
 		secret := &corev1.Secret{}
-    // TODO Update for client registration secret
 		clientIdExists, clientCreds, errReg = r.ClientIdExists(ctx, client)
 		if errReg != nil {
 			reqLogger.Error(nil, "Error occurred while getting oidc registration.")
 		} else if !clientIdExists {
 			reqLogger.Info("ClientId don't exist, create new registration")
-      // TODO Update for client registration secret
 			clientCreds, errReg = r.CreateClientCredentials(ctx, client)
 			if errReg != nil {
 				return errReg
 			}
-      // TODO Update for client registration secret
 			secret, errSecret = r.newSecretForClient(ctx, client, clientCreds)
 			if isRoksEnabled {
 				_, errOauthClient = r.newOAuthClientForClient(ctx, client, clientCreds)
@@ -289,7 +285,6 @@ func (r *ReconcileClient) processOidcRegistration(ctx context.Context, reqLogger
 			if isRoksEnabled {
 				_ = r.reconcileOAuthClient(ctx, client, clientCreds)
 			}
-      // TODO Update for client registration secret
 			clientCreds, errReg = r.UpdateClientCredentials(ctx, client, secret)
 
 			errZen = r.processZenRegistration(reqLogger, client)
@@ -406,13 +401,11 @@ func (r *ReconcileClient) processDeleteRegistration(ctx context.Context, reqLogg
 	isInstanceMarkedToBeDeleted := client.GetDeletionTimestamp() != nil
 	// Update finalizer to allow delete CR
 	if isInstanceMarkedToBeDeleted {
-    // TODO Update for client registration secret
 		errDel := r.DeleteClientCredentials(ctx, client)
 		if errDel != nil {
 			reqLogger.Error(errDel, "Failed to Delete OIDC Client.")
 			return errDel, true
 		}
-    // TODO Replace with platform-auth-idp ConfigMap Lookup
 		isRoksEnabled, err := r.GetROKSEnabled()
     if err != nil {
       return err, false

@@ -19,6 +19,7 @@ package client
 import (
 	"bytes"
 	"context"
+
 	//"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
@@ -30,16 +31,13 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	securityv1 "github.com/IBM/ibm-iam-operator/pkg/apis/oidc/v1"
-	"k8s.io/apimachinery/pkg/types"
-	utils "github.com/IBM/ibm-iam-operator/pkg/utils"
 	regen "github.com/zach-klippenstein/goregen"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 type ClientCredentials struct {
@@ -94,56 +92,56 @@ const (
 )
 
 // The default auth service URL
-const authServiceUrl = "https://platform-auth-service:9443"
+const authServiceURL = "https://platform-auth-service:9443"
 
-func (r *ReconcileClient) CreateClientCredentials(client *securityv1.Client, recorder record.EventRecorder) (*ClientCredentials, error) {
-	url := strings.Join([]string{authServiceUrl, "/oidc/endpoint/OP/registration"}, "")
+func (r *ReconcileClient) CreateClientCredentials(ctx context.Context, client *securityv1.Client) (*ClientCredentials, error) {
+	url := strings.Join([]string{authServiceURL, "/oidc/endpoint/OP/registration"}, "")
 	serviceName := client.Name
 	clientCred := r.generateClientCredentials(serviceName)
 
 	payload := r.generateClientRegistrationPayload(client, clientCred)
-	response, err := r.invokeRegistration(client, PostType, url, payload)
+	response, err := r.invokeRegistration(ctx, client, PostType, url, payload)
 	if response != nil && response.Status == "201 Created" {
 		client.Spec.ClientId = clientCred.CLIENT_ID
 		defer response.Body.Close()
 		return clientCred, nil
 	} else {
-		handleOIDCClientError(client, response, err, PostType, recorder)
+		handleOIDCClientError(client, response, err, PostType, r.recorder)
 		err = fmt.Errorf("Error occurred during create oidc client regstration")
 		return nil, err
 	}
 
 }
 
-func (r *ReconcileClient) UpdateClientCredentials(client *securityv1.Client, secret *corev1.Secret, recorder record.EventRecorder) (*ClientCredentials, error) {
+func (r *ReconcileClient) UpdateClientCredentials(ctx context.Context, client *securityv1.Client, secret *corev1.Secret) (*ClientCredentials, error) {
 	secretData := secret.Data
 	clientCred := &ClientCredentials{
 		CLIENT_ID:     string(secretData["CLIENT_ID"]),
 		CLIENT_SECRET: string(secretData["CLIENT_SECRET"]),
 	}
 	payload := r.generateClientRegistrationPayload(client, clientCred)
-	url := strings.Join([]string{authServiceUrl, "/oidc/endpoint/OP/registration/", clientCred.CLIENT_ID}, "")
-	response, err := r.invokeRegistration(client, PutType, url, payload)
+	url := strings.Join([]string{authServiceURL, "/oidc/endpoint/OP/registration/", clientCred.CLIENT_ID}, "")
+	response, err := r.invokeRegistration(ctx, client, PutType, url, payload)
 	if response != nil && response.Status == "200 OK" {
 		defer response.Body.Close()
 		return clientCred, nil
 	} else {
-		handleOIDCClientError(client, response, err, PutType, recorder)
+		handleOIDCClientError(client, response, err, PutType, r.recorder)
 		err = fmt.Errorf("Error occurred during update oidc client regstration")
 		return nil, err
 	}
 }
 
-func (r *ReconcileClient) DeleteClientCredentials(client *securityv1.Client, recorder record.EventRecorder) error {
+func (r *ReconcileClient) DeleteClientCredentials(ctx context.Context, client *securityv1.Client) error {
 	clientId := client.Spec.ClientId
 	if clientId != "" {
-		url := strings.Join([]string{authServiceUrl, "/oidc/endpoint/OP/registration/", clientId}, "")
-		response, err := r.invokeRegistration(client, DeleteType, url, "")
+		url := strings.Join([]string{authServiceURL, "/oidc/endpoint/OP/registration/", clientId}, "")
+		response, err := r.invokeRegistration(ctx, client, DeleteType, url, "")
 		if response != nil && (response.Status == "204 No Content" || response.Status == "404 Not Found") {
 			defer response.Body.Close()
 			return nil
 		} else {
-			handleOIDCClientError(client, response, err, DeleteType, recorder)
+			handleOIDCClientError(client, response, err, DeleteType, r.recorder)
 			err = fmt.Errorf("Error occurred during delete oidc client regstration")
 			return err
 		}
@@ -152,10 +150,10 @@ func (r *ReconcileClient) DeleteClientCredentials(client *securityv1.Client, rec
 	}
 }
 
-func (r *ReconcileClient) invokeRegistration(oidcreg *securityv1.Client, requestType string, requestUrl string, payload string) (*http.Response, error) {
+func (r *ReconcileClient) invokeRegistration(ctx context.Context, oidcreg *securityv1.Client, requestType string, requestURL string, payload string) (*http.Response, error) {
   clientRegistrationSecretName := "platform-oidc-credentials"
   secretObj := &corev1.Secret{}
-  err := r.client.Get(context.TODO(), types.NamespacedName{Name: clientRegistrationSecretName, Namespace: oidcreg.GetNamespace()}, secretObj)
+  err := r.client.Get(ctx, types.NamespacedName{Name: clientRegistrationSecretName, Namespace: oidcreg.GetNamespace()}, secretObj)
   if err != nil {
     log.Error(err, fmt.Sprintf("failed to get secret %q", clientRegistrationSecretName))
     return nil, err
@@ -164,7 +162,7 @@ func (r *ReconcileClient) invokeRegistration(oidcreg *securityv1.Client, request
   oauthAdmin := "oauthadmin"
   clientRegistrationSecret := string(secretObj.Data["OAUTH2_CLIENT_REGISTRATION_SECRET"])
 
-	req, _ := http.NewRequest(requestType, requestUrl, bytes.NewBuffer([]byte(payload)))
+	req, _ := http.NewRequest(requestType, requestURL, bytes.NewBuffer([]byte(payload)))
 	req.Header.Set("Content-Type", "application/json")
 	req.SetBasicAuth(oauthAdmin, clientRegistrationSecret)
 	caCert, err := ioutil.ReadFile("/certs/ca.crt")
@@ -188,23 +186,23 @@ func (r *ReconcileClient) invokeRegistration(oidcreg *securityv1.Client, request
 	return resp, nil
 }
 
-func (r *ReconcileClient) getClientCredentials(oidcreg *securityv1.Client, recorder record.EventRecorder) (*http.Response, error) {
+func (r *ReconcileClient) getClientCredentials(ctx context.Context, oidcreg *securityv1.Client) (*http.Response, error) {
 	clientId := oidcreg.Spec.ClientId
-	url := strings.Join([]string{authServiceUrl, "/oidc/endpoint/OP/registration/", clientId}, "")
-	response, err := r.invokeRegistration(oidcreg, GetType, url, "")
+	url := strings.Join([]string{authServiceURL, "/oidc/endpoint/OP/registration/", clientId}, "")
+	response, err := r.invokeRegistration(ctx, oidcreg, GetType, url, "")
 	if response != nil && response.Status == "200 OK" {
 		return response, nil
 	} else {
-		handleOIDCClientError(oidcreg, response, err, GetType, recorder)
+		handleOIDCClientError(oidcreg, response, err, GetType, r.recorder)
 		err = fmt.Errorf("Error occurred while getting oidc client registration")
 		return nil, err
 	}
 }
 
-func (r *ReconcileClient) ClientIdExists(client *securityv1.Client, recorder record.EventRecorder) (bool, *ClientCredentials, error) {
+func (r *ReconcileClient) ClientIdExists(ctx context.Context, client *securityv1.Client) (bool, *ClientCredentials, error) {
 	clientId := client.Spec.ClientId
 	if clientId != "" {
-		resp, err := r.getClientCredentials(client, recorder)
+		resp, err := r.getClientCredentials(ctx, client)
 		if err != nil {
 			return false, nil, err
 		} else if clientId != "" && resp.Status == "200 OK" {
@@ -245,16 +243,6 @@ func (r *ReconcileClient) generateClientCredentials(serviceName string) *ClientC
 	rule := `^([a-z0-9]){32,}$`
 	clientId := generateRandomString(rule)
 	clientSecret := generateRandomString(rule)
-
-	//masterNodesList := os.Getenv("MASTER_NODES_LIST")
-	//randomString := string(SecureRandomAlphaString(30))
-	//  clientIdData := []byte(strings.Join([]string{masterNodesList,serviceName,"id", randomString},""))
-	//  clientIdHash := sha256.Sum256(clientIdData)
-	//  clientId := hex.EncodeToString(clientIdHash[:])
-	//  clientSecretData := []byte(strings.Join([]string{masterNodesList,serviceName,"secret", randomString},""))
-	//  clientSecretHash := sha256.Sum256(clientSecretData)
-	//  clientSecret := hex.EncodeToString(clientSecretHash[:])
-
 	return &ClientCredentials{
 		CLIENT_ID:     clientId,
 		CLIENT_SECRET: clientSecret,
@@ -326,6 +314,7 @@ func (r *ReconcileClient) generateClientRegistrationPayload(oidcreg *securityv1.
 	return payload
 }
 
+
 // GetZenInstance returns the zen instance or nil if it does not exist
 func (r *ReconcileClient) GetZenInstance(client *securityv1.Client) (*ZenInstance, error) {
 
@@ -333,10 +322,14 @@ func (r *ReconcileClient) GetZenInstance(client *securityv1.Client) (*ZenInstanc
 		return nil, fmt.Errorf("Zen instance id is required to query a zen instance")
 	}
 
-	idmgmtURL := os.Getenv("IDENTITY_MGMT_URL")
-	requestURL := strings.Join([]string{idmgmtURL, "/identity/api/v1/zeninstance/", client.Spec.ZenInstanceId}, "")
+  identityManagementURL, err := r.GetIdentityManagementURL()
+  if err != nil {
+    return nil, err
+  } 
 
-	response, err := utils.InvokeIamApi(utils.GetType, requestURL, "")
+	requestURL := strings.Join([]string{identityManagementURL, "/identity/api/v1/zeninstance/", client.Spec.ZenInstanceId}, "")
+
+	response, err := r.invokeIamApi(GetType, requestURL, "")
 
 	if err != nil {
 		return nil, err
@@ -366,15 +359,17 @@ func (r *ReconcileClient) GetZenInstance(client *securityv1.Client) (*ZenInstanc
 
 // DeleteZenInstance deletes the requested zen instance
 func (r *ReconcileClient) DeleteZenInstance(client *securityv1.Client) error {
-
 	if client.Spec.ZenInstanceId == "" {
 		return fmt.Errorf("Zen instance id is required to delete a zen instance")
 	}
 
-	idmgmtURL := os.Getenv("IDENTITY_MGMT_URL")
-	requestURL := strings.Join([]string{idmgmtURL, "/identity/api/v1/zeninstance/", client.Spec.ZenInstanceId}, "")
-
-	response, err := utils.InvokeIamApi(utils.DeleteType, requestURL, "")
+  // Get the platform-auth-idp ConfigMap to obtain constant values
+  identityManagementURL, err := r.GetIdentityManagementURL()
+  if err != nil {
+    return err
+  } 
+	requestURL := strings.Join([]string{identityManagementURL, "/identity/api/v1/zeninstance/", client.Spec.ZenInstanceId}, "")
+	response, err := r.invokeIamApi(DeleteType, requestURL, "")
 
 	if err != nil {
 		return err
@@ -405,10 +400,13 @@ func (r *ReconcileClient) CreateZenInstance(client *securityv1.Client) error {
 	payloadBytes, _ := json.Marshal(payloadJSON)
 	payload := string(payloadBytes[:])
 
-	idmgmtURL := os.Getenv("IDENTITY_MGMT_URL")
-	requestURL := strings.Join([]string{idmgmtURL, "/identity/api/v1/zeninstance"}, "")
+  identityManagementURL, err := r.GetIdentityManagementURL()
+  if err != nil {
+    return err
+  } 
+	requestURL := strings.Join([]string{identityManagementURL, "/identity/api/v1/zeninstance"}, "")
 
-	response, err := utils.InvokeIamApi(utils.PostType, requestURL, payload)
+	response, err := r.invokeIamApi(PostType, requestURL, payload)
 	if response != nil && response.Status == "200 OK" {
 		return nil
 	}

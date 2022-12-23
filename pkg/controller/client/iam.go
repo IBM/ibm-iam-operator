@@ -43,13 +43,18 @@ type TokenInfo struct {
 	IdToken      string `json:"id_token"`
 }
 
-func generateAuthPayload() string {
-  // TODO Figure out where this is set in a ConfigMap
-	defaultAdmin := os.Getenv("DEFAULT_ADMIN_USER")
-	defaultAdminPassword := os.Getenv("DEFAULT_ADMIN_PASSWORD")
-
-	payloadJSON := "grant_type=password&scope=openid&username=" + defaultAdmin + "&password=" + defaultAdminPassword
-	return payloadJSON
+// generateAuthPayload generates the authentication payload used with the IAM API
+func (r *ReconcileClient) generateAuthPayload() (payloadJSON string, err error) {
+	defaultAdminUser, err := r.GetDefaultAdminUser()
+  if err != nil {
+    return
+  }
+  defaultAdminPassword, err := r.GetDefaultAdminPassword()
+  if err != nil {
+    return
+  }
+	payloadJSON = "grant_type=password&scope=openid&username=" + defaultAdminUser + "&password=" + defaultAdminPassword
+	return
 }
 
 func getTokenInfoFromResponse(response *http.Response) (*TokenInfo, error) {
@@ -65,44 +70,18 @@ func getTokenInfoFromResponse(response *http.Response) (*TokenInfo, error) {
 	}
 }
 
-// getValueFromConfigMap returns the value stored at the provided key in the provided ConfigMap.
-// If the ConfigMap's Data field is empty, the provided Kubernetes client will be used to query the cluster for a
-// ConfigMap resource with a matching Name and Namespace. Produces an error if the ConfigMap's ObjectMeta has unset Name
-// or Namespace values or if the key provided is not found in the ConfigMap's Data field.
-func getValueFromConfigMap(k8sClient k8sclient.Client, configMap *corev1.ConfigMap, key string) (value string, err error) {
-  if configMap.Data == nil {
-    var (
-      configMapName string
-      configMapNamespace string
-    )
-    configMapName = configMap.GetName()
-    configMapNamespace = configMap.GetNamespace()
-    if configMapName == "" {
-      err = fmt.Errorf("provided ConfigMap must have a name but did not have one")
-      return
-    } else if configMapNamespace == "" {
-      err = fmt.Errorf("provided ConfigMap must have a namespace but did not have one")
-      return
-    } else {
-      err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: configMapName, Namespace: configMapNamespace}, configMap)
-      if err != nil {
-        return
-      } 
-    }
+// getAuthnTokens attempts to retrieve authentication tokens from the IAM API
+func (r *ReconcileClient) getAuthnTokens() (tokenInfo *TokenInfo, err error) {
+  identityProviderURL, err := r.GetIdentityProviderURL()
+  if err != nil {
+    return nil, err
   }
-  if value, ok := configMap.Data[key]; ok {
-    return value, nil
-  } else {
-    err = fmt.Errorf("key %q not found in ConfigMap %q", key, configMap.GetName())
+	requestURL := strings.Join([]string{identityProviderURL, "/v1/auth/identitytoken"}, "")
+	payload, err := r.generateAuthPayload()
+  if err != nil {
+    return nil, err
   }
-  return
-}
-
-// Returns auth tokens to make IAM calls
-func GetAuthnTokens(identityProviderURL string) (*TokenInfo, error) {
-	requestUrl := strings.Join([]string{identityProviderURL, "/v1/auth/identitytoken"}, "")
-	payload := generateAuthPayload()
-	req, _ := http.NewRequest("POST", requestUrl, bytes.NewBuffer([]byte(payload)))
+	req, _ := http.NewRequest("POST", requestURL, bytes.NewBuffer([]byte(payload)))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8")
 	caCert, err := ioutil.ReadFile("/certs/ca.crt")
 	if err != nil {
@@ -115,19 +94,17 @@ func GetAuthnTokens(identityProviderURL string) (*TokenInfo, error) {
 
 	var tIndex = 0
 	var tResp *http.Response
-	var tErr error
-	var tokenInfo *TokenInfo
 	for {
-		tResp, tErr = client.Do(req)
-		if tErr != nil {
-			fmt.Println(tErr.Error())
+		tResp, err = client.Do(req)
+		if err != nil {
+			fmt.Println(err.Error())
 		}
 		if tResp != nil && tResp.StatusCode == 200 {
 			defer tResp.Body.Close()
 
-			tokenInfo, tErr = getTokenInfoFromResponse(tResp)
-			if tErr != nil {
-				fmt.Println(tErr.Error())
+			tokenInfo, err = getTokenInfoFromResponse(tResp)
+			if err != nil {
+				fmt.Println(err.Error())
 			}
 			if tokenInfo != nil {
 				return tokenInfo, nil
@@ -140,36 +117,36 @@ func GetAuthnTokens(identityProviderURL string) (*TokenInfo, error) {
 		time.Sleep(2 * time.Second)
 		fmt.Println("Retrying identitytoken...")
 	}
-	if tErr != nil {
-		return nil, tErr
+	if err != nil {
+		return
 	}
 
-	tErr = fmt.Errorf("Failed to get access token")
-	return nil, tErr
+	err = fmt.Errorf("Failed to get access token")
+	return
 }
 
 //Invoke an IAM API.  This function will obtain the required token before calling
-func InvokeIamApi(identityProviderURL string, requestType string, requestUrl string, payload string) (*http.Response, error) {
-	tokenInfo, err2 := GetAuthnTokens(identityProviderURL)
-	if err2 != nil {
-		return nil, err2
+func (r *ReconcileClient) invokeIamApi(requestType string, requestURL string, payload string) (resp *http.Response, err error) {
+	tokenInfo, err := r.getAuthnTokens()
+	if err != nil {
+		return
 	}
 	bearer := strings.Join([]string{"Bearer ", tokenInfo.AccessToken}, "")
-	req, _ := http.NewRequest(requestType, requestUrl, bytes.NewBuffer([]byte(payload)))
+	req, _ := http.NewRequest(requestType, requestURL, bytes.NewBuffer([]byte(payload)))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", bearer)
 	req.Header.Set("Accept", "application/json")
 	caCert, err := ioutil.ReadFile("/certs/ca.crt")
 	if err != nil {
-		return nil, err
+		return
 	}
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCert)
 	transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: caCertPool}}
 	client := &http.Client{Transport: transport}
-	resp, err := client.Do(req)
+	resp, err = client.Do(req)
 	if err != nil {
-		return nil, err
+		return
 	}
-	return resp, nil
+	return
 }

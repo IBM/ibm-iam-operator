@@ -18,20 +18,14 @@ package client
 
 import (
 	"bytes"
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"strings"
 	"time"
-
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type TokenInfo struct {

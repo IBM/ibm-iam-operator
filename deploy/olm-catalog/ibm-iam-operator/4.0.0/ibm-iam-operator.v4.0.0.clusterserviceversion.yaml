@@ -1383,6 +1383,9 @@ spec:
                     - ALL
                   privileged: false
                   readOnlyRootFilesystem: true
+                volumeMounts:
+                - mountPath: /certs
+                  name: cluster-ca-cert
               serviceAccountName: ibm-iam-operator
               volumes:
               - name: cluster-ca-cert

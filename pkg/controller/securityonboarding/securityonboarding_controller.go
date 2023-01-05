@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -126,6 +127,7 @@ type ReconcileSecurityOnboarding struct {
 	// that reads objects from the cache and writes to the apiserver
 	client client.Client
 	scheme *runtime.Scheme
+	event  record.EventRecorder
 }
 
 // Reconcile reads that state of the cluster for a SecurityOnboarding object and makes changes based on the state read
@@ -162,6 +164,9 @@ func (r *ReconcileSecurityOnboarding) Reconcile(context context.Context, request
 
 	recResult, err = r.handleJob(instance)
 	if err != nil {
+		reqLogger.Error(err, "Failed to list jobs", "SecurityOnboarding.Namespace", instance.Namespace, "SecurityOnboarding.Name", instance.Name)
+		reqLogger.Info("job failed name=", recResult)
+		r.event.Eventf(instance, "Warning", "Onboarding Job failed", "Job dependencies not met, please check troubleshooting document %s for reasons and solutions", recResult)
 		return recResult, err
 	}
 

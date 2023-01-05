@@ -1305,6 +1305,18 @@ spec:
     mediatype: "image/png"
   install:
     spec:
+      clusterPermissions:
+      - rules:
+        # OauthClient logic is moved from icp-oidcclient-watcher to ibm-iam-operator,hence serviceAccountName: ibm-iam-operator
+        - apiGroups:
+          - oauth.openshift.io
+          resources:
+          - oauthclients
+          verbs:
+          - get
+          - list
+          - watch
+        serviceAccountName: ibm-iam-operator
       deployments:
       - name: ibm-iam-operator
         spec:

@@ -147,6 +147,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 						// if global cm, ignore CR, and populate auth-idp with value from global
 						// if no global cm, take value from CR - NOT REQD.
 						newConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isOSEnv)
+						newConfigMap.Data["OSAUTH_ENABLED"] = strconv.FormatBool(instance.Spec.Config.OSAuthEnabled)
 
 					} else {
 						//user specifies roksEnabled and roksURL, but not roksPrefix, then we set prefix to IAM# (consistent with previous release behavior)
@@ -395,8 +396,8 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"SCIM_LDAP_SEARCH_TIME_LIMIT":        "10",
 			"SCIM_ASYNC_PARALLEL_LIMIT":          "100",
 			"SCIM_GET_DISPLAY_FOR_GROUP_USERS":   "true",
-			"SCIM_AUTH_CACHE_MAX_SIZE":   			  "1000",
-			"SCIM_AUTH_CACHE_TTL_VALUE":   			  "60",
+			"SCIM_AUTH_CACHE_MAX_SIZE":           "1000",
+			"SCIM_AUTH_CACHE_TTL_VALUE":          "60",
 			"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
 		},
 	}

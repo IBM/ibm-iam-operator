@@ -290,6 +290,22 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 	if err != nil {
 		return reconcile.Result{}, err
 	}
+	// create clusterrole and clusterrolebinding if OSAuthEnabled is true
+	reqLogger.Info("TML::OSAuthEnabled ?::", instance.Spec.Config.OSAuthEnabled)
+	if instance.Spec.Config.OSAuthEnabled {
+		reqLogger.Info("TML:: inside clusterrole and clusterrolebinding logic")
+		clusterRole := &rbacv1.ClusterRole{}
+		err = r.handleClusterRole(instance, clusterRole, &requeueResult)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+
+		clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
+		err = r.handleClusterRoleBinding(instance, clusterRoleBinding, &requeueResult)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+	}
 
 	if requeueResult {
 		return reconcile.Result{Requeue: true}, nil

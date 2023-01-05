@@ -214,6 +214,8 @@ spec:
                     type: string
                   roksEnabled:
                     type: boolean
+                  osAuthEnabled:
+                    type: boolean
                   roksURL:
                     type: string
                   roksUserPrefix:

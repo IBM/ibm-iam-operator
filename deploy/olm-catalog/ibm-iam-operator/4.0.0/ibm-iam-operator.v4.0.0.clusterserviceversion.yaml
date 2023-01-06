@@ -1305,6 +1305,18 @@ spec:
     mediatype: "image/png"
   install:
     spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - user.openshift.io
+          resources:
+          - users
+          - groups
+          - identities
+          verbs:
+          - get
+          - list
+        serviceAccountName: ibm-iam-operand-restricted
       deployments:
       - name: ibm-iam-operator
         spec:

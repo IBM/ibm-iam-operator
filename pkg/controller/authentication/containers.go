@@ -587,15 +587,8 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
 		},
 		{
-			Name: "roksClientId",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_ID",
-				},
-			},
+			Name:  "roksClientId",
+			Value: "system:serviceaccount:" + instance.Namespace + ":ibm-iam-operand-restricted",
 		},
 		{
 			Name: "roksClientSecret",
@@ -903,15 +896,8 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
 		},
 		{
-			Name: "roksClientId",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_ID",
-				},
-			},
+			Name:  "roksClientId",
+			Value: "system:serviceaccount:" + instance.Namespace + ":ibm-iam-operand-restricted",
 		},
 		{
 			Name: "roksClientSecret",

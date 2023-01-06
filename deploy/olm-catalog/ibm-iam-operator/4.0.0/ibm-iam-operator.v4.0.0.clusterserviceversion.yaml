@@ -6,79 +6,6 @@ metadata:
       [
         {
           "apiVersion": "operator.ibm.com/v1alpha1",
-          "kind": "OIDCClientWatcher",
-          "metadata": {
-            "labels": {
-              "app.kubernetes.io/instance": "ibm-iam-operator",
-              "app.kubernetes.io/managed-by": "ibm-iam-operator",
-              "app.kubernetes.io/name": "ibm-iam-operator"
-            },
-            "name": "example-oidcclientwatcher"
-          },
-          "spec": {
-            "imageRegistry": "quay.io/opencloudio/icp-oidcclient-watcher",
-            "imageTagPostfix": "3.10.0",
-            "operatorVersion": "0.14.1",
-            "replicas": 1,
-            "resources": {
-              "limits": {
-                "cpu": "200m",
-                "memory": "256Mi"
-              },
-              "requests": {
-                "cpu": "10m",
-                "memory": "16Mi"
-              }
-            },
-            "oidcInitAuthService": {
-              "imageName": "icp-platform-auth",
-              "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.10.0",
-              "resources": {
-                "limits": {
-                  "cpu": "200m",
-                  "memory": "256Mi"
-                },
-                "requests": {
-                  "cpu": "100m",
-                  "memory": "128M"
-                }
-              }
-            },
-            "oidcInitIdentityProvider": {
-              "imageName": "icp-platform-auth",
-              "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.10.0",
-              "resources": {
-                "limits": {
-                  "cpu": "200m",
-                  "memory": "256Mi"
-                },
-                "requests": {
-                  "cpu": "100m",
-                  "memory": "128M"
-                }
-              }
-            },
-            "oidcInitIdentityManager": {
-              "imageName": "icp-platform-auth",
-              "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4.0.0",
-              "resources": {
-                "limits": {
-                  "cpu": "200m",
-                  "memory": "256Mi"
-                },
-                "requests": {
-                  "cpu": "100m",
-                  "memory": "128M"
-                }
-              }
-            }
-          }
-        },
-        {
-          "apiVersion": "operator.ibm.com/v1alpha1",
           "kind": "PolicyDecision",
           "metadata": {
             "labels": {
@@ -577,8 +504,6 @@ spec:
       image: quay.io/opencloudio/iam-policy-decision@sha256:d5e180383338bf7b17956946bff7b6deb17cec86967ba0e5b904ec3e46168310
     - name: icp-secret-watcher
       image: quay.io/opencloudio/icp-secret-watcher@sha256:ef189c20f205f67985af85a581859b95af41a71bd33325398e7220855517199c
-    - name: icp-oidcclient-watcher
-      image: quay.io/opencloudio/icp-oidcclient-watcher@sha256:87b80b342fb8523b1ff96eded391446d3ce578e2148369a2826c82c9a657ad28
     - name: icp-iam-onboarding
       image: quay.io/opencloudio/icp-iam-onboarding@sha256:f52fb8fcb76005274887996e29f97720bd18324f20f1742f32e4b04f87935d25
     - name: audit-syslog-service
@@ -654,9 +579,6 @@ spec:
         - kind: deployments
           name: ''
           version: v1
-        - kind: oidcclientwatchers
-          name: ''
-          version: v1alpha1
         - kind: users
           name: ''
           version: v1
@@ -712,129 +634,6 @@ spec:
       - description: A list defines the catalog information for config.
         displayName: Config
         path: config
-        x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:text'
-      statusDescriptors:
-      - description: The status of operators.
-        displayName: Operator Status
-        path: OperatorsStatus
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:podStatuses
-      - description: The status of nodes.
-        displayName: Node Status
-        path: nodes
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:podStatuses
-      version: v1alpha1
-    - description: OIDCClientWatcher is the schema for the oidcclientwatchers API
-      kind: OIDCClientWatcher
-      name: oidcclientwatchers.operator.ibm.com
-      displayName: OIDCClientWatcher
-      resources:
-        - kind: secrets
-          name: ''
-          version: v1
-        - kind: mutatingwebhookconfigurations
-          name: ''
-          version: v1beta1
-        - kind: clusterroles
-          name: ''
-          version: v1
-        - kind: clusterrolebindings
-          name: ''
-          version: v1
-        - kind: paps
-          name: ''
-          version: v1alpha1
-        - kind: policycontrollers
-          name: ''
-          version: v1alpha1
-        - kind: ingresses
-          name: ''
-          version: v1beta1
-        - kind: securityonboardings
-          name: ''
-          version: v1alpha1
-        - kind: customresourcedefinitions
-          name: ''
-          version: v1beta1
-        - kind: policydecisions
-          name: ''
-          version: v1alpha1
-        - kind: secretwatchers
-          name: ''
-          version: v1alpha1
-        - kind: authentications
-          name: ''
-          version: v1alpha1
-        - kind: Pods
-          name: ''
-          version: v1
-        - kind: statefulsets
-          name: ''
-          version: v1
-        - kind: services
-          name: ''
-          version: v1
-        - kind: persistentvolumeclaims
-          name: ''
-          version: v1
-        - kind: Jobs
-          name: ''
-          version: v1
-        - kind: configmaps
-          name: ''
-          version: v1
-        - kind: certificates
-          name: ''
-          version: v1alpha1
-        - kind: deployments
-          name: ''
-          version: v1
-        - kind: oidcclientwatchers
-          name: ''
-          version: v1alpha1
-        - kind: users
-          name: ''
-          version: v1
-        - kind: replicasets
-          name: ''
-          version: v1
-        - kind: securityonboardings
-          name: ''
-          version: v1alpha1
-        - kind: servicemonitors
-          name: ''
-          version: v1
-      specDescriptors:
-      - description: A list defines the catalog information for operators.
-        displayName: Operators
-        path: operators
-        x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:text'
-      - description: A list defines the catalog information for image registry.
-        displayName: imageRegistry
-        path: imageRegistry
-        x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:text'
-      - description: A list defines the catalog information for image tag postfix.
-        displayName: imageTagPostfix
-        path: imageTagPostfix
-        x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:text'
-      - description: A list defines the catalog information for operator version.
-        displayName: operatorVersion
-        path: operatorVersion
-        x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:text'
-      - description: A list defines the catalog information for replicas.
-        displayName: Replicas
-        path: replicas
-        x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:text'
-      - description: A list defines the catalog information for resources.
-        displayName: Resources
-        path: resources
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
       statusDescriptors:
@@ -908,9 +707,6 @@ spec:
         - kind: deployments
           name: ''
           version: v1
-        - kind: oidcclientwatchers
-          name: ''
-          version: v1alpha1
         - kind: users
           name: ''
           version: v1
@@ -1020,9 +816,6 @@ spec:
         - kind: deployments
           name: ''
           version: v1
-        - kind: oidcclientwatchers
-          name: ''
-          version: v1alpha1
         - kind: users
           name: ''
           version: v1
@@ -1131,9 +924,6 @@ spec:
         - kind: deployments
           name: ''
           version: v1
-        - kind: oidcclientwatchers
-          name: ''
-          version: v1alpha1
         - kind: users
           name: ''
           version: v1
@@ -1257,9 +1047,6 @@ spec:
         - kind: deployments
           name: ''
           version: v1
-        - kind: oidcclientwatchers
-          name: ''
-          version: v1alpha1
         - kind: users
           name: ''
           version: v1
@@ -1368,9 +1155,6 @@ spec:
         - kind: deployments
           name: ''
           version: v1
-        - kind: oidcclientwatchers
-          name: ''
-          version: v1alpha1
         - kind: users
           name: ''
           version: v1
@@ -1521,6 +1305,18 @@ spec:
     mediatype: "image/png"
   install:
     spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - user.openshift.io
+          resources:
+          - users
+          - groups
+          - identities
+          verbs:
+          - get
+          - list
+        serviceAccountName: ibm-iam-operand-restricted
       deployments:
       - name: ibm-iam-operator
         spec:
@@ -1568,8 +1364,6 @@ spec:
                   value: quay.io/opencloudio/iam-policy-decision:3.10.0
                 - name: ICP_SECRET_WATCHER_IMAGE
                   value: quay.io/opencloudio/icp-secret-watcher:3.7.12
-                - name: ICP_OIDCCLIENT_WATCHER_IMAGE
-                  value: quay.io/opencloudio/icp-oidcclient-watcher:3.10.0
                 - name: ICP_IAM_ONBOARDING_IMAGE
                   value: quay.io/opencloudio/icp-iam-onboarding:3.10.0
                 - name: AUDIT_SYSLOG_SERVICE_IMAGE
@@ -1601,6 +1395,9 @@ spec:
                     - ALL
                   privileged: false
                   readOnlyRootFilesystem: true
+                volumeMounts:
+                - mountPath: /certs
+                  name: cluster-ca-cert
               serviceAccountName: ibm-iam-operator
               volumes:
               - name: cluster-ca-cert
@@ -1648,38 +1445,10 @@ spec:
           - patch
           - update
           - watch
-        # used by oidcclient watcher
-        - apiGroups:
-          - oidc.security.ibm.com
-          resources:
-          - clients
-          - clients/finalizers
-          - clients/status
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
         - apiGroups:
           - rbac.authorization.k8s.io
           resources:
           - roles
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - rbac.authorization.k8s.io
-          resources:
-          - rolebindings
-          - rolebindings/finalizers
           verbs:
           - create
           - delete
@@ -1752,6 +1521,20 @@ spec:
           - update
           - watch
         - apiGroups:
+          - oidc.security.ibm.com
+          resources:
+          - clients
+          - clients/finalizers
+          - clients/status
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
           - monitoring.coreos.com
           resources:
           - servicemonitors
@@ -1784,7 +1567,6 @@ spec:
           resources:
           - '*'
           - policydecisions
-          - oidcclientwatchers
           - authentications
           - policycontrollers
           - paps

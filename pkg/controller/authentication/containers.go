@@ -587,15 +587,8 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
 		},
 		{
-			Name: "roksClientId",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_ID",
-				},
-			},
+			Name:  "roksClientId",
+			Value: "system:serviceaccount:" + instance.Namespace + ":ibm-iam-operand-restricted",
 		},
 		{
 			Name: "roksClientSecret",
@@ -632,7 +625,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		},
 		{
 			Name:  "IDMGMT_KUBEDNS_NAME",
-			Value: "127.0.0.1",
+			Value: "platform-identity-management",
 		},
 		{
 			Name: "OAUTH2_CLIENT_REGISTRATION_SECRET",
@@ -673,7 +666,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		},
 		{
 			Name:  "IAM_OIDC_TOKEN_SERVICE_URL",
-			Value: "https://127.0.0.1:9443/iam",
+			Value: "https://platform-auth-service:9443/iam",
 		},
 		{
 			Name:  "MASTER_HOST",
@@ -903,15 +896,8 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
 		},
 		{
-			Name: "roksClientId",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_ID",
-				},
-			},
+			Name:  "roksClientId",
+			Value: "system:serviceaccount:" + instance.Namespace + ":ibm-iam-operand-restricted",
 		},
 		{
 			Name: "roksClientSecret",
@@ -948,11 +934,11 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		},
 		{
 			Name:  "IDPROVIDER_KUBEDNS_NAME",
-			Value: "https://127.0.0.1",
+			Value: "https://platform-identity-provider",
 		},
 		{
 			Name:  "IAM_TOKEN_SERVICE_URL",
-			Value: "https://127.0.0.1:9443",
+			Value: "https://platform-auth-service:9443",
 		},
 		{
 			Name:  "MASTER_NODES_LIST",
@@ -1062,7 +1048,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 	}
 
 	return corev1.Container{
-		Name:            "platform-identity-manager",
+		Name:            "platform-identity-management",
 		Image:           identityManagerImage,
 		ImagePullPolicy: corev1.PullAlways,
 		SecurityContext: &corev1.SecurityContext{
@@ -1135,10 +1121,30 @@ func buildContainers(instance *operatorv1alpha1.Authentication, auditImage strin
 	auditResources := instance.Spec.AuditService.Resources
 	auditContainer := buildAuditContainer(auditImage, syslogTlsPath, auditResources)
 	authServiceContainer := buildAuthServiceContainer(instance, authServiceImage)
-	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId)
+	//identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId)
+	//identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL)
+
+	return []corev1.Container{auditContainer, authServiceContainer}
+}
+
+func buildManagerContainers(instance *operatorv1alpha1.Authentication, auditImage string, identityManagerImage string, syslogTlsPath string, icpConsoleURL string, saasCrnId string) []corev1.Container {
+
+	auditResources := instance.Spec.AuditService.Resources
+	auditContainer := buildAuditContainer(auditImage, syslogTlsPath, auditResources)
+
 	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL)
 
-	return []corev1.Container{auditContainer, authServiceContainer, identityProviderContainer, identityManagerContainer}
+	return []corev1.Container{auditContainer, identityManagerContainer}
+}
+
+func buildProviderContainers(instance *operatorv1alpha1.Authentication, auditImage string, identityProviderImage string, syslogTlsPath string, icpConsoleURL string, saasCrnId string) []corev1.Container {
+
+	auditResources := instance.Spec.AuditService.Resources
+	auditContainer := buildAuditContainer(auditImage, syslogTlsPath, auditResources)
+
+	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId)
+
+	return []corev1.Container{auditContainer, identityProviderContainer}
 }
 
 func buildIdpEnvVars(envVarList []string) []corev1.EnvVar {

@@ -14,13 +14,21 @@
 // limitations under the License.
 //
 
-package controller
+package utils
 
 import (
-	"github.com/IBM/ibm-iam-operator/pkg/controller/oidcclientwatcher"
+	"math/rand"
+	"time"
+
+	regen "github.com/zach-klippenstein/goregen"
 )
 
-func init() {
-	// AddToManagerFuncs is a list of functions to create controllers and add them to a manager.
-	AddToManagerFuncs = append(AddToManagerFuncs, oidcclientwatcher.Add)
+// GenerateRandomString generates a random string based upon a string that is a valid regex pattern.
+func GenerateRandomString(rule string) string {
+
+	generator, _ := regen.NewGenerator(rule, &regen.GeneratorArgs{
+		RngSource:               rand.NewSource(time.Now().UnixNano()),
+		MaxUnboundedRepeatCount: 1})
+	randomString := generator.Generate()
+	return randomString
 }

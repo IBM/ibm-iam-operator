@@ -20,6 +20,7 @@ import (
 	"context"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	utils "github.com/IBM/ibm-iam-operator/pkg/utils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,10 +31,10 @@ import (
 
 var rule2 = `^([a-zA-Z0-9]){32,}$`
 var rule3 = `^([a-zA-Z0-9]){16,}$`
-var adminPassword = generateRandomString(rule2)
-var encryptionKey = generateRandomString(rule2)
-var wlpClientRegistrationSecret = generateRandomString(rule2)
-var encryptionIV = generateRandomString(rule3)
+var adminPassword = utils.GenerateRandomString(rule2)
+var encryptionKey = utils.GenerateRandomString(rule2)
+var wlpClientRegistrationSecret = utils.GenerateRandomString(rule2)
+var encryptionIV = utils.GenerateRandomString(rule3)
 
 func generateSecretData(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string) map[string]map[string][]byte {
 

@@ -156,7 +156,7 @@ build-image: build $(CONFIG_DOCKER_TARGET)
 build-image-amd64: build $(CONFIG_DOCKER_TARGET)
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/_output/bin/ibm-iam-operator-amd64 ./cmd/manager
 	docker run --rm --privileged multiarch/qemu-user-static:register --reset
-	docker build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-amd64:$(VERSION) -f build/Dockerfile .
+	docker build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-amd64:$(VERSION) -f build/Dockerfile.amd64 .
 	@\rm -f build/_output/bin/ibm-iam-operator-amd64
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then docker push $(REGISTRY)/$(IMG)-$(ARCH):$(VERSION); fi
 
@@ -194,7 +194,7 @@ scorecard: ## Run scorecard test
 
 ##@ Release
 
-images: build-image-amd64 build-image-ppc64le build-image-s390x
+images: build-image build-image-ppc64le build-image-s390x
 	@curl -L -o /tmp/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.3/manifest-tool-linux-amd64
 	@chmod +x /tmp/manifest-tool
 	/tmp/manifest-tool push from-args --platforms linux/amd64,linux/ppc64le,linux/s390x --template $(REGISTRY)/$(IMG)-ARCH:$(VERSION) --target $(REGISTRY)/$(IMG) --ignore-missing

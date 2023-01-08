@@ -47,26 +47,15 @@ import (
 const controllerName = "controller_oidc_client"
 const OptimisticLockErrorMsg = "the object has been modified; please apply your changes to the latest version and try again"
 
-var log = logf.Log.WithName(controllerName)
-var Clock clock.Clock = clock.RealClock{}
-
 const (
   // PlatformAuthIDPConfigMapName is the name of the ConfigMap containing settings used for Client management
   PlatformAuthIDPConfigMapName string = "platform-auth-idp"
   // PlatformAuthIDPCredentialsSecretName is the name of the Secret containing default credentials
   PlatformAuthIDPCredentialsSecretName string = "platform-auth-idp-credentials"
-  // IdentityManagementURLKey is the key in the ReconcileClient's config corresponding to the Identity Management service URL value
-  IdentityManagementURLKey string = "IDENTITY_MGMT_URL"
-  // IdentityProviderURLKey is the key in the ReconcileClient's config corresponding to the Identity Provider service URL value
-  IdentityProviderURLKey string = "IDENTITY_PROVIDER_URL"
-  // AuthServiceURL is the key in the ReconcileClient's config corresponding to the OIDC URL value
-  AuthServiceURLKey string = "BASE_OIDC_URL"
-  // ROKSEnabledKey is the key in the ReconcileClient's config corresponding to a boolean value that enables or disables
-  // the automatic creation of an Openshift OAuthClients
-  ROKSEnabledKey string = "ROKS_ENABLED"
-  DefaultAdminUserKey string = "admin_username"
-  DefaultAdminPasswordKey string = "admin_password"
 )
+
+var log = logf.Log.WithName(controllerName)
+var Clock clock.Clock = clock.RealClock{}
 
 // Add creates a new Client Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -76,7 +65,13 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileClient{client: mgr.GetClient(), Reader: mgr.GetAPIReader(), recorder: mgr.GetEventRecorderFor(controllerName), scheme: mgr.GetScheme()}
+	return &ReconcileClient{
+    client: mgr.GetClient(),
+    Reader: mgr.GetAPIReader(),
+    recorder: mgr.GetEventRecorderFor(controllerName),
+    scheme: mgr.GetScheme(),
+    config: ClientControllerConfig{},
+  }
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -104,149 +99,39 @@ type ReconcileClient struct {
 	Reader   client.Reader
 	recorder record.EventRecorder
 	scheme   *runtime.Scheme
-  config   map[string]string
+  config   ClientControllerConfig
 }
 
+// SetConfig sets the ClientControllerConfig on the ReconcileClient using the platform-auth-idp ConfigMap and
+// platform-auth-idp-credentials Secret that are installed on the cluster.
 func (r *ReconcileClient) SetConfig(ctx context.Context, namespace string) (err error) {
-  if r.config == nil {
-    r.config = make(map[string]string)
-  }
-  err = r.setConfigWithConfigMap(ctx, PlatformAuthIDPConfigMapName, namespace, IdentityManagementURLKey, IdentityProviderURLKey, ROKSEnabledKey, AuthServiceURLKey)
-  if err != nil {
-    return fmt.Errorf("failed to configure: %w", err)
-  }
-  err = r.setConfigWithSecret(ctx, PlatformAuthIDPCredentialsSecretName, namespace, DefaultAdminUserKey, DefaultAdminPasswordKey)
-  if err != nil {
-    return fmt.Errorf("failed to configure: %w", err)
-  }
-  return
-}
-
-// ConfigWithInstalledConfigMap gets an installed ConfigMap from the cluster using the provided name and namespace as
-// filters and sets the ReconcileClient's config to that ConfigMap's Data field. 
-func (r *ReconcileClient) setConfigWithConfigMap(ctx context.Context, name string, namespace string, keysList ...string) (err error) {
-  configMap := &corev1.ConfigMap{}
-  if name == "" {
-    return fmt.Errorf("provided name must be non-empty")
-  } else if namespace == "" {
+  if namespace == "" {
     return fmt.Errorf("provided namespace must be non-empty")
-  } else {
-    err = r.client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, configMap)
-    if err != nil {
-      return fmt.Errorf("client failed to GET ConfigMap: %w", err)
-    }
   }
-  if configMap.Data != nil {
-    if len(keysList) != 0 {
-      for _, k := range keysList {
-        r.config[k] = configMap.Data[k]
-      }
-    } else {
-      for k, v := range configMap.Data {
-        r.config[k] = v
-      }
-    }
+  if !r.IsConfigured(){
+    r.config = ClientControllerConfig{}
+  }
+  configMap := &corev1.ConfigMap{}
+  err = r.client.Get(ctx, types.NamespacedName{Name: PlatformAuthIDPConfigMapName, Namespace: namespace}, configMap)
+  if err != nil {
+    return fmt.Errorf("client failed to GET ConfigMap: %w", err)
+  }
+  err = r.config.ApplyConfigMap(configMap, identityManagementURLKey, identityProviderURLKey, rOKSEnabledKey, authServiceURLKey)
+  if err != nil {
+    return fmt.Errorf("failed to configure: %w", err)
+  }
+  secret := &corev1.Secret{}
+  err = r.client.Get(ctx, types.NamespacedName{Name: PlatformAuthIDPCredentialsSecretName, Namespace: namespace}, secret)
+  if err != nil {
     return
   }
-  return fmt.Errorf("found ConfigMap had no \"Data\" field")
-}
-
-func (r *ReconcileClient) setConfigWithSecret(ctx context.Context, name string, namespace string, keysList ...string) (err error) {
-  secret := &corev1.Secret{}
-  if name == "" {
-    return fmt.Errorf("provided name must be non-empty")
-  } else if namespace == "" {
-    return fmt.Errorf("provided namespace must be non-empty")
-  } else {
-    err = r.client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, secret)
-    if err != nil {
-      return
-    }
-    // If a keysList is provided, only copy in the key-value pairs specified; else, copy all key-value pairs into config
-    if secret.Data != nil {
-      if len(keysList) != 0 {
-        for _, k := range keysList {
-          r.config[k] = string(secret.Data[k][:])
-        }
-      } else {
-        for k, v := range secret.Data {
-          r.config[k] = string(v[:])
-        }
-      }
-      return
-    }
-  }
-  return fmt.Errorf("found Secret had no \"Data\" field")
-}
-
-
-// IsConfigured returns whether all mandatory config fields are set.
-func (r *ReconcileClient) IsConfigured() bool {
-  if value, err := r.GetIdentityManagementURL(); value != "" && err != nil {
-    return false
-  }
-  if value, err := r.GetIdentityProviderURL(); value != "" && err != nil {
-    return false
-  }
-  if _, err := r.GetROKSEnabled(); err != nil {
-    return false
-  }
-  if value, err := r.GetAuthServiceURL(); value != "" && err != nil {
-    return false
-  }
-  if value, err := r.GetDefaultAdminUser(); value != "" && err != nil {
-    return false
-  }
-  if value, err := r.GetDefaultAdminPassword(); value != "" && err != nil {
-    return false
-  }
-  return true
-}
-
-// getConfigValue retrieves the value stored at the provided key from the ReconcileClient's config field.
-func (r *ReconcileClient) getConfigValue(key string) (value string, err error) {
-  if r.config == nil || len(r.config) == 0 {
-    return "", fmt.Errorf("config is not set")
-  }
-  value, ok := r.config[key]
-  if !ok {
-    err = fmt.Errorf("unable to retrieve value for key %q from config", key)
+  err = r.config.ApplySecret(secret, defaultAdminUserKey, defaultAdminPasswordKey)
+  if err != nil {
+    return fmt.Errorf("failed to configure: %w", err)
   }
   return
 }
 
-func (r *ReconcileClient) GetDefaultAdminUser() (value string, err error) {
-  value, err = r.getConfigValue(DefaultAdminUserKey)
-  return
-}
-
-func (r *ReconcileClient) GetDefaultAdminPassword() (value string, err error) {
-  value, err = r.getConfigValue(DefaultAdminPasswordKey)
-  return
-}
-
-func (r *ReconcileClient) GetROKSEnabled() (value bool, err error) {
-  valueStr, err := r.getConfigValue(ROKSEnabledKey)
-  if valueStr == "true" {
-    return true, nil
-  }
-  return
-}
-
-func (r *ReconcileClient) GetIdentityProviderURL() (value string, err error) {
-  value, err = r.getConfigValue(IdentityProviderURLKey)
-  return
-}
-
-func (r *ReconcileClient) GetIdentityManagementURL() (value string, err error) {
-  value, err = r.getConfigValue(IdentityManagementURLKey)
-  return
-}
-
-func (r *ReconcileClient) GetAuthServiceURL() (value string, err error) {
-  value, err = r.getConfigValue(AuthServiceURLKey)
-  return
-}
 // Reconcile reads that state of the cluster for a Client object and makes changes based on the state read
 // and what is in the Client.Spec
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or

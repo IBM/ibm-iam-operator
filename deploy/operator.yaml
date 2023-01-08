@@ -44,13 +44,13 @@ spec:
           imagePullPolicy: Always
           env:
             - name: ICP_PLATFORM_AUTH_IMAGE
-              value: icr.io/cpopen/cpfs/icp-platform-auth:3.10.0
+              value: icr.io/cpopen/cpfs/icp-platform-auth:4.0.0
             - name: ICP_IDENTITY_PROVIDER_IMAGE
               value: icr.io/cpopen/cpfs/icp-identity-provider:4.0.0
             - name: ICP_IDENTITY_MANAGER_IMAGE
               value: icr.io/cpopen/cpfs/icp-identity-manager:4.0.0
             - name: IAM_POLICY_ADMINISTRATION_IMAGE
-              value: icr.io/cpopen/cpfs/iam-policy-administration:3.10.0
+              value: icr.io/cpopen/cpfs/iam-policy-administration:4.0.0
             - name: IAM_POLICY_DECISION_IMAGE
               value: icr.io/cpopen/cpfs/iam-policy-decision:3.10.0
             - name: ICP_SECRET_WATCHER_IMAGE
@@ -60,7 +60,7 @@ spec:
             - name: ICP_IAM_ONBOARDING_IMAGE
               value: icr.io/cpopen/cpfs/icp-iam-onboarding:3.10.0
             - name: AUDIT_SYSLOG_SERVICE_IMAGE
-              value: icr.io/cpopen/cpfs/audit-syslog-service:1.8.0
+              value: icr.io/cpopen/cpfs/audit-syslog-service:1.10.0
             - name: WATCH_NAMESPACE
               valueFrom:
                 fieldRef:

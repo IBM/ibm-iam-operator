@@ -121,7 +121,7 @@ func (r *ReconcileAuthentication) platformAuthService(instance *operatorv1alpha1
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-auth-service",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
@@ -130,12 +130,12 @@ func (r *ReconcileAuthentication) platformAuthService(instance *operatorv1alpha1
 					Port: authPort,
 				},
 				{
-					Name: "p3100",
-					Port: dirPort,
-				},
+ 					Name: "p3100",
+ 					Port: dirPort,
+ 				},
 			},
 			Selector: map[string]string{
-				"k8s-app": "auth-idp",
+				"k8s-app": "platform-auth-service",
 			},
 			Type:            "ClusterIP",
 			SessionAffinity: corev1.ServiceAffinityClientIP,
@@ -161,7 +161,7 @@ func (r *ReconcileAuthentication) identityManagementService(instance *operatorv1
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-identity-management",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-identity-management"},
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
@@ -179,7 +179,7 @@ func (r *ReconcileAuthentication) identityManagementService(instance *operatorv1
 				},
 			},
 			Selector: map[string]string{
-				"k8s-app": "auth-idp",
+				"k8s-app": "platform-identity-management",
 			},
 			Type:            "ClusterIP",
 			SessionAffinity: corev1.ServiceAffinityClientIP,
@@ -200,12 +200,11 @@ func (r *ReconcileAuthentication) identityProviderService(instance *operatorv1al
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var idproviderPort int32 = 4300
-	var redirectPort int32 = 9443
 	identityProviderService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-identity-provider",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-identity-provider"},
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
@@ -213,13 +212,9 @@ func (r *ReconcileAuthentication) identityProviderService(instance *operatorv1al
 					Name: "p4300",
 					Port: idproviderPort,
 				},
-				{
-					Name: "p9443",
-					Port: redirectPort,
-				},
 			},
 			Selector: map[string]string{
-				"k8s-app": "auth-idp",
+				"k8s-app": "platform-identity-provider",
 			},
 			Type:            "ClusterIP",
 			SessionAffinity: corev1.ServiceAffinityClientIP,
@@ -244,7 +239,7 @@ func (r *ReconcileAuthentication) iamTokenService(instance *operatorv1alpha1.Aut
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "iam-token-service",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"component": "auth-idp"},
+			Labels:    map[string]string{"component": "platform-auth-service"},
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{

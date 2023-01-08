@@ -91,11 +91,12 @@ const (
 	letterIdxMask = 1<<letterIdxBits - 1                                             // All 1-bits, as many as letterIdxBits
 )
 
-// The default auth service URL
-const authServiceURL = "https://platform-auth-service:9443"
-
 func (r *ReconcileClient) CreateClientCredentials(ctx context.Context, client *securityv1.Client) (*ClientCredentials, error) {
-	url := strings.Join([]string{authServiceURL, "/oidc/endpoint/OP/registration"}, "")
+  authServiceURL, err := r.GetAuthServiceURL()
+  if err != nil {
+    return nil, err
+  }
+	url := strings.Join([]string{authServiceURL, "registration"}, "/")
 	serviceName := client.Name
 	clientCred := r.generateClientCredentials(serviceName)
 
@@ -107,7 +108,7 @@ func (r *ReconcileClient) CreateClientCredentials(ctx context.Context, client *s
 		return clientCred, nil
 	} else {
 		handleOIDCClientError(client, response, err, PostType, r.recorder)
-		err = fmt.Errorf("Error occurred during create oidc client regstration")
+		err = fmt.Errorf("Error occurred during create oidc client registration")
 		return nil, err
 	}
 
@@ -116,11 +117,15 @@ func (r *ReconcileClient) CreateClientCredentials(ctx context.Context, client *s
 func (r *ReconcileClient) UpdateClientCredentials(ctx context.Context, client *securityv1.Client, secret *corev1.Secret) (*ClientCredentials, error) {
 	secretData := secret.Data
 	clientCred := &ClientCredentials{
-		CLIENT_ID:     string(secretData["CLIENT_ID"]),
-		CLIENT_SECRET: string(secretData["CLIENT_SECRET"]),
+    CLIENT_ID:     string(secretData["CLIENT_ID"][:]),
+    CLIENT_SECRET: string(secretData["CLIENT_SECRET"][:]),
 	}
+  authServiceURL, err := r.GetAuthServiceURL()
+  if err != nil {
+    return nil, err
+  }
 	payload := r.generateClientRegistrationPayload(client, clientCred)
-	url := strings.Join([]string{authServiceURL, "/oidc/endpoint/OP/registration/", clientCred.CLIENT_ID}, "")
+	url := strings.Join([]string{authServiceURL, "registration", clientCred.CLIENT_ID}, "/")
 	response, err := r.invokeRegistration(ctx, client, PutType, url, payload)
 	if response != nil && response.Status == "200 OK" {
 		defer response.Body.Close()
@@ -135,7 +140,11 @@ func (r *ReconcileClient) UpdateClientCredentials(ctx context.Context, client *s
 func (r *ReconcileClient) DeleteClientCredentials(ctx context.Context, client *securityv1.Client) error {
 	clientId := client.Spec.ClientId
 	if clientId != "" {
-		url := strings.Join([]string{authServiceURL, "/oidc/endpoint/OP/registration/", clientId}, "")
+    authServiceURL, err := r.GetAuthServiceURL()
+    if err != nil {
+      return err
+    }
+		url := strings.Join([]string{authServiceURL, "registration", clientId}, "/")
 		response, err := r.invokeRegistration(ctx, client, DeleteType, url, "")
 		if response != nil && (response.Status == "204 No Content" || response.Status == "404 Not Found") {
 			defer response.Body.Close()
@@ -160,7 +169,7 @@ func (r *ReconcileClient) invokeRegistration(ctx context.Context, oidcreg *secur
   } 
   log.Info(fmt.Sprintf("Retrieved secret %q", clientRegistrationSecretName))
   oauthAdmin := "oauthadmin"
-  clientRegistrationSecret := string(secretObj.Data["OAUTH2_CLIENT_REGISTRATION_SECRET"])
+  clientRegistrationSecret := string(secretObj.Data["OAUTH2_CLIENT_REGISTRATION_SECRET"][:])
 
 	req, _ := http.NewRequest(requestType, requestURL, bytes.NewBuffer([]byte(payload)))
 	req.Header.Set("Content-Type", "application/json")
@@ -188,7 +197,11 @@ func (r *ReconcileClient) invokeRegistration(ctx context.Context, oidcreg *secur
 
 func (r *ReconcileClient) getClientCredentials(ctx context.Context, oidcreg *securityv1.Client) (*http.Response, error) {
 	clientId := oidcreg.Spec.ClientId
-	url := strings.Join([]string{authServiceURL, "/oidc/endpoint/OP/registration/", clientId}, "")
+  authServiceURL, err := r.GetAuthServiceURL()
+  if err != nil {
+    return nil, err
+  }
+	url := strings.Join([]string{authServiceURL, "registration", clientId}, "/")
 	response, err := r.invokeRegistration(ctx, oidcreg, GetType, url, "")
 	if response != nil && response.Status == "200 OK" {
 		return response, nil

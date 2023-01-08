@@ -53,15 +53,19 @@ var Clock clock.Clock = clock.RealClock{}
 const (
   // PlatformAuthIDPConfigMapName is the name of the ConfigMap containing settings used for Client management
   PlatformAuthIDPConfigMapName string = "platform-auth-idp"
+  // PlatformAuthIDPCredentialsSecretName is the name of the Secret containing default credentials
+  PlatformAuthIDPCredentialsSecretName string = "platform-auth-idp-credentials"
   // IdentityManagementURLKey is the key in the ReconcileClient's config corresponding to the Identity Management service URL value
   IdentityManagementURLKey string = "IDENTITY_MGMT_URL"
   // IdentityProviderURLKey is the key in the ReconcileClient's config corresponding to the Identity Provider service URL value
   IdentityProviderURLKey string = "IDENTITY_PROVIDER_URL"
+  // AuthServiceURL is the key in the ReconcileClient's config corresponding to the OIDC URL value
+  AuthServiceURLKey string = "BASE_OIDC_URL"
   // ROKSEnabledKey is the key in the ReconcileClient's config corresponding to a boolean value that enables or disables
   // the automatic creation of an Openshift OAuthClients
   ROKSEnabledKey string = "ROKS_ENABLED"
-  DefaultAdminUserKey string = "DEFAULT_ADMIN_USER"
-  DefaultAdminPasswordKey string = "DEFAULT_ADMIN_PASSWORD"
+  DefaultAdminUserKey string = "admin_username"
+  DefaultAdminPasswordKey string = "admin_password"
 )
 
 // Add creates a new Client Controller and adds it to the Manager. The Manager will set fields on the Controller
@@ -103,9 +107,24 @@ type ReconcileClient struct {
   config   map[string]string
 }
 
+func (r *ReconcileClient) SetConfig(ctx context.Context, namespace string) (err error) {
+  if r.config == nil {
+    r.config = make(map[string]string)
+  }
+  err = r.setConfigWithConfigMap(ctx, PlatformAuthIDPConfigMapName, namespace, IdentityManagementURLKey, IdentityProviderURLKey, ROKSEnabledKey, AuthServiceURLKey)
+  if err != nil {
+    return fmt.Errorf("failed to configure: %w", err)
+  }
+  err = r.setConfigWithSecret(ctx, PlatformAuthIDPCredentialsSecretName, namespace, DefaultAdminUserKey, DefaultAdminPasswordKey)
+  if err != nil {
+    return fmt.Errorf("failed to configure: %w", err)
+  }
+  return
+}
+
 // ConfigWithInstalledConfigMap gets an installed ConfigMap from the cluster using the provided name and namespace as
 // filters and sets the ReconcileClient's config to that ConfigMap's Data field. 
-func (r *ReconcileClient) SetConfigWithInstalledConfigMap(ctx context.Context, name string, namespace string) (err error) {
+func (r *ReconcileClient) setConfigWithConfigMap(ctx context.Context, name string, namespace string, keysList ...string) (err error) {
   configMap := &corev1.ConfigMap{}
   if name == "" {
     return fmt.Errorf("provided name must be non-empty")
@@ -114,42 +133,72 @@ func (r *ReconcileClient) SetConfigWithInstalledConfigMap(ctx context.Context, n
   } else {
     err = r.client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, configMap)
     if err != nil {
-      return
+      return fmt.Errorf("client failed to GET ConfigMap: %w", err)
     }
   }
   if configMap.Data != nil {
-    r.config = configMap.Data
+    if len(keysList) != 0 {
+      for _, k := range keysList {
+        r.config[k] = configMap.Data[k]
+      }
+    } else {
+      for k, v := range configMap.Data {
+        r.config[k] = v
+      }
+    }
     return
   }
-  return fmt.Errorf("ConfigMap %q in namespace %q had no Data field", name, namespace)
+  return fmt.Errorf("found ConfigMap had no \"Data\" field")
 }
 
-// IsConfigured confirms that the ReconcileClient is adequately configured to process requests by confirming that each
-// of the config getters returns a non-error value and not an error.
+func (r *ReconcileClient) setConfigWithSecret(ctx context.Context, name string, namespace string, keysList ...string) (err error) {
+  secret := &corev1.Secret{}
+  if name == "" {
+    return fmt.Errorf("provided name must be non-empty")
+  } else if namespace == "" {
+    return fmt.Errorf("provided namespace must be non-empty")
+  } else {
+    err = r.client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, secret)
+    if err != nil {
+      return
+    }
+    // If a keysList is provided, only copy in the key-value pairs specified; else, copy all key-value pairs into config
+    if secret.Data != nil {
+      if len(keysList) != 0 {
+        for _, k := range keysList {
+          r.config[k] = string(secret.Data[k][:])
+        }
+      } else {
+        for k, v := range secret.Data {
+          r.config[k] = string(v[:])
+        }
+      }
+      return
+    }
+  }
+  return fmt.Errorf("found Secret had no \"Data\" field")
+}
+
+
+// IsConfigured returns whether all mandatory config fields are set.
 func (r *ReconcileClient) IsConfigured() bool {
-  string_getters := []func() (string, error) {
-    r.GetDefaultAdminUser,
-    r.GetDefaultAdminPassword,
-    r.GetIdentityManagementURL,
-    r.GetIdentityProviderURL,
+  if value, err := r.GetIdentityManagementURL(); value != "" && err != nil {
+    return false
   }
-  bool_getters := []func() (bool, error) {
-    r.GetROKSEnabled,
+  if value, err := r.GetIdentityProviderURL(); value != "" && err != nil {
+    return false
   }
-
-  var err error
-  for _, f := range string_getters {
-    _, err = f()
-    if err != nil {
-      return false
-    }
+  if _, err := r.GetROKSEnabled(); err != nil {
+    return false
   }
-
-  for _, f := range bool_getters {
-    _, err = f()
-    if err != nil {
-      return false
-    }
+  if value, err := r.GetAuthServiceURL(); value != "" && err != nil {
+    return false
+  }
+  if value, err := r.GetDefaultAdminUser(); value != "" && err != nil {
+    return false
+  }
+  if value, err := r.GetDefaultAdminPassword(); value != "" && err != nil {
+    return false
   }
   return true
 }
@@ -194,6 +243,10 @@ func (r *ReconcileClient) GetIdentityManagementURL() (value string, err error) {
   return
 }
 
+func (r *ReconcileClient) GetAuthServiceURL() (value string, err error) {
+  value, err = r.getConfigValue(AuthServiceURLKey)
+  return
+}
 // Reconcile reads that state of the cluster for a Client object and makes changes based on the state read
 // and what is in the Client.Spec
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
@@ -217,12 +270,17 @@ func (r *ReconcileClient) Reconcile(ctx context.Context, request reconcile.Reque
 		return reconcile.Result{}, err
 	}
   
+  reqLogger.Info("checking to see if controller is fully configured")
   if !r.IsConfigured() {
-    err = r.SetConfigWithInstalledConfigMap(ctx, PlatformAuthIDPConfigMapName, request.Namespace)
+    err = r.SetConfig(ctx, request.Namespace)
     if err != nil {
       // Return error if the attempt to configure the ReconcileClient did not work
-      return reconcile.Result{}, err
+      return reconcile.Result{}, fmt.Errorf("failed to set controller config: %w", err)
+    } else {
+      reqLogger.Info("successfully set config for controller")
     }
+  } else {
+    reqLogger.Info("controller is fully configured")
   }
 	errorRg := r.processOidcRegistration(ctx, reqLogger, instance)
 	if errorRg != nil {
@@ -243,7 +301,7 @@ func (r *ReconcileClient) Reconcile(ctx context.Context, request reconcile.Reque
 }
 
 func (r *ReconcileClient) processOidcRegistration(ctx context.Context, reqLogger logr.Logger, client *oidcv1.Client) error {
-	reqLogger.Info("Processing OIDC client Registration ")
+	reqLogger.Info("Processing OIDC client Registration")
 	var errReg, errSecret, errOauthClient, errZen error
 	var isDeleteEvent, clientIdExists bool
 
@@ -262,16 +320,19 @@ func (r *ReconcileClient) processOidcRegistration(ctx context.Context, reqLogger
 		secret := &corev1.Secret{}
 		clientIdExists, clientCreds, errReg = r.ClientIdExists(ctx, client)
 		if errReg != nil {
-			reqLogger.Error(nil, "Error occurred while getting oidc registration.")
+      reqLogger.Error(nil, "ClientId not registered")
 		} else if !clientIdExists {
 			reqLogger.Info("ClientId don't exist, create new registration")
 			clientCreds, errReg = r.CreateClientCredentials(ctx, client)
 			if errReg != nil {
 				return errReg
 			}
-			secret, errSecret = r.newSecretForClient(ctx, client, clientCreds)
+			_, errSecret = r.newSecretForClient(ctx, client, clientCreds)
 			if isRoksEnabled {
 				_, errOauthClient = r.newOAuthClientForClient(ctx, client, clientCreds)
+        if errOauthClient != nil {
+          reqLogger.Error(errOauthClient, "error during oauthclient creation")
+        }
 			}
 
 			errZen = r.processZenRegistration(reqLogger, client)
@@ -285,7 +346,7 @@ func (r *ReconcileClient) processOidcRegistration(ctx context.Context, reqLogger
 			if isRoksEnabled {
 				_ = r.reconcileOAuthClient(ctx, client, clientCreds)
 			}
-			clientCreds, errReg = r.UpdateClientCredentials(ctx, client, secret)
+			_, errReg = r.UpdateClientCredentials(ctx, client, secret)
 
 			errZen = r.processZenRegistration(reqLogger, client)
 			if errZen != nil {
@@ -298,7 +359,7 @@ func (r *ReconcileClient) processOidcRegistration(ctx context.Context, reqLogger
 				oidcv1.ConditionTrue,
 				ReasonCreateClientSuccessful,
 				MessageClientSuccessful)
-			if clientIdExists == false {
+			if !clientIdExists {
 				r.recorder.Event(client, corev1.EventTypeNormal, ReasonCreateClientSuccessful, MessageCreateClientSuccessful)
 			} else {
 				r.recorder.Event(client, corev1.EventTypeNormal, ReasonUpdateClientSuccessful, MessageUpdateClientSuccessful)
@@ -355,7 +416,6 @@ func (r *ReconcileClient) processZenRegistration(reqLogger logr.Logger, client *
 		r.recorder.Event(client, corev1.EventTypeWarning, ReasonCreateZenRegistrationFailed, zenErr.Error())
 		return zenErr
 	}
-
 	if zenReg != nil {
 		//Zen registration exists - currently updates to the zen registration are not supported
 		reqLogger.Info("Zen registration already exists for oidc client - the zen instance will not be updated", "clientId", client.Spec.ClientId, "zenInstanceId", client.Spec.ZenInstanceId)
@@ -458,7 +518,6 @@ func (r *ReconcileClient) reconcileSecret(ctx context.Context, client *oidcv1.Cl
 	if err == nil {
 		return found
 	} else {
-		secret := &corev1.Secret{}
 		secret, errSec := r.newSecretForClient(ctx, client, clientCreds)
 		if errSec == nil {
 			return secret
@@ -553,7 +612,6 @@ func (r *ReconcileClient) newOAuthClientForClient(ctx context.Context, client *o
 	}
 	err := r.client.Create(ctx, oauthclient)
 	if err != nil {
-		reqLogger.Error(err, "Error occurred during oauthclient creation")
 		return nil, err
 	}
 	return oauthclient, nil

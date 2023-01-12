@@ -158,7 +158,7 @@ build-image-amd64: build $(CONFIG_DOCKER_TARGET)
 	docker run --rm --privileged multiarch/qemu-user-static:register --reset
 	docker build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-amd64:$(VERSION) -f build/Dockerfile.amd64 .
 	@\rm -f build/_output/bin/ibm-iam-operator-amd64
-	@if [ $(BUILD_LOCALLY) -ne 1 ]; then docker push $(REGISTRY)/$(IMG)-$(ARCH):$(VERSION); fi
+	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-amd64:$(VERSION); fi
 
 # runs on amd64 machine
 build-image-ppc64le: $(CONFIG_DOCKER_TARGET)

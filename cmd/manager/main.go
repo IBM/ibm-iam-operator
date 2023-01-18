@@ -91,7 +91,6 @@ func main() {
 		log.Error(err, "Failed to get watch namespace")
 		os.Exit(1)
 	}
-	namespaces := strings.Split(namespace, ",")
 	// Get a config to talk to the apiserver
 	cfg, err := config.GetConfig()
 	if err != nil {
@@ -105,43 +104,51 @@ func main() {
 	if err != nil {
 		log.Error(err, "")
 		os.Exit(1)
-	}
-	for _, ns := range namespaces {
-		// Create a new Cmd to provide shared dependencies and start components
-		mgr, err := manager.New(cfg, manager.Options{
-			Namespace:          ns,
+	}	
+	var managerOpt manager.Options
+	if strings.Contains(namespace, ",") {
+		namespaces := strings.Split(namespace, ",")
+		managerOpt = manager.Options{
 			MetricsBindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),
-		})
-		if err != nil {
-			log.Error(err, "")
-			os.Exit(1)
+			NewCache:           cache.MultiNamespacedCacheBuilder(namespaces),
 		}
-
-		log.Info("Registering Components.")
-
-		// Setup Scheme for all resources
-		if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
-			log.Error(err, "")
-			os.Exit(1)
+	}else{
+		managerOpt = manager.Options{
+			Namespace:          namespace,
+			MetricsBindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),
 		}
+	}
 
-		// Setup all Controllers
-		if err := controller.AddToManager(mgr); err != nil {
-			log.Error(err, "")
-			os.Exit(1)
-		}
+	// Create a new Cmd to provide shared dependencies and start components
+	mgr, err := manager.New(cfg, managerOpt)
+	if err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
+	log.Info("Registering Components.")
 
-		// Add the Metrics Service
-		// Disable metrics for now to avoid continuous 'failed to list' logs
-		//addMetrics(ctx, cfg, namespace)
+	// Setup Scheme for all resources
+	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
 
-		log.Info("Starting the Cmd.")
+	// Setup all Controllers
+	if err := controller.AddToManager(mgr); err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
 
-		// Start the Cmd
-		if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
-			log.Error(err, "Manager exited non-zero")
-			os.Exit(1)
-		}
+	// Add the Metrics Service
+	// Disable metrics for now to avoid continuous 'failed to list' logs
+	//addMetrics(ctx, cfg, namespace)
+
+	log.Info("Starting the Cmd.")
+
+	// Start the Cmd
+	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
+		log.Error(err, "Manager exited non-zero")
+		os.Exit(1)
 	}
 }
 

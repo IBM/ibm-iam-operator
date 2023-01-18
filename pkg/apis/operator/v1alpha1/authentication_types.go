@@ -91,6 +91,8 @@ type ConfigSpec struct {
 	ClusterCADomain             string `json:"clusterCADomain"`
 	DefaultAdminUser            string `json:"defaultAdminUser"`
 	DefaultAdminPassword        string `json:"defaultAdminPassword"`
+	ScimAdminUser               string `json:"scimAdminUser"`
+	ScimAdminPassword           string `json:"scimAdminPassword"`
 	ClusterName                 string `json:"clusterName"`
 	ClusterInternalAddress      string `json:"clusterInternalAddress"`
 	ClusterExternalAddress      string `json:"clusterExternalAddress"`

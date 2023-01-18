@@ -32,6 +32,7 @@ import (
 var rule2 = `^([a-zA-Z0-9]){32,}$`
 var rule3 = `^([a-zA-Z0-9]){16,}$`
 var adminPassword = utils.GenerateRandomString(rule2)
+var scimAdminPassword = utils.GenerateRandomString(rule2)
 var encryptionKey = utils.GenerateRandomString(rule2)
 var wlpClientRegistrationSecret = utils.GenerateRandomString(rule2)
 var encryptionIV = utils.GenerateRandomString(rule3)
@@ -45,6 +46,10 @@ func generateSecretData(instance *operatorv1alpha1.Authentication, wlpClientID s
 		"platform-auth-idp-credentials": {
 			"admin_username": []byte(instance.Spec.Config.DefaultAdminUser),
 			"admin_password": []byte(adminPassword),
+		},
+		"platform-auth-scim-credentials": {
+			"scim_admin_username": []byte(instance.Spec.Config.ScimAdminUser),
+			"scim_admin_password": []byte(scimAdminPassword),
 		},
 		"platform-auth-idp-encryption": {
 			"ENCRYPTION_KEY": []byte(encryptionKey),

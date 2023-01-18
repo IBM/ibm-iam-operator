@@ -609,15 +609,8 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
 		},
 		{
-			Name: "roksClientId",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_ID",
-				},
-			},
+			Name:  "roksClientId",
+			Value: "system:serviceaccount:" + instance.Namespace + ":ibm-iam-operand-restricted",
 		},
 		{
 			Name: "roksClientSecret",
@@ -703,7 +696,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		},
 	}
 
-	idpEnvVarList := []string{"NODE_ENV", "LOG_LEVEL_IDPROVIDER", "LOG_LEVEL_MW", "PROVIDER_ISSUER_URL", "PREFERRED_LOGIN", "IDTOKEN_LIFETIME", "SAAS_CLIENT_REDIRECT_URL", "IBM_CLOUD_SAAS", "ROKS_ENABLED", "ROKS_URL", "ROKS_USER_PREFIX", "OS_TOKEN_LENGTH", "LIBERTY_TOKEN_LENGTH",
+	idpEnvVarList := []string{"NODE_ENV", "LOG_LEVEL_IDPROVIDER", "LOG_LEVEL_MW", "PROVIDER_ISSUER_URL", "PREFERRED_LOGIN", "IDTOKEN_LIFETIME", "SAAS_CLIENT_REDIRECT_URL", "IBM_CLOUD_SAAS", "ROKS_ENABLED", "OSAUTH_ENABLED", "ROKS_URL", "ROKS_USER_PREFIX", "OS_TOKEN_LENGTH", "LIBERTY_TOKEN_LENGTH",
 		"IDENTITY_PROVIDER_URL", "BASE_AUTH_URL", "BASE_OIDC_URL", "SCOPE_CLAIM", "OIDC_ISSUER_URL", "HTTP_ONLY"}
 
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
@@ -925,15 +918,8 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
 		},
 		{
-			Name: "roksClientId",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_ID",
-				},
-			},
+			Name:  "roksClientId",
+			Value: "system:serviceaccount:" + instance.Namespace + ":ibm-iam-operand-restricted",
 		},
 		{
 			Name: "roksClientSecret",

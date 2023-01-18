@@ -19,7 +19,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"strings"
@@ -48,13 +47,15 @@ import (
 const controllerName = "controller_oidc_client"
 const OptimisticLockErrorMsg = "the object has been modified; please apply your changes to the latest version and try again"
 
+const (
+  // PlatformAuthIDPConfigMapName is the name of the ConfigMap containing settings used for Client management
+  PlatformAuthIDPConfigMapName string = "platform-auth-idp"
+  // PlatformAuthIDPCredentialsSecretName is the name of the Secret containing default credentials
+  PlatformAuthIDPCredentialsSecretName string = "platform-auth-idp-credentials"
+)
+
 var log = logf.Log.WithName(controllerName)
 var Clock clock.Clock = clock.RealClock{}
-
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
 
 // Add creates a new Client Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -64,7 +65,13 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileClient{client: mgr.GetClient(), Reader: mgr.GetAPIReader(), recorder: mgr.GetEventRecorderFor(controllerName), scheme: mgr.GetScheme()}
+	return &ReconcileClient{
+    client: mgr.GetClient(),
+    Reader: mgr.GetAPIReader(),
+    recorder: mgr.GetEventRecorderFor(controllerName),
+    scheme: mgr.GetScheme(),
+    config: ClientControllerConfig{},
+  }
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -80,37 +87,53 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
-
-	// Watch for changes to configmaps created by Nginx
-	/*        err = c.Watch(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForOwner{
-	                  IsController: true,
-	                  OwnerType:    &oidcv1.Client{},
-	          })
-	          if err != nil {
-	                  return err
-	          }
-	*/
 	return nil
 }
 
 // blank assignment to verify that ReconcileClient implements reconcile.Reconciler
 var _ reconcile.Reconciler = &ReconcileClient{}
 
-// ReconcileClient reconciles a Client object
+// ReconcileClient is a split client that reads objects from the cache and writes to the apiserver
 type ReconcileClient struct {
-	// This client, initialized using mgr.Client() above, is a split client
-	// that reads objects from the cache and writes to the apiserver
 	client   client.Client
 	Reader   client.Reader
 	recorder record.EventRecorder
 	scheme   *runtime.Scheme
+  config   ClientControllerConfig
+}
+
+// SetConfig sets the ClientControllerConfig on the ReconcileClient using the platform-auth-idp ConfigMap and
+// platform-auth-idp-credentials Secret that are installed on the cluster.
+func (r *ReconcileClient) SetConfig(ctx context.Context, namespace string) (err error) {
+  if namespace == "" {
+    return fmt.Errorf("provided namespace must be non-empty")
+  }
+  if !r.IsConfigured(){
+    r.config = ClientControllerConfig{}
+  }
+  configMap := &corev1.ConfigMap{}
+  err = r.client.Get(ctx, types.NamespacedName{Name: PlatformAuthIDPConfigMapName, Namespace: namespace}, configMap)
+  if err != nil {
+    return fmt.Errorf("client failed to GET ConfigMap: %w", err)
+  }
+  err = r.config.ApplyConfigMap(configMap, identityManagementURLKey, identityProviderURLKey, rOKSEnabledKey, authServiceURLKey)
+  if err != nil {
+    return fmt.Errorf("failed to configure: %w", err)
+  }
+  secret := &corev1.Secret{}
+  err = r.client.Get(ctx, types.NamespacedName{Name: PlatformAuthIDPCredentialsSecretName, Namespace: namespace}, secret)
+  if err != nil {
+    return
+  }
+  err = r.config.ApplySecret(secret, defaultAdminUserKey, defaultAdminPasswordKey)
+  if err != nil {
+    return fmt.Errorf("failed to configure: %w", err)
+  }
+  return
 }
 
 // Reconcile reads that state of the cluster for a Client object and makes changes based on the state read
 // and what is in the Client.Spec
-// TODO(user): Modify this Reconcile function to implement your Controller logic.  This example creates
-// a Pod as an example
-// Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 func (r *ReconcileClient) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
@@ -131,8 +154,20 @@ func (r *ReconcileClient) Reconcile(ctx context.Context, request reconcile.Reque
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
-
-	errorRg := r.processOidcRegistration(ctx, reqLogger, instance, r.recorder)
+  
+  reqLogger.Info("checking to see if controller is fully configured")
+  if !r.IsConfigured() {
+    err = r.SetConfig(ctx, request.Namespace)
+    if err != nil {
+      // Return error if the attempt to configure the ReconcileClient did not work
+      return reconcile.Result{}, fmt.Errorf("failed to set controller config: %w", err)
+    } else {
+      reqLogger.Info("successfully set config for controller")
+    }
+  } else {
+    reqLogger.Info("controller is fully configured")
+  }
+	errorRg := r.processOidcRegistration(ctx, reqLogger, instance)
 	if errorRg != nil {
 		//Occassionally we will receive an error message stating the object had been modified and needs to
 		//be reloaded.  k8s says these are benign - we will eat the error and requeue
@@ -150,39 +185,52 @@ func (r *ReconcileClient) Reconcile(ctx context.Context, request reconcile.Reque
 	}
 }
 
-func (r *ReconcileClient) processOidcRegistration(ctx context.Context, reqLogger logr.Logger, client *oidcv1.Client, evtRecorder record.EventRecorder) error {
-	reqLogger.Info("Processing OIDC client Registration ")
+func (r *ReconcileClient) processOidcRegistration(ctx context.Context, reqLogger logr.Logger, client *oidcv1.Client) error {
+	reqLogger.Info("Processing OIDC client Registration")
 	var errReg, errSecret, errOauthClient, errZen error
 	var isDeleteEvent, clientIdExists bool
 
-	isRoksEnabled := os.Getenv("ROKS_ENABLED")
+	isRoksEnabled, err := r.GetROKSEnabled()
+  if err != nil {
+    return err
+  }
 
-	errReg, isDeleteEvent = r.processDeleteRegistration(ctx, reqLogger, client, evtRecorder)
-	if isDeleteEvent == true && errReg == nil {
+  isOSAuthEnabled, err := r.GetOSAuthEnabled()
+  if err != nil {
+    return err
+  }
+
+	errReg, isDeleteEvent = r.processDeleteRegistration(ctx, reqLogger, client)
+	if isDeleteEvent && errReg == nil {
 		return nil
-	} else if isDeleteEvent == true && errReg != nil {
+	} else if isDeleteEvent && errReg != nil {
 		reqLogger.Error(nil, "Error occurred while deleting oidc registration.")
 	} else {
 		clientCreds := &ClientCredentials{}
 		secret := &corev1.Secret{}
-    // TODO Update for client registration secret
-		clientIdExists, clientCreds, errReg = r.ClientIdExists(client, evtRecorder)
+		clientIdExists, clientCreds, errReg = r.ClientIdExists(ctx, client)
 		if errReg != nil {
-			reqLogger.Error(nil, "Error occurred while getting oidc registration.")
-		} else if clientIdExists == false {
+      reqLogger.Error(nil, "ClientId not registered")
+		} else if !clientIdExists {
 			reqLogger.Info("ClientId don't exist, create new registration")
-      // TODO Update for client registration secret
-			clientCreds, errReg = r.CreateClientCredentials(client, evtRecorder)
+			clientCreds, errReg = r.CreateClientCredentials(ctx, client)
 			if errReg != nil {
 				return errReg
 			}
-      // TODO Update for client registration secret
-			secret, errSecret = r.newSecretForClient(ctx, client, clientCreds)
-			if isRoksEnabled == "true" {
+			_, errSecret = r.newSecretForClient(ctx, client, clientCreds)
+      reqLogger.Info("current ROKS_ENABLED setting", "ROKS_ENABLED", isRoksEnabled)
+      reqLogger.Info("current OSAUTH_ENABLED setting", "OSAUTH_ENABLED", isOSAuthEnabled)
+			if isOSAuthEnabled {
+        reqLogger.Info("OSAUTH_ENABLED is set to true, creating OAuthClient")
 				_, errOauthClient = r.newOAuthClientForClient(ctx, client, clientCreds)
-			}
+        if errOauthClient != nil {
+          reqLogger.Error(errOauthClient, "error during OAuthClient creation")
+        }
+			} else {
+        reqLogger.Info("OSAUTH_ENABLED is set to false, skipping OAuthClient creation")
+      }
 
-			errZen = r.processZenRegistration(reqLogger, client, evtRecorder)
+			errZen = r.processZenRegistration(reqLogger, client)
 			if errZen != nil {
 				reqLogger.Error(errZen, "An error occurred during zen registration")
 			}
@@ -190,13 +238,12 @@ func (r *ReconcileClient) processOidcRegistration(ctx context.Context, reqLogger
 		} else {
 			reqLogger.Info("ClientId exist, update existing registration")
 			secret = r.reconcileSecret(ctx, client, clientCreds)
-			if isRoksEnabled == "true" {
+			if isRoksEnabled {
 				_ = r.reconcileOAuthClient(ctx, client, clientCreds)
 			}
-      // TODO Update for client registration secret
-			clientCreds, errReg = r.UpdateClientCredentials(client, secret, evtRecorder)
+			_, errReg = r.UpdateClientCredentials(ctx, client, secret)
 
-			errZen = r.processZenRegistration(reqLogger, client, evtRecorder)
+			errZen = r.processZenRegistration(reqLogger, client)
 			if errZen != nil {
 				reqLogger.Error(errZen, "An error occurred during zen registration")
 			}
@@ -207,7 +254,7 @@ func (r *ReconcileClient) processOidcRegistration(ctx context.Context, reqLogger
 				oidcv1.ConditionTrue,
 				ReasonCreateClientSuccessful,
 				MessageClientSuccessful)
-			if clientIdExists == false {
+			if !clientIdExists {
 				r.recorder.Event(client, corev1.EventTypeNormal, ReasonCreateClientSuccessful, MessageCreateClientSuccessful)
 			} else {
 				r.recorder.Event(client, corev1.EventTypeNormal, ReasonUpdateClientSuccessful, MessageUpdateClientSuccessful)
@@ -249,7 +296,7 @@ func (r *ReconcileClient) processOidcRegistration(ctx context.Context, reqLogger
 	}
 }
 
-func (r *ReconcileClient) processZenRegistration(reqLogger logr.Logger, client *oidcv1.Client, evtRecorder record.EventRecorder) error {
+func (r *ReconcileClient) processZenRegistration(reqLogger logr.Logger, client *oidcv1.Client) error {
 
 	if client.Spec.ZenInstanceId == "" {
 		reqLogger.Info("Zen instance ID not specified, skipping zen registration")
@@ -261,10 +308,9 @@ func (r *ReconcileClient) processZenRegistration(reqLogger logr.Logger, client *
 		//Set the status to false since zen registration cannot be completed
 		condition.SetClientCondition(client, oidcv1.ClientConditionReady, oidcv1.ConditionFalse, ReasonCreateZenRegistrationFailed,
 			MessageCreateZenRegistrationFailed)
-		evtRecorder.Event(client, corev1.EventTypeWarning, ReasonCreateZenRegistrationFailed, zenErr.Error())
+		r.recorder.Event(client, corev1.EventTypeWarning, ReasonCreateZenRegistrationFailed, zenErr.Error())
 		return zenErr
 	}
-
 	if zenReg != nil {
 		//Zen registration exists - currently updates to the zen registration are not supported
 		reqLogger.Info("Zen registration already exists for oidc client - the zen instance will not be updated", "clientId", client.Spec.ClientId, "zenInstanceId", client.Spec.ZenInstanceId)
@@ -278,7 +324,7 @@ func (r *ReconcileClient) processZenRegistration(reqLogger logr.Logger, client *
 		//Set the status to false since zen registration cannot be completed
 		condition.SetClientCondition(client, oidcv1.ClientConditionReady, oidcv1.ConditionFalse, ReasonCreateZenRegistrationFailed,
 			MessageCreateZenRegistrationFailed)
-		evtRecorder.Event(client, corev1.EventTypeWarning, ReasonCreateZenRegistrationFailed, err.Error())
+		r.recorder.Event(client, corev1.EventTypeWarning, ReasonCreateZenRegistrationFailed, err.Error())
 		return err
 	}
 
@@ -305,19 +351,22 @@ func containsString(slice []string, s string) bool {
 	return false
 }
 
-func (r *ReconcileClient) processDeleteRegistration(ctx context.Context, reqLogger logr.Logger, client *oidcv1.Client, evtRecorder record.EventRecorder) (error, bool) {
+func (r *ReconcileClient) processDeleteRegistration(ctx context.Context, reqLogger logr.Logger, client *oidcv1.Client) (error, bool) {
 
 	isInstanceMarkedToBeDeleted := client.GetDeletionTimestamp() != nil
 	// Update finalizer to allow delete CR
 	if isInstanceMarkedToBeDeleted {
-    // TODO Update for client registration secret
-		errDel := r.DeleteClientCredentials(client, evtRecorder)
+		errDel := r.DeleteClientCredentials(ctx, client)
 		if errDel != nil {
 			reqLogger.Error(errDel, "Failed to Delete OIDC Client.")
 			return errDel, true
 		}
-		isRoksEnabled := os.Getenv("ROKS_ENABLED")
-		if isRoksEnabled == "true" {
+    isOSAuthEnabled, err := r.GetOSAuthEnabled()
+    if err != nil {
+      return err, false
+    }
+
+		if isOSAuthEnabled  {
 			oAuthClientToBeDeleted := &oauthv1.OAuthClient{}
 			clientId := client.Spec.ClientId
 			errGet := r.Reader.Get(ctx, types.NamespacedName{Name: clientId}, oAuthClientToBeDeleted)
@@ -365,7 +414,6 @@ func (r *ReconcileClient) reconcileSecret(ctx context.Context, client *oidcv1.Cl
 	if err == nil {
 		return found
 	} else {
-		secret := &corev1.Secret{}
 		secret, errSec := r.newSecretForClient(ctx, client, clientCreds)
 		if errSec == nil {
 			return secret
@@ -447,12 +495,6 @@ func (r *ReconcileClient) newOAuthClientForClient(ctx context.Context, client *o
 		},
 	}
 
-	// Set OIDC Client instance as the owner and controller
-	/*if err := controllerutil.SetControllerReference(client, oauthclient, r.scheme); err != nil {
-		reqLogger.Error(err, "Failed to set client instance as owner: %v")
-		return nil, err
-	}*/
-
 	if clientCreds != new(ClientCredentials) && clientCreds != nil {
 		if oauthclient.RedirectURIs == nil {
 			oauthclient.RedirectURIs = []string{}
@@ -466,7 +508,6 @@ func (r *ReconcileClient) newOAuthClientForClient(ctx context.Context, client *o
 	}
 	err := r.client.Create(ctx, oauthclient)
 	if err != nil {
-		reqLogger.Error(err, "Error occurred during oauthclient creation")
 		return nil, err
 	}
 	return oauthclient, nil

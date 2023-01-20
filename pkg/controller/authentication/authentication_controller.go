@@ -181,6 +181,7 @@ type ReconcileAuthentication struct {
 	// that reads objects from the cache and writes to the apiserver
 	client client.Client
 	scheme *runtime.Scheme
+	reader client.Reader
 }
 
 // Reconcile reads that state of the cluster for a Authentication object and makes changes based on the state read

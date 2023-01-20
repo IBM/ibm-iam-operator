@@ -424,12 +424,6 @@ metadata:
                   },
                   {
                     "name": "ibm-cert-manager-operator"
-                  },
-                  {
-                    "name": "ibm-management-ingress-operator"
-                  },
-                  {
-                    "name": "ibm-ingress-nginx-operator"
                   }
                 ],
                 "registry": "common-service"
@@ -1394,6 +1388,12 @@ spec:
                       fieldPath: metadata.name
                 - name: OPERATOR_NAME
                   value: ibm-iam-operator
+                - name: ROUTE_HTTP_PORT
+                  value:
+                - name: ROUTE_HTTPS_PORT
+                  value:
+                - name: cluster_name
+                  value:
                 image: quay.io/opencloudio/ibm-iam-operator:latest
                 imagePullPolicy: Always
                 name: ibm-iam-operator

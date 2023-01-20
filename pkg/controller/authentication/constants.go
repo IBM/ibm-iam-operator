@@ -16,6 +16,20 @@
 
 package authentication
 
+const (
+	// ClusterConfigName ... ibmcloud-cluster-info
+	ClusterAddr          string = "cluster_address"
+	ClusterEP            string = "cluster_endpoint"
+	RouteHTTPPort        string = "cluster_router_http_port"
+	RouteHTTPSPort       string = "cluster_router_https_port"
+	RouteHTTPPortValue   string = "80"
+	RouteHTTPSPortValue  string = "443"
+	ClusterName          string = "cluster_name"
+	ClusterNameValue     string = "mycluster"
+	ClusterAPIServerHost string = "cluster_kube_apiserver_host"
+	ClusterAPIServerPort string = "cluster_kube_apiserver_port"
+)
+
 const registerClientScript = `#!/bin/sh
 HTTP_CODE=""
 while true

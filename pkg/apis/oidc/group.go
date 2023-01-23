@@ -14,13 +14,9 @@
 // limitations under the License.
 //
 
-package controller
-
-import (
-	"github.com/IBM/ibm-iam-operator/pkg/controller/policycontroller"
-)
-
-func init() {
-	// AddToManagerFuncs is a list of functions to create controllers and add them to a manager.
-	AddToManagerFuncs = append(AddToManagerFuncs, policycontroller.Add)
-}
+// Package oidc contains oidc API versions.
+//
+// This file ensures Go source parsers acknowledge the oidc package
+// and any child packages. It can be removed if any other Go source files are
+// added to this package.
+package oidc

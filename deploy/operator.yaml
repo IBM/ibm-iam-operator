@@ -44,25 +44,23 @@ spec:
           imagePullPolicy: Always
           env:
             - name: ICP_PLATFORM_AUTH_IMAGE
-              value: icr.io/cpopen/cpfs/icp-platform-auth:3.10.0
+              value: icr.io/cpopen/cpfs/icp-platform-auth:4.0.0
             - name: ICP_IDENTITY_PROVIDER_IMAGE
               value: icr.io/cpopen/cpfs/icp-identity-provider:4.0.0
             - name: ICP_IDENTITY_MANAGER_IMAGE
               value: icr.io/cpopen/cpfs/icp-identity-manager:4.0.0
             - name: IAM_POLICY_ADMINISTRATION_IMAGE
-              value: icr.io/cpopen/cpfs/iam-policy-administration:3.10.0
+              value: icr.io/cpopen/cpfs/iam-policy-administration:4.0.0
             - name: IAM_POLICY_DECISION_IMAGE
               value: icr.io/cpopen/cpfs/iam-policy-decision:3.10.0
             - name: ICP_SECRET_WATCHER_IMAGE
               value: icr.io/cpopen/cpfs/icp-secret-watcher:3.7.12
-            - name: ICP_OIDCCLIENT_WATCHER_IMAGE
-              value: icr.io/cpopen/cpfs/icp-oidcclient-watcher:3.10.0
             - name: IAM_POLICY_CONTROLLER_IMAGE
               value: icr.io/cpopen/cpfs/iam-policy-controller:3.7.12
             - name: ICP_IAM_ONBOARDING_IMAGE
               value: icr.io/cpopen/cpfs/icp-iam-onboarding:3.10.0
             - name: AUDIT_SYSLOG_SERVICE_IMAGE
-              value: icr.io/cpopen/cpfs/audit-syslog-service:1.8.0
+              value: icr.io/cpopen/cpfs/audit-syslog-service:1.10.0
             - name: WATCH_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -87,3 +85,16 @@ spec:
               - ALL
             privileged: false
             readOnlyRootFilesystem: true
+          volumeMounts:
+          - mountPath: /certs
+            name: cluster-ca-cert
+      volumes:
+        - name: cluster-ca-cert
+          secret:
+            defaultMode: 420
+            items:
+            - key: tls.key
+              path: ca.key
+            - key: tls.crt
+              path: ca.crt
+            secretName: cs-ca-certificate-secret

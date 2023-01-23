@@ -18,14 +18,13 @@ package authentication
 
 import (
 	"context"
-	"math/rand"
 	"time"
 
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	res "github.com/IBM/ibm-iam-operator/pkg/resources"
+	utils "github.com/IBM/ibm-iam-operator/pkg/utils"
 	userv1 "github.com/openshift/api/user/v1"
-	regen "github.com/zach-klippenstein/goregen"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -67,8 +66,8 @@ var memory350 = resource.NewQuantity(350*1024*1024, resource.BinarySI)   // 350M
 var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024Mi
 
 var rule = `^([a-z0-9]){32,}$`
-var wlpClientID = generateRandomString(rule)
-var wlpClientSecret = generateRandomString(rule)
+var wlpClientID = utils.GenerateRandomString(rule)
+var wlpClientSecret = utils.GenerateRandomString(rule)
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -285,7 +284,9 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 
 	// Check if this Deployment already exists and create it if it doesn't
 	currentDeployment := &appsv1.Deployment{}
-	err = r.handleDeployment(instance, currentDeployment, &requeueResult)
+	currentProviderDeployment := &appsv1.Deployment{}
+	currentManagerDeployment := &appsv1.Deployment{}
+	err = r.handleDeployment(instance, currentDeployment, currentProviderDeployment, currentManagerDeployment, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -462,13 +463,4 @@ func removeUser(client client.Client, userName string) error {
 		return err
 	}
 	return nil
-}
-
-func generateRandomString(rule string) string {
-
-	generator, _ := regen.NewGenerator(rule, &regen.GeneratorArgs{
-		RngSource:               rand.NewSource(time.Now().UnixNano()),
-		MaxUnboundedRepeatCount: 1})
-	randomString := generator.Generate()
-	return randomString
 }

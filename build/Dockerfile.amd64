@@ -20,7 +20,7 @@ ENV OPERATOR=/usr/local/bin/ibm-iam-operator \
     USER_NAME=ibm-iam-operator
 
 # install operator binary
-COPY build/_output/bin/ibm-iam-operator ${OPERATOR}
+COPY build/_output/bin/ibm-iam-operator-amd64 ${OPERATOR}
 
 COPY build/bin /usr/local/bin
 RUN  /usr/local/bin/user_setup

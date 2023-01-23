@@ -18,14 +18,17 @@ package client
 
 import (
 	"bytes"
+  "context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	oidcv1 "github.com/IBM/ibm-iam-operator/pkg/apis/oidc/v1"
 	"strings"
 	"time"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type TokenInfo struct {
@@ -37,110 +40,138 @@ type TokenInfo struct {
 	IdToken      string `json:"id_token"`
 }
 
-// generateAuthPayload generates the authentication payload used with the IAM API
-func (r *ReconcileClient) generateAuthPayload() (payloadJSON string, err error) {
-	defaultAdminUser, err := r.GetDefaultAdminUser()
-  if err != nil {
-    return
+func getTokenInfoFromResponse(response *http.Response) (tokenInfo *TokenInfo, err error) {
+  if response.Body != nil {
+    defer response.Body.Close()
+    tokenInfo = &TokenInfo{}
+    buf := new(bytes.Buffer)
+    buf.ReadFrom(response.Body)
+    regResponse := buf.String()
+    err = json.Unmarshal([]byte(regResponse), tokenInfo)
+    if err != nil {
+      return nil, fmt.Errorf("failed to get unmarshal response JSON %q: %w", regResponse, err)
+    } 
+    return tokenInfo, nil
   }
-  defaultAdminPassword, err := r.GetDefaultAdminPassword()
-  if err != nil {
-    return
-  }
-	payloadJSON = "grant_type=password&scope=openid&username=" + defaultAdminUser + "&password=" + defaultAdminPassword
-	return
+  return nil, fmt.Errorf("response body was not set")
 }
 
-func getTokenInfoFromResponse(response *http.Response) (*TokenInfo, error) {
-	responseObj := &TokenInfo{}
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(response.Body)
-	regRespone := buf.String()
-	errParse := json.Unmarshal([]byte(regRespone), responseObj)
-	if errParse == nil {
-		return responseObj, nil
-	} else {
-		return nil, errParse
-	}
-}
-
-// getAuthnTokens attempts to retrieve authentication tokens from the IAM API
-func (r *ReconcileClient) getAuthnTokens() (tokenInfo *TokenInfo, err error) {
+// getAuthnTokens attempts to retrieve authentication tokens from the IAM identity provider. If the Client is configured
+// for the cpclient_credentials authorization grant type, the v1/auth/token endpoint is used with the Client's
+// corresponding ClientCredentials. Otherwise, the password grant type is used with the OP admin credentials configured
+// in platform-auth-idp-credentials.
+func (r *ReconcileClient) getAuthnTokens(ctx context.Context, client *oidcv1.Client) (tokenInfo *TokenInfo, err error) {
+  reqLogger := logf.FromContext(ctx).WithName("getAuthnTokens")
   identityProviderURL, err := r.GetIdentityProviderURL()
   if err != nil {
     return nil, err
   }
-	requestURL := strings.Join([]string{identityProviderURL, "/v1/auth/identitytoken"}, "")
-	payload, err := r.generateAuthPayload()
-  if err != nil {
-    return nil, err
+  var requestURL, grantType, tokenType, defaultAdminUser, defaultAdminPassword string
+  var clientCreds *ClientCredentials
+  payload := "scope=openid"
+  requestURLSplit := []string{identityProviderURL, "v1", "auth"}
+  if client.IsCPClientCredentialsEnabled() {
+    tokenType = "token"
+    grantType = "cpclient_credentials"
+    clientCreds, err = r.GetClientCreds(ctx, client)
+    if err != nil {
+      return nil, fmt.Errorf("failed to get Client credentials: %w", err)
+    }
+    reqLogger.Info("Retrieved client creds", "client_id", clientCreds.ClientID)
+    payload = fmt.Sprintf("%s&grant_type=%s&client_id=%s&client_secret=%s", payload, grantType, clientCreds.ClientID, clientCreds.ClientSecret)
+    reqLogger.Info("check payload", "client_id", clientCreds.ClientID, "client_secret_set", clientCreds.ClientSecret != "")
+  } else {
+    tokenType = "identitytoken"
+    grantType = "password"
+    defaultAdminUser, err = r.GetDefaultAdminUser()
+    if err != nil {
+      return
+    }
+    defaultAdminPassword, err = r.GetDefaultAdminPassword()
+    if err != nil {
+      return
+    }
+    payload = fmt.Sprintf("%s&grant_type=%s&username=%s&password=%s", payload, grantType, defaultAdminUser, defaultAdminPassword)
   }
-	req, _ := http.NewRequest("POST", requestURL, bytes.NewBuffer([]byte(payload)))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8")
+  requestURL = strings.Join(append(requestURLSplit, tokenType), "/")
+
+	var tResp *http.Response
+  var req *http.Request
+  var httpClient *http.Client
+  oAuthAdminPassword, err := r.GetOAuthAdminPassword()
+  if err != nil {
+    return
+  }
+  maxAttempts := 3
+  for tIndex := 0; tIndex < maxAttempts; tIndex++ {
+    err = nil
+    reqLogger.Info("Attempt to retrieve token from id provider", "requestURL", requestURL, "tokenType", tokenType, "attempt", tIndex + 1, "maxAttempts", maxAttempts)
+    req, err = http.NewRequest("POST", requestURL, bytes.NewBuffer([]byte(payload)))
+    if err != nil {
+      return
+    }
+    req.Header.Set("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8")
+    if client.IsCPClientCredentialsEnabled() {
+      req.SetBasicAuth("oauthadmin", oAuthAdminPassword)
+    }
+    httpClient, err = createHTTPClient()
+    if err != nil {
+      return
+    }
+		tResp, err = httpClient.Do(req)
+		if err != nil {
+      reqLogger.Error(err, "failed to request token from id provider")
+			goto sleep
+		}
+    tokenInfo, err = getTokenInfoFromResponse(tResp)
+    if err != nil {
+      reqLogger.Error(err, "failed to get token from id provider HTTP response")
+    } else if tokenInfo != nil {
+      return
+    }
+
+    sleep:
+    if tIndex < maxAttempts - 1 {
+      time.Sleep(2 * time.Second)
+    }
+	}
+	if err != nil {
+    err = fmt.Errorf("failed to get access token: %w", err)
+	} else {
+    err = fmt.Errorf("failed to get access token")
+  }
+	return
+}
+
+// createHTTPClient handles boilerplate of creating an http.Client configured for TLS using the Common Services CA
+// certificate.
+func createHTTPClient() (httpClient *http.Client, err error) {
 	caCert, err := ioutil.ReadFile("/certs/ca.crt")
 	if err != nil {
-		return nil, err
+		return
 	}
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCert)
 	transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: caCertPool}}
-	client := &http.Client{Transport: transport}
-
-	var tIndex = 0
-	var tResp *http.Response
-	for {
-		tResp, err = client.Do(req)
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-		if tResp != nil && tResp.StatusCode == 200 {
-			defer tResp.Body.Close()
-
-			tokenInfo, err = getTokenInfoFromResponse(tResp)
-			if err != nil {
-				fmt.Println(err.Error())
-			}
-			if tokenInfo != nil {
-				return tokenInfo, nil
-			}
-		}
-		if tIndex >= 2 {
-			break
-		}
-		tIndex += 1
-		time.Sleep(2 * time.Second)
-		fmt.Println("Retrying identitytoken...")
-	}
-	if err != nil {
-		return
-	}
-
-	err = fmt.Errorf("Failed to get access token")
-	return
+	httpClient = &http.Client{Transport: transport}
+  return
 }
 
-//Invoke an IAM API.  This function will obtain the required token before calling
-func (r *ReconcileClient) invokeIamApi(requestType string, requestURL string, payload string) (resp *http.Response, err error) {
-	tokenInfo, err := r.getAuthnTokens()
+// Invoke an IAM API.  This function will obtain the required token before calling
+func (r *ReconcileClient) invokeIamApi(ctx context.Context, client *oidcv1.Client, requestType string, requestURL string, payload string) (response *http.Response, err error) {
+	tokenInfo, err := r.getAuthnTokens(ctx, client)
 	if err != nil {
 		return
 	}
 	bearer := strings.Join([]string{"Bearer ", tokenInfo.AccessToken}, "")
-	req, _ := http.NewRequest(requestType, requestURL, bytes.NewBuffer([]byte(payload)))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", bearer)
-	req.Header.Set("Accept", "application/json")
-	caCert, err := ioutil.ReadFile("/certs/ca.crt")
-	if err != nil {
-		return
-	}
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
-	transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: caCertPool}}
-	client := &http.Client{Transport: transport}
-	resp, err = client.Do(req)
-	if err != nil {
-		return
-	}
+	request, _ := http.NewRequest(requestType, requestURL, bytes.NewBuffer([]byte(payload)))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", bearer)
+	request.Header.Set("Accept", "application/json")
+  httpClient, err := createHTTPClient()
+  if err != nil {
+    return
+  }
+	response, err = httpClient.Do(request)
 	return
 }

@@ -31,8 +31,10 @@ type ClientSpec struct {
         OidcLibertyClient OidcLibertyClient `json:"oidcLibertyClient"`
         Secret            string            `json:"secret"`
         ClientId          string            `json:"clientId"`
+        ZenAuditUrl       string            `json:"zenAuditUrl,omitempty"`
         ZenInstanceId     string            `json:"zenInstanceId,omitempty"`
         ZenProductNameUrl string            `json:"zenProductNameUrl,omitempty"`
+        Roles             []string          `json:"roles,omitempty"`
 }
 
 type OidcLibertyClient struct {
@@ -105,6 +107,13 @@ type Client struct {
 
         Spec   ClientSpec   `json:"spec,omitempty"`
         Status ClientStatus `json:"status,omitempty"`
+}
+
+// IsCPClientCredentialsEnabled returns whether the fields required for a Client to be granted authentication tokens
+// with a Client ID and Secret are set
+func (c *Client) IsCPClientCredentialsEnabled() bool {
+  return len(c.Spec.Roles) > 0 &&
+    len(c.Spec.ZenAuditUrl) > 0
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -32,6 +32,7 @@ IMAGE_BUILD_OPTS=--build-arg "VCS_REF=$(GIT_COMMIT_ID)" --build-arg "VCS_URL=$(G
 # Use your own docker registry and image name for dev/test by overridding the IMG and REGISTRY environment variable.
 IMG ?= ibm-iam-operator
 REGISTRY ?= "docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-integration-docker-local/ibmcom"
+CONTAINER_CLI ?= docker
 
 CSV_VERSION ?= 4.0.0
 
@@ -142,39 +143,39 @@ endif
 
 ##@ Build
 
-build:
+build: ## Build the Operator binary for the host OS and architecture
 	@echo "Building the ibm-iam-operator binary"
 	@CGO_ENABLED=0 go build -o build/_output/bin/$(IMG) ./cmd/manager
 	@strip $(STRIP_FLAGS) build/_output/bin/$(IMG)
 
-build-image: build $(CONFIG_DOCKER_TARGET)
+build-image: build $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on amd64
 	$(eval ARCH := $(shell uname -m|sed 's/x86_64/amd64/'))
-	docker build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-$(ARCH):$(VERSION) -f build/Dockerfile .
+	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-$(ARCH):$(VERSION) -f build/Dockerfile .
 	@\rm -f build/_output/bin/ibm-iam-operator
-	@if [ $(BUILD_LOCALLY) -ne 1 ] && [ "$(ARCH)" = "amd64" ]; then docker push $(REGISTRY)/$(IMG)-$(ARCH):$(VERSION); fi
+	@if [ $(BUILD_LOCALLY) -ne 1 ] && [ "$(ARCH)" = "amd64" ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-$(ARCH):$(VERSION); fi
 
-build-image-amd64: build $(CONFIG_DOCKER_TARGET)
+build-image-amd64: build $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on amd64
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/_output/bin/ibm-iam-operator-amd64 ./cmd/manager
-	docker run --rm --privileged multiarch/qemu-user-static:register --reset
-	docker build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-amd64:$(VERSION) -f build/Dockerfile.amd64 .
+	$(CONTAINER_CLI) run --rm --privileged multiarch/qemu-user-static:register --reset
+	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-amd64:$(VERSION) -f build/Dockerfile.amd64 .
 	@\rm -f build/_output/bin/ibm-iam-operator-amd64
-	@if [ $(BUILD_LOCALLY) -ne 1 ]; then docker push $(REGISTRY)/$(IMG)-$(ARCH):$(VERSION); fi
+	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-amd64:$(VERSION); fi
 
 # runs on amd64 machine
-build-image-ppc64le: $(CONFIG_DOCKER_TARGET)
+build-image-ppc64le: $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on ppc64le
 	GOOS=linux GOARCH=ppc64le CGO_ENABLED=0 go build -o build/_output/bin/ibm-iam-operator-ppc64le ./cmd/manager
-	docker run --rm --privileged multiarch/qemu-user-static:register --reset
-	docker build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-ppc64le:$(VERSION) -f build/Dockerfile.ppc64le .
+	$(CONTAINER_CLI) run --rm --privileged multiarch/qemu-user-static:register --reset
+	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-ppc64le:$(VERSION) -f build/Dockerfile.ppc64le .
 	@\rm -f build/_output/bin/ibm-iam-operator-ppc64le
-	@if [ $(BUILD_LOCALLY) -ne 1 ]; then docker push $(REGISTRY)/$(IMG)-ppc64le:$(VERSION); fi
+	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-ppc64le:$(VERSION); fi
 
 # runs on amd64 machine
-build-image-s390x: $(CONFIG_DOCKER_TARGET)
+build-image-s390x: $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on s390x
 	GOOS=linux GOARCH=s390x CGO_ENABLED=0 go build -o build/_output/bin/ibm-iam-operator-s390x ./cmd/manager
-	docker run --rm --privileged multiarch/qemu-user-static:register --reset
-	docker build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-s390x:$(VERSION) -f build/Dockerfile.s390x .
+	$(CONTAINER_CLI) run --rm --privileged multiarch/qemu-user-static:register --reset
+	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-s390x:$(VERSION) -f build/Dockerfile.s390x .
 	@\rm -f build/_output/bin/ibm-iam-operator-s390x
-	@if [ $(BUILD_LOCALLY) -ne 1 ]; then docker push $(REGISTRY)/$(IMG)-s390x:$(VERSION); fi
+	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-s390x:$(VERSION); fi
 
 ##@ Test
 
@@ -195,7 +196,7 @@ scorecard: ## Run scorecard test
 ##@ Release
 
 images: build-image build-image-ppc64le build-image-s390x
-	@curl -L -o /tmp/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.3/manifest-tool-linux-amd64
+	@curl -L -o /tmp/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.3/manifest-tool-$(TARGET_OS)-amd64
 	@chmod +x /tmp/manifest-tool
 	/tmp/manifest-tool push from-args --platforms linux/amd64,linux/ppc64le,linux/s390x --template $(REGISTRY)/$(IMG)-ARCH:$(VERSION) --target $(REGISTRY)/$(IMG) --ignore-missing
 	/tmp/manifest-tool push from-args --platforms linux/amd64,linux/ppc64le,linux/s390x --template $(REGISTRY)/$(IMG)-ARCH:$(VERSION) --target $(REGISTRY)/$(IMG):$(VERSION) --ignore-missing

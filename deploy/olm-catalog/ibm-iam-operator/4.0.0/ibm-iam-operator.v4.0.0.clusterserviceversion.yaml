@@ -72,6 +72,8 @@ metadata:
               "clusterName": "mycluster",
               "defaultAdminPassword": "password",
               "defaultAdminUser": "admin",
+              "scimAdminPassword": "scimpassword",
+              "scimAdminUser": "scimadmin",
               "enableImpersonation": false,
               "fipsEnabled": true,
               "ibmCloudSaas": false,
@@ -188,6 +190,9 @@ metadata:
               },
               "public-auth-creds": {
                 "secret" : "platform-auth-idp-credentials"
+              },
+              "public-scim-creds": {
+                "secret" : "platform-auth-scim-credentials"
               },
               "public-auth-cert": {
                 "secret" : "platform-auth-secret"
@@ -768,7 +773,7 @@ spec:
     type: OwnNamespace
   - supported: true
     type: SingleNamespace
-  - supported: false
+  - supported: true
     type: MultiNamespace
   - supported: true
     type: AllNamespaces

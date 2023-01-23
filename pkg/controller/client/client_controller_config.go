@@ -32,8 +32,11 @@ const (
   // authServiceURL is the key in the ClientControllerConfig corresponding to the OIDC URL value
   authServiceURLKey string = "BASE_OIDC_URL"
   // rOKSEnabledKey is the key in the ClientControllerConfig corresponding to a boolean string value that enables or
-  // disables the automatic creation of an Openshift OAuthClients
+  // disables the automatic creation of an Openshift OAuthClients (legacy)
   rOKSEnabledKey string = "ROKS_ENABLED"
+  // osAuthEnabledKey is the key in the ClientControllerConfig corresponding to a boolean string value that enables or
+  // disables OpenShift authentication using OAuthClients
+  osAuthEnabledKey string = "OSAUTH_ENABLED"
   // defaultAdminUserKey is the key in the ClientControllerConfig corresponding to the default admin username for the IAM API
   defaultAdminUserKey string = "admin_username"
   // defaultAdminPasswordKey is the key in the ClientControllerConfig corresponding to the default admin password for the IAM API
@@ -131,10 +134,22 @@ func (r *ReconcileClient) GetDefaultAdminPassword() (value string, err error) {
 }
 
 // GetROKSEnabled gets from the ClientControllerCOnfig whether the controller is enabled to use OpenShift OAuthClients
-// for OIDC Client authentication; creates and manages OAuthClient objects with names that match OIDC Client's clientId
-// field. Produces an error if the ClientControllerConfig is empty or if the key is not present.
+// for OIDC Client authentication via legacy configuration; creates and manages OAuthClient objects with names that
+// match OIDC Client's clientId field. Produces an error if the ClientControllerConfig is empty or if the key is not
+// present.
 func (r *ReconcileClient) GetROKSEnabled() (value bool, err error) {
   valueStr, err := r.config.getConfigValue(rOKSEnabledKey)
+  if valueStr == "true" {
+    return true, nil
+  }
+  return
+}
+
+// GetOSAuthEnabled gets from the ClientControllerCOnfig whether the controller is enabled to use OpenShift OAuthClients
+// for OIDC Client authentication; creates and manages OAuthClient objects with names that match OIDC Client's clientId
+// field. Produces an error if the ClientControllerConfig is empty or if the key is not present.
+func (r *ReconcileClient) GetOSAuthEnabled() (value bool, err error) {
+  valueStr, err := r.config.getConfigValue(osAuthEnabledKey)
   if valueStr == "true" {
     return true, nil
   }

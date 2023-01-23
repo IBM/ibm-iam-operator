@@ -195,6 +195,11 @@ func (r *ReconcileClient) processOidcRegistration(ctx context.Context, reqLogger
     return err
   }
 
+  isOSAuthEnabled, err := r.GetOSAuthEnabled()
+  if err != nil {
+    return err
+  }
+
 	errReg, isDeleteEvent = r.processDeleteRegistration(ctx, reqLogger, client)
 	if isDeleteEvent && errReg == nil {
 		return nil
@@ -213,12 +218,17 @@ func (r *ReconcileClient) processOidcRegistration(ctx context.Context, reqLogger
 				return errReg
 			}
 			_, errSecret = r.newSecretForClient(ctx, client, clientCreds)
-			if isRoksEnabled {
+      reqLogger.Info("current ROKS_ENABLED setting", "ROKS_ENABLED", isRoksEnabled)
+      reqLogger.Info("current OSAUTH_ENABLED setting", "OSAUTH_ENABLED", isOSAuthEnabled)
+			if isOSAuthEnabled {
+        reqLogger.Info("OSAUTH_ENABLED is set to true, creating OAuthClient")
 				_, errOauthClient = r.newOAuthClientForClient(ctx, client, clientCreds)
         if errOauthClient != nil {
-          reqLogger.Error(errOauthClient, "error during oauthclient creation")
+          reqLogger.Error(errOauthClient, "error during OAuthClient creation")
         }
-			}
+			} else {
+        reqLogger.Info("OSAUTH_ENABLED is set to false, skipping OAuthClient creation")
+      }
 
 			errZen = r.processZenRegistration(reqLogger, client)
 			if errZen != nil {
@@ -351,11 +361,12 @@ func (r *ReconcileClient) processDeleteRegistration(ctx context.Context, reqLogg
 			reqLogger.Error(errDel, "Failed to Delete OIDC Client.")
 			return errDel, true
 		}
-		isRoksEnabled, err := r.GetROKSEnabled()
+    isOSAuthEnabled, err := r.GetOSAuthEnabled()
     if err != nil {
       return err, false
     }
-		if isRoksEnabled  {
+
+		if isOSAuthEnabled  {
 			oAuthClientToBeDeleted := &oauthv1.OAuthClient{}
 			clientId := client.Spec.ClientId
 			errGet := r.Reader.Get(ctx, types.NamespacedName{Name: clientId}, oAuthClientToBeDeleted)

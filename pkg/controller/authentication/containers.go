@@ -311,6 +311,28 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 				},
 			},
 		},
+		{
+			Name: "SCIM_ADMIN_USER",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-scim-credentials",
+					},
+					Key: "scim_admin_username",
+				},
+			},
+		},
+		{
+			Name: "SCIM_ADMIN_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-scim-credentials",
+					},
+					Key: "scim_admin_password",
+				},
+			},
+		},
 	}
 
 	idpEnvVarList := []string{"NODE_ENV", "MASTER_HOST", "IDENTITY_PROVIDER_URL", "HTTP_ONLY", "SESSION_TIMEOUT", "LDAP_RECURSIVE_SEARCH", "LDAP_ATTR_CACHE_SIZE", "LDAP_ATTR_CACHE_TIMEOUT", "LDAP_ATTR_CACHE_ENABLED", "LDAP_ATTR_CACHE_SIZELIMIT",
@@ -674,7 +696,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		},
 	}
 
-	idpEnvVarList := []string{"NODE_ENV", "LOG_LEVEL_IDPROVIDER", "LOG_LEVEL_MW", "PROVIDER_ISSUER_URL", "PREFERRED_LOGIN", "IDTOKEN_LIFETIME", "SAAS_CLIENT_REDIRECT_URL", "IBM_CLOUD_SAAS", "ROKS_ENABLED", "ROKS_URL", "ROKS_USER_PREFIX", "OS_TOKEN_LENGTH", "LIBERTY_TOKEN_LENGTH",
+	idpEnvVarList := []string{"NODE_ENV", "LOG_LEVEL_IDPROVIDER", "LOG_LEVEL_MW", "PROVIDER_ISSUER_URL", "PREFERRED_LOGIN", "IDTOKEN_LIFETIME", "SAAS_CLIENT_REDIRECT_URL", "IBM_CLOUD_SAAS", "ROKS_ENABLED", "OSAUTH_ENABLED", "ROKS_URL", "ROKS_USER_PREFIX", "OS_TOKEN_LENGTH", "LIBERTY_TOKEN_LENGTH",
 		"IDENTITY_PROVIDER_URL", "BASE_AUTH_URL", "BASE_OIDC_URL", "SCOPE_CLAIM", "OIDC_ISSUER_URL", "HTTP_ONLY"}
 
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
@@ -944,6 +966,28 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 						Name: "platform-auth-idp-credentials",
 					},
 					Key: "admin_password",
+				},
+			},
+		},
+		{
+			Name: "SCIM_ADMIN_USER",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-scim-credentials",
+					},
+					Key: "scim_admin_username",
+				},
+			},
+		},
+		{
+			Name: "SCIM_ADMIN_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-scim-credentials",
+					},
+					Key: "scim_admin_password",
 				},
 			},
 		},

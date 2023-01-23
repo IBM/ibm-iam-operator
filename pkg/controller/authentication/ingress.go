@@ -31,13 +31,13 @@ import (
 
 func (r *ReconcileAuthentication) handleIngress(instance *operatorv1alpha1.Authentication, currentIngress *net.Ingress, requeueResult *bool) error {
 
-	ingressList := []string{"api-key", "iam-token-redirect", "iam-token", "ibmid-ui-callback", "id-mgmt", "idmgmt-v2-api",
-		"platform-auth", "platform-id-auth-block", "platform-id-auth", "platform-id-provider", "platform-login", "platform-oidc-block", "platform-oidc", "platform-oidc-introspect",
-		"platform-oidc-keys", "platform-oidc-token-2", "platform-oidc-token", "service-id", "token-service-version", "saml-ui-callback", "version-idmgmt", "social-login-callback"}
+	ingressList := []string{ "ibmid-ui-callback", "id-mgmt", "idmgmt-v2-api",
+		"platform-auth", "platform-id-auth-block", "platform-id-auth", "platform-id-provider", "platform-login", "platform-oidc-block", "platform-oidc",
+		"saml-ui-callback", "version-idmgmt", "social-login-callback"}
 
 	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *net.Ingress{apiKeyIngress, iamTokenRedirectIngress, iamTokenIngress, ibmidUiCallbackIngress, idMgmtIngress, idmgmtV2ApiIngress,
 		platformAuthIngress, platformIdAuthBlockIngress, platformIdAuthIngress, platformIdProviderIngress, platformLoginIngress, platformOidcBlockIngress, platformOidcIngress, platformOidcIntrospectIngress,
-		platformOidcKeysIngress, platformOidcToken2Ingress, platformOidcTokenIngress, serviceIdIngress, tokenServiceVersionIngress, samlUiCallbackIngress, versionIdmgmtIngress, socialLoginCallbackIngress}
+		tokenServiceVersionIngress, samlUiCallbackIngress, versionIdmgmtIngress, socialLoginCallbackIngress}
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
@@ -128,56 +128,6 @@ func apiKeyIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Sc
 							Paths: []net.HTTPIngressPath{
 								{
 									Path:     "/apikeys",
-									PathType: &pathType,
-									Backend: net.IngressBackend{
-										Service: &net.IngressServiceBackend{
-											Name: "platform-auth-service",
-											Port: net.ServiceBackendPort{
-												Number: 9443,
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// Set Authentication instance as the owner and controller of the Ingress
-	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
-	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Ingress")
-		return nil
-	}
-	return newIngress
-
-}
-
-func iamTokenRedirectIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *net.Ingress {
-	pathType := net.PathType("ImplementationSpecific")
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	newIngress := &net.Ingress{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "iam-token-redirect",
-			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "platform-auth-service"},
-			Annotations: map[string]string{
-				"kubernetes.io/ingress.class":            "ibm-icp-management",
-				"icp.management.ibm.com/secure-backends": "true",
-				"icp.management.ibm.com/rewrite-target":  "/iam/oidc",
-			},
-		},
-		Spec: net.IngressSpec{
-			Rules: []net.IngressRule{
-				{
-					IngressRuleValue: net.IngressRuleValue{
-						HTTP: &net.HTTPIngressRuleValue{
-							Paths: []net.HTTPIngressPath{
-								{
-									Path:     "/iam-token/oidc/",
 									PathType: &pathType,
 									Backend: net.IngressBackend{
 										Service: &net.IngressServiceBackend{

@@ -20,7 +20,7 @@ RUN wget -O /qemu-s390x-static https://github.com/multiarch/qemu-user-static/rel
 
 RUN chmod +x /qemu-s390x-static
 
-FROM hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/build-images/ubi8-minimal:latest-s390x
+FROM docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-edge-docker-local/build-images/ubi8-minimal:latest-s390x
 
 ARG VCS_REF
 ARG VCS_URL

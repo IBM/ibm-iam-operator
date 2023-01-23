@@ -889,7 +889,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		},
 		{
 			Name: "AUTHZ_DISABLED",
-			Value: "false",
+			Value: "true",
 		},
 		{
 			Name: "MONGO_PASSWORD",

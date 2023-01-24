@@ -365,9 +365,10 @@ func (r *ReconcileClient) DeleteZenInstance(ctx context.Context, client *oidcv1.
 }
 
 // CreateZenInstance registers the zen instance with the iam identity mgmt service
-func (r *ReconcileClient) CreateZenInstance(ctx context.Context, client *oidcv1.Client) (err error) {
+func (r *ReconcileClient) CreateZenInstance(ctx context.Context, client *oidcv1.Client, clientCreds *ClientCredentials) (err error) {
 	payloadJSON := map[string]interface{}{
 		"clientId":       client.Spec.ClientId,
+    "clientSecret":   clientCreds.ClientSecret,
 		"instanceId":     client.Spec.ZenInstanceId,
 		"productNameUrl": client.Spec.ZenProductNameUrl,
 		"namespace":      client.Namespace,

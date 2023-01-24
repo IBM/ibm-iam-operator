@@ -66,6 +66,7 @@ var registrationJson string = `{
    "post_logout_redirect_uris":["https://ICP_CONSOLE_URL/console/logout"],
    "preauthorized_scope":"openid profile email general",
    "introspect_tokens":true,
+   "functional_user_groupIds": ["Administrator"],
    "trusted_uri_prefixes":["https://ICP_CONSOLE_URL"],
    "redirect_uris":["https://ICP_CONSOLE_URL/auth/liberty/callback","https://127.0.0.1:443/idauth/oidc/endpoint/OP"]
 }

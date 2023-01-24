@@ -877,6 +877,21 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			},
 		},
 		{
+			Name: "OAUTH2_CLIENT_REGISTRATION_SECRET",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-oidc-credentials",
+					},
+					Key: "OAUTH2_CLIENT_REGISTRATION_SECRET",
+				},
+			},
+		},
+		{
+			Name: "AUTHZ_DISABLED",
+			Value: "true",
+		},
+		{
 			Name: "MONGO_PASSWORD",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{

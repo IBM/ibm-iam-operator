@@ -166,6 +166,12 @@ metadata:
                     "name": "ibm-cert-manager-operator"
                   },
                   {
+                    "name": "ibm-management-ingress-operator"
+                  },
+                  {
+                    "name": "ibm-ingress-nginx-operator"
+                  },
+                  {
                     "name": "ibm-commonui-operator"
                   }
                 ],

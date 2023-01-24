@@ -519,8 +519,9 @@ spec:
                   value: quay.io/opencloudio/audit-syslog-service:1.8.0
                 - name: WATCH_NAMESPACE
                   valueFrom:
-                    fieldRef:
-                      fieldPath: metadata.annotations['olm.targetNamespaces']
+                    configMapKeyRef:
+                      name: namespace-scope
+                      key: namespaces
                 - name: POD_NAME
                   valueFrom:
                     fieldRef:

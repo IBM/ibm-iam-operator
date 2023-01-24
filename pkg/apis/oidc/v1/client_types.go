@@ -110,10 +110,12 @@ type Client struct {
 }
 
 // IsCPClientCredentialsEnabled returns whether the fields required for a Client to be granted authentication tokens
-// with a Client ID and Secret are set
+// with a Client ID and Secret are set.
 func (c *Client) IsCPClientCredentialsEnabled() bool {
-  return len(c.Spec.Roles) > 0 &&
-    len(c.Spec.ZenAuditUrl) > 0
+  if len(c.Spec.ZenInstanceId) > 0 {
+    return len(c.Spec.Roles) > 0 && len(c.Spec.ZenAuditUrl) > 0
+  }
+  return len(c.Spec.Roles) > 0
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

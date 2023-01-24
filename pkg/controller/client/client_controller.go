@@ -203,7 +203,6 @@ func (r *ReconcileClient) Reconcile(ctx context.Context, request reconcile.Reque
 func (r *ReconcileClient) createClient(ctx context.Context, client *oidcv1.Client) (err error) {
   reqLogger := logf.FromContext(ctx).WithName("createClient")
   var clientCreds *ClientCredentials
-  // TODO
   var isOSAuthEnabled bool
   clientCreds = r.generateClientCredentials("")
   reqLogger.Info("generated new client ID/secret pair", "clientId", clientCreds.ClientID)
@@ -234,7 +233,7 @@ func (r *ReconcileClient) createClient(ctx context.Context, client *oidcv1.Clien
     }
   }
   if client.Spec.ZenInstanceId == "" {
-    err = r.processZenRegistration(ctx, client)
+    err = r.processZenRegistration(ctx, client, clientCreds)
     if err != nil {
       reqLogger.Error(err, "An error occurred during Zen registration", "clientId", client.Spec.ClientId)
     }
@@ -284,7 +283,6 @@ func (r *ReconcileClient) updateClient(ctx context.Context, client *oidcv1.Clien
     }
   }
 
-  // TODO
   var isOSAuthEnabled bool
   isOSAuthEnabled, err = r.GetOSAuthEnabled()
   if err != nil {
@@ -298,7 +296,7 @@ func (r *ReconcileClient) updateClient(ctx context.Context, client *oidcv1.Clien
     }
   }
 
-  err = r.processZenRegistration(ctx, client)
+  err = r.processZenRegistration(ctx, client, clientCreds)
   if err != nil {
     reqLogger.Error(err, "An error occurred during zen registration")
   }
@@ -354,7 +352,7 @@ func (r *ReconcileClient) processOidcRegistration(ctx context.Context, client *o
   return
 }
 
-func (r *ReconcileClient) processZenRegistration(ctx context.Context, client *oidcv1.Client) (err error) {
+func (r *ReconcileClient) processZenRegistration(ctx context.Context, client *oidcv1.Client, clientCreds *ClientCredentials) (err error) {
   reqLogger := logf.FromContext(ctx)
 	if client.Spec.ZenInstanceId == "" {
 		reqLogger.Info("Zen instance ID not specified, skipping zen registration")
@@ -377,7 +375,7 @@ func (r *ReconcileClient) processZenRegistration(ctx context.Context, client *oi
 
 	//Zen registration does not exist, create
 	reqLogger.Info("Creating zen registration for client")
-	err = r.CreateZenInstance(ctx, client)
+	err = r.CreateZenInstance(ctx, client, clientCreds)
 	if err != nil {
 		//Set the status to false since zen registration cannot be completed
 		condition.SetClientCondition(client, oidcv1.ClientConditionReady, oidcv1.ConditionFalse, ReasonCreateZenRegistrationFailed,

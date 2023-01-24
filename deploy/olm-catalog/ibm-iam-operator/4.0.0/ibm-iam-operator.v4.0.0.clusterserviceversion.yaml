@@ -429,6 +429,9 @@ metadata:
                     "name": "ibm-management-ingress-operator"
                   },
                   {
+                    "name": "ibm-commonui-operator"
+                  },
+                  {
                     "name": "ibm-ingress-nginx-operator"
                   }
                 ],

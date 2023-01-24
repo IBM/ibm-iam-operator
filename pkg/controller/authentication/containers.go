@@ -410,7 +410,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 		ReadinessProbe: &corev1.Probe{
 			Handler: corev1.Handler{
 				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/iam/oidc/keys",
+					Path: "/oidc/endpoint/OP/.well-known/openid-configuration",
 					Port: intstr.IntOrString{
 						IntVal: authServicePort,
 					},
@@ -425,7 +425,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 		LivenessProbe: &corev1.Probe{
 			Handler: corev1.Handler{
 				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/iam/oidc/keys",
+					Path: "/oidc/endpoint/OP/.well-known/openid-configuration",
 					Port: intstr.IntOrString{
 						IntVal: authServicePort,
 					},
@@ -875,6 +875,21 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 					Key: "user",
 				},
 			},
+		},
+		{
+			Name: "OAUTH2_CLIENT_REGISTRATION_SECRET",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-oidc-credentials",
+					},
+					Key: "OAUTH2_CLIENT_REGISTRATION_SECRET",
+				},
+			},
+		},
+		{
+			Name: "AUTHZ_DISABLED",
+			Value: "true",
 		},
 		{
 			Name: "MONGO_PASSWORD",

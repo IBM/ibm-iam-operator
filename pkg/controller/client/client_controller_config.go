@@ -41,6 +41,9 @@ const (
   defaultAdminUserKey string = "admin_username"
   // defaultAdminPasswordKey is the key in the ClientControllerConfig corresponding to the default admin password for the IAM API
   defaultAdminPasswordKey string = "admin_password"
+  // oauthAdminPasswordKey is the key in the ClientControllerConfig corresponding to the password for the oauthAdmin
+  // account
+  oAuthAdminPasswordKey string = "OAUTH2_CLIENT_REGISTRATION_SECRET"
 )
 
 // ApplyConfigMap takes the key value pairs found in a ConfigMap's Data field and sets the same keys and values in the
@@ -94,6 +97,9 @@ func (r *ReconcileClient) IsConfigured() bool {
   if _, err := r.GetROKSEnabled(); err != nil {
     return false
   }
+  if _, err := r.GetOSAuthEnabled(); err != nil {
+    return false
+  }
   if value, err := r.GetAuthServiceURL(); value != "" && err != nil {
     return false
   }
@@ -101,6 +107,9 @@ func (r *ReconcileClient) IsConfigured() bool {
     return false
   }
   if value, err := r.GetDefaultAdminPassword(); value != "" && err != nil {
+    return false
+  }
+  if value, err := r.GetOAuthAdminPassword(); value != "" && err != nil {
     return false
   }
   return true
@@ -130,6 +139,13 @@ func (r *ReconcileClient) GetDefaultAdminUser() (value string, err error) {
 // ClientControllerConfig. Produces an error if the ClientControllerConfig is empty or if the key is not present.
 func (r *ReconcileClient) GetDefaultAdminPassword() (value string, err error) {
   value, err = r.config.getConfigValue(defaultAdminPasswordKey)
+  return
+}
+
+// GetOauthAdminPassword gets the password for the OAuth Provider oauthadmin account from the ReconcileClient's
+// ClientControllerConfig. Produces an error if the ClientControllerConfig is empty or if the key is not present.
+func (r *ReconcileClient) GetOAuthAdminPassword() (value string, err error) {
+  value, err = r.config.getConfigValue(oAuthAdminPasswordKey)
   return
 }
 

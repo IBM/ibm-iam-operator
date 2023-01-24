@@ -18,10 +18,12 @@ package client
 
 import (
 	"bytes"
+  "context"
 	"encoding/json"
 	"net/http"
 
 	condition "github.com/IBM/ibm-iam-operator/pkg/api/util"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	securityv1 "github.com/IBM/ibm-iam-operator/pkg/apis/oidc/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -58,7 +60,8 @@ const (
 	ReasonUnknown                     string = "Unknown"
 )
 
-func handleOIDCClientError(oidcreg *securityv1.Client, response *http.Response, err error, requestType string, recorder record.EventRecorder) {
+func handleOIDCClientError(ctx context.Context, oidcreg *securityv1.Client, response *http.Response, err error, requestType string, recorder record.EventRecorder) {
+  logger := logf.FromContext(ctx)
 	var errorMessage, reason string
 	errorObj := &OidcClientError{}
 
@@ -85,9 +88,12 @@ func handleOIDCClientError(oidcreg *securityv1.Client, response *http.Response, 
 		} else {
 			errorMessage = MessageUnknown
 		}
+    logger.Info("nil error", "errorMessage", errorMsg, "status", response.Status)
 	} else {
+    logger.Error(err, "error found from OIDC Client")
 		errorMessage = err.Error()
 	}
+
 
 	if requestType == PostType {
 		condition.SetClientCondition(oidcreg,

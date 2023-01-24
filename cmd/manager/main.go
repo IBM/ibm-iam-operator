@@ -32,6 +32,7 @@ import (
 	"github.com/IBM/ibm-iam-operator/pkg/apis"
 	"github.com/IBM/ibm-iam-operator/pkg/controller"
 	"github.com/IBM/ibm-iam-operator/version"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	kubemetrics "github.com/operator-framework/operator-sdk/pkg/kube-metrics"

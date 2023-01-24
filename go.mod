@@ -18,7 +18,7 @@ require (
 	sigs.k8s.io/controller-runtime v0.8.0
 )
 
-require github.com/go-logr/logr v1.2.3
+require github.com/go-logr/logr v1.2.3 // indirect
 
 require (
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
@@ -26,7 +26,6 @@ require (
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.1.2 // indirect
 	github.com/onsi/ginkgo v1.16.4 // indirect
-	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
 	golang.org/x/net v0.5.0 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

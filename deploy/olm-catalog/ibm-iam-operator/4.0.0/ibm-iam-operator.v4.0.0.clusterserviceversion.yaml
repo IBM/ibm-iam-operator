@@ -166,6 +166,12 @@ metadata:
                     "name": "ibm-cert-manager-operator"
                   },
                   {
+                    "name": "ibm-management-ingress-operator"
+                  },
+                  {
+                    "name": "ibm-ingress-nginx-operator"
+                  },
+                  {
                     "name": "ibm-commonui-operator"
                   }
                 ],
@@ -787,5 +793,4 @@ spec:
   maturity: stable
   provider:
     name: IBM
-  replaces: ibm-iam-operator.v3.10.0
   version: 4.0.0

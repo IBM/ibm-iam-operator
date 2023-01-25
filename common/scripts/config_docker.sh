@@ -26,4 +26,3 @@ CONTAINER_CLI=${CONTAINER_CLI:-docker}
 
 # login the docker registry
 ${CONTAINER_CLI} login "${DOCKER_REGISTRY}" -u "${DOCKER_USERNAME}" -p "${DOCKER_PASSWORD}"
-

@@ -163,9 +163,6 @@ metadata:
                     "name": "ibm-mongodb-operator"
                   },
                   {
-                    "name": "ibm-cert-manager-operator"
-                  },
-                  {
                     "name": "ibm-management-ingress-operator"
                   },
                   {

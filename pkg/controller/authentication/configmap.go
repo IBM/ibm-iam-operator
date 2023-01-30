@@ -30,6 +30,7 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	osconfigv1 "github.com/openshift/api/config/v1"
+	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,50 +42,17 @@ import (
 
 func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentConfigMap *corev1.ConfigMap, requeueResult *bool) error {
 
-	configMapList := []string{"platform-auth-idp", "registration-script", "oauth-client-map", "registration-json", "ibmcloud-cluster-info"}
-
-	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{r.authIdpConfigMap, registrationScriptConfigMap}
-	isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 	var isOSEnv bool
 	var domainName string
 	var newConfigMap *corev1.ConfigMap
 
-	// Checking Dependencies
-	consoleConfigMapName := "management-ingress-info"
-	consoleConfigMap := &corev1.ConfigMap{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: consoleConfigMapName, Namespace: instance.Namespace}, consoleConfigMap)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			reqLogger.Error(err, "The configmap ", consoleConfigMapName, " is not created yet")
-			return err
-		}
-		reqLogger.Error(err, "Failed to get ConfigMap", consoleConfigMapName)
-		return err
-	}
+	configMapList := []string{"platform-auth-idp", "registration-script", "oauth-client-map", "registration-json"}
+	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{r.authIdpConfigMap, registrationScriptConfigMap}
 
-	icpConsoleURL := consoleConfigMap.Data["MANAGEMENT_INGRESS_ROUTE_HOST"]
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
-	proxyConfigMapName := "ibmcloud-cluster-info"
-	proxyConfigMap := &corev1.ConfigMap{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: proxyConfigMapName, Namespace: instance.Namespace}, proxyConfigMap)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			reqLogger.Error(err, "The configmap ", proxyConfigMapName, " is not created yet")
-			return err
-		}
-		reqLogger.Error(err, "Failed to get ConfigMap", proxyConfigMapName)
-		return err
-	}
-	icpProxyURL, ok := proxyConfigMap.Data["proxy_address"]
-	if !ok {
-		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain proxy address")
-		*requeueResult = true
-		return nil
-	}
-
-	//Check cluster type
+	// Check cluster type if CNCF or OCP
 	globalConfigMapName := "ibm-cpp-config"
 	globalConfigMap := &corev1.ConfigMap{}
 	reqLogger.Info("Query global cm", "Configmap.Namespace", instance.Namespace, "Global Configmap", globalConfigMapName)
@@ -110,7 +78,51 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 		isOSEnv = (instance.Spec.Config.IsOpenshiftEnv)
 	}
 
-	// Creation the configmaps
+	// Reconcile ibmcloud-cluster-info configmap if not created already
+	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: "ibmcloud-cluster-info", Namespace: instance.Namespace}, currentConfigMap)
+	if errGet != nil {
+		if errors.IsNotFound(errGet) {
+			reqLogger.Info("In Create of ibmcloud-cluster-info Configmap ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+			newConfigMap = r.ibmcloudClusterInfoConfigMap(instance, isOSEnv, domainName, r.scheme)
+			reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+			err = r.client.Create(context.TODO(), newConfigMap)
+			if err != nil {
+				reqLogger.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+				return err
+			}
+		}
+	}
+
+	// Public Cloud to be checked from ibmcloud-cluster-info
+	isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
+
+	//icpConsoleURL , icpProxyURL to be fetched from bmcloud-cluster-info
+	proxyConfigMapName := "ibmcloud-cluster-info"
+	proxyConfigMap := &corev1.ConfigMap{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: proxyConfigMapName, Namespace: instance.Namespace}, proxyConfigMap)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Error(err, "The configmap ", proxyConfigMapName, " is not created yet")
+			return err
+		}
+		reqLogger.Error(err, "Failed to get ConfigMap", proxyConfigMapName)
+		return err
+	}
+	icpProxyURL, ok := proxyConfigMap.Data["proxy_address"]
+	if !ok {
+		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain proxy address")
+		*requeueResult = true
+		return nil
+	}
+	icpConsoleURL, ok := proxyConfigMap.Data["cluster_address"]
+
+	if !ok {
+		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain cluster_address address")
+		*requeueResult = true
+		return nil
+	}
+
+	// Creation the default configmaps
 	for index, configMap := range configMapList {
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: instance.Namespace}, currentConfigMap)
 		if err != nil {
@@ -120,8 +132,6 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					newConfigMap = registrationJsonConfigMap(instance, wlpClientID, wlpClientSecret, icpConsoleURL, r.scheme)
 				} else if configMapList[index] == "oauth-client-map" {
 					newConfigMap = oauthClientConfigMap(instance, icpConsoleURL, icpProxyURL, r.scheme)
-				} else if configMapList[index] == "ibmcloud-cluster-info" {
-					newConfigMap = r.ibmcloudClusterInfoConfigMap(instance, icpConsoleURL, icpProxyURL, isOSEnv, domainName, r.scheme)
 				} else {
 					newConfigMap = functionList[index](instance, r.scheme)
 					if configMapList[index] == "platform-auth-idp" {
@@ -495,7 +505,7 @@ func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, icpConsoleU
 	return newConfigMap
 
 }
-func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(instance *operatorv1alpha1.Authentication, icpConsoleURL string, icpProxyURL string, isOSEnv bool, domainName string, scheme *runtime.Scheme) *corev1.ConfigMap {
+func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(instance *operatorv1alpha1.Authentication, isOSEnv bool, domainName string, scheme *runtime.Scheme) *corev1.ConfigMap {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
@@ -529,6 +539,7 @@ func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(instance *operato
 				RouteHTTPPort:  rhttpPort,
 				RouteHTTPSPort: rhttpsPort,
 				ClusterName:    cname,
+				ProxyAddress:   ClusterAddress,
 			},
 		}
 
@@ -542,19 +553,36 @@ func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(instance *operato
 
 	} else if isOSEnv { // if the env identified as OCP
 
-		// get domain name from ingresses.config/cluster
+		// get domain name from ingresses.config/cluster from openshift-ingress-operator ns
 		var DomainName string
+		var ProxyDomainName string
 		ingressConfigName := "cluster"
 		ingressConfig := &osconfigv1.Ingress{}
-		errGet := r.reader.Get(context.TODO(), types.NamespacedName{Name: ingressConfigName}, ingressConfig)
+		errGet := r.reader.Get(context.TODO(), types.NamespacedName{Name: ingressConfigName, Namespace: "openshift-ingress-operator"}, ingressConfig)
 
 		if errGet == nil {
 			appsDomain := ingressConfig.Spec.AppsDomain
 			if len(appsDomain) > 0 {
-				DomainName = strings.Join([]string{"cp-console", appsDomain}, ".")
+				if instance.Spec.Config.OnPremMultipleDeploy {
+					multipleInstanceRouteName := strings.Join([]string{"cp-console", instance.Namespace}, "-")
+					strings.Join([]string{multipleInstanceRouteName, appsDomain}, ".")
+					multipleInstanceProxyRouteName := strings.Join([]string{"cp-proxy", instance.Namespace}, "-")
+					ProxyDomainName = strings.Join([]string{multipleInstanceProxyRouteName, appsDomain}, ".")
+				} else {
+					DomainName = strings.Join([]string{"cp-console", appsDomain}, ".")
+					ProxyDomainName = strings.Join([]string{"cp-proxy", appsDomain}, ".")
+				}
 			} else {
 				ingressDomain := ingressConfig.Spec.Domain
-				DomainName = strings.Join([]string{"cp-console", ingressDomain}, ".")
+				if instance.Spec.Config.OnPremMultipleDeploy {
+					multipleInstanceRouteName := strings.Join([]string{"cp-console", instance.Namespace}, "-")
+					strings.Join([]string{multipleInstanceRouteName, ingressDomain}, ".")
+					multipleInstanceProxyRouteName := strings.Join([]string{"cp-proxy", instance.Namespace}, "-")
+					ProxyDomainName = strings.Join([]string{multipleInstanceProxyRouteName, ingressDomain}, ".")
+				} else {
+					DomainName = strings.Join([]string{"cp-console", ingressDomain}, ".")
+					ProxyDomainName = strings.Join([]string{"cp-proxy", ingressDomain}, ".")
+				}
 			}
 		} else {
 			if !errors.IsNotFound(errGet) {
@@ -562,7 +590,40 @@ func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(instance *operato
 			}
 		}
 
-		ClusterAddress := strings.Join([]string{"cp-console", DomainName}, ".")
+		// get clusterApiServer Details cm console-config from openshift-console ns
+		OSconsoleConfigMap := &corev1.ConfigMap{}
+
+		err := r.reader.Get(context.TODO(), types.NamespacedName{Name: "console-config", Namespace: "openshift-console"}, OSconsoleConfigMap)
+
+		if err != nil {
+			reqLogger.Error(err, "Failed to get console-config configmap from  openshift-console namespace")
+			return nil
+		}
+
+		var result map[interface{}]interface{}
+		var apiaddr string
+		if err := yaml.Unmarshal([]byte(OSconsoleConfigMap.Data["console-config.yaml"]), &result); err != nil {
+			reqLogger.Error(err, "Failed to read console-config.yaml from console-config configmap")
+			return nil
+		}
+
+		for k, v := range result {
+			if k.(string) == "clusterInfo" {
+				cinfo := v.(map[interface{}]interface{})
+				for k1, v1 := range cinfo {
+					if k1.(string) == "masterPublicURL" {
+						apiaddr = v1.(string)
+						apiaddr = strings.TrimPrefix(apiaddr, "https://")
+						break
+					}
+				}
+				break
+			}
+		}
+
+		pos := strings.LastIndex(apiaddr, ":")
+
+		//ClusterAddress := strings.Join([]string{"cp-console", DomainName}, ".")
 		// to be checked
 		ep := "https://icp-management-ingress" + "." + instance.Namespace + ".svc:443"
 
@@ -573,17 +634,21 @@ func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(instance *operato
 				Labels:    map[string]string{"app": "auth-idp"},
 			},
 			Data: map[string]string{
-				ClusterAddr:    ClusterAddress,
-				ClusterEP:      ep,
-				RouteHTTPPort:  rhttpPort,
-				RouteHTTPSPort: rhttpsPort,
-				ClusterName:    cname,
+				ClusterAddr:          DomainName,
+				ClusterEP:            ep,
+				RouteHTTPPort:        rhttpPort,
+				RouteHTTPSPort:       rhttpsPort,
+				ClusterName:          cname,
+				ClusterAPIServerHost: apiaddr[0:pos],
+				ClusterAPIServerPort: apiaddr[pos+1:],
+				ProxyAddress:         ProxyDomainName,
 			},
 		}
 
 		// Set Authentication instance as the owner and controller of the ConfigMap
-		err := controllerutil.SetControllerReference(instance, newConfigMap, scheme)
-		if err != nil {
+		errset := controllerutil.SetControllerReference(instance, newConfigMap, scheme)
+
+		if errset != nil {
 			reqLogger.Error(err, "Failed to set owner for ConfigMap")
 			return nil
 		}

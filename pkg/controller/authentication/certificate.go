@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -175,7 +174,7 @@ func (r *ReconcileAuthentication) createClusterCACert(i *operatorv1alpha1.Authen
 			return fmt.Errorf("failure creating secret for %q: %v", secretName, err)
 		}
 
-		klog.Infof("Trying to update secret: %s as it already existed.", secretName)
+		reqLogger.Info("Trying to update secret: %s as it already existed.", secretName)
 		// Update config
 		current := &core.Secret{}
 		err := r.client.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: i.Namespace}, current)
@@ -185,12 +184,12 @@ func (r *ReconcileAuthentication) createClusterCACert(i *operatorv1alpha1.Authen
 
 		// no data change, just return
 		if reflect.DeepEqual(clusterSecret.Data, current.Data) {
-			klog.Infof("No change found from the secret: %s, skip updating current secret.", secretName)
+			reqLogger.Info("No change found from the secret: %s, skip updating current secret.", secretName)
 			return nil
 		}
 
 		json, _ := json.Marshal(clusterSecret)
-		klog.Infof("Found change from secret %s, trying to update it.", json)
+		reqLogger.Info("Found change from secret %s, trying to update it.", json)
 		current.Data = clusterSecret.Data
 
 		// Apply the latest change to configmap
@@ -204,7 +203,8 @@ func (r *ReconcileAuthentication) createClusterCACert(i *operatorv1alpha1.Authen
 }
 
 func (r *ReconcileAuthentication) waitForSecret(instance *operatorv1alpha1.Authentication, name string, stopCh <-chan struct{}) (*core.Secret, error) {
-	klog.Infof("Waiting for secret: %s ...", name)
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger.Info("Waiting for secret: %s ...", name)
 	s := &core.Secret{}
 
 	err := wait.PollImmediateUntil(2*time.Second, func() (done bool, err error) {

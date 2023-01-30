@@ -29,6 +29,7 @@ const (
 	ClusterAPIServerHost string = "cluster_kube_apiserver_host"
 	ClusterAPIServerPort string = "cluster_kube_apiserver_port"
 	ClusterSecretName    string = "ibmcloud-cluster-ca-cert"
+	ProxyAddress         string = "proxy_address"
 )
 
 const registerClientScript = `#!/bin/sh

@@ -163,9 +163,6 @@ metadata:
                     "name": "ibm-mongodb-operator"
                   },
                   {
-                    "name": "ibm-cert-manager-operator"
-                  },
-                  {
                     "name": "ibm-management-ingress-operator"
                   },
                   {
@@ -490,6 +487,7 @@ spec:
                 app.kubernetes.io/instance: ibm-iam-operator
                 app.kubernetes.io/managed-by: ibm-iam-operator
                 app.kubernetes.io/name: ibm-iam-operator
+                intent: projected
                 name: ibm-iam-operator
             spec:
               affinity:
@@ -768,6 +766,16 @@ spec:
           verbs:
           - create
           - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - serviceaccounts
+          verbs:
           - get
           - list
           - patch

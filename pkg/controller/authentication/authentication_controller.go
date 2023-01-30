@@ -282,6 +282,9 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 		return reconcile.Result{}, err
 	}
 
+	// update serviceaccount with annotation if Openshift authentication is enabled
+	r.handleServiceAccount(instance)
+
 	// Check if this Deployment already exists and create it if it doesn't
 	currentDeployment := &appsv1.Deployment{}
 	currentProviderDeployment := &appsv1.Deployment{}

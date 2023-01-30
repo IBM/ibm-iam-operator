@@ -23,7 +23,6 @@ import (
 var CsConfigAnnotationSuffix = "common-service/config"
 var CsDefaultNamespace = "ibm-common-services"
 
-
 // GetCsConfigAnnotation returns '<namespace>.common-service/config' annotation name for given namespace
 func GetCsConfigAnnotation(namespace string) string {
 	if len(namespace) == 0 {
@@ -32,7 +31,6 @@ func GetCsConfigAnnotation(namespace string) string {
 
 	return namespace + "." + CsConfigAnnotationSuffix
 }
-
 
 // IsCsConfigAnnotationExists checks if '<namespace>.common-service/config' annotation name exists in the given annotations map or not
 func IsCsConfigAnnotationExists(annotations map[string]string) bool {
@@ -53,3 +51,20 @@ func IsCsConfigAnnotationExists(annotations map[string]string) bool {
 	return false
 }
 
+func IsOAuthAnnotationExists(annotations map[string]string) bool {
+	if len(annotations) == 0 {
+		return false
+	}
+	csOauthAnnotationFound := false
+	reg, _ := regexp.Compile(`^(.*)\/oauth-redirectreference`)
+	for anno := range annotations {
+		if reg.MatchString(anno) {
+			csOauthAnnotationFound = true
+			break
+		}
+	}
+	if csOauthAnnotationFound {
+		return true
+	}
+	return false
+}

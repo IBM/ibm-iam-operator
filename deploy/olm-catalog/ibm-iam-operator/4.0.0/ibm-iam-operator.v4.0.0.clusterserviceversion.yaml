@@ -773,6 +773,16 @@ spec:
           - patch
           - update
           - watch
+        - apiGroups:
+          - ""
+          resources:
+          - serviceaccounts
+          verbs:
+          - get
+          - list
+          - patch
+          - update
+          - watch
         serviceAccountName: ibm-iam-operator
     strategy: deployment
   installModes:

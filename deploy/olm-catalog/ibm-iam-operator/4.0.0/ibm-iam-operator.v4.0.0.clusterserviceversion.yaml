@@ -457,13 +457,6 @@ spec:
           - get
           - update
           - delete
-        - apiGroups:
-          - user.openshift.io
-          resources:
-          - users
-          verbs:
-          - get
-          - list
         serviceAccountName: ibm-iam-operator
       - rules:
         - apiGroups:

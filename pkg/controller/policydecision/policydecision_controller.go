@@ -24,7 +24,6 @@ import (
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
-	res "github.com/IBM/ibm-iam-operator/pkg/resources"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1"
@@ -447,16 +446,8 @@ func (r *ReconcilePolicyDecision) configMapForPolicyDecision(instance *operatorv
 			Labels:    map[string]string{"app": "auth-pdp"},
 		},
 		Data: map[string]string{
-			"AUDIT_ENABLED":   "false",
-			"AUDIT_LOG_PATH":  "/var/log/audit",
-			"SYSLOG_TLS_PATH": instance.Spec.AuditService.SyslogTlsPath,
-			"logrotate-conf": `\n # rotate log files weekly\ndaily\n\n# use the syslog group by
-								default, since this is the owning group # of /var/log/syslog.\n#su root syslog\n\n#
-								keep 4 weeks worth of backlogs\nrotate 4\n\n# create new (empty) log files after
-								rotating old ones \ncreate\n\n# uncomment this if you want your log files compressed\n
-								#compress\n\n# packages drop log rotation information into this directory\n include
-								/etc/logrotate.d\n# no packages own wtmp, or btmp -- we'll rotate them here\n`,
-			"logrotate": "/var/log/audit/*.log {\n  copytruncate\n  rotate 24\n  hourly\n  missingok\n  notifempty\n}",
+			"AUDIT_ENABLED":  "false",
+			"AUDIT_LOG_PATH": "/var/log/audit",
 		},
 	}
 
@@ -521,18 +512,10 @@ func (r *ReconcilePolicyDecision) ingressForPolicyDecision(instance *operatorv1a
 
 func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operatorv1alpha1.PolicyDecision) *appsv1.Deployment {
 
-	// Update the audit image for upgrade scenarios
-	if instance.Spec.AuditService.ImageName != res.AuditImageName {
-		instance.Spec.AuditService.ImageName = res.AuditImageName
-	}
-
 	reqLogger := log.WithValues("deploymentForPolicyDecision", "Entry", "instance.Name", instance.Name)
 	pdpImage := shatag.GetImageRef("IAM_POLICY_DECISION_IMAGE")
 	mongoDBImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
-	auditImage := shatag.GetImageRef("AUDIT_SYSLOG_SERVICE_IMAGE")
 	replicas := instance.Spec.Replicas
-	syslogTlsPath := instance.Spec.AuditService.SyslogTlsPath
-	auditResources := instance.Spec.AuditService.Resources
 	pdpResources := instance.Spec.Resources
 
 	pdpDeployment := &appsv1.Deployment{
@@ -641,7 +624,7 @@ func (r *ReconcilePolicyDecision) deploymentForPolicyDecision(instance *operator
 						},
 					},
 					Volumes:        buildPdpVolumes(),
-					Containers:     buildContainers(auditImage, pdpImage, syslogTlsPath, auditResources, pdpResources),
+					Containers:     buildContainers(pdpImage, pdpResources),
 					InitContainers: buildInitContainers(mongoDBImage),
 				},
 			},
@@ -708,70 +691,6 @@ func buildPdpVolumes() []corev1.Volume {
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "icp-mongodb-client-cert",
-				},
-			},
-		},
-		{
-			Name: "audit-server-certs",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: "audit-server-certs",
-					Optional:   &trueVar,
-				},
-			},
-		},
-		{
-			Name: "audit-ingest",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "audit-logging-fluentd-ds-http-ingesturl",
-					},
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "AuditLoggingSyslogIngestURL",
-							Path: "auditurl",
-						},
-					},
-					Optional: &trueVar,
-				},
-			},
-		},
-		{
-			Name: "shared",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		},
-		{
-			Name: "logrotate",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "auth-pdp",
-					},
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "logrotate",
-							Path: "audit",
-						},
-					},
-				},
-			},
-		},
-		{
-			Name: "logrotate-conf",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "auth-pdp",
-					},
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "logrotate-conf",
-							Path: "logrotate.conf",
-						},
-					},
 				},
 			},
 		},

@@ -23,7 +23,6 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
-	res "github.com/IBM/ibm-iam-operator/pkg/resources"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -251,7 +250,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	reqLogger.Info("Skip reconcile: Provider deployment already exists", "Deployment.Namespace", instance.Namespace, "Deployment.Name", providerDeployment)
 	return nil
 
-	}
+}
 
 func getPodNames(pods []corev1.Pod) []string {
 	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
@@ -265,18 +264,10 @@ func getPodNames(pods []corev1.Pod) []string {
 
 func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string, saasCrnId string) *appsv1.Deployment {
 
-	// Update the audit image for upgrade scenarios
-	if instance.Spec.AuditService.ImageName != res.AuditImageName {
-		instance.Spec.AuditService.ImageName = res.AuditImageName
-	}
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	authServiceImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
-	identityProviderImage := shatag.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
-	identityManagerImage := shatag.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
 	mongoDBImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
-	auditImage := shatag.GetImageRef("AUDIT_SYSLOG_SERVICE_IMAGE")
 	replicas := instance.Spec.Replicas
-	syslogTlsPath := instance.Spec.AuditService.SyslogTlsPath
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
 
@@ -387,7 +378,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 						},
 					},
 					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret),
-					Containers:     buildContainers(instance, auditImage, authServiceImage, identityProviderImage, identityManagerImage, syslogTlsPath, icpConsoleURL, saasCrnId),
+					Containers:     buildContainers(instance, authServiceImage),
 					InitContainers: buildInitContainers(mongoDBImage),
 				},
 			},
@@ -404,16 +395,10 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 
 func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string, saasCrnId string) *appsv1.Deployment {
 
-	// Update the audit image for upgrade scenarios
-	if instance.Spec.AuditService.ImageName != res.AuditImageName {
-		instance.Spec.AuditService.ImageName = res.AuditImageName
-	}
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	identityProviderImage := shatag.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
 	mongoDBImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
-	auditImage := shatag.GetImageRef("AUDIT_SYSLOG_SERVICE_IMAGE")
 	replicas := instance.Spec.Replicas
-	syslogTlsPath := instance.Spec.AuditService.SyslogTlsPath
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
 
@@ -524,7 +509,7 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 						},
 					},
 					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret),
-					Containers:     buildProviderContainers(instance, auditImage, identityProviderImage, syslogTlsPath, icpConsoleURL, saasCrnId),
+					Containers:     buildProviderContainers(instance, identityProviderImage, icpConsoleURL, saasCrnId),
 					InitContainers: buildInitContainers(mongoDBImage),
 				},
 			},
@@ -541,16 +526,10 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 
 func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string, saasCrnId string) *appsv1.Deployment {
 
-	// Update the audit image for upgrade scenarios
-	if instance.Spec.AuditService.ImageName != res.AuditImageName {
-		instance.Spec.AuditService.ImageName = res.AuditImageName
-	}
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	identityManagerImage := shatag.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
 	mongoDBImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
-	auditImage := shatag.GetImageRef("AUDIT_SYSLOG_SERVICE_IMAGE")
 	replicas := instance.Spec.Replicas
-	syslogTlsPath := instance.Spec.AuditService.SyslogTlsPath
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
 
@@ -661,7 +640,7 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 						},
 					},
 					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret),
-					Containers:     buildManagerContainers(instance, auditImage, identityManagerImage, syslogTlsPath, icpConsoleURL, saasCrnId),
+					Containers:     buildManagerContainers(instance, identityManagerImage, icpConsoleURL),
 					InitContainers: buildInitContainers(mongoDBImage),
 				},
 			},
@@ -679,32 +658,6 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume {
 	return []corev1.Volume{
 		{
-			Name: "audit-server-certs",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: "audit-server-certs",
-					Optional:   &trueVar,
-				},
-			},
-		},
-		{
-			Name: "audit-ingest",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "audit-logging-fluentd-ds-http-ingesturl",
-					},
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "AuditLoggingSyslogIngestURL",
-							Path: "auditurl",
-						},
-					},
-					Optional: &trueVar,
-				},
-			},
-		},
-		{
 			Name: "platform-identity-management",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
@@ -719,46 +672,6 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume
 							Path: "tls.crt",
 						},
 					},
-				},
-			},
-		},
-		{
-			Name: "shared",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		},
-		{
-			Name: "logrotate",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp",
-					},
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "logrotate",
-							Path: "audit",
-						},
-					},
-					DefaultMode: &partialAccess,
-				},
-			},
-		},
-		{
-			Name: "logrotate-conf",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp",
-					},
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "logrotate-conf",
-							Path: "logrotate.conf",
-						},
-					},
-					DefaultMode: &partialAccess,
 				},
 			},
 		},

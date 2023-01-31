@@ -16,22 +16,6 @@ metadata:
             "name": "example-authentication"
           },
           "spec": {
-            "auditService": {
-              "imageName": "audit-syslog-service",
-              "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "1.8.0",
-              "syslogTlsPath": "/etc/audit-tls",
-              "resources": {
-                "limits": {
-                  "cpu": "100m",
-                  "memory": "128Mi"
-                },
-                "requests": {
-                  "cpu": "10m",
-                  "memory": "100Mi"
-                }
-              }
-            },
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
@@ -243,8 +227,6 @@ spec:
       image: quay.io/opencloudio/icp-identity-provider@sha256:15c8a1c9b2384bfa4cff1ae38bf0261492a4fef4d9a4907de3b0e7411cd3c0dd
     - name: icp-identity-manager
       image: quay.io/opencloudio/icp-identity-manager@sha256:191c45c6e69849123c8d5f0f7a789cb522b2fb5c2aab75563f43af78150e030a
-    - name: audit-syslog-service
-      image: quay.io/opencloudio/audit-syslog-service@sha256:232d0407440b3b051d612a6ce48d4c92e1859cc94c3170b0450bde069b838e42
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
@@ -336,11 +318,6 @@ spec:
       - description: A list defines the catalog information for operator version.
         displayName: OperatorVersion
         path: operatorVersion
-        x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:text'
-      - description: A list defines the catalog information for audit service.
-        displayName: AuditService
-        path: auditService
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
       - description: A list defines the catalog information for auth service.
@@ -519,8 +496,6 @@ spec:
                   value: quay.io/opencloudio/icp-secret-watcher:3.7.12
                 - name: ICP_IAM_ONBOARDING_IMAGE
                   value: quay.io/opencloudio/icp-iam-onboarding:3.10.0
-                - name: AUDIT_SYSLOG_SERVICE_IMAGE
-                  value: quay.io/opencloudio/audit-syslog-service:1.8.0
                 - name: WATCH_NAMESPACE
                   valueFrom:
                     configMapKeyRef:

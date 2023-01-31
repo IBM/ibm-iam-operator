@@ -951,10 +951,6 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					MountPath: "/certs",
 				},
 				{
-					Name:      "shared",
-					MountPath: "/app/logs/audit",
-				},
-				{
 					Name:      "mongodb-client-cert",
 					MountPath: "/certs/mongodb-client",
 				},
@@ -962,7 +958,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			Env: tmpEnvs,
 		},
 	}
-	var mode1, mode2, mode3, mode4 int32 = 420, 420, 420, 420
+	var mode1, mode2 int32 = 420, 420
 	tmpVolumes := []corev1.Volume{
 		{
 			Name: "mongodb-ca-cert",
@@ -1007,48 +1003,6 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 						},
 					},
 					DefaultMode: &mode2,
-				},
-			},
-		},
-		{
-			Name: "shared",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{
-					Medium: "",
-				},
-			},
-		},
-		{
-			Name: "logrotate",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "auth-pdp",
-					},
-					DefaultMode: &mode3,
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "logrotate",
-							Path: "audit",
-						},
-					},
-				},
-			},
-		},
-		{
-			Name: "logrotate-conf",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "auth-pdp",
-					},
-					DefaultMode: &mode4,
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "logrotate-conf",
-							Path: "logrotate.conf",
-						},
-					},
 				},
 			},
 		},
@@ -1143,10 +1097,6 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 					{
 						Name:      "cluster-ca",
 						MountPath: "/certs",
-					},
-					{
-						Name:      "shared",
-						MountPath: "/app/logs/audit",
 					},
 					{
 						Name:      "mongodb-client-cert",

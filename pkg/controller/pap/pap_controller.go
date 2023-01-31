@@ -25,7 +25,6 @@ import (
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
-	res "github.com/IBM/ibm-iam-operator/pkg/resources"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1"
@@ -62,42 +61,6 @@ type IamPapCertificateValues struct {
 // ConfigValues defines the values of pap config
 type ConfigValues struct {
 	ClusterCAIssuer string
-}
-
-// IcpAuditValues defines the values of icp-audit container
-type IcpAuditValues struct {
-	Name  string
-	Image struct {
-		Repository string
-		Tag        string
-		PullPolicy string
-	}
-	Resources struct {
-		Requests struct {
-			CPU    string
-			Memory string
-		}
-		Limits struct {
-			CPU    string
-			Memory string
-		}
-	}
-	ContainerSecurityContext struct {
-		Privileged               bool
-		RunAsNonRoot             bool
-		ReadOnlyRootFilesystem   bool
-		AllowPrivilegeEscalation bool
-		RunAsUser                int
-		SeLinuxOptions           struct {
-			Type string
-		}
-		Capabilities struct {
-			Drop []string
-		}
-	}
-	Config struct {
-		SyslogTlsPath string
-	}
 }
 
 var log = logf.Log.WithName("controller_pap")
@@ -534,16 +497,8 @@ func (r *ReconcilePap) configMapForPap(instance *operatorv1alpha1.Pap) *corev1.C
 			Labels:    map[string]string{"app": iamPapServiceValues.PodName},
 		},
 		Data: map[string]string{
-			"AUDIT_ENABLED":   "false",
-			"AUDIT_DETAIL":    "false",
-			"SYSLOG_TLS_PATH": instance.Spec.AuditService.SyslogTlsPath,
-			"logrotate-conf": "\n # rotate log files weekly\ndaily\n\n# use the syslog group by " +
-				"default, since this is the owning group # of /var/log/syslog.\n#su root syslog\n\n# " +
-				"keep 4 weeks worth of backlogs\nrotate 4\n\n# create new (empty) log files after " +
-				"rotating old ones \ncreate\n\n# uncomment this if you want your log files compressed\n " +
-				"#compress\n\n# packages drop log rotation information into this directory\n include " +
-				"/etc/logrotate.d\n# no packages own wtmp, or btmp -- we'll rotate them here\n",
-			"logrotate": "/app/audit/*.log {\n  copytruncate\n  rotate 24\n  hourly\n  missingok\n  notifempty\n}",
+			"AUDIT_ENABLED": "false",
+			"AUDIT_DETAIL":  "false",
 		},
 	}
 
@@ -608,17 +563,9 @@ func (r *ReconcilePap) ingressForPap(instance *operatorv1alpha1.Pap) *net.Ingres
 
 func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.Deployment {
 
-	// Update the audit image for upgrade scenarios
-	if instance.Spec.AuditService.ImageName != res.AuditImageName {
-		instance.Spec.AuditService.ImageName = res.AuditImageName
-	}
-
 	reqLogger := log.WithValues("deploymentForPap", "Entry", "instance.Name", instance.Name)
 	papImage := shatag.GetImageRef("IAM_POLICY_ADMINISTRATION_IMAGE")
-	auditImage := shatag.GetImageRef("AUDIT_SYSLOG_SERVICE_IMAGE")
 	replicas := instance.Spec.Replicas
-	syslogTlsPath := instance.Spec.AuditService.SyslogTlsPath
-	auditResources := instance.Spec.AuditService.Resources
 	papResources := instance.Spec.PapService.Resources
 
 	papDeployment := &appsv1.Deployment{
@@ -727,7 +674,7 @@ func (r *ReconcilePap) deploymentForPap(instance *operatorv1alpha1.Pap) *appsv1.
 						},
 					},
 					Volumes:    buildPapVolumes(),
-					Containers: buildContainers(auditImage, papImage, syslogTlsPath, auditResources, papResources),
+					Containers: buildContainers(papImage, papResources),
 				},
 			},
 		},
@@ -774,72 +721,6 @@ func buildPapVolumes() []corev1.Volume {
 						{
 							Key:  "tls.crt",
 							Path: "ca.crt",
-						},
-					},
-				},
-			},
-		},
-		{
-			Name: "audit-server-certs",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: "audit-server-certs",
-					Optional:   &trueVar,
-				},
-			},
-		},
-		{
-			Name: "audit-ingest",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "audit-logging-fluentd-ds-http-ingesturl",
-					},
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "AuditLoggingSyslogIngestURL",
-							Path: "auditurl",
-						},
-					},
-					Optional: &trueVar,
-				},
-			},
-		},
-		{
-			Name: "shared",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		},
-		{
-			Name: "logrotate",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					DefaultMode: &defaultMode,
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "auth-pap",
-					},
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "logrotate",
-							Path: "audit",
-						},
-					},
-				},
-			},
-		},
-		{
-			Name: "logrotate-conf",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					DefaultMode: &defaultMode,
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "auth-pap",
-					},
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "logrotate-conf",
-							Path: "logrotate.conf",
 						},
 					},
 				},

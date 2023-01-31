@@ -18,22 +18,17 @@ package authentication
 
 import (
 	"context"
-	"time"
 
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
-	res "github.com/IBM/ibm-iam-operator/pkg/resources"
 	utils "github.com/IBM/ibm-iam-operator/pkg/utils"
-	userv1 "github.com/openshift/api/user/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -224,12 +219,6 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 	} else {
 		// Object scheduled to be deleted
 		if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
-			if err := r.deleteExternalResources(instance); err != nil {
-				log.Error(err, "Error deleting resources created by this operator")
-
-				return reconcile.Result{}, err
-			}
-
 			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
 			if err := r.client.Update(context.Background(), instance); err != nil {
 				log.Error(err, "Error updating the CR to remove the finalizer")
@@ -301,26 +290,6 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 	return reconcile.Result{}, nil
 }
 
-// Removes some of the resources created by this controller for the CR including
-// The clusterrole, clusterrolebinding and User resources created by Authentication
-func (r *ReconcileAuthentication) deleteExternalResources(instance *operatorv1alpha1.Authentication) error {
-
-	userName := instance.Spec.Config.DefaultAdminUser
-
-	log.V(0).Info("Wait for 2 seconds.")
-	time.Sleep(time.Second * 2)
-
-	log.V(0).Info("Wait for 2 seconds.")
-	time.Sleep(time.Second * 2)
-
-	// Remove User
-
-	if err := removeUser(r.client, userName); err != nil {
-		return err
-	}
-	return nil
-}
-
 // Helper functions to check and remove string from a slice of strings.
 func containsString(slice []string, s string) bool {
 	for _, item := range slice {
@@ -339,131 +308,4 @@ func removeString(slice []string, s string) (result []string) {
 		result = append(result, item)
 	}
 	return
-}
-
-// Functions to remove cluster scoped resources
-
-func isOidcAdminBindingCRBExists(client client.Client) bool {
-	// checks if oidc-admin-binding ClusterRoleBinding exists or not
-	crbName := "oidc-admin-binding"
-	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
-	if err := client.Get(context.Background(), types.NamespacedName{Name: crbName, Namespace: ""}, clusterRoleBinding); err != nil && errors.IsNotFound(err) {
-		return false
-	}
-	return true
-}
-
-func removeCsAnnotationFromCR(client client.Client, crName string, csCfgAnnotationName string) error {
-	// Remove common-service/config annotation
-	clusterRole := &rbacv1.ClusterRole{}
-	if err := client.Get(context.Background(), types.NamespacedName{Name: crName, Namespace: ""}, clusterRole); err != nil && errors.IsNotFound(err) {
-		log.V(1).Info("Error getting cluster role", crName, err)
-		return nil
-	} else if err == nil {
-		if len(clusterRole.ObjectMeta.Annotations) > 0 {
-			if _, ok := clusterRole.ObjectMeta.Annotations[csCfgAnnotationName]; ok {
-				delete(clusterRole.ObjectMeta.Annotations, csCfgAnnotationName)
-				if err = client.Update(context.Background(), clusterRole); err != nil {
-					// if error, retry second time to avoid manual deletion after uninstall
-					if err2 := client.Update(context.Background(), clusterRole); err2 != nil {
-						log.V(1).Info("Error removing common-service/config from cluster role", "name", crName, "error message", err2)
-						return err2
-					}
-				}
-			}
-		}
-	} else {
-		return err
-	}
-	return nil
-}
-
-func removeCsAnnotationFromCRB(client client.Client, crbName string, csCfgAnnotationName string) error {
-	// Remove common-service/config annotation
-	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
-	if err := client.Get(context.Background(), types.NamespacedName{Name: crbName, Namespace: ""}, clusterRoleBinding); err != nil && errors.IsNotFound(err) {
-		log.V(1).Info("Error getting cluster role binding", crbName, err)
-		return nil
-	} else if err == nil {
-		if len(clusterRoleBinding.ObjectMeta.Annotations) > 0 {
-			if _, ok := clusterRoleBinding.ObjectMeta.Annotations[csCfgAnnotationName]; ok {
-				delete(clusterRoleBinding.ObjectMeta.Annotations, csCfgAnnotationName)
-				if err = client.Update(context.Background(), clusterRoleBinding); err != nil {
-					// if error, retry second time to avoid manual deletion after uninstall
-					if err2 := client.Update(context.Background(), clusterRoleBinding); err2 != nil {
-						log.V(1).Info("Error removing common-service/config annotation from cluster role binding", "name", crbName, "error message", err2)
-						return err2
-					}
-				}
-			}
-		}
-	} else {
-		return err
-	}
-	return nil
-}
-
-func removeCR(client client.Client, crName string) error {
-	// Delete Clusterrole
-	clusterRole := &rbacv1.ClusterRole{}
-	if err := client.Get(context.Background(), types.NamespacedName{Name: crName, Namespace: ""}, clusterRole); err != nil && errors.IsNotFound(err) {
-		log.V(1).Info("Error getting cluster role", crName, err)
-		return nil
-	} else if err == nil {
-		if !res.IsCsConfigAnnotationExists(clusterRole.ObjectMeta.Annotations) {
-			if err = client.Delete(context.Background(), clusterRole); err != nil {
-				log.V(1).Info("Error deleting cluster role", "name", crName, "error message", err)
-				return err
-			}
-		}
-	} else {
-		return err
-	}
-	return nil
-}
-
-func removeCRB(client client.Client, crbName string) error {
-	// Delete ClusterRoleBinding
-	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
-	if err := client.Get(context.Background(), types.NamespacedName{Name: crbName, Namespace: ""}, clusterRoleBinding); err != nil && errors.IsNotFound(err) {
-		log.V(1).Info("Error getting cluster role binding", crbName, err)
-		return nil
-	} else if err == nil {
-		if crbName == "oidc-admin-binding" {
-			clusterRoleBinding.ObjectMeta.Finalizers = []string{}
-			if err = client.Update(context.Background(), clusterRoleBinding); err != nil {
-				log.V(1).Info("Error updating cluster role binding", "name", crbName, "error message", err)
-				return err
-			}
-		}
-		if !res.IsCsConfigAnnotationExists(clusterRoleBinding.ObjectMeta.Annotations) {
-			if err = client.Delete(context.Background(), clusterRoleBinding); err != nil {
-				log.V(1).Info("Error deleting cluster role binding", "name", crbName, "error message", err)
-				return err
-			}
-		}
-	} else {
-		return err
-	}
-	return nil
-}
-
-func removeUser(client client.Client, userName string) error {
-	// Delete User
-	user := &userv1.User{}
-	if err := client.Get(context.Background(), types.NamespacedName{Name: userName, Namespace: ""}, user); err != nil && errors.IsNotFound(err) {
-		log.V(1).Info("Error getting user", userName, err)
-		return nil
-	} else if err == nil {
-		// check if oidc-admin-binding CRB exists or not
-		if !isOidcAdminBindingCRBExists(client) {
-			if err = client.Delete(context.Background(), user); err != nil {
-				log.V(1).Info("Error deleting user", "name", userName, "error message", err)
-				return err
-			}
-		}
-	} else {
-		return err
-	}
-	return nil
 }

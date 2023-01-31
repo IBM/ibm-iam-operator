@@ -17,7 +17,6 @@
 package v1alpha1
 
 import (
-	userv1 "github.com/openshift/api/user/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -148,5 +147,4 @@ type AuthenticationList struct {
 
 func init() {
 	SchemeBuilder.Register(&Authentication{}, &AuthenticationList{})
-	UserBuilder.Register(&userv1.User{}, &userv1.UserList{})
 }

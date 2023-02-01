@@ -18,7 +18,7 @@ package authentication
 
 import (
 	"context"
-	//certmgr "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	certmgrv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	//certmgrv1alpha1 "github.com/ibm/ibm-cert-manager-operator/apis/certmanager/v1alpha1"
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	//certmgrv1 "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1"
@@ -31,7 +31,7 @@ import (
 )
 
 var certificateData map[string]map[string]string
-//const DefaultClusterIssuer = "cs-ca-issuer"
+const DefaultClusterIssuer = "cs-ca-issuer"
 const Certv1alpha1APIVersion = "certmanager.k8s.io/v1alpha1"
 
 func generateCertificateData(instance *operatorv1alpha1.Authentication) {
@@ -84,9 +84,78 @@ func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.A
 	return nil
 }
 
+//nolint
+/*func getDesiredCertificate(ctx context.Context, client client.Client, instance *operatorsv1alpha1.CommonWebUI, data CertificateData) (*certmgr.Certificate, error) {
+	reqLogger := log.WithValues("func", "getDesiredCertificate", "instance.Name", instance.Name, "instance.Namespace", instance.Namespace)
+
+	metaLabels := map[string]string{
+		"app":                          data.App,
+		"component":                    data.Common,
+		"release":                      ReleaseName,
+		"app.kubernetes.io/instance":   "ibm-commonui-operator",
+		"app.kubernetes.io/managed-by": "ibm-commonui-operator",
+		"app.kubernetes.io/name":       UICertName,
+	}
+
+	certificate := &certmgr.Certificate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      data.Name,
+			Labels:    metaLabels,
+			Namespace: instance.Namespace,
+		},
+		Spec: certmgr.CertificateSpec{
+			CommonName: data.Common,
+			SecretName: data.Secret,
+			IsCA:       false,
+			DNSNames: []string{
+				data.Common,
+				data.Common + "." + instance.Namespace,
+				data.Common + "." + instance.Namespace + ".svc.cluster.local",
+			},
+			// Organization: []string{"IBM"},
+			IssuerRef: cmmeta.ObjectReference{
+				Name: DefaultClusterIssuer,
+				Kind: certmgr.IssuerKind,
+			},
+		},
+	}
+
+	err := controllerutil.SetControllerReference(instance, certificate, client.Scheme())
+	if err != nil {
+		reqLogger.Error(err, "Failed to set owner for certificate")
+		return nil, err
+	}
+
+	return certificate, nil
+}*/
+
 func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, certificateName string) *certmgr.Certificate {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	certSpec := certmgr.CertificateSpec{
+	metaLabels := map[string]string{
+		"app":                          certificateData[certificateName]["cn"],
+		"app.kubernetes.io/instance":   "ibm-iam-operator",
+		"app.kubernetes.io/managed-by": "ibm-iam-operator",
+		"app.kubernetes.io/name":       certificateData[certificateName]["cn"],
+	}
+
+	certSpec := &certmgrv1.Certificate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      certificate.Name,
+			Labels:    metaLabels,
+			Namespace: instance.Namespace,
+		},
+		Spec: certmgr.CertificateSpec{
+			CommonName: certificateData[certificateName]["cn",
+			SecretName: certificateData[certificateName]["secretName"],
+			IsCA:       false,
+			DNSNames: []string{certificateData[certificateName]["cn"]}
+			IssuerRef: cmmeta.ObjectReference{
+				Name: DefaultClusterIssuer,
+				Kind: certmgrv1.IssuerKind,
+			},
+		},
+	}
+	/*certSpec := certmgr.CertificateSpec{
 		SecretName: certificateData[certificateName]["secretName"],
 		IssuerRef: certmgr.ObjectReference{
 			Name: "cs-ca-issuer",
@@ -94,7 +163,7 @@ func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme
 		},
 		CommonName: certificateData[certificateName]["cn"],
 		DNSNames:   []string{certificateData[certificateName]["cn"]},
-	}
+	}*/
 	if certificateName == "platform-identity-management" {
 		certSpec.DNSNames = append(certSpec.DNSNames, certificateData[certificateName]["completeName"])
 	}
@@ -136,8 +205,8 @@ func (r *ReconcileAuthentication) deleteCertsv1alpha1(ctx context.Context, insta
 		}
 		return
 	}
-	reqLogger.Info("Certificate "+ certificateName+" found, checking api version..")
-	reqLogger.Info("API version is: " + certificate.APIVersion)
+	reqLogger.Info("Checking for existing certificate", "Certificate.Namespace", instance.Namespace, "Certificate found, checking api version", certificateName)
+	reqLogger.Info("Checking for existing certificate", "Certificate.Namespace", instance.Namespace, "API version is: " + certificate.APIVersion)
 	if certificate.APIVersion == Certv1alpha1APIVersion {
 		reqLogger.Info("deleting cert: " + certificateName)
 		err = r.client.Delete(ctx, certificate)

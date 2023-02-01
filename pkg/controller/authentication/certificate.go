@@ -18,8 +18,10 @@ package authentication
 
 import (
 	"context"
-
+	//certmgr "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	//certmgrv1alpha1 "github.com/ibm/ibm-cert-manager-operator/apis/certmanager/v1alpha1"
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
+	//certmgrv1 "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +31,8 @@ import (
 )
 
 var certificateData map[string]map[string]string
+//const DefaultClusterIssuer = "cs-ca-issuer"
+const Certv1alpha1APIVersion = "certmanager.k8s.io/v1alpha1"
 
 func generateCertificateData(instance *operatorv1alpha1.Authentication) {
 	completeName := "platform-identity-management." + instance.Namespace + ".svc"
@@ -57,6 +61,8 @@ func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.A
 	var err error
 
 	for certificate := range certificateData {
+		// Delete v1alpha1 Certificate
+		r.deleteCertsv1alpha1(context.TODO(),instance, r.scheme, certificate)
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: certificate, Namespace: instance.Namespace}, currentCertificate)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new Certificate
@@ -99,7 +105,7 @@ func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certificateName,
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": certificateData[certificateName]["cn"]},
 		},
 		Spec: certSpec,
 	}
@@ -111,4 +117,36 @@ func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme
 		return nil
 	}
 	return newCertificate
+}
+
+func (r *ReconcileAuthentication) deleteCertsv1alpha1(ctx context.Context, instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, certificateName string) {
+	reqLogger := log.WithValues("func", "deleteCertsv1alpha1", "instance.Name", instance.Name, "instance.Namespace", instance.Namespace)
+
+	certificate := &certmgr.Certificate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      certificateName,
+			Namespace: instance.Namespace,
+		},
+	}
+	err := r.client.Get(ctx, types.NamespacedName{Name: certificateName, Namespace: instance.Namespace}, certificate)
+
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			reqLogger.Info("Unable to load v1alpha1 certificate - most likely this means the CRD doesn't exist and this can be ignored")
+		}
+		return
+	}
+	reqLogger.Info("Certificate "+ certificateName+" found, checking api version..")
+	reqLogger.Info("API version is: " + certificate.APIVersion)
+	if certificate.APIVersion == Certv1alpha1APIVersion {
+		reqLogger.Info("deleting cert: " + certificateName)
+		err = r.client.Delete(ctx, certificate)
+		if err != nil {
+			reqLogger.Error(err, "Failed to delete")
+		} else {
+			reqLogger.Info("Successfully deleted")
+		}
+	} else {
+		reqLogger.Info("API version is NOT v1alpha1, returning..")
+	}
 }

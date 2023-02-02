@@ -709,10 +709,13 @@ spec:
           - update
           - watch
         - apiGroups:
-          - certmanager.k8s.io
+          - cert-manager.io
           resources:
-          - '*'
           - certificates
+          - certificaterequests
+          - orders
+          - challenges
+          - issuers
           verbs:
           - create
           - delete
@@ -720,6 +723,16 @@ spec:
           - list
           - patch
           - update
+          - watch
+        - apiGroups:
+          - certmanager.k8s.io
+          resources:
+          - '*'
+          - certificates
+          verbs:
+          - delete
+          - get
+          - list
           - watch
         - apiGroups:
           - networking.k8s.io

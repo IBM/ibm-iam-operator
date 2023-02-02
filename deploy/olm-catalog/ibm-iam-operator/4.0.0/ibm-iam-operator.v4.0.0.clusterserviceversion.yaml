@@ -467,7 +467,7 @@ spec:
           - ingresses
           verbs:
           - get
-         - apiGroups:
+        - apiGroups:
           - ""
           resources:
           - configmaps

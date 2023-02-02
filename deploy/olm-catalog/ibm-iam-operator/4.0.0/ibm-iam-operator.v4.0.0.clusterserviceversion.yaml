@@ -147,12 +147,6 @@ metadata:
                     "name": "ibm-mongodb-operator"
                   },
                   {
-                    "name": "ibm-management-ingress-operator"
-                  },
-                  {
-                    "name": "ibm-ingress-nginx-operator"
-                  },
-                  {
                     "name": "ibm-commonui-operator"
                   }
                 ],
@@ -201,8 +195,7 @@ metadata:
               },
               "public-ibmcloudca-secret": {
                 "secret" : "ibmcloud-cluster-ca-cert"
-              },
-
+              }
             }
           }
         }
@@ -456,7 +449,6 @@ spec:
           verbs:
           - get
         serviceAccountName: ibm-iam-operator
-
       - rules:
         - apiGroups:
           - user.openshift.io

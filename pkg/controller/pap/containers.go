@@ -30,71 +30,6 @@ var memory20 = resource.NewQuantity(20*1024*1024, resource.BinarySI)     // 20Mi
 var memory200 = resource.NewQuantity(200*1024*1024, resource.BinarySI)   // 200Mi
 var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024Mi
 
-func buildAuditContainer(auditImage string, syslogTlsPath string, resources *corev1.ResourceRequirements) corev1.Container {
-
-	if resources == nil {
-		resources = &corev1.ResourceRequirements{
-			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu200,
-				corev1.ResourceMemory: *memory200},
-			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu20,
-				corev1.ResourceMemory: *memory20},
-		}
-	}
-
-	if len(syslogTlsPath) == 0 {
-		syslogTlsPath = "/etc/audit-tls"
-	}
-	
-	return corev1.Container{
-		Name:            "icp-audit-service",
-		Image:           auditImage,
-		ImagePullPolicy: corev1.PullAlways,
-		Env: []corev1.EnvVar{
-			{
-				Name:  "AUDIT_DIR",
-				Value: "/app/audit",
-			},
-		},
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      "shared",
-				MountPath: "/app/audit",
-			},
-			{
-				Name:      "audit-server-certs",
-				MountPath: syslogTlsPath,
-			},
-			{
-				Name:      "audit-ingest",
-				MountPath: "/etc/audit-ingest/",
-			},
-			{
-				Name:      "logrotate",
-				MountPath: "/etc/logrotate.d/audit",
-				SubPath:   "audit",
-			},
-			{
-				Name:      "logrotate-conf",
-				MountPath: "/etc/logrotate.conf",
-				SubPath:   "logrotate.conf",
-			},
-		},
-		SecurityContext: &corev1.SecurityContext{
-			Privileged:               &falseVar,
-			RunAsNonRoot:             &trueVar,
-			ReadOnlyRootFilesystem:   &trueVar,
-			AllowPrivilegeEscalation: &falseVar,
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL"},
-			},
-		},
-		Resources: *resources,
-	}
-
-}
-
 func buildPapContainer(papImage string, resources *corev1.ResourceRequirements) corev1.Container {
 
 	if resources == nil {
@@ -134,10 +69,6 @@ func buildPapContainer(papImage string, resources *corev1.ResourceRequirements) 
 			{
 				Name:      "cluster-ca",
 				MountPath: "/certs/cluster-ca",
-			},
-			{
-				Name:      "shared",
-				MountPath: "/app/audit",
 			},
 			{
 				Name:      "mongodb-client-cert",
@@ -194,10 +125,6 @@ func buildPapContainer(papImage string, resources *corev1.ResourceRequirements) 
 			{
 				Name:  "MONGO_COLLECTION",
 				Value: "iam",
-			},
-			{
-				Name:  "AUDIT_LOG_PATH",
-				Value: "/app/audit/pap-audit.log",
 			},
 			{
 				Name:  "SERVICE_NAME",
@@ -348,10 +275,9 @@ func buildPapContainer(papImage string, resources *corev1.ResourceRequirements) 
 
 }
 
-func buildContainers(auditImage string, papImage string, syslogTlsPath string, auditResources *corev1.ResourceRequirements, papResources *corev1.ResourceRequirements) []corev1.Container {
+func buildContainers(papImage string, papResources *corev1.ResourceRequirements) []corev1.Container {
 
-	auditContainer := buildAuditContainer(auditImage, syslogTlsPath, auditResources)
 	papContainer := buildPapContainer(papImage, papResources)
 
-	return []corev1.Container{auditContainer, papContainer}
+	return []corev1.Container{papContainer}
 }

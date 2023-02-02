@@ -17,7 +17,6 @@
 package v1alpha1
 
 import (
-	userv1 "github.com/openshift/api/user/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -32,21 +31,12 @@ type AuthenticationSpec struct {
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
 	OperatorVersion    string                 `json:"operatorVersion"`
 	Replicas           int32                  `json:"replicas"`
-	AuditService       AuditServiceSpec       `json:"auditService"`
 	AuthService        AuthServiceSpec        `json:"authService"`
 	IdentityProvider   IdentityProviderSpec   `json:"identityProvider"`
 	IdentityManager    IdentityManagerSpec    `json:"identityManager"`
 	InitMongodb        InitMongodbSpec        `json:"initMongodb"`
 	ClientRegistration ClientRegistrationSpec `json:"clientRegistration"`
 	Config             ConfigSpec             `json:"config"`
-}
-
-type AuditServiceSpec struct {
-	ImageRegistry string                       `json:"imageRegistry"`
-	ImageName     string                       `json:"imageName"`
-	ImageTag      string                       `json:"imageTag"`
-	SyslogTlsPath string                       `json:"syslogTlsPath,omitempty"`
-	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type AuthServiceSpec struct {
@@ -157,5 +147,4 @@ type AuthenticationList struct {
 
 func init() {
 	SchemeBuilder.Register(&Authentication{}, &AuthenticationList{})
-	UserBuilder.Register(&userv1.User{}, &userv1.UserList{})
 }

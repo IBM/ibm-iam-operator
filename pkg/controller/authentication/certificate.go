@@ -85,51 +85,6 @@ func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.A
 	return nil
 }
 
-//nolint
-/*func getDesiredCertificate(ctx context.Context, client client.Client, instance *operatorsv1alpha1.CommonWebUI, data CertificateData) (*certmgr.Certificate, error) {
-	reqLogger := log.WithValues("func", "getDesiredCertificate", "instance.Name", instance.Name, "instance.Namespace", instance.Namespace)
-
-	metaLabels := map[string]string{
-		"app":                          data.App,
-		"component":                    data.Common,
-		"release":                      ReleaseName,
-		"app.kubernetes.io/instance":   "ibm-commonui-operator",
-		"app.kubernetes.io/managed-by": "ibm-commonui-operator",
-		"app.kubernetes.io/name":       UICertName,
-	}
-
-	certificate := &certmgr.Certificate{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      data.Name,
-			Labels:    metaLabels,
-			Namespace: instance.Namespace,
-		},
-		Spec: certmgr.CertificateSpec{
-			CommonName: data.Common,
-			SecretName: data.Secret,
-			IsCA:       false,
-			DNSNames: []string{
-				data.Common,
-				data.Common + "." + instance.Namespace,
-				data.Common + "." + instance.Namespace + ".svc.cluster.local",
-			},
-			// Organization: []string{"IBM"},
-			IssuerRef: cmmeta.ObjectReference{
-				Name: DefaultClusterIssuer,
-				Kind: certmgr.IssuerKind,
-			},
-		},
-	}
-
-	err := controllerutil.SetControllerReference(instance, certificate, client.Scheme())
-	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for certificate")
-		return nil, err
-	}
-
-	return certificate, nil
-}*/
-
 func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, certificateName string) *certmgrv1.Certificate {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	metaLabels := map[string]string{

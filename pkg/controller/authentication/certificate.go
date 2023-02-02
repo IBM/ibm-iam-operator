@@ -19,6 +19,7 @@ package authentication
 import (
 	"context"
 	certmgrv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	//certmgrv1alpha1 "github.com/ibm/ibm-cert-manager-operator/apis/certmanager/v1alpha1"
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	//certmgrv1 "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1"
@@ -131,7 +132,7 @@ func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.A
 	return certificate, nil
 }*/
 
-func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, certificateName string) *certmgr.Certificate {
+func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, certificateName string) *certmgrv1.Certificate {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	metaLabels := map[string]string{
 		"app":                          certificateData[certificateName]["cn"],
@@ -140,54 +141,37 @@ func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme
 		"app.kubernetes.io/name":       certificateData[certificateName]["cn"],
 	}
 
-	certSpec := &certmgrv1.Certificate{
+	certificate := &certmgrv1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      certificate.Name,
+			Name:      certificateName,
 			Labels:    metaLabels,
 			Namespace: instance.Namespace,
 		},
-		Spec: certmgr.CertificateSpec{
-			CommonName: certificateData[certificateName]["cn",
+		Spec: certmgrv1.CertificateSpec{
+			CommonName: certificateData[certificateName]["cn"],
 			SecretName: certificateData[certificateName]["secretName"],
 			IsCA:       false,
-			DNSNames: []string{certificateData[certificateName]["cn"]}
+			DNSNames: []string{certificateData[certificateName]["cn"]},
 			IssuerRef: cmmeta.ObjectReference{
 				Name: DefaultClusterIssuer,
 				Kind: certmgrv1.IssuerKind,
 			},
 		},
 	}
-	/*certSpec := certmgr.CertificateSpec{
-		SecretName: certificateData[certificateName]["secretName"],
-		IssuerRef: certmgr.ObjectReference{
-			Name: "cs-ca-issuer",
-			Kind: certmgr.IssuerKind,
-		},
-		CommonName: certificateData[certificateName]["cn"],
-		DNSNames:   []string{certificateData[certificateName]["cn"]},
-	}*/
 	if certificateName == "platform-identity-management" {
-		certSpec.DNSNames = append(certSpec.DNSNames, certificateData[certificateName]["completeName"])
+		certificate.Spec.DNSNames = append(certificate.Spec.DNSNames, certificateData[certificateName]["completeName"])
 	}
 	if certificateName == "platform-auth-cert" {
-		certSpec.IPAddresses = []string{"127.0.0.1", "::1"}
-	}
-	newCertificate := &certmgr.Certificate{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      certificateName,
-			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": certificateData[certificateName]["cn"]},
-		},
-		Spec: certSpec,
+		certificate.Spec.IPAddresses = []string{"127.0.0.1", "::1"}
 	}
 
 	// Set Authentication instance as the owner and controller of the Certificate
-	err := controllerutil.SetControllerReference(instance, newCertificate, scheme)
+	err := controllerutil.SetControllerReference(instance, certificate, scheme)
 	if err != nil {
 		reqLogger.Error(err, "Failed to set owner for Certificate")
 		return nil
 	}
-	return newCertificate
+	return certificate
 }
 
 func (r *ReconcileAuthentication) deleteCertsv1alpha1(ctx context.Context, instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, certificateName string) {

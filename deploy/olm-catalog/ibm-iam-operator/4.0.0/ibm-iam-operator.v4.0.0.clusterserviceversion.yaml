@@ -208,7 +208,14 @@ metadata:
               },
               "public-auth-config": {
                 "configmap" : "platform-auth-idp"
-              }
+              },
+              "public-ibmcloud-config": {
+                "configmap" : "ibmcloud-cluster-info"
+              },
+              "public-ibmcloudca-secret": {
+                "secret" : "ibmcloud-cluster-ca-cert"
+              },
+
             }
           }
         }
@@ -454,7 +461,22 @@ spec:
           - get
           - update
           - delete
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - ingresses
+          verbs:
+          - get
+         - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          resourceNames:
+          - console-config
+          verbs:
+          - get
         serviceAccountName: ibm-iam-operator
+
       - rules:
         - apiGroups:
           - user.openshift.io

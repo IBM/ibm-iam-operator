@@ -18,7 +18,6 @@ package authentication
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
@@ -85,16 +84,16 @@ func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.A
 	reqLogger.Info("Creating or updating new secret", "Certificate.Namespace", instance.Namespace, "Secret.Name", "ibmcloud-cluster-ca-cert")
 	// create or update cluster-ca-secret
 	stop := WaitForTimeout(10 * time.Minute)
-	// get ca.crt from platform-auth-cert
-	secret, err := r.waitForSecret(instance, "platform-auth-cert", stop)
+	// get ca.crt from platform-auth-secret
+	secret, err := r.waitForSecret(instance, "platform-auth-secret", stop)
 	if err != nil {
-		reqLogger.Error(err, "Failed to get Secret platform-auth-cert")
+		reqLogger.Error(err, "Failed to get Secret platform-auth-secret")
 		return err
 	}
 
 	var caCert = secret.Data["ca.crt"]
 
-	// Create or update secret ibmcloud-cluster-ca-cert with ca.crt from platform-auth-cert
+	// Create or update secret ibmcloud-cluster-ca-cert with ca.crt from platform-auth-secret
 	if err := r.createClusterCACert(instance, r.scheme, ClusterSecretName, instance.Namespace, caCert); err != nil {
 		return fmt.Errorf("failure creating or updating ibmcloud-cluster-ca-cert secret: %v", err)
 	}
@@ -174,7 +173,8 @@ func (r *ReconcileAuthentication) createClusterCACert(i *operatorv1alpha1.Authen
 			return fmt.Errorf("failure creating secret for %q: %v", secretName, err)
 		}
 
-		reqLogger.Info("Trying to update secret: %s as it already existed.", secretName)
+		reqLogger.Info("Trying to update secret: as it already existed.", "Certificate.Namespace", i.Namespace, "Secret.Name", secretName)
+
 		// Update config
 		current := &core.Secret{}
 		err := r.client.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: i.Namespace}, current)
@@ -184,12 +184,10 @@ func (r *ReconcileAuthentication) createClusterCACert(i *operatorv1alpha1.Authen
 
 		// no data change, just return
 		if reflect.DeepEqual(clusterSecret.Data, current.Data) {
-			reqLogger.Info("No change found from the secret: %s, skip updating current secret.", secretName)
+			reqLogger.Info("No change found from the secret: skip updating current secret.", "Certificate.Namespace", i.Namespace, "Secret.Name", secretName)
 			return nil
 		}
-
-		json, _ := json.Marshal(clusterSecret)
-		reqLogger.Info("Found change from secret %s, trying to update it.", json)
+		reqLogger.Info("Found change from secret %s, trying to update it", "Certificate.Namespace", i.Namespace, "Secret.Name", secretName)
 		current.Data = clusterSecret.Data
 
 		// Apply the latest change to configmap
@@ -197,14 +195,15 @@ func (r *ReconcileAuthentication) createClusterCACert(i *operatorv1alpha1.Authen
 			return fmt.Errorf("failure updating secret: %v for %q: ", secretName, err)
 		}
 	}
-
-	reqLogger.Info("Successfully created or updated secret %q", secretName)
+	reqLogger.Info("Successfully created or updated secret", "Certificate.Namespace", i.Namespace, "Secret.Name", secretName)
 	return nil
 }
 
 func (r *ReconcileAuthentication) waitForSecret(instance *operatorv1alpha1.Authentication, name string, stopCh <-chan struct{}) (*core.Secret, error) {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	reqLogger.Info("Waiting for secret: %s ...", name)
+
+	reqLogger.Info("Waiting for secret", "Certificate.Namespace", instance.Namespace, "Secret.Name", name)
+
 	s := &core.Secret{}
 
 	err := wait.PollImmediateUntil(2*time.Second, func() (done bool, err error) {

@@ -35,8 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -79,24 +81,29 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	}
 
 	// Reconcile ibmcloud-cluster-info configmap if not created already
-	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: "ibmcloud-cluster-info", Namespace: instance.Namespace}, currentConfigMap)
-	if errGet != nil {
-		if errors.IsNotFound(errGet) {
-			reqLogger.Info("In Create of ibmcloud-cluster-info Configmap ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-			newConfigMap = r.ibmcloudClusterInfoConfigMap(instance, isOSEnv, domainName, r.scheme)
-			reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ibmcloud-cluster-info", Namespace: instance.Namespace}, currentConfigMap)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Info("Configmap is not found ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+			reqLogger.Info("Going to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+			newConfigMap = r.ibmcloudClusterInfoConfigMap(r.client, instance, isOSEnv, domainName, r.scheme)
 			err = r.client.Create(context.TODO(), newConfigMap)
 			if err != nil {
 				reqLogger.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
 				return err
+			} else {
+				reqLogger.Info("Successfully created ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
 			}
+			*requeueResult = true
 		}
+	} else {
+		reqLogger.Info("Configmap is already exist ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
 	}
 
 	// Public Cloud to be checked from ibmcloud-cluster-info
 	isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
 
-	//icpConsoleURL , icpProxyURL to be fetched from bmcloud-cluster-info
+	//icpConsoleURL , icpProxyURL to be fetched from ibmcloud-cluster-info
 	proxyConfigMapName := "ibmcloud-cluster-info"
 	proxyConfigMap := &corev1.ConfigMap{}
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: proxyConfigMapName, Namespace: instance.Namespace}, proxyConfigMap)
@@ -106,7 +113,8 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 			return err
 		}
 		reqLogger.Error(err, "Failed to get ConfigMap", proxyConfigMapName)
-		return err
+		*requeueResult = true
+		return nil
 	}
 	icpProxyURL, ok := proxyConfigMap.Data["proxy_address"]
 	if !ok {
@@ -505,7 +513,7 @@ func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, icpConsoleU
 	return newConfigMap
 
 }
-func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(instance *operatorv1alpha1.Authentication, isOSEnv bool, domainName string, scheme *runtime.Scheme) *corev1.ConfigMap {
+func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(client client.Client, instance *operatorv1alpha1.Authentication, isOSEnv bool, domainName string, scheme *runtime.Scheme) *corev1.ConfigMap {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
@@ -523,8 +531,10 @@ func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(instance *operato
 	}
 	// if the env identified as CNCF
 	if !isOSEnv {
+		reqLogger.Info("Env type is CNCF")
+
 		ClusterAddress := strings.Join([]string{"cp-console", domainName}, ".")
-		// to be checked
+		// to be checked for CNCF
 		ep := "https://icp-management-ingress" + "." + instance.Namespace + ".svc:443"
 
 		newConfigMap := &corev1.ConfigMap{
@@ -540,6 +550,8 @@ func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(instance *operato
 				RouteHTTPSPort: rhttpsPort,
 				ClusterName:    cname,
 				ProxyAddress:   ClusterAddress,
+				ProviderSVC:    "https://platform-identity-provider" + "." + instance.Namespace + ".svc:443",
+				IDMgmtSVC:      "https://platform-identity-management" + "." + instance.Namespace + ".svc:443",
 			},
 		}
 
@@ -553,19 +565,30 @@ func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(instance *operato
 
 	} else if isOSEnv { // if the env identified as OCP
 
+		reqLogger.Info("Env Type is OCP")
 		// get domain name from ingresses.config/cluster from openshift-ingress-operator ns
 		var DomainName string
 		var ProxyDomainName string
 		ingressConfigName := "cluster"
 		ingressConfig := &osconfigv1.Ingress{}
-		errGet := r.reader.Get(context.TODO(), types.NamespacedName{Name: ingressConfigName, Namespace: "openshift-ingress-operator"}, ingressConfig)
+		clusterClient, err := createOrGetClusterClient()
+
+		if err != nil {
+			reqLogger.Error(err, "Failure creating or getting cluster client")
+		}
+
+		reqLogger.Info("Going to READ openshift ingress cluster config")
+		errGet := clusterClient.Get(context.TODO(), types.NamespacedName{Name: ingressConfigName, Namespace: "openshift-authentication"}, ingressConfig)
 
 		if errGet == nil {
+			reqLogger.Info("Successfully READ openshift ingress cluster config")
 			appsDomain := ingressConfig.Spec.AppsDomain
 			if len(appsDomain) > 0 {
+				reqLogger.Info("appsDomain has been configured", "appsDomain.value", appsDomain)
+
 				if instance.Spec.Config.OnPremMultipleDeploy {
 					multipleInstanceRouteName := strings.Join([]string{"cp-console", instance.Namespace}, "-")
-					strings.Join([]string{multipleInstanceRouteName, appsDomain}, ".")
+					DomainName = strings.Join([]string{multipleInstanceRouteName, appsDomain}, ".")
 					multipleInstanceProxyRouteName := strings.Join([]string{"cp-proxy", instance.Namespace}, "-")
 					ProxyDomainName = strings.Join([]string{multipleInstanceProxyRouteName, appsDomain}, ".")
 				} else {
@@ -574,9 +597,10 @@ func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(instance *operato
 				}
 			} else {
 				ingressDomain := ingressConfig.Spec.Domain
+				reqLogger.Info("appsDomain is not configured , going to fetch default domain", "ingressDomain.value", ingressDomain)
 				if instance.Spec.Config.OnPremMultipleDeploy {
 					multipleInstanceRouteName := strings.Join([]string{"cp-console", instance.Namespace}, "-")
-					strings.Join([]string{multipleInstanceRouteName, ingressDomain}, ".")
+					DomainName = strings.Join([]string{multipleInstanceRouteName, ingressDomain}, ".")
 					multipleInstanceProxyRouteName := strings.Join([]string{"cp-proxy", instance.Namespace}, "-")
 					ProxyDomainName = strings.Join([]string{multipleInstanceProxyRouteName, ingressDomain}, ".")
 				} else {
@@ -586,14 +610,14 @@ func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(instance *operato
 			}
 		} else {
 			if !errors.IsNotFound(errGet) {
-				reqLogger.Error(errGet, "Failed to get openshift ingress cluster config")
+				reqLogger.Error(errGet, "Failed to READ openshift ingress cluster config")
 			}
 		}
 
 		// get clusterApiServer Details cm console-config from openshift-console ns
 		OSconsoleConfigMap := &corev1.ConfigMap{}
 
-		err := r.reader.Get(context.TODO(), types.NamespacedName{Name: "console-config", Namespace: "openshift-console"}, OSconsoleConfigMap)
+		err = clusterClient.Get(context.TODO(), types.NamespacedName{Name: "console-config", Namespace: "openshift-console"}, OSconsoleConfigMap)
 
 		if err != nil {
 			reqLogger.Error(err, "Failed to get console-config configmap from  openshift-console namespace")
@@ -623,10 +647,6 @@ func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(instance *operato
 
 		pos := strings.LastIndex(apiaddr, ":")
 
-		//ClusterAddress := strings.Join([]string{"cp-console", DomainName}, ".")
-		// to be checked
-		ep := "https://icp-management-ingress" + "." + instance.Namespace + ".svc:443"
-
 		newConfigMap := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "ibmcloud-cluster-info",
@@ -635,13 +655,15 @@ func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(instance *operato
 			},
 			Data: map[string]string{
 				ClusterAddr:          DomainName,
-				ClusterEP:            ep,
+				ClusterEP:            DomainName,
 				RouteHTTPPort:        rhttpPort,
 				RouteHTTPSPort:       rhttpsPort,
 				ClusterName:          cname,
 				ClusterAPIServerHost: apiaddr[0:pos],
 				ClusterAPIServerPort: apiaddr[pos+1:],
 				ProxyAddress:         ProxyDomainName,
+				ProviderSVC:          "https://platform-identity-provider" + "." + instance.Namespace + ".svc:443",
+				IDMgmtSVC:            "https://platform-identity-management" + "." + instance.Namespace + ".svc:443",
 			},
 		}
 
@@ -658,6 +680,35 @@ func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(instance *operato
 	reqLogger.Info("Failed to create ibmcloudClusterInfoConfigMap , can't determine the env type")
 	return nil
 
+}
+
+var (
+	clusterClient               client.Client
+	scheme                      = runtime.NewScheme()
+	ConfigMapSchemeGroupVersion = schema.GroupVersion{Group: "", Version: "v1"}
+	ConfigSchemeGroupVersion    = schema.GroupVersion{Group: "config.openshift.io", Version: "v1"}
+)
+
+func createOrGetClusterClient() (client.Client, error) {
+	// return if cluster client already exists
+	if clusterClient != nil {
+		return clusterClient, nil
+	}
+	// get a config to talk to the apiserver
+	cfg, err := config.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	scheme.AddKnownTypes(ConfigSchemeGroupVersion, &osconfigv1.Ingress{}, &osconfigv1.IngressList{})
+	scheme.AddKnownTypes(ConfigMapSchemeGroupVersion, &corev1.ConfigMap{}, &corev1.ConfigMapList{})
+
+	clusterClient, err = client.New(cfg, client.Options{Scheme: scheme})
+	if err != nil {
+		return nil, err
+	}
+
+	return clusterClient, nil
 }
 
 // Check if hosted on IBM Cloud

@@ -38,7 +38,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
 	// Check for the presence of dependencies
-	consoleConfigMapName := "management-ingress-info"
+	consoleConfigMapName := "ibmcloud-cluster-info"
 	consoleConfigMap := &corev1.ConfigMap{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: consoleConfigMapName, Namespace: instance.Namespace}, consoleConfigMap)
 	if err != nil {
@@ -50,7 +50,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 			return err
 		}
 	}
-	icpConsoleURL := consoleConfigMap.Data["MANAGEMENT_INGRESS_ROUTE_HOST"]
+	icpConsoleURL := consoleConfigMap.Data["cluster_address"]
 
 	// Check for the presence of dependencies, for SAAS
 	reqLogger.Info("Is SAAS enabled?", "Instance spec config value", instance.Spec.Config.IBMCloudSaas)
@@ -300,7 +300,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 						"productName":                        "IBM Cloud Platform Common Services",
 						"productID":                          "068a62892a1e4db39641342e592daa25",
 						"productMetric":                      "FREE",
-						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
+						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -431,7 +431,7 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 						"productName":                        "IBM Cloud Platform Common Services",
 						"productID":                          "068a62892a1e4db39641342e592daa25",
 						"productMetric":                      "FREE",
-						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
+						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -562,7 +562,7 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 						"productName":                        "IBM Cloud Platform Common Services",
 						"productID":                          "068a62892a1e4db39641342e592daa25",
 						"productMetric":                      "FREE",
-						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
+						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb",
 					},
 				},
 				Spec: corev1.PodSpec{

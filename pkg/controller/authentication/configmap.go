@@ -94,7 +94,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 			} else {
 				reqLogger.Info("Successfully created ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
 			}
-			*requeueResult = true
+			//*requeueResult = true
 		}
 	} else {
 		reqLogger.Info("Configmap is already exist ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
@@ -654,7 +654,7 @@ func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(client client.Cli
 				ClusterAPIServerHost: apiaddr[0:pos],
 				ClusterAPIServerPort: apiaddr[pos+1:],
 				ProxyAddress:         ProxyDomainName,
-				ProviderSVC:          "https://platform-identity-provider" + "." + instance.Namespace + ".svc:443",
+				ProviderSVC:          "https://platform-identity-provider" + "." + instance.Namespace + ".svc:4300",
 				IDMgmtSVC:            "https://platform-identity-management" + "." + instance.Namespace + ".svc:443",
 			},
 		}

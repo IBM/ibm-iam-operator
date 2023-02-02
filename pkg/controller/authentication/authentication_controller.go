@@ -25,7 +25,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	net "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -145,16 +144,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
-	// Watch for changes to secondary resource Ingress and requeue the owner Authentication
-	err = c.Watch(&source.Kind{Type: &net.Ingress{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &operatorv1alpha1.Authentication{},
-	})
-	if err != nil {
-		return err
-	}
-
-	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Deployment and requeue the owner Authentication
 	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
@@ -236,6 +225,13 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 		return reconcile.Result{}, err
 	}
 
+	//Check if this ConfigMap already exists and create it if it doesn't
+	currentConfigMap := &corev1.ConfigMap{}
+	err = r.handleConfigMap(instance, wlpClientID, wlpClientSecret, currentConfigMap, &requeueResult)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	// Check if this Service already exists and create it if it doesn't
 	currentService := &corev1.Service{}
 	err = r.handleService(instance, currentService, &requeueResult)
@@ -253,20 +249,6 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 	// Check if this Job already exists and create it if it doesn't
 	currentJob := &batchv1.Job{}
 	err = r.handleJob(instance, currentJob, &requeueResult)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-
-	//Check if this ConfigMap already exists and create it if it doesn't
-	currentConfigMap := &corev1.ConfigMap{}
-	err = r.handleConfigMap(instance, wlpClientID, wlpClientSecret, currentConfigMap, &requeueResult)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-
-	// Check if this Ingress already exists and create it if it doesn't
-	currentIngress := &net.Ingress{}
-	err = r.handleIngress(instance, currentIngress, &requeueResult)
 	if err != nil {
 		return reconcile.Result{}, err
 	}

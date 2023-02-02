@@ -342,7 +342,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/oidc/endpoint/OP/.well-known/openid-configuration",
 					Port: intstr.IntOrString{
@@ -357,7 +357,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			FailureThreshold:    6,
 		},
 		LivenessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/oidc/endpoint/OP/.well-known/openid-configuration",
 					Port: intstr.IntOrString{
@@ -690,7 +690,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/",
 					Port: intstr.IntOrString{
@@ -702,7 +702,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			TimeoutSeconds: 10,
 		},
 		LivenessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/",
 					Port: intstr.IntOrString{
@@ -1073,7 +1073,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/",
 					Port: intstr.IntOrString{
@@ -1085,7 +1085,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			TimeoutSeconds: 10,
 		},
 		LivenessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/",
 					Port: intstr.IntOrString{

@@ -35,7 +35,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/coreos/prometheus-operator v0.38.1-0.20200424145508-7e176fda06cc // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
+	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
@@ -45,7 +45,6 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.2.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/gnostic v0.6.9 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.3.0 // indirect
@@ -92,12 +91,14 @@ require (
 // Pinned to kubernetes-1.16.2
 replace (
 	github.com/dgrijalva/jwt-go => github.com/dgrijalva/jwt-go/v4 v4.0.0-preview1
+	github.com/golang/protobuf => github.com/golang/protobuf v1.5.2
 	//github.com/go-logr/logr => github.com/go-logr/logr v0.4.0 // indirect
 	//github.com/go-logr/zapr v0.4.0 => github.com/go-logr/zapr v0.4.0 // indirect
-	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.5.1
+	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.5.5
 	github.com/operator-framework/operator-sdk => github.com/operator-framework/operator-sdk v0.19.0
 	github.com/prometheus-operator/prometheus-operator => github.com/prometheus-operator/prometheus-operator v0.38.0 // indirect
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20201216223049-8b5274cf687f
+	//google.golang.org/protobuf => google.golang.org/protobuf v1.26.1-0.20210525005349-febffdd88e85
 	k8s.io/api => k8s.io/api v0.23.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.19.17-rc.0
 	k8s.io/apimachinery => k8s.io/apimachinery v0.22.0
@@ -114,6 +115,7 @@ replace (
 	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.19.10
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.19.10
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.19.10
+	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65
 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.19.10
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.19.10
 	k8s.io/kube-state-metrics => k8s.io/kube-state-metrics v1.7.2

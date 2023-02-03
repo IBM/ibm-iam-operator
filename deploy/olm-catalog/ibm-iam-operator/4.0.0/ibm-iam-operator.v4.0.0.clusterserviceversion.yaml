@@ -522,11 +522,11 @@ spec:
                 - name: OPERATOR_NAME
                   value: ibm-iam-operator
                 - name: ROUTE_HTTP_PORT
-                  value:
+                  value: ""
                 - name: ROUTE_HTTPS_PORT
-                  value:
+                  value: ""
                 - name: cluster_name
-                  value:
+                  value: ""
                 image: quay.io/opencloudio/ibm-iam-operator:latest
                 imagePullPolicy: Always
                 name: ibm-iam-operator

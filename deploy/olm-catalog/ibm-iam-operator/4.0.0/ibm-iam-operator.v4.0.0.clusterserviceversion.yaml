@@ -147,12 +147,6 @@ metadata:
                     "name": "ibm-mongodb-operator"
                   },
                   {
-                    "name": "ibm-management-ingress-operator"
-                  },
-                  {
-                    "name": "ibm-ingress-nginx-operator"
-                  },
-                  {
                     "name": "ibm-commonui-operator"
                   }
                 ],
@@ -195,6 +189,12 @@ metadata:
               },
               "public-auth-config": {
                 "configmap" : "platform-auth-idp"
+              },
+              "public-ibmcloud-config": {
+                "configmap" : "ibmcloud-cluster-info"
+              },
+              "public-ibmcloudca-secret": {
+                "secret" : "ibmcloud-cluster-ca-cert"
               }
             }
           }
@@ -434,6 +434,20 @@ spec:
           - get
           - update
           - delete
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - ingresses
+          verbs:
+          - get
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          resourceNames:
+          - console-config
+          verbs:
+          - get
         serviceAccountName: ibm-iam-operator
       - rules:
         - apiGroups:
@@ -507,6 +521,12 @@ spec:
                       fieldPath: metadata.name
                 - name: OPERATOR_NAME
                   value: ibm-iam-operator
+                - name: ROUTE_HTTP_PORT
+                  value: ""
+                - name: ROUTE_HTTPS_PORT
+                  value: ""
+                - name: cluster_name
+                  value: ""
                 image: quay.io/opencloudio/ibm-iam-operator:latest
                 imagePullPolicy: Always
                 name: ibm-iam-operator

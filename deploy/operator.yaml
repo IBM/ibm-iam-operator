@@ -69,6 +69,12 @@ spec:
                   fieldPath: metadata.name
             - name: OPERATOR_NAME
               value: "ibm-iam-operator"
+            - name: ROUTE_HTTP_PORT
+              value: ""
+            - name: ROUTE_HTTPS_PORT
+              value: ""
+            - name: cluster_name
+              value: ""
           resources:
             limits:
               cpu: 25m

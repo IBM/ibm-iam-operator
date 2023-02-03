@@ -75,9 +75,7 @@ func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.A
 		}
 
 	}
-
 	return nil
-
 }
 
 func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, certificateName string) *certmgr.Certificate {

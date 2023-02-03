@@ -92,7 +92,7 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 						"productName":                        "IBM Cloud Platform Common Services",
 						"productID":                          "068a62892a1e4db39641342e592daa25",
 						"productMetric":                      "FREE",
-						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
+						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -243,9 +243,9 @@ func buildContainer(jobName string, image string, resources *corev1.ResourceRequ
 					ValueFrom: &corev1.EnvVarSource{
 						ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "management-ingress-info",
+								Name: "ibmcloud-cluster-info",
 							},
-							Key: "MANAGEMENT_INGRESS_ROUTE_HOST",
+							Key: "cluster_address",
 						},
 					},
 				},

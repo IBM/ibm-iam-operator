@@ -196,11 +196,11 @@ func (r *ReconcileAuthentication) createClusterCACert(i *operatorv1alpha1.Authen
 
 	// create ibmcloud-cluster-ca-cert
 	labels := map[string]string{
-		"app":                          "auth-idp",
-		"component":                    "auth-idp",
-		"app.kubernetes.io/component":  "auth-idp",
-		"app.kubernetes.io/name":       "auth-idp",
-		"app.kubernetes.io/instance":   "auth-idp",
+		"app":                          "platform-auth-service",
+		"component":                    "platform-auth-service",
+		"app.kubernetes.io/component":  "platform-auth-service",
+		"app.kubernetes.io/name":       "platform-auth-service",
+		"app.kubernetes.io/instance":   "platform-auth-service",
 		"app.kubernetes.io/managed-by": "",
 	}
 	clusterSecret := &corev1.Secret{

@@ -181,9 +181,6 @@ metadata:
               "public-cam-secret": {
                 "secret" : "oauth-client-secret"
               },
-              "protected-zen-serviceid": {
-                "secret" : "zen-serviceid-apikey-secret"
-              },
               "public-cam-map": {
                 "configmap" : "oauth-client-map"
               },

@@ -84,7 +84,7 @@ func generateSecretData(instance *operatorv1alpha1.Authentication, wlpClientID s
 	return secretData
 }
 
-func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentSecret *corev1.Secret, requeueResult *bool) error {
+func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentSecret *corev1.Secret) error {
 
 	secretData := generateSecretData(instance, wlpClientID, wlpClientSecret)
 
@@ -104,7 +104,7 @@ func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authen
 					return err
 				}
 				// Secret created successfully - return and requeue
-				*requeueResult = true
+				r.needToRequeue = true
 			} else {
 				reqLogger.Error(err, "Failed to get Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
 				return err

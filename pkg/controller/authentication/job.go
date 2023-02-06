@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentication, currentJob *batchv1.Job, requeueResult *bool) error {
+func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentication, currentJob *batchv1.Job) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
@@ -48,7 +48,7 @@ func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentic
 			return err
 		}
 		// Job created successfully - return and requeue
-		*requeueResult = true
+		r.needToRequeue = true
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Job")
 		return err

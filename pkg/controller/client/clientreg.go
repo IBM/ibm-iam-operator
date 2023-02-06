@@ -134,7 +134,6 @@ func (r *ReconcileClient) DeleteClientRegistration(ctx context.Context, client *
 func (r *ReconcileClient) invokeClientRegistrationAPI(ctx context.Context, client *oidcv1.Client, requestType string, requestURL string, payload string) (response *http.Response, err error) {
   reqLogger := logf.FromContext(ctx).WithName("invokeClientRegistrationAPI")
   reqLogger.Info("params", "requestType", requestType, "requestURL", requestURL)
-  r.GetOAuthAdminPassword()
   oauthAdmin := "oauthadmin"
   var clientRegistrationSecret string
   clientRegistrationSecret, err = r.GetOAuthAdminPassword()

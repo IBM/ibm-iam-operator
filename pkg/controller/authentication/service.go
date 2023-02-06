@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authentication, currentService *corev1.Service, requeueResult *bool) error {
+func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authentication, currentService *corev1.Service) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "platform-auth-service", Namespace: instance.Namespace}, currentService)
@@ -42,7 +42,7 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 			return err
 		}
 		// Service created successfully - return and requeue
-		*requeueResult = true
+		r.needToRequeue = true
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Service")
 		return err
@@ -59,7 +59,7 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 			return err
 		}
 		// Service created successfully - return and requeue
-		*requeueResult = true
+		r.needToRequeue = true
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Service")
 		return err
@@ -76,7 +76,7 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 			return err
 		}
 		// Service created successfully - return and requeue
-		*requeueResult = true
+		r.needToRequeue = true
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Service")
 		return err
@@ -93,7 +93,7 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 			return err
 		}
 		// Service created successfully - return and requeue
-		*requeueResult = true
+		r.needToRequeue = true
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Service")
 		return err

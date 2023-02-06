@@ -423,7 +423,7 @@ spec:
       clusterPermissions:
       - rules:
         - apiGroups:
-          - oauth.openshift.io 
+          - oauth.openshift.io
           resources:
           - oauthclients
           verbs:
@@ -558,32 +558,6 @@ spec:
       permissions:
       - rules:
         - apiGroups:
-          - route.openshift.io
-          resources:
-          - routes
-          verbs:
-          - get
-          - list
-          - watch
-          - create
-          - delete
-          - update
-          - patch
-        - apiGroups:
-          - route.openshift.io
-          resources:
-          - routes/custom-host
-          verbs:
-          - create
-        - apiGroups:
-          - route.openshift.io
-          resources:
-          - routes/status
-          verbs:
-          - get
-          - list
-          - watch
-        - apiGroups:
           - ""
           resources:
           - pods
@@ -658,6 +632,32 @@ spec:
           - watch
         serviceAccountName: ibm-iam-operand-restricted
       - rules:
+        - apiGroups:
+          - route.openshift.io
+          resources:
+          - routes
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - delete
+          - update
+          - patch
+        - apiGroups:
+          - route.openshift.io
+          resources:
+          - routes/custom-host
+          verbs:
+          - create
+        - apiGroups:
+          - route.openshift.io
+          resources:
+          - routes/status
+          verbs:
+          - get
+          - list
+          - watch
         - apiGroups:
           - ""
           resources:

@@ -42,7 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentConfigMap *corev1.ConfigMap, requeueResult *bool) error {
+func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentConfigMap *corev1.ConfigMap) error {
 
 	var err error
 	var isOSEnv bool
@@ -54,7 +54,25 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
-	// Check cluster type if CNCF or OCP
+	proxyConfigMapName := "ibmcloud-cluster-info"
+	proxyConfigMap := &corev1.ConfigMap{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: proxyConfigMapName, Namespace: instance.Namespace}, proxyConfigMap)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Error(err, "The configmap ", proxyConfigMapName, " is not created yet")
+			return err
+		}
+		reqLogger.Error(err, "Failed to get ConfigMap", proxyConfigMapName)
+		return err
+	}
+	icpProxyURL, ok := proxyConfigMap.Data["proxy_address"]
+	if !ok {
+		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain proxy address")
+		r.needToRequeue = true
+		return nil
+	}
+
+	//Check cluster type
 	globalConfigMapName := "ibm-cpp-config"
 	globalConfigMap := &corev1.ConfigMap{}
 	reqLogger.Info("Query global cm", "Configmap.Namespace", instance.Namespace, "Global Configmap", globalConfigMapName)
@@ -103,30 +121,11 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	// Public Cloud to be checked from ibmcloud-cluster-info
 	isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
 
-	//icpConsoleURL , icpProxyURL to be fetched from ibmcloud-cluster-info
-	proxyConfigMapName := "ibmcloud-cluster-info"
-	proxyConfigMap := &corev1.ConfigMap{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: proxyConfigMapName, Namespace: instance.Namespace}, proxyConfigMap)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			reqLogger.Error(err, "The configmap ", proxyConfigMapName, " is not created yet")
-			return err
-		}
-		reqLogger.Error(err, "Failed to get ConfigMap", proxyConfigMapName)
-		*requeueResult = true
-		return nil
-	}
-	icpProxyURL, ok := proxyConfigMap.Data["proxy_address"]
-	if !ok {
-		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain proxy address")
-		*requeueResult = true
-		return nil
-	}
 	icpConsoleURL, ok := proxyConfigMap.Data["cluster_address"]
 
 	if !ok {
 		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain cluster_address address")
-		*requeueResult = true
+		r.needToRequeue = true
 		return nil
 	}
 
@@ -188,7 +187,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					return err
 				}
 				// ConfigMap created successfully - return and requeue
-				*requeueResult = true
+				r.needToRequeue = true
 			} else {
 				reqLogger.Error(err, "Failed to get ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
 				return err

@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Authentication, currentDeployment *appsv1.Deployment, currentProviderDeployment *appsv1.Deployment, currentManagerDeployment *appsv1.Deployment, requeueResult *bool) error {
+func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Authentication, currentDeployment *appsv1.Deployment, currentProviderDeployment *appsv1.Deployment, currentManagerDeployment *appsv1.Deployment) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
@@ -89,7 +89,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 				return err
 			}
 			// Deployment created successfully - return and requeue
-			*requeueResult = true
+			r.needToRequeue = true
 		} else {
 			return err
 		}
@@ -141,7 +141,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 				return err
 			}
 			// Deployment created successfully - return and requeue
-			*requeueResult = true
+			r.needToRequeue = true
 		} else {
 			return err
 		}
@@ -196,7 +196,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 				return err
 			}
 			// Deployment created successfully - return and requeue
-			*requeueResult = true
+			r.needToRequeue = true
 		} else {
 			return err
 		}

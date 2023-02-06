@@ -9,6 +9,31 @@ metadata:
     app.kubernetes.io/name: ibm-iam-operator
 rules:
 - apiGroups:
+  - route.openshift.io
+  resources:
+  - routes/custom-host
+  verbs:
+  - create
+- apiGroups:
+  - route.openshift.io
+  resources:
+  - routes/status
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - route.openshift.io
+  resources:
+  - routes
+  verbs:
+  - get
+  - update
+  - create
+  - delete
+  - watch
+  - patch
+- apiGroups:
   - ""
   resources:
   - pods

@@ -162,7 +162,7 @@ metadata:
             "name": "ibm-iam-bindinfo"
           },
           "spec": {
-            "operand": "ibm-iam-operator",
+            "operand": "ibm-im-operator",
             "registry": "common-service",
             "description": "Binding information that should be accessible to iam adopters",
             "bindings": {
@@ -557,6 +557,32 @@ spec:
                   secretName: cs-ca-certificate-secret
       permissions:
       - rules:
+        - apiGroups:
+          - route.openshift.io
+          resources:
+          - routes
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - delete
+          - update
+          - patch
+        - apiGroups:
+          - route.openshift.io
+          resources:
+          - routes/custom-host
+          verbs:
+          - create
+        - apiGroups:
+          - route.openshift.io
+          resources:
+          - routes/status
+          verbs:
+          - get
+          - list
+          - watch
         - apiGroups:
           - ""
           resources:

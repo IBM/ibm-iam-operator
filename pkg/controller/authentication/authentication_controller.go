@@ -18,6 +18,7 @@ package authentication
 
 import (
 	"context"
+  "fmt"
 
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
@@ -25,6 +26,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	net "k8s.io/api/networking/v1"
+	routev1 "github.com/openshift/api/route/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -143,7 +146,23 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create that are owned by the primary resource
+	// Watch for changes to secondary resource Ingress and requeue the owner Authentication
+	err = c.Watch(&source.Kind{Type: &net.Ingress{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &operatorv1alpha1.Authentication{},
+	})
+	if err != nil {
+		return err
+	}
+
+	err = c.Watch(&source.Kind{Type: &routev1.Route{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &operatorv1alpha1.Authentication{},
+	})
+	if err != nil {
+		return err
+	}
+
 	// Watch for changes to secondary resource Deployment and requeue the owner Authentication
 	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
@@ -165,6 +184,27 @@ type ReconcileAuthentication struct {
 	// that reads objects from the cache and writes to the apiserver
 	client client.Client
 	scheme *runtime.Scheme
+  needToRequeue bool
+}
+
+func (r *ReconcileAuthentication) addFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
+  if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
+    instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
+    err = r.client.Update(ctx, instance)
+  }
+  return
+}
+
+// removeFinalizer removes the provided finalizer from the Authentication instance.
+func (r *ReconcileAuthentication) removeFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
+		if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
+			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
+      err = r.client.Update(ctx, instance)
+			if err != nil {
+        return fmt.Errorf("error updating the CR to remove the finalizer: %w", err)
+			}
+		}
+    return
 }
 
 // Reconcile reads that state of the cluster for a Authentication object and makes changes based on the state read
@@ -174,23 +214,25 @@ type ReconcileAuthentication struct {
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-func (r *ReconcileAuthentication) Reconcile(contect context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, err error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-	reqLogger.Info("Reconciling Authentication")
-	var requeueResult bool = false
+  reconcileCtx := logf.IntoContext(ctx, reqLogger)
+  // Set default result
+  result = reconcile.Result{}
+  reqLogger.Info("Reconciling Authentication")
 
 	// Fetch the Authentication instance
 	instance := &operatorv1alpha1.Authentication{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	err = r.client.Get(reconcileCtx, request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-			// Return and don't requeue
-			return reconcile.Result{}, nil
+			// Set err to nil to signal the error has been handled
+      err = nil
 		}
-		// Error reading the object - requeue the request.
-		return reconcile.Result{}, err
+    // Return without requeueing 
+		return 
 	}
 
 	// Credit: kubebuilder book
@@ -198,78 +240,75 @@ func (r *ReconcileAuthentication) Reconcile(contect context.Context, request rec
 	// Determine if the Authentication CR  is going to be deleted
 	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Object not being deleted, but add our finalizer so we know to remove this object later when it is going to be deleted
-		if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
-			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
-			if err := r.client.Update(context.Background(), instance); err != nil {
-				log.Error(err, "Error adding the finalizer to the CR")
-				return reconcile.Result{}, err
-			}
-		}
+    err = r.addFinalizer(reconcileCtx, finalizerName, instance)
+    if err != nil {
+      return
+    }
 	} else {
 		// Object scheduled to be deleted
-		if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
-			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
-			if err := r.client.Update(context.Background(), instance); err != nil {
-				log.Error(err, "Error updating the CR to remove the finalizer")
-				return reconcile.Result{}, err
-			}
-
-		}
-		return reconcile.Result{}, nil
+    err = r.removeFinalizer(reconcileCtx, finalizerName, instance)
+		return
 	}
 
 	// Check if this Certificate already exists and create it if it doesn't
 	currentCertificate := &certmgr.Certificate{}
-	err = r.handleCertificate(instance, currentCertificate, &requeueResult)
+	err = r.handleCertificate(instance, currentCertificate)
 	if err != nil {
-		return reconcile.Result{}, err
+		return
 	}
 
 	//Check if this ConfigMap already exists and create it if it doesn't
 	currentConfigMap := &corev1.ConfigMap{}
-	err = r.handleConfigMap(instance, wlpClientID, wlpClientSecret, currentConfigMap, &requeueResult)
+	err = r.handleConfigMap(instance, wlpClientID, wlpClientSecret, currentConfigMap)
 	if err != nil {
-		return reconcile.Result{}, err
+		return
 	}
 
 	// Check if this Service already exists and create it if it doesn't
 	currentService := &corev1.Service{}
-	err = r.handleService(instance, currentService, &requeueResult)
+	err = r.handleService(instance, currentService)
 	if err != nil {
-		return reconcile.Result{}, err
+		return
 	}
 
 	// Check if this Secret already exists and create it if it doesn't
 	currentSecret := &corev1.Secret{}
-	err = r.handleSecret(instance, wlpClientID, wlpClientSecret, currentSecret, &requeueResult)
+	err = r.handleSecret(instance, wlpClientID, wlpClientSecret, currentSecret)
 	if err != nil {
-		return reconcile.Result{}, err
+		return
 	}
 
 	// Check if this Job already exists and create it if it doesn't
 	currentJob := &batchv1.Job{}
-	err = r.handleJob(instance, currentJob, &requeueResult)
+	err = r.handleJob(instance, currentJob)
 	if err != nil {
-		return reconcile.Result{}, err
+		return
 	}
+
+  r.ReconcileRemoveIngresses(ctx, instance)
 
 	// update serviceaccount with annotation if Openshift authentication is enabled
 	r.handleServiceAccount(instance)
+
+  err = r.reconcileRoutes(ctx, instance)
+  if err != nil {
+    return
+  }
 
 	// Check if this Deployment already exists and create it if it doesn't
 	currentDeployment := &appsv1.Deployment{}
 	currentProviderDeployment := &appsv1.Deployment{}
 	currentManagerDeployment := &appsv1.Deployment{}
-	err = r.handleDeployment(instance, currentDeployment, currentProviderDeployment, currentManagerDeployment, &requeueResult)
+	err = r.handleDeployment(instance, currentDeployment, currentProviderDeployment, currentManagerDeployment)
 	if err != nil {
-		return reconcile.Result{}, err
+		return
 	}
 
-	if requeueResult {
+	if r.needToRequeue {
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	return reconcile.Result{}, nil
+	return
 }
 
 // Helper functions to check and remove string from a slice of strings.

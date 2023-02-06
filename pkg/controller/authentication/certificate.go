@@ -52,7 +52,7 @@ func generateCertificateData(instance *operatorv1alpha1.Authentication) {
 	}
 }
 
-func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.Authentication, currentCertificate *certmgr.Certificate, requeueResult *bool) error {
+func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.Authentication, currentCertificate *certmgr.Certificate) error {
 
 	generateCertificateData(instance)
 
@@ -73,7 +73,7 @@ func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.A
 				return err
 			}
 			// Certificate created successfully - return and requeue
-			*requeueResult = true
+			r.needToRequeue = true
 		} else if err != nil {
 			reqLogger.Error(err, "Failed to get Certificate")
 			return err

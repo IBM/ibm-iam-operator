@@ -18,11 +18,14 @@ package apis
 
 import (
 	"github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	certmgrv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 )
 
 func init() {
 	// Register the types with the Scheme so the components can map objects to GroupVersionKinds and back
 	AddToSchemes = append(AddToSchemes, v1alpha1.SchemeBuilder.AddToScheme)
-	AddToSchemes = append(AddToSchemes, v1alpha1.CertificateSchemeBuilder.AddToScheme)
-	AddToSchemes = append(AddToSchemes, v1alpha1.UserBuilder.AddToScheme)
+	AddToSchemes = append(AddToSchemes, certmgr.SchemeBuilder.AddToScheme)
+	AddToSchemes = append(AddToSchemes, certmgrv1.SchemeBuilder.AddToScheme)
+
 }

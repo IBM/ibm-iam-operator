@@ -59,8 +59,6 @@ spec:
               value: icr.io/cpopen/cpfs/iam-policy-controller:3.7.12
             - name: ICP_IAM_ONBOARDING_IMAGE
               value: icr.io/cpopen/cpfs/icp-iam-onboarding:3.10.0
-            - name: AUDIT_SYSLOG_SERVICE_IMAGE
-              value: icr.io/cpopen/cpfs/audit-syslog-service:1.10.0
             - name: WATCH_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -71,6 +69,12 @@ spec:
                   fieldPath: metadata.name
             - name: OPERATOR_NAME
               value: "ibm-iam-operator"
+            - name: ROUTE_HTTP_PORT
+              value: ""
+            - name: ROUTE_HTTPS_PORT
+              value: ""
+            - name: cluster_name
+              value: ""
           resources:
             limits:
               cpu: 25m

@@ -57,72 +57,6 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 	}
 }
 
-func buildAuditContainer(auditImage string, syslogTlsPath string, resources *corev1.ResourceRequirements) corev1.Container {
-
-	if resources == nil {
-
-		resources = &corev1.ResourceRequirements{
-			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu100,
-				corev1.ResourceMemory: *memory128},
-			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu10,
-				corev1.ResourceMemory: *memory32},
-		}
-	}
-
-	if len(syslogTlsPath) == 0 {
-		syslogTlsPath = "/etc/audit-tls"
-	}
-
-	return corev1.Container{
-		Name:            "icp-audit-service",
-		Image:           auditImage,
-		ImagePullPolicy: corev1.PullAlways,
-		Env: []corev1.EnvVar{
-			{
-				Name:  "AUDIT_DIR",
-				Value: "/var/log/audit",
-			},
-		},
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      "shared",
-				MountPath: "/var/log/audit",
-			},
-			{
-				Name:      "audit-server-certs",
-				MountPath: syslogTlsPath,
-			},
-			{
-				Name:      "audit-ingest",
-				MountPath: "/etc/audit-ingest/",
-			},
-			{
-				Name:      "logrotate",
-				MountPath: "/etc/logrotate.d/audit",
-				SubPath:   "audit",
-			},
-			{
-				Name:      "logrotate-conf",
-				MountPath: "/etc/logrotate.conf",
-				SubPath:   "logrotate.conf",
-			},
-		},
-		SecurityContext: &corev1.SecurityContext{
-			Privileged:               &falseVar,
-			RunAsNonRoot:             &trueVar,
-			ReadOnlyRootFilesystem:   &trueVar,
-			AllowPrivilegeEscalation: &falseVar,
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL"},
-			},
-		},
-		Resources: *resources,
-	}
-
-}
-
 // This function divides the memory request of auth-service container in MB by 2
 // and returns it to liberty in the format that it accepts
 func convertToLibertyFormat(memory string) string {
@@ -408,7 +342,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/oidc/endpoint/OP/.well-known/openid-configuration",
 					Port: intstr.IntOrString{
@@ -423,7 +357,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			FailureThreshold:    6,
 		},
 		LivenessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/oidc/endpoint/OP/.well-known/openid-configuration",
 					Port: intstr.IntOrString{
@@ -743,10 +677,6 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 				MountPath: "/opt/ibm/identity-provider/server/boot/auth-key",
 			},
 			{
-				Name:      "shared",
-				MountPath: "/var/log/audit",
-			},
-			{
 				Name:      "identity-provider-cert",
 				MountPath: "/opt/ibm/identity-provider/certs",
 			},
@@ -760,7 +690,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/",
 					Port: intstr.IntOrString{
@@ -772,7 +702,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			TimeoutSeconds: 10,
 		},
 		LivenessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/",
 					Port: intstr.IntOrString{
@@ -888,7 +818,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			},
 		},
 		{
-			Name: "AUTHZ_DISABLED",
+			Name:  "AUTHZ_DISABLED",
 			Value: "true",
 		},
 		{
@@ -1130,10 +1060,6 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 				MountPath: "/opt/ibm/identity-mgmt/server/certs",
 			},
 			{
-				Name:      "shared",
-				MountPath: "/var/log/audit",
-			},
-			{
 				Name:      "mongodb-ca-cert",
 				MountPath: "/certs/mongodb-ca",
 			},
@@ -1147,7 +1073,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/",
 					Port: intstr.IntOrString{
@@ -1159,7 +1085,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			TimeoutSeconds: 10,
 		},
 		LivenessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/",
 					Port: intstr.IntOrString{
@@ -1175,35 +1101,27 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 
 }
 
-func buildContainers(instance *operatorv1alpha1.Authentication, auditImage string, authServiceImage string, identityProviderImage string, identityManagerImage string, syslogTlsPath string, icpConsoleURL string, saasCrnId string) []corev1.Container {
+func buildContainers(instance *operatorv1alpha1.Authentication, authServiceImage string) []corev1.Container {
 
-	auditResources := instance.Spec.AuditService.Resources
-	auditContainer := buildAuditContainer(auditImage, syslogTlsPath, auditResources)
 	authServiceContainer := buildAuthServiceContainer(instance, authServiceImage)
 	//identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId)
 	//identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL)
 
-	return []corev1.Container{auditContainer, authServiceContainer}
+	return []corev1.Container{authServiceContainer}
 }
 
-func buildManagerContainers(instance *operatorv1alpha1.Authentication, auditImage string, identityManagerImage string, syslogTlsPath string, icpConsoleURL string, saasCrnId string) []corev1.Container {
-
-	auditResources := instance.Spec.AuditService.Resources
-	auditContainer := buildAuditContainer(auditImage, syslogTlsPath, auditResources)
+func buildManagerContainers(instance *operatorv1alpha1.Authentication, identityManagerImage string, icpConsoleURL string) []corev1.Container {
 
 	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL)
 
-	return []corev1.Container{auditContainer, identityManagerContainer}
+	return []corev1.Container{identityManagerContainer}
 }
 
-func buildProviderContainers(instance *operatorv1alpha1.Authentication, auditImage string, identityProviderImage string, syslogTlsPath string, icpConsoleURL string, saasCrnId string) []corev1.Container {
-
-	auditResources := instance.Spec.AuditService.Resources
-	auditContainer := buildAuditContainer(auditImage, syslogTlsPath, auditResources)
+func buildProviderContainers(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string, saasCrnId string) []corev1.Container {
 
 	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId)
 
-	return []corev1.Container{auditContainer, identityProviderContainer}
+	return []corev1.Container{identityProviderContainer}
 }
 
 func buildIdpEnvVars(envVarList []string) []corev1.EnvVar {

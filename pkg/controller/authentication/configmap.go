@@ -113,13 +113,13 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 			return err
 		}
 		reqLogger.Error(err, "Failed to get ConfigMap", proxyConfigMapName)
-		*requeueResult = true
+		r.needToRequeue = true
 		return nil
 	}
 	icpProxyURL, ok := proxyConfigMap.Data["proxy_address"]
 	if !ok {
 		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain proxy address")
-		*requeueResult = true
+		r.needToRequeue = true
 		return nil
 	}
 	icpConsoleURL, ok := proxyConfigMap.Data["cluster_address"]

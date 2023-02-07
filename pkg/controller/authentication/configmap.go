@@ -54,25 +54,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
-	proxyConfigMapName := "ibmcloud-cluster-info"
-	proxyConfigMap := &corev1.ConfigMap{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: proxyConfigMapName, Namespace: instance.Namespace}, proxyConfigMap)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			reqLogger.Error(err, "The configmap ", proxyConfigMapName, " is not created yet")
-			return err
-		}
-		reqLogger.Error(err, "Failed to get ConfigMap", proxyConfigMapName)
-		return err
-	}
-	icpProxyURL, ok := proxyConfigMap.Data["proxy_address"]
-	if !ok {
-		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain proxy address")
-		r.needToRequeue = true
-		return nil
-	}
-
-	//Check cluster type
+	// Check cluster type if CNCF or OCP
 	globalConfigMapName := "ibm-cpp-config"
 	globalConfigMap := &corev1.ConfigMap{}
 	reqLogger.Info("Query global cm", "Configmap.Namespace", instance.Namespace, "Global Configmap", globalConfigMapName)
@@ -120,8 +102,28 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 
 	// Public Cloud to be checked from ibmcloud-cluster-info
 	isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
-
+	
+	//icpConsoleURL , icpProxyURL to be fetched from ibmcloud-cluster-info
+	proxyConfigMapName := "ibmcloud-cluster-info"
+	proxyConfigMap := &corev1.ConfigMap{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: proxyConfigMapName, Namespace: instance.Namespace}, proxyConfigMap)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Error(err, "The configmap ", proxyConfigMapName, " is not created yet")
+			return err
+		}
+		reqLogger.Error(err, "Failed to get ConfigMap", proxyConfigMapName)
+		r.needToRequeue = true
+		return nil
+	}
+	icpProxyURL, ok := proxyConfigMap.Data["proxy_address"]
+	if !ok {
+		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain proxy address")
+		r.needToRequeue = true
+		return nil
+	}
 	icpConsoleURL, ok := proxyConfigMap.Data["cluster_address"]
+	
 
 	if !ok {
 		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain cluster_address address")

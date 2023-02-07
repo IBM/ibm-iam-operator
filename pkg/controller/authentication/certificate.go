@@ -18,10 +18,11 @@ package authentication
 
 import (
 	"context"
-	certmgrv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
-	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
+
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	certmgrv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,6 +31,7 @@ import (
 )
 
 var certificateData map[string]map[string]string
+
 const DefaultClusterIssuer = "cs-ca-issuer"
 const Certv1alpha1APIVersion = "certmanager.k8s.io/v1alpha1"
 
@@ -52,7 +54,7 @@ func generateCertificateData(instance *operatorv1alpha1.Authentication) {
 	}
 }
 
-func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.Authentication, currentCertificate *certmgr.Certificate) error {
+func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.Authentication, currentCertificate *certmgrv1.Certificate) error {
 
 	generateCertificateData(instance)
 
@@ -61,7 +63,7 @@ func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.A
 
 	for certificate := range certificateData {
 		// Delete v1alpha1 Certificate
-		r.deleteCertsv1alpha1(context.TODO(),instance, r.scheme, certificate)
+		r.deleteCertsv1alpha1(context.TODO(), instance, r.scheme, certificate)
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: certificate, Namespace: instance.Namespace}, currentCertificate)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new Certificate
@@ -102,7 +104,7 @@ func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme
 			CommonName: certificateData[certificateName]["cn"],
 			SecretName: certificateData[certificateName]["secretName"],
 			IsCA:       false,
-			DNSNames: []string{certificateData[certificateName]["cn"]},
+			DNSNames:   []string{certificateData[certificateName]["cn"]},
 			IssuerRef: cmmeta.ObjectReference{
 				Name: DefaultClusterIssuer,
 				Kind: certmgrv1.IssuerKind,
@@ -143,7 +145,7 @@ func (r *ReconcileAuthentication) deleteCertsv1alpha1(ctx context.Context, insta
 		return
 	}
 	reqLogger.Info("Checking for existing certificate", "Certificate.Namespace", instance.Namespace, "Certificate found, checking api version", certificateName)
-	reqLogger.Info("Checking for existing certificate", "Certificate.Namespace", instance.Namespace, "API version is: " + certificate.APIVersion)
+	reqLogger.Info("Checking for existing certificate", "Certificate.Namespace", instance.Namespace, "API version is: "+certificate.APIVersion)
 	if certificate.APIVersion == Certv1alpha1APIVersion {
 		reqLogger.Info("deleting cert: " + certificateName)
 		err = r.client.Delete(ctx, certificate)

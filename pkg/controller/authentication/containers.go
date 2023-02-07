@@ -336,10 +336,6 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 				Name:      "mongodb-client-cert",
 				MountPath: "/certs/mongodb-client",
 			},
-			{
-				Name:      "router-certs",
-				MountPath: "/certs/router-certs",
-			},
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{

@@ -52,7 +52,7 @@ func generateCertificateData(instance *operatorv1alpha1.Authentication) {
 	}
 }
 
-func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.Authentication, currentCertificate *certmgr.Certificate) error {
+func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.Authentication, currentCertificate *certmgrv1.Certificate) error {
 
 	generateCertificateData(instance)
 

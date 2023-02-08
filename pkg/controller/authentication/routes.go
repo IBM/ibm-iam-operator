@@ -182,18 +182,6 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
       ServiceName: PlatformIdentityManagementServiceName,
       DestinationCAcert: platformIdentityManagementCert,
     },
-    "idmgmt-v2-api": {
-      Annotations: map[string]string{
-        "haproxy.router.openshift.io/hsts_header": "max-age=31536000;includeSubDomains",
-        "haproxy.router.openshift.io/rewrite-target": "/identity/api/v1/teams/resources",
-      },
-      Name: "idmgmt-v2-api",
-      RouteHost: routeHost,
-      RoutePath: "/idmgmt/identity/api/v2/teams/resources",
-      RoutePort: 4500,
-      ServiceName: PlatformIdentityManagementServiceName,
-      DestinationCAcert: platformIdentityManagementCert,
-    },
     "platform-auth": {
       Annotations: map[string]string{
         "haproxy.router.openshift.io/hsts_header": "max-age=31536000;includeSubDomains",

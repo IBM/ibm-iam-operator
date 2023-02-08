@@ -159,17 +159,6 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
   //  "haproxy.router.openshift.io/timeout": "300s",
   //}
   allRoutesFields := map[string]*reconcileRouteFields{
-    "ibmid-ui-callback": {
-      Annotations: map[string]string{
-        "haproxy.router.openshift.io/rewrite-target": "/oidcclient/redirect/ICP_IBMID",
-      },
-      Name: "ibmid-ui-callback",
-      RouteHost: routeHost,
-      RoutePath: "/oidcclient/redirect/ICP_IBMID",
-      RoutePort: 9443,
-      ServiceName: PlatformAuthServiceName,
-      DestinationCAcert: platformAuthCert,
-    },
     "id-mgmt": {
       Annotations: map[string]string{
         "haproxy.router.openshift.io/rewrite-target": "/idmgmt/",

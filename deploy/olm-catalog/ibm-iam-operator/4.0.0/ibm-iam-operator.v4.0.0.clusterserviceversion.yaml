@@ -499,14 +499,6 @@ spec:
                   value: quay.io/opencloudio/icp-identity-provider:4.0.0
                 - name: ICP_IDENTITY_MANAGER_IMAGE
                   value: quay.io/opencloudio/icp-identity-manager:4.0.0
-                - name: IAM_POLICY_ADMINISTRATION_IMAGE
-                  value: quay.io/opencloudio/iam-policy-administration:3.10.0
-                - name: IAM_POLICY_DECISION_IMAGE
-                  value: quay.io/opencloudio/iam-policy-decision:3.10.0
-                - name: ICP_SECRET_WATCHER_IMAGE
-                  value: quay.io/opencloudio/icp-secret-watcher:3.7.12
-                - name: ICP_IAM_ONBOARDING_IMAGE
-                  value: quay.io/opencloudio/icp-iam-onboarding:3.10.0
                 - name: WATCH_NAMESPACE
                   valueFrom:
                     configMapKeyRef:

@@ -218,18 +218,6 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
       DestinationCAcert: platformAuthCert,
       ServiceName: PlatformAuthServiceName,
     },
-    "platform-id-auth-block": {
-      Annotations: map[string]string{
-        "haproxy.router.openshift.io/hsts_header": "max-age=31536000;includeSubDomains",
-        "haproxy.router.openshift.io/rewrite-target": "/",
-      },
-      Name: "platform-id-auth-block",
-      RouteHost: routeHost,
-      RoutePath: "/idauth/oidc/endpoint",
-      RoutePort: 80,
-      DestinationCAcert: nil,
-      ServiceName: DefaultHTTPBackendServiceName,
-    },
     "platform-id-provider": {
       Annotations: map[string]string{
         "haproxy.router.openshift.io/hsts_header": "max-age=31536000;includeSubDomains",
@@ -264,15 +252,6 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
       RoutePort: 9443,
       DestinationCAcert: platformAuthCert,
       ServiceName: PlatformAuthServiceName,
-    },
-    "platform-oidc-block": {
-      Annotations: map[string]string{},
-      Name: "platform-oidc-block",
-      RouteHost: routeHost,
-      RoutePath: "/oidc/endpoint",
-      RoutePort: 80,
-      DestinationCAcert: nil,
-      ServiceName: DefaultHTTPBackendServiceName,
     },
     "saml-ui-callback": {
       Annotations: map[string]string{

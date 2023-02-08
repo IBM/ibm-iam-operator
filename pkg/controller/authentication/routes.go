@@ -203,8 +203,8 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
       RouteHost: routeHost,
       RoutePath: "/v1/auth/",
       RoutePort: 4300,
-      DestinationCAcert: platformAuthCert,
-      ServiceName: PlatformAuthServiceName,
+      DestinationCAcert: platformIdentityProviderCert,
+      ServiceName: PlatformIdentityProviderServiceName,
     },
     "platform-id-auth": {
       Annotations: map[string]string{

@@ -687,15 +687,15 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/",
-					Port: intstr.IntOrString{
-						IntVal: identityProviderPort,
-					},
-					Scheme: "HTTPS",
+				Exec: &corev1.ExecAction{
+					Command: []string{"curl", "-k", "https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration"},
 				},
 			},
-			TimeoutSeconds: 10,
+			InitialDelaySeconds: 20,
+			PeriodSeconds:       15,
+			TimeoutSeconds:      10,
+			SuccessThreshold:    1,
+			FailureThreshold:    5,
 		},
 		LivenessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
@@ -1070,15 +1070,15 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/",
-					Port: intstr.IntOrString{
-						IntVal: identityManagerPort,
-					},
-					Scheme: "HTTPS",
+				Exec: &corev1.ExecAction{
+					Command: []string{"curl", "-k", "https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration"},
 				},
 			},
-			TimeoutSeconds: 10,
+			InitialDelaySeconds: 20,
+			PeriodSeconds:       15,
+			TimeoutSeconds:      10,
+			SuccessThreshold:    1,
+			FailureThreshold:    5,
 		},
 		LivenessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{

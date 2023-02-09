@@ -253,7 +253,7 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
 		RoutePort: 9443,
 		ServiceName: PlatformAuthServiceName,
 		DestinationCAcert: platformAuthCert,
-	  },
+	},
   }
 
   for _, routeFields := range allRoutesFields {

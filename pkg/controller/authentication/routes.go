@@ -233,7 +233,7 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
     "saml-ui-callback": {
       Annotations: map[string]string{
         "haproxy.router.openshift.io/hsts_header": "max-age=31536000;includeSubDomains",
-        "haproxy.router.openshift.io/rewrite-target": "/",
+        "haproxy.router.openshift.io/rewrite-target": "/ibm/saml20/defaultSP/acs",
       },
       Name: "saml-ui-callback",
       RouteHost: routeHost,
@@ -242,6 +242,18 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
       ServiceName: PlatformAuthServiceName,
       DestinationCAcert: platformAuthCert,
     },
+	"social-login-callback": {
+		Annotations: map[string]string{
+		  "haproxy.router.openshift.io/hsts_header": "max-age=31536000;includeSubDomains",
+		  "haproxy.router.openshift.io/rewrite-target": "/ibm/api/social-login",
+		},
+		Name: "social-login-callback",
+		RouteHost: routeHost,
+		RoutePath: "/ibm/api/social-login",
+		RoutePort: 9443,
+		ServiceName: PlatformAuthServiceName,
+		DestinationCAcert: platformAuthCert,
+	  },
   }
 
   for _, routeFields := range allRoutesFields {

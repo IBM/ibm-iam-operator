@@ -20,9 +20,10 @@ import (
 	"context"
 	certmgrv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
-	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
+	certmgrv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -52,22 +53,21 @@ func generateCertificateData(instance *operatorv1alpha1.Authentication) {
 	}
 }
 
-func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.Authentication, currentCertificate *certmgrv1.Certificate) error {
-
+func (r *ReconcileAuthentication) handleCertificate(ctx context.Context, instance *operatorv1alpha1.Authentication, currentCertificate *certmgrv1.Certificate) error {
+	reqLogger := logf.FromContext(ctx).WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name).WithName("handleCertificate")
 	generateCertificateData(instance)
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 
 	for certificate := range certificateData {
 		// Delete v1alpha1 Certificate
-		r.deleteCertsv1alpha1(context.TODO(),instance, r.scheme, certificate)
-		err = r.client.Get(context.TODO(), types.NamespacedName{Name: certificate, Namespace: instance.Namespace}, currentCertificate)
+		r.deleteCertsv1alpha1(ctx,instance, r.scheme, certificate)
+		err = r.client.Get(ctx, types.NamespacedName{Name: certificate, Namespace: instance.Namespace}, currentCertificate)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new Certificate
 			newCertificate := generateCertificateObject(instance, r.scheme, certificate)
 			reqLogger.Info("Creating a new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", certificate)
-			err = r.client.Create(context.TODO(), newCertificate)
+			err = r.client.Create(ctx, newCertificate)
 			if err != nil {
 				reqLogger.Error(err, "Failed to create new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", certificate)
 				return err
@@ -126,14 +126,15 @@ func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme
 }
 
 func (r *ReconcileAuthentication) deleteCertsv1alpha1(ctx context.Context, instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, certificateName string) {
-	reqLogger := log.WithValues("func", "deleteCertsv1alpha1", "instance.Name", instance.Name, "instance.Namespace", instance.Namespace)
+	reqLogger := logf.FromContext(ctx).WithName("deleteCertsv1alpha1").WithValues("instance.Name", instance.Name, "instance.Namespace", instance.Namespace)
 
-	certificate := &certmgr.Certificate{
+	certificate := &certmgrv1alpha1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certificateName,
 			Namespace: instance.Namespace,
 		},
 	}
+  reqLogger.Info("attempt deletion of v1alpha1 Certificate", "certificateName", certificateName)
 	err := r.client.Get(ctx, types.NamespacedName{Name: certificateName, Namespace: instance.Namespace}, certificate)
 
 	if err != nil {

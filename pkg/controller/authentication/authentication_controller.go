@@ -252,7 +252,7 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 
 	// Check if this Certificate already exists and create it if it doesn't
 	currentCertificate := &certmgr.Certificate{}
-	err = r.handleCertificate(instance, currentCertificate)
+	err = r.handleCertificate(reconcileCtx, instance, currentCertificate)
 	if err != nil {
 		return
 	}

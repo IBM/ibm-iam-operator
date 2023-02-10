@@ -161,7 +161,7 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
   allRoutesFields := map[string]*reconcileRouteFields{
     "id-mgmt": {
       Annotations: map[string]string{
-        "haproxy.router.openshift.io/rewrite-target": "/idmgmt/",
+        "haproxy.router.openshift.io/rewrite-target": "/",
         "haproxy.router.openshift.io/hsts_header": "max-age=31536000;includeSubDomains",
       },
       Name: "id-mgmt",

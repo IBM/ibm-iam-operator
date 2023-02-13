@@ -11,6 +11,18 @@ rules:
 - apiGroups:
   - route.openshift.io
   resources:
+  - routes
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update
+  - patch
+- apiGroups:
+  - route.openshift.io
+  resources:
   - routes/custom-host
   verbs:
   - create
@@ -22,17 +34,6 @@ rules:
   - get
   - list
   - watch
-- apiGroups:
-  - route.openshift.io
-  resources:
-  - routes
-  verbs:
-  - get
-  - update
-  - create
-  - delete
-  - watch
-  - patch
 - apiGroups:
   - ""
   resources:
@@ -59,6 +60,20 @@ rules:
   - daemonsets
   - replicasets
   - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - oidc.security.ibm.com
+  resources:
+  - clients
+  - clients/finalizers
+  - clients/status
   verbs:
   - create
   - delete
@@ -139,20 +154,6 @@ rules:
   - list
   - watch
 - apiGroups:
-  - oidc.security.ibm.com
-  resources:
-  - clients
-  - clients/finalizers
-  - clients/status
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
   - networking.k8s.io
   resources:
   - '*'
@@ -172,6 +173,17 @@ rules:
   verbs:
   - create
   - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - create
   - get
   - list
   - patch
@@ -198,131 +210,27 @@ rules:
   - get
   - update
   - delete
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  creationTimestamp: null
-  name: ibm-iam-operand-restricted
-  labels:
-    app.kubernetes.io/instance: ibm-iam-operator
-    app.kubernetes.io/managed-by: ibm-iam-operator
-    app.kubernetes.io/name: ibm-iam-operator
-rules:
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - ingresses
+  verbs:
+  - get
 - apiGroups:
   - ""
   resources:
-  - pods
-  - services
-  - services/finalizers
-  - endpoints
-  - persistentvolumeclaims
-  - events
   - configmaps
-  - secrets
+  resourceNames:
+  - console-config
   verbs:
-  - create
-  - delete
   - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  - daemonsets
-  - replicasets
-  - statefulsets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-# used by oidcclient watcher
-- apiGroups:
-  - oidc.security.ibm.com
-  resources:
-  - clients
-  - clients/finalizers
-  - clients/status
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
-  - roles
+  - clusterroles
+  - clusterrolebindings
   verbs:
   - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - rolebindings
-  - rolebindings/finalizers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-# this is used by iam poliy controller
-- apiGroups:
-  - iam.policies.ibm.com
-  resources:
-  - iampolicies
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - update
-  - watch
-  - delete
-# this is used by identity provider to create/delete rolebinding for zen user
-- apiGroups:
-  - authorization.openshift.io
-  resources:
-  - rolebindings
-  - rolebindings/finalizers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: ibm-iam-operand-restricted
-  labels:
-    app.kubernetes.io/instance: ibm-iam-operator
-    app.kubernetes.io/managed-by: ibm-iam-operator
-    app.kubernetes.io/name: ibm-iam-operator
-rules:
-# fetch users call is used in identity manager
 - apiGroups:
   - user.openshift.io
   resources:

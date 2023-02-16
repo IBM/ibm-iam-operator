@@ -984,17 +984,6 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			Name:  "MASTER_HOST",
 			Value: icpConsoleURL,
 		},
-		{
-			Name: "NAMESPACES",
-			ValueFrom: &corev1.EnvVarSource{
-				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "namespace-scope",
-					},
-					Key: "namespaces",
-				},
-			},
-		},
 	}
 
 	idpEnvVarList := []string{"NODE_ENV", "LOG_LEVEL_IDMGMT", "LOG_LEVEL_MW", "IBM_CLOUD_SAAS", "IBMID_PROFILE_URL", "IBMID_PROFILE_CLIENT_ID", "IBMID_PROFILE_FIELDS", "AUDIT_DETAIL",

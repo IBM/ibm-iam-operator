@@ -72,7 +72,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
     Reader: mgr.GetAPIReader(),
     recorder: mgr.GetEventRecorderFor(controllerName),
     scheme: mgr.GetScheme(),
-    config: ClientControllerConfig{},
+    config: map[string]ClientControllerConfig{},
   }
 }
 
@@ -101,7 +101,8 @@ type ReconcileClient struct {
 	Reader   client.Reader
 	recorder record.EventRecorder
 	scheme   *runtime.Scheme
-  config   ClientControllerConfig
+  config   map[string]ClientControllerConfig
+  csCACertSecrets map[string]*corev1.Secret
 }
 
 // SetConfig sets the ClientControllerConfig on the ReconcileClient using the platform-auth-idp ConfigMap and
@@ -110,15 +111,15 @@ func (r *ReconcileClient) SetConfig(ctx context.Context, namespace string) (err 
   if namespace == "" {
     return fmt.Errorf("provided namespace must be non-empty")
   }
-  if !r.IsConfigured(){
-    r.config = ClientControllerConfig{}
+  if !r.IsConfigured(namespace){
+    r.config[namespace] = ClientControllerConfig{}
   }
   configMap := &corev1.ConfigMap{}
   err = r.client.Get(ctx, types.NamespacedName{Name: PlatformAuthIDPConfigMapName, Namespace: namespace}, configMap)
   if err != nil {
     return fmt.Errorf("client failed to GET ConfigMap: %w", err)
   }
-  err = r.config.ApplyConfigMap(configMap, identityManagementURLKey, identityProviderURLKey, rOKSEnabledKey, authServiceURLKey, osAuthEnabledKey)
+  err = r.config[namespace].ApplyConfigMap(configMap, identityManagementURLKey, identityProviderURLKey, rOKSEnabledKey, authServiceURLKey, osAuthEnabledKey)
   if err != nil {
     return fmt.Errorf("failed to configure: %w", err)
   }
@@ -127,7 +128,7 @@ func (r *ReconcileClient) SetConfig(ctx context.Context, namespace string) (err 
   if err != nil {
     return
   }
-  err = r.config.ApplySecret(platformAuthIDPCredentialsSecret, defaultAdminUserKey, defaultAdminPasswordKey)
+  err = r.config[namespace].ApplySecret(platformAuthIDPCredentialsSecret, defaultAdminUserKey, defaultAdminPasswordKey)
   if err != nil {
     return fmt.Errorf("failed to configure: %w", err)
   }
@@ -136,7 +137,7 @@ func (r *ReconcileClient) SetConfig(ctx context.Context, namespace string) (err 
   if err != nil {
     return
   }
-  err = r.config.ApplySecret(platformOIDCCredentialsSecret, oAuthAdminPasswordKey)
+  err = r.config[namespace].ApplySecret(platformOIDCCredentialsSecret, oAuthAdminPasswordKey)
   if err != nil {
     return fmt.Errorf("failed to configure: %w", err)
   }
@@ -167,7 +168,7 @@ func (r *ReconcileClient) Reconcile(ctx context.Context, request reconcile.Reque
 	}
   
   reqLogger.Info("checking to see if controller is fully configured")
-  if !r.IsConfigured() {
+  if !r.IsConfigured(request.Namespace) {
     err = r.SetConfig(ctx, request.Namespace)
     if err != nil {
       // Return error if the attempt to configure the ReconcileClient did not work
@@ -221,7 +222,7 @@ func (r *ReconcileClient) createClient(ctx context.Context, client *oidcv1.Clien
   if err != nil {
     return
   }
-  isOSAuthEnabled, err = r.GetOSAuthEnabled()
+  isOSAuthEnabled, err = r.GetOSAuthEnabled(client.Namespace)
   if err != nil {
     return
   }
@@ -284,7 +285,7 @@ func (r *ReconcileClient) updateClient(ctx context.Context, client *oidcv1.Clien
   }
 
   var isOSAuthEnabled bool
-  isOSAuthEnabled, err = r.GetOSAuthEnabled()
+  isOSAuthEnabled, err = r.GetOSAuthEnabled(client.Namespace)
   if err != nil {
     return err
   }
@@ -436,7 +437,7 @@ func (r *ReconcileClient) deleteClient(ctx context.Context, client *oidcv1.Clien
   }
   reqLogger.Info("Client registration successfully deleted")
 
-  isOSAuthEnabled, err := r.GetOSAuthEnabled()
+  isOSAuthEnabled, err := r.GetOSAuthEnabled(client.Namespace)
   if err != nil {
     return
   }

@@ -18,19 +18,22 @@ package authentication
 
 import (
 	"context"
- 	"fmt"
+	"fmt"
+	"strconv"
 
-	certmgr "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	utils "github.com/IBM/ibm-iam-operator/pkg/utils"
+	certmgr "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1"
-	routev1 "github.com/openshift/api/route/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -182,29 +185,29 @@ var _ reconcile.Reconciler = &ReconcileAuthentication{}
 type ReconcileAuthentication struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client client.Client
-	scheme *runtime.Scheme
-  needToRequeue bool
+	client        client.Client
+	scheme        *runtime.Scheme
+	needToRequeue bool
 }
 
 func (r *ReconcileAuthentication) addFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
-  if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
-    instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
-    err = r.client.Update(ctx, instance)
-  }
-  return
+	if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
+		instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
+		err = r.client.Update(ctx, instance)
+	}
+	return
 }
 
 // removeFinalizer removes the provided finalizer from the Authentication instance.
 func (r *ReconcileAuthentication) removeFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
-		if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
-			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
-      err = r.client.Update(ctx, instance)
-			if err != nil {
-        return fmt.Errorf("error updating the CR to remove the finalizer: %w", err)
-			}
+	if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
+		instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
+		err = r.client.Update(ctx, instance)
+		if err != nil {
+			return fmt.Errorf("error updating the CR to remove the finalizer: %w", err)
 		}
-    return
+	}
+	return
 }
 
 // Reconcile reads that state of the cluster for a Authentication object and makes changes based on the state read
@@ -216,10 +219,10 @@ func (r *ReconcileAuthentication) removeFinalizer(ctx context.Context, finalizer
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, err error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-  reconcileCtx := logf.IntoContext(ctx, reqLogger)
-  // Set default result
-  result = reconcile.Result{}
-  reqLogger.Info("Reconciling Authentication")
+	reconcileCtx := logf.IntoContext(ctx, reqLogger)
+	// Set default result
+	result = reconcile.Result{}
+	reqLogger.Info("Reconciling Authentication")
 
 	// Fetch the Authentication instance
 	instance := &operatorv1alpha1.Authentication{}
@@ -229,10 +232,10 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Set err to nil to signal the error has been handled
-      err = nil
+			err = nil
 		}
-    // Return without requeueing 
-		return 
+		// Return without requeueing
+		return
 	}
 
 	// Credit: kubebuilder book
@@ -240,13 +243,21 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	// Determine if the Authentication CR  is going to be deleted
 	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Object not being deleted, but add our finalizer so we know to remove this object later when it is going to be deleted
-    err = r.addFinalizer(reconcileCtx, finalizerName, instance)
-    if err != nil {
-      return
-    }
+		err = r.addFinalizer(reconcileCtx, finalizerName, instance)
+		if err != nil {
+			return
+		}
 	} else {
 		// Object scheduled to be deleted
-    err = r.removeFinalizer(reconcileCtx, finalizerName, instance)
+		err = r.removeFinalizer(reconcileCtx, finalizerName, instance)
+		return
+	}
+
+	// Check if this Certificate already exists and create it if it doesn't
+	reqLogger.Info("Creating ibm-iam-operand-restricted serviceaccount")
+	currentSA := &corev1.ServiceAccount{}
+	err = r.createSA(instance, currentSA)
+	if err != nil {
 		return
 	}
 
@@ -284,16 +295,27 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	if err != nil {
 		return
 	}
+	// create clusterrole and clusterrolebinding if OSAuthEnabled is true
+	if r.isOSAuthEnabled(instance) {
+		clusterRole := &rbacv1.ClusterRole{}
+		r.handleClusterRole(instance, clusterRole)
 
-  r.ReconcileRemoveIngresses(ctx, instance)
+		clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
+		r.handleClusterRoleBinding(instance, clusterRoleBinding)
+
+	}
+
+	r.ReconcileRemoveIngresses(ctx, instance)
 
 	// update serviceaccount with annotation if Openshift authentication is enabled
-	r.handleServiceAccount(instance)
+	if r.isOSAuthEnabled(instance) {
+		r.handleServiceAccount(instance)
+	}
 
-  err = r.reconcileRoutes(ctx, instance)
-  if err != nil {
-    return
-  }
+	err = r.reconcileRoutes(ctx, instance)
+	if err != nil {
+		return
+	}
 
 	// Check if this Deployment already exists and create it if it doesn't
 	currentDeployment := &appsv1.Deployment{}
@@ -329,4 +351,21 @@ func removeString(slice []string, s string) (result []string) {
 		result = append(result, item)
 	}
 	return
+}
+
+func (r *ReconcileAuthentication) isOSAuthEnabled(instance *operatorv1alpha1.Authentication) bool {
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	authIdpConfigMapName := "platform-auth-idp"
+	authIdpConfigMap := &corev1.ConfigMap{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: authIdpConfigMapName, Namespace: instance.Namespace}, authIdpConfigMap)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Error(err, "The configmap "+authIdpConfigMapName+" is not created yet")
+			return false
+		}
+		reqLogger.Error(err, "Failed to get ConfigMap"+authIdpConfigMapName)
+		return false
+	}
+	isOSAuthEnabled, _ := strconv.ParseBool(authIdpConfigMap.Data["OSAUTH_ENABLED"])
+	return isOSAuthEnabled
 }

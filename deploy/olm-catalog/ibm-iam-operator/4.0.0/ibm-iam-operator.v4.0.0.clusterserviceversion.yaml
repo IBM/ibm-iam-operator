@@ -445,8 +445,13 @@ spec:
           - console-config
           verbs:
           - get
-        serviceAccountName: ibm-iam-operator
-      - rules:
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterroles
+          - clusterrolebindings
+          verbs:
+          - create
         - apiGroups:
           - user.openshift.io
           resources:
@@ -456,7 +461,7 @@ spec:
           verbs:
           - get
           - list
-        serviceAccountName: ibm-iam-operand-restricted
+        serviceAccountName: ibm-iam-operator
       deployments:
       - name: ibm-iam-operator
         spec:
@@ -556,81 +561,6 @@ spec:
                     path: ca.crt
                   secretName: cs-ca-certificate-secret
       permissions:
-      - rules:
-        - apiGroups:
-          - ""
-          resources:
-          - pods
-          - services
-          - services/finalizers
-          - endpoints
-          - persistentvolumeclaims
-          - events
-          - configmaps
-          - secrets
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - apps
-          resources:
-          - deployments
-          - daemonsets
-          - replicasets
-          - statefulsets
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - rbac.authorization.k8s.io
-          resources:
-          - roles
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        # this is used by iam poliy controller
-        - apiGroups:
-          - iam.policies.ibm.com
-          resources:
-          - iampolicies
-          verbs:
-          - create
-          - get
-          - list
-          - patch
-          - update
-          - watch
-          - delete
-        # this is used by identity provider to create/delete rolebinding for zen user
-        - apiGroups:
-          - authorization.openshift.io
-          resources:
-          - rolebindings
-          - rolebindings/finalizers
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        serviceAccountName: ibm-iam-operand-restricted
       - rules:
         - apiGroups:
           - route.openshift.io
@@ -807,6 +737,7 @@ spec:
           resources:
           - serviceaccounts
           verbs:
+          - create
           - get
           - list
           - patch

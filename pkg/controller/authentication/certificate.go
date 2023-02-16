@@ -35,6 +35,7 @@ const Certv1alpha1APIVersion = "certmanager.k8s.io/v1alpha1"
 
 func generateCertificateData(instance *operatorv1alpha1.Authentication) {
 	completeName := "platform-identity-management." + instance.Namespace + ".svc"
+	completeNameProvider := "platform-identity-provider." + instance.Namespace + ".svc"
 	certificateData = map[string]map[string]string{
 		"platform-auth-cert": {
 			"secretName": "platform-auth-secret",
@@ -43,6 +44,7 @@ func generateCertificateData(instance *operatorv1alpha1.Authentication) {
 		"identity-provider-cert": {
 			"secretName": "identity-provider-secret",
 			"cn":         "platform-identity-provider",
+			"completeName": completeNameProvider,
 		},
 		"platform-identity-management": {
 			"secretName":   "platform-identity-management",
@@ -110,6 +112,9 @@ func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme
 		},
 	}
 	if certificateName == "platform-identity-management" {
+		certificate.Spec.DNSNames = append(certificate.Spec.DNSNames, certificateData[certificateName]["completeName"])
+	}
+	if certificateName == "identity-provider-cert" {
 		certificate.Spec.DNSNames = append(certificate.Spec.DNSNames, certificateData[certificateName]["completeName"])
 	}
 	if certificateName == "platform-auth-cert" {

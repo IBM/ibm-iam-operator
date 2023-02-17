@@ -19,7 +19,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"strings"
@@ -73,6 +72,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
     recorder: mgr.GetEventRecorderFor(controllerName),
     scheme: mgr.GetScheme(),
     config: map[string]ClientControllerConfig{},
+    csCACertSecrets: map[string]*corev1.Secret{},
   }
 }
 
@@ -207,10 +207,9 @@ func (r *ReconcileClient) createClient(ctx context.Context, client *oidcv1.Clien
   var isOSAuthEnabled bool
   clientCreds = r.generateClientCredentials("")
   reqLogger.Info("generated new client ID/secret pair", "clientId", clientCreds.ClientID)
-  var response *http.Response
-  response, err = r.CreateClientRegistration(ctx, client, clientCreds)
-  if response == nil || response.Status != "201 Created" {
-    handleOIDCClientError(ctx, client, response, err, PostType, r.recorder)
+  _, err = r.CreateClientRegistration(ctx, client, clientCreds)
+  if err != nil {
+    r.handleOIDCClientError(ctx, client, err, PostType)
     err = fmt.Errorf("error occurred during client registration: %w", err)
     return 
   }
@@ -266,10 +265,9 @@ func (r *ReconcileClient) updateClient(ctx context.Context, client *oidcv1.Clien
       return fmt.Errorf("could not create new ClientCredentials struct: %w", err)
     }
   }
-  var response *http.Response
-  response, err = r.UpdateClientRegistration(ctx, client, clientCreds)
-  if response == nil || response.Status != "200 OK" {
-    handleOIDCClientError(ctx, client, response, err, PutType, r.recorder)
+  _, err = r.UpdateClientRegistration(ctx, client, clientCreds)
+  if err != nil {
+    r.handleOIDCClientError(ctx, client, err, PutType)
     err = fmt.Errorf("error occurred during update oidc client registration: %w", err)
     return
   }
@@ -390,11 +388,25 @@ func (r *ReconcileClient) processZenRegistration(ctx context.Context, client *oi
 // addFinalizer adds a finalizer to the Client if it hasn't already been marked for deletion
 func addFinalizer(client *oidcv1.Client) {
 	if client.ObjectMeta.DeletionTimestamp.IsZero() {
-		finalizerName := "finalizer.client.oidc.security.ibm.com"
+		finalizerName := "client.oidc.security.ibm.com"
 		if !containsString(client.ObjectMeta.Finalizers, finalizerName) {
 			client.ObjectMeta.Finalizers = append(client.ObjectMeta.Finalizers, finalizerName)
 		}
 	}
+}
+
+func removeFinalizer(client *oidcv1.Client) {
+  finalizerName := "client.oidc.security.ibm.com"
+  finalizers := client.ObjectMeta.GetFinalizers()
+  updatedFinalizers := make([]string, 0)
+  for i, finalizer := range finalizers {
+    if finalizer == finalizerName {
+      updatedFinalizers = append(updatedFinalizers, finalizers[:i]...)
+      updatedFinalizers = append(updatedFinalizers, finalizers[i+1:]...)
+      break
+    }
+  }
+  client.SetFinalizers(updatedFinalizers)
 }
 
 func containsString(slice []string, s string) bool {
@@ -428,10 +440,22 @@ func (r *ReconcileClient) deleteOAuthClient(ctx context.Context, name string) (e
 // Identity Management service will be deleted. If any of the operations attempted produce errors, those are returned.
 func (r *ReconcileClient) deleteClient(ctx context.Context, client *oidcv1.Client) (err error) {
   reqLogger := logf.FromContext(ctx).WithName("deleteClient").WithValues("clientId", client.Spec.ClientId)
-  var response *http.Response
-  response, err = r.DeleteClientRegistration(ctx, client)
-  if response == nil || (response.Status != "204 No Content" && response.Status != "404 Not Found") {
-    handleOIDCClientError(ctx, client, response, err, DeleteType, r.recorder)
+  // In the event that a Client needs to be deleted and it doesn't have a Client ID (meaning it was never properly
+  // registered), remove the finalizer and update.
+  if client.Spec.ClientId == "" {
+    // Remove the finalizers
+    reqLogger.Info("Removing finalizer from Client", "clientId", client.Spec.ClientId)
+    removeFinalizer(client)
+    // Update CR
+    err = r.client.Update(ctx, client)
+    if err != nil {
+      reqLogger.Error(err, "Finalizer update failed")
+    }
+    return
+  }
+  _, err = r.DeleteClientRegistration(ctx, client)
+  if err != nil {
+    r.handleOIDCClientError(ctx, client, err, DeleteType)
     err = fmt.Errorf("error occurred during delete oidc client registration: %w", err)
     return
   }
@@ -462,7 +486,7 @@ func (r *ReconcileClient) deleteClient(ctx context.Context, client *oidcv1.Clien
   }
   // Remove the finalizers
   reqLogger.Info("Removing finalizer from Client", "clientId", client.Spec.ClientId)
-  client.SetFinalizers(nil)
+  removeFinalizer(client)
   // Update CR
   err = r.client.Update(ctx, client)
   if err != nil {

@@ -362,14 +362,57 @@ func IsRouteEqual(oldRoute, newRoute *routev1.Route) bool {
 
 	if !reflect.DeepEqual(oldRoute.Spec, newRoute.Spec) {
 		//ugly, but don't print the CA to the log
-		logger.Info("Specs not equal", "oldHost", oldRoute.Spec.Host, "newHost", newRoute.Spec.Host,
-			"oldPath", oldRoute.Spec.Path, "newHost", newRoute.Spec.Path,
-			"oldWildcardPolicy", oldRoute.Spec.WildcardPolicy, "newWildcardPolicy", newRoute.Spec.WildcardPolicy,
-			"oldPort", fmt.Sprintf("%v", oldRoute.Spec.Port), "newPort", fmt.Sprintf("%v", newRoute.Spec.Port),
-			"oldToService", fmt.Sprintf("%v", oldRoute.Spec.To), "newToService", fmt.Sprintf("%v", newRoute.Spec.To),
-			"old.tls.termination", oldRoute.Spec.TLS.Termination, "new.tls.termination", newRoute.Spec.TLS.Termination,
-			"old.tls.insecureEdgeTerminationPolicy", oldRoute.Spec.TLS.InsecureEdgeTerminationPolicy,
-			"new.tls.insecureEdgeTerminationPolicy", newRoute.Spec.TLS.InsecureEdgeTerminationPolicy)
+    var loggedValues []interface{}
+
+    loggedValues = append(loggedValues, "oldHost", oldRoute.Spec.Host, "newHost", newRoute.Spec.Host)
+
+    loggedValues = append(loggedValues, "oldPath", oldRoute.Spec.Path, "newHost", newRoute.Spec.Path)
+
+    loggedValues = append(loggedValues, "oldWildcardPolicy", oldRoute.Spec.WildcardPolicy, "newWildcardPolicy", newRoute.Spec.WildcardPolicy)
+
+    loggedValues = append(loggedValues, "oldPort")
+    if oldRoute.Spec.Port != nil {
+      loggedValues = append(loggedValues, fmt.Sprintf("%v", oldRoute.Spec.Port))
+    } else {
+      loggedValues = append(loggedValues, "unset")
+    }
+    loggedValues = append(loggedValues, "newPort")
+    if oldRoute.Spec.Port != nil {
+      loggedValues = append(loggedValues, fmt.Sprintf("%v", newRoute.Spec.Port))
+    } else {
+      loggedValues = append(loggedValues, "unset")
+    }
+
+    loggedValues = append(loggedValues, "oldToService", fmt.Sprintf("%v", oldRoute.Spec.To))
+    loggedValues = append(loggedValues, "newToService", fmt.Sprintf("%v", newRoute.Spec.To))
+
+    loggedValues = append(loggedValues, "old.tls.termination")
+    if oldRoute.Spec.TLS != nil {
+      loggedValues = append(loggedValues, oldRoute.Spec.TLS.Termination)
+    } else {
+      loggedValues = append(loggedValues, "unset")
+    }
+    loggedValues = append(loggedValues, "new.tls.termination")
+    if newRoute.Spec.TLS != nil {
+      loggedValues = append(loggedValues, newRoute.Spec.TLS.Termination)
+    } else {
+      loggedValues = append(loggedValues, "unset")
+    }
+
+    loggedValues = append(loggedValues, "old.tls.insecureEdgeTerminationPolicy")
+    if oldRoute.Spec.TLS != nil {
+      loggedValues = append(loggedValues, oldRoute.Spec.TLS.InsecureEdgeTerminationPolicy)
+    } else {
+      loggedValues = append(loggedValues, "unset")
+    }
+    loggedValues = append(loggedValues, "new.tls.insecureEdgeTerminationPolicy")
+    if newRoute.Spec.TLS != nil {
+      loggedValues = append(loggedValues, newRoute.Spec.TLS.InsecureEdgeTerminationPolicy)
+    } else {
+      loggedValues = append(loggedValues, "unset")
+    }
+
+		logger.Info("Specs not equal", loggedValues... )
 		return false
 	}
 

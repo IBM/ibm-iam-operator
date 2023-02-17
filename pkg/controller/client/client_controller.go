@@ -23,7 +23,6 @@ import (
 
 	"strings"
 
-	condition "github.com/IBM/ibm-iam-operator/pkg/api/util"
 	oidcv1 "github.com/IBM/ibm-iam-operator/pkg/apis/oidc/v1"
 	oauthv1 "github.com/openshift/api/oauth/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -239,7 +238,7 @@ func (r *ReconcileClient) createClient(ctx context.Context, client *oidcv1.Clien
     }
   }
   if err == nil {
-    condition.SetClientCondition(client,
+    SetClientCondition(client,
       oidcv1.ClientConditionReady,
       oidcv1.ConditionTrue,
       ReasonCreateClientSuccessful,
@@ -361,7 +360,7 @@ func (r *ReconcileClient) processZenRegistration(ctx context.Context, client *oi
 	zenReg, err = r.GetZenInstance(ctx, client)
 	if err != nil {
 		//Set the status to false since zen registration cannot be completed
-		condition.SetClientCondition(client, oidcv1.ClientConditionReady, oidcv1.ConditionFalse, ReasonCreateZenRegistrationFailed,
+		SetClientCondition(client, oidcv1.ClientConditionReady, oidcv1.ConditionFalse, ReasonCreateZenRegistrationFailed,
 			MessageCreateZenRegistrationFailed)
 		r.recorder.Event(client, corev1.EventTypeWarning, ReasonCreateZenRegistrationFailed, err.Error())
 		return
@@ -377,7 +376,7 @@ func (r *ReconcileClient) processZenRegistration(ctx context.Context, client *oi
 	err = r.CreateZenInstance(ctx, client, clientCreds)
 	if err != nil {
 		//Set the status to false since zen registration cannot be completed
-		condition.SetClientCondition(client, oidcv1.ClientConditionReady, oidcv1.ConditionFalse, ReasonCreateZenRegistrationFailed,
+		SetClientCondition(client, oidcv1.ClientConditionReady, oidcv1.ConditionFalse, ReasonCreateZenRegistrationFailed,
 			MessageCreateZenRegistrationFailed)
 		r.recorder.Event(client, corev1.EventTypeWarning, ReasonCreateZenRegistrationFailed, err.Error())
 	}

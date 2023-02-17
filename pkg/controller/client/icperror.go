@@ -22,7 +22,6 @@ import (
   "io/ioutil"
 	"net/http"
 
-	condition "github.com/IBM/ibm-iam-operator/pkg/api/util"
 	oidcv1 "github.com/IBM/ibm-iam-operator/pkg/apis/oidc/v1"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -101,7 +100,7 @@ func (r *ReconcileClient) handleOIDCClientError(ctx context.Context, client *oid
 
 
 	if requestType == PostType {
-		condition.SetClientCondition(client,
+		SetClientCondition(client,
 			oidcv1.ClientConditionReady,
 			oidcv1.ConditionFalse,
 			reason,

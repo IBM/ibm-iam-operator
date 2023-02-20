@@ -52,7 +52,7 @@ func generateCertificateData(instance *operatorv1alpha1.Authentication) {
 			"completeName": completeName,
 		},
 		"saml-auth-cert": {
-			"secretName":   "saml-auth-cert",
+			"secretName":   "saml-auth-secret",
 			"cn":           "saml-auth",
 		},
 	}

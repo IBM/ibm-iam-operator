@@ -754,6 +754,24 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume
 			},
 		},
 		{
+			Name: "saml-cert",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: routerCertSecret,
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "tls.crt",
+							Path: "icp-router.crt",
+						},
+						{
+							Key:  "tls.key",
+							Path: "icp-router.key",
+						},
+					},
+				},
+			},
+		},
+		{
 			Name: "cluster-ca",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{

@@ -337,6 +337,10 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 				MountPath: "/certs/mongodb-client",
 			},
 		},
+		{
+			Name:      "saml-cert",
+			MountPath: "/certs/router-certs",
+		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{

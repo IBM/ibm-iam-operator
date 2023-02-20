@@ -80,6 +80,7 @@ type ClientRegistrationSpec struct {
 type ConfigSpec struct {
 	ClusterCADomain             string `json:"clusterCADomain"`
 	DefaultAdminUser            string `json:"defaultAdminUser"`
+	DefaultOauthAdminUser       string `json:"defaultOauthAdminUser"`
 	DefaultAdminPassword        string `json:"defaultAdminPassword"`
 	ScimAdminUser               string `json:"scimAdminUser"`
 	ScimAdminPassword           string `json:"scimAdminPassword"`

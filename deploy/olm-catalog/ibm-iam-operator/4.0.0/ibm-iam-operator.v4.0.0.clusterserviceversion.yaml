@@ -31,7 +31,7 @@ metadata:
                   "memory": "350Mi"
                 }
               },
-              "routerCertSecret": "saml-auth-secret"
+              "routerCertSecret": "route-tls-secret"
             },
             "clientRegistration": {
               "imageName": "icp-platform-auth",

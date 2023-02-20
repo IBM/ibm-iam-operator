@@ -121,9 +121,6 @@ func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme
 	if certificateName == "identity-provider-cert" {
 		certificate.Spec.DNSNames = append(certificate.Spec.DNSNames, certificateData[certificateName]["completeName"])
 	}
-	if certificateName == "saml-auth-cert" {
-		certificate.Spec.DNSNames = append(certificate.Spec.DNSNames, certificateData["platform-auth-cert"]["cn"])
-	}
 	if certificateName == "platform-auth-cert" {
 		certificate.Spec.IPAddresses = []string{"127.0.0.1", "::1"}
 	}

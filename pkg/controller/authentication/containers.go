@@ -602,6 +602,17 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			},
 		},
 		{
+			Name: "DEFAULT_OAUTHADMIN_USER",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp-credentials",
+					},
+					Key: "oauthadmin_username",
+				},
+			},
+		},
+		{
 			Name: "DEFAULT_ADMIN_PASSWORD",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{

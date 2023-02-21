@@ -338,7 +338,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			},
 			{
 				Name:      "saml-cert",
-				MountPath: "/certs/router-certs",
+				MountPath: "/certs/saml-certs",
 			},
 		},
 		ReadinessProbe: &corev1.Probe{

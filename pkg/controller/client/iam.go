@@ -116,7 +116,10 @@ func (r *ReconcileClient) getAuthnTokens(ctx context.Context, client *oidcv1.Cli
       req.SetBasicAuth("oauthadmin", oAuthAdminPassword)
     }
     caCertSecret, err = r.getCSCACertificateSecret(ctx, client.Namespace)
-    httpClient, err = createHTTPClient(caCertSecret.Data["tls.crt"])
+    if err != nil {
+      return
+    }
+    httpClient, err = createHTTPClient(caCertSecret.Data[corev1.TLSCertKey])
     if err != nil {
       return
     }
@@ -175,7 +178,7 @@ func (r *ReconcileClient) invokeIamApi(ctx context.Context, client *oidcv1.Clien
   if err != nil {
     return nil, fmt.Errorf("failed to get certificate secret for namespace %q: %w", client.Namespace, err)
   }
-  httpClient, err := createHTTPClient(caCertSecret.Data["tls.crt"])
+  httpClient, err := createHTTPClient(caCertSecret.Data[corev1.TLSCertKey])
   if err != nil {
     return nil, fmt.Errorf("failed to create IAM API HTTP client: %w", err)
   }

@@ -159,7 +159,7 @@ func (r *ReconcileClient) invokeClientRegistrationAPI(ctx context.Context, clien
     return
   }
 
-  httpClient, err := createHTTPClient(caCertSecret.Data["tls.crt"])
+  httpClient, err := createHTTPClient(caCertSecret.Data[corev1.TLSCertKey])
   if err != nil {
     return
   }
@@ -195,6 +195,10 @@ func (r *ReconcileClient) setCSCACertificateSecret(ctx context.Context, namespac
   }
   r.csCACertSecrets[namespace] = secret 
   return
+}
+
+func (r *ReconcileClient) deleteCSCACertificateSecret(ctx context.Context, namespace string) {
+  delete(r.csCACertSecrets, namespace)
 }
 
 func (r *ReconcileClient) getCSCACertificateSecret(ctx context.Context, namespace string) (secret *corev1.Secret, err error) {

@@ -761,11 +761,11 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume
 					Items: []corev1.KeyToPath{
 						{
 							Key:  "tls.crt",
-							Path: "icp-router.crt",
+							Path: "saml-auth.crt",
 						},
 						{
 							Key:  "tls.key",
-							Path: "icp-router.key",
+							Path: "saml-auth.key",
 						},
 					},
 				},

@@ -120,6 +120,14 @@ func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authen
 					secretUpdateRequired = true
 				}
 			}
+			if secret == "platform-oidc-credentials" {
+				if _, keyExists := currentSecret.Data["OAUTH2_CLIENT_REGISTRATION_USERNAME"]; !keyExists {
+					reqLogger.Info("Updating an existing Secret", "Secret.Namespace", currentSecret.Namespace, "Secret.Name", currentSecret.Name)
+					newSecret := generateSecretObject(instance, r.scheme, secret, secretData[secret])
+					currentSecret.Data["OAUTH2_CLIENT_REGISTRATION_USERNAME"] = newSecret.Data["OAUTH2_CLIENT_REGISTRATION_USERNAME"]
+					secretUpdateRequired = true
+				}
+			}
 			if secretUpdateRequired {
 				err = r.client.Update(context.TODO(), currentSecret)
 				if err != nil {

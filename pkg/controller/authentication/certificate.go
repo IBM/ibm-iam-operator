@@ -51,6 +51,10 @@ func generateCertificateData(instance *operatorv1alpha1.Authentication) {
 			"cn":           "platform-identity-management",
 			"completeName": completeName,
 		},
+		"saml-auth-cert": {
+			"secretName":   "saml-auth-secret",
+			"cn":           "saml-auth",
+		},
 	}
 }
 

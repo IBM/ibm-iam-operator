@@ -14,7 +14,7 @@ spec:
     imageName: "icp-platform-auth"
     imageTag: "3.3.7"
     ldapsCACert: "platform-auth-ldaps-ca-cert"
-    routerCertSecret: "route-tls-secret"
+    routerCertSecret: "saml-auth-secret"
     resources:
       limits:
         cpu: 1000m

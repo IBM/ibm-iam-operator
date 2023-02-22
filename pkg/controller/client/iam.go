@@ -152,10 +152,6 @@ func (r *ReconcileClient) getAuthnTokens(ctx context.Context, client *oidcv1.Cli
 // certificate.
 // TODO update this to take a namespace corresponding to 
 func createHTTPClient(caCert []byte) (httpClient *http.Client, err error) {
-	//caCert, err = ioutil.ReadFile("/certs/ca.crt")
-	//if err != nil {
-	//	return
-	//}
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCert)
 	transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: caCertPool}}

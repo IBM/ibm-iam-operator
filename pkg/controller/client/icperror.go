@@ -27,7 +27,6 @@ import (
 )
 
 type OIDCClientError struct {
-	//Error       string `json:"error"`
 	Description string `json:"error_description"`
 }
 
@@ -61,6 +60,8 @@ const (
 	ReasonUnknown                     string = "Unknown"
 )
 
+// NewOIDCClientError produces a new OIDCClientError by attempting to unmarshal the response body JSON into an
+// OIDCClientError's Description field.
 func NewOIDCClientError(response *http.Response) (oidcErr *OIDCClientError) {
   if response == nil || response.Body == nil {
     return nil

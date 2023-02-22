@@ -150,7 +150,6 @@ func (r *ReconcileClient) getAuthnTokens(ctx context.Context, client *oidcv1.Cli
 
 // createHTTPClient handles boilerplate of creating an http.Client configured for TLS using the Common Services CA
 // certificate.
-// TODO update this to take a namespace corresponding to 
 func createHTTPClient(caCert []byte) (httpClient *http.Client, err error) {
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCert)

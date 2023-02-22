@@ -189,6 +189,9 @@ func (r *ReconcileClient) GetClientRegistration(ctx context.Context, client *oid
   return
 }
 
+// setCSCACertificateSecret caches a copy of the Secret that contains the Common Services CA certificate for the
+// provided namespace. If a Secret has already been cached for the namespace, this function replaces it with the new
+// Secret.
 func (r *ReconcileClient) setCSCACertificateSecret(ctx context.Context, namespace string, secret *corev1.Secret) (err error) {
   if secret == nil {
     return fmt.Errorf("provided Secret pointer was nil")
@@ -197,10 +200,15 @@ func (r *ReconcileClient) setCSCACertificateSecret(ctx context.Context, namespac
   return
 }
 
+// deleteCSCACertificateSecret deletes the cached copy of the Secret that contains the Common Services CA certificate
+// for the provided namespace.
 func (r *ReconcileClient) deleteCSCACertificateSecret(ctx context.Context, namespace string) {
   delete(r.csCACertSecrets, namespace)
 }
 
+// getCSCACertificateSecret gets the Secret that contains the Common Services CA certificate for the provided namespace.
+// It will return the ReconcileClient's cached Secret for the namespace if it has one registered, or it will look up and
+// return whatever matching Secret exists in the cluster and cache it for future use.
 func (r *ReconcileClient) getCSCACertificateSecret(ctx context.Context, namespace string) (secret *corev1.Secret, err error) {
   logger := logf.FromContext(ctx, "namespace", namespace).WithName("getCSCACertificateSecret")
   var ok bool

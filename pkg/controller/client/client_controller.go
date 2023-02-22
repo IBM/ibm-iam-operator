@@ -57,6 +57,8 @@ const (
   // CSCACertificateSecretName is the name of the Secret created by the installer in the Operand namespace that contains
   // the Common Services CA certificate and private key details
   CSCACertificateSecretName string = "cs-ca-certificate-secret"
+  // FinalizerName is the name of the finalizer added to Resources by the Client controller
+  FinalizerName string = "client.oidc.security.ibm.com"
 )
 
 var log = logf.Log.WithName(controllerName)
@@ -181,6 +183,8 @@ func (r *ReconcileClient) SetConfig(ctx context.Context, namespace string) (err 
   return
 }
 
+// processCSCACertificateSecretUpdate synchronizes the state of cached certificates from the Common Services CA based
+// upon events received from the cluster.
 func (r *ReconcileClient) processCSCACertificateSecretUpdate(ctx context.Context, namespacedName *types.NamespacedName) (err error) {
   reqLogger := logf.FromContext(ctx).WithName("processCSCACertificateSecret")
   currentCertSecret := &corev1.Secret{}
@@ -472,22 +476,21 @@ func (r *ReconcileClient) processZenRegistration(ctx context.Context, client *oi
 	return
 }
 
-// addFinalizer adds a finalizer to the Client if it hasn't already been marked for deletion
+// addFinalizer adds a finalizer to the Client if it hasn't already been marked for deletion.
 func addFinalizer(client *oidcv1.Client) {
 	if client.ObjectMeta.DeletionTimestamp.IsZero() {
-		finalizerName := "client.oidc.security.ibm.com"
-		if !containsString(client.ObjectMeta.Finalizers, finalizerName) {
-			client.ObjectMeta.Finalizers = append(client.ObjectMeta.Finalizers, finalizerName)
+		if !containsString(client.ObjectMeta.Finalizers, FinalizerName) {
+			client.ObjectMeta.Finalizers = append(client.ObjectMeta.Finalizers, FinalizerName)
 		}
 	}
 }
 
+// removeFinalizer removes the Client controller's finalizer from a Client resource.
 func removeFinalizer(client *oidcv1.Client) {
-  finalizerName := "client.oidc.security.ibm.com"
   finalizers := client.ObjectMeta.GetFinalizers()
   updatedFinalizers := make([]string, 0)
   for i, finalizer := range finalizers {
-    if finalizer == finalizerName {
+    if finalizer == FinalizerName {
       updatedFinalizers = append(updatedFinalizers, finalizers[:i]...)
       updatedFinalizers = append(updatedFinalizers, finalizers[i+1:]...)
       break

@@ -29,7 +29,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -260,6 +259,9 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	if err != nil {
 		return
 	}
+	// create operand role and role-binding
+	r.createRole(instance)
+	r.createRoleBinding(instance)
 
 	// Check if this Certificate already exists and create it if it doesn't
 	currentCertificate := &certmgr.Certificate{}
@@ -297,12 +299,8 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	}
 	// create clusterrole and clusterrolebinding if OSAuthEnabled is true
 	if r.isOSAuthEnabled(instance) {
-		clusterRole := &rbacv1.ClusterRole{}
-		r.handleClusterRole(instance, clusterRole)
-
-		clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
-		r.handleClusterRoleBinding(instance, clusterRoleBinding)
-
+		r.createClusterRole(instance)
+		r.createClusterRoleBinding(instance)
 	}
 
 	r.ReconcileRemoveIngresses(ctx, instance)

@@ -743,6 +743,13 @@ spec:
           - patch
           - update
           - watch
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - roles
+          - rolebindings
+          verbs:
+          - create
         serviceAccountName: ibm-iam-operator
     strategy: deployment
   installModes:

@@ -1,5 +1,5 @@
 //
-// Copyright 2023 IBM Corporation
+// Copyright 2020 IBM Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,36 +24,40 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *ReconcileAuthentication) createClusterRole(instance *operatorv1alpha1.Authentication) {
+func (r *ReconcileAuthentication) createRoleBinding(instance *operatorv1alpha1.Authentication) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	// Define a new ClusterRole
-	operandClusterRole := r.iamOperandClusterRole(instance)
-	reqLogger.Info("Creating ibm-iam-operand-restricted clusterrole")
-	err := r.client.Create(context.TODO(), operandClusterRole)
+	// Define a new RoleBinding
+	operandRB := r.iamOperandRB(instance)
+	reqLogger.Info("Creating ibm-iam-operand-restricted RoleBinding")
+	err := r.client.Create(context.TODO(), operandRB)
 	if err != nil {
-		reqLogger.Info("Failed to create ibm-iam-operand-restricted clusterrole or its already present")
+		reqLogger.Info("Failed to create ibm-iam-operand-restricted RoleBinding or its already present")
 	}
-	// ClusterRole created successfully - return and requeue
 
 }
-func (r *ReconcileAuthentication) iamOperandClusterRole(instance *operatorv1alpha1.Authentication) *rbacv1.ClusterRole {
+func (r *ReconcileAuthentication) iamOperandRB(instance *operatorv1alpha1.Authentication) *rbacv1.RoleBinding {
 
 	// reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	operandClusterRole := &rbacv1.ClusterRole{
+	operandRB := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "ibm-iam-operand-restricted",
+			Namespace: instance.Namespace,
 			Labels:    map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/managed-by": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"},
-			Namespace: "",
 		},
-		Rules: []rbacv1.PolicyRule{
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     "ibm-iam-operand-restricted",
+		},
+		Subjects: []rbacv1.Subject{
 			{
-				APIGroups: []string{"user.openshift.io"},
-				Resources: []string{"users", "groups", "identities"},
-				Verbs:     []string{"get", "list"},
+				Kind:      "ServiceAccount",
+				Name:      "ibm-iam-operand-restricted",
+				Namespace: instance.Namespace,
 			},
 		},
 	}
-	return operandClusterRole
+	return operandRB
 
 }

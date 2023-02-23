@@ -17,21 +17,21 @@
 package client
 
 import (
-	"bytes"
   "context"
 	"encoding/json"
+  "io/ioutil"
 	"net/http"
 
-	condition "github.com/IBM/ibm-iam-operator/pkg/api/util"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	securityv1 "github.com/IBM/ibm-iam-operator/pkg/apis/oidc/v1"
+	oidcv1 "github.com/IBM/ibm-iam-operator/pkg/apis/oidc/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
 )
 
-type OidcClientError struct {
-	Error       string `json:"error"`
+type OIDCClientError struct {
 	Description string `json:"error_description"`
+}
+
+func (e *OIDCClientError) Error() string {
+  return e.Description
 }
 
 // ConditionStatus represents a condition's status.
@@ -60,11 +60,30 @@ const (
 	ReasonUnknown                     string = "Unknown"
 )
 
-func handleOIDCClientError(ctx context.Context, oidcreg *securityv1.Client, response *http.Response, err error, requestType string, recorder record.EventRecorder) {
-  logger := logf.FromContext(ctx)
-	var errorMessage, reason string
-	errorObj := &OidcClientError{}
+// NewOIDCClientError produces a new OIDCClientError by attempting to unmarshal the response body JSON into an
+// OIDCClientError's Description field.
+func NewOIDCClientError(response *http.Response) (oidcErr *OIDCClientError) {
+  if response == nil || response.Body == nil {
+    return nil
+  }
+  defer response.Body.Close()
+  bodyBuffer, err := ioutil.ReadAll(response.Body)
+  if err != nil {
+    return &OIDCClientError{
+      Description: MessageUnknown,
+    }
+  }
+  err = json.Unmarshal(bodyBuffer, oidcErr)
+  if err != nil {
+    return &OIDCClientError{
+      Description: MessageUnknown,
+    }
+  }
+  return
+}
 
+func (r *ReconcileClient) handleOIDCClientError(ctx context.Context, client *oidcv1.Client, err error, requestType string) {
+	var errorMessage, reason string
 	switch requestType {
 	case PostType:
 		reason = ReasonCreateClientFailed
@@ -78,33 +97,15 @@ func handleOIDCClientError(ctx context.Context, oidcreg *securityv1.Client, resp
 		reason = ReasonUnknown
 	}
 
-	if err == nil {
-		buf := new(bytes.Buffer)
-		buf.ReadFrom(response.Body)
-		errorMsg := buf.String()
-		errParse := json.Unmarshal([]byte(errorMsg), errorObj)
-		if errParse == nil {
-			errorMessage = errorObj.Description
-		} else {
-			errorMessage = MessageUnknown
-		}
-    logger.Info("nil error", "errorMessage", errorMsg, "status", response.Status)
-	} else {
-    logger.Error(err, "error found from OIDC Client")
-		errorMessage = err.Error()
-	}
+  errorMessage = err.Error()
 
 
 	if requestType == PostType {
-		condition.SetClientCondition(oidcreg,
-			securityv1.ClientConditionReady,
-			securityv1.ConditionFalse,
+		SetClientCondition(client,
+			oidcv1.ClientConditionReady,
+			oidcv1.ConditionFalse,
 			reason,
 			MessageCreateClientFailed)
 	}
-	recorder.Event(oidcreg, corev1.EventTypeWarning, reason, errorMessage)
-  // If the response is non-nil and Body is non-nil, attempt to close
-  if response != nil && response.Body != nil {
-    defer response.Body.Close()
-  }
+	r.recorder.Event(client, corev1.EventTypeWarning, reason, errorMessage)
 }

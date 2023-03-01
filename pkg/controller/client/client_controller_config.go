@@ -83,40 +83,8 @@ func (c ClientControllerConfig) ApplySecret(secret *corev1.Secret, keysList ...s
   return fmt.Errorf("found Secret had no \"Data\" field")
 }
 
-// IsConfigured returns whether all mandatory config fields are set.
-func (r *ReconcileClient) IsConfigured() bool {
-  if r.config == nil || len(r.config) == 0 {
-    return false
-  }
-  if value, err := r.GetIdentityManagementURL(); value != "" && err != nil {
-    return false
-  }
-  if value, err := r.GetIdentityProviderURL(); value != "" && err != nil {
-    return false
-  }
-  if _, err := r.GetROKSEnabled(); err != nil {
-    return false
-  }
-  if _, err := r.GetOSAuthEnabled(); err != nil {
-    return false
-  }
-  if value, err := r.GetAuthServiceURL(); value != "" && err != nil {
-    return false
-  }
-  if value, err := r.GetDefaultAdminUser(); value != "" && err != nil {
-    return false
-  }
-  if value, err := r.GetDefaultAdminPassword(); value != "" && err != nil {
-    return false
-  }
-  if value, err := r.GetOAuthAdminPassword(); value != "" && err != nil {
-    return false
-  }
-  return true
-}
-
-// getConfigValue retrieves the value stored at the provided key from the ReconcileClient's config field. Produces an
-// error if the ClientControllerConfig is empty or if the key is not present.
+// getConfigValue retrieves the value stored at the provided key from the ClientControllerConfig. Produces an error if
+// the ClientControllerConfig is empty or if the key is not present.
 func (c ClientControllerConfig) getConfigValue(key string) (value string, err error) {
   if len(c) == 0 {
     return "", fmt.Errorf("config is not set")
@@ -128,68 +96,107 @@ func (c ClientControllerConfig) getConfigValue(key string) (value string, err er
   return
 }
 
-// GetDefaultAdminUser gets the default admin user for the IAM API from the ReconcileClient's ClientControllerConfig.
-// Produces an error if the ClientControllerConfig is empty or if the key is not present.
-func (r *ReconcileClient) GetDefaultAdminUser() (value string, err error) {
-  value, err = r.config.getConfigValue(defaultAdminUserKey)
+// IsConfigured returns whether all mandatory config fields are set for the given namespace.
+func (r *ReconcileClient) IsConfigured(namespace string) bool {
+  if r.config == nil || len(r.config) == 0 {
+    return false
+  }
+  _, ok := r.config[namespace]
+  if !ok || len(r.config[namespace]) == 0 {
+    return false
+  }
+  if value, err := r.GetIdentityManagementURL(namespace); value != "" && err != nil {
+    return false
+  }
+  if value, err := r.GetIdentityProviderURL(namespace); value != "" && err != nil {
+    return false
+  }
+  if _, err := r.GetROKSEnabled(namespace); err != nil {
+    return false
+  }
+  if _, err := r.GetOSAuthEnabled(namespace); err != nil {
+    return false
+  }
+  if value, err := r.GetAuthServiceURL(namespace); value != "" && err != nil {
+    return false
+  }
+  if value, err := r.GetDefaultAdminUser(namespace); value != "" && err != nil {
+    return false
+  }
+  if value, err := r.GetDefaultAdminPassword(namespace); value != "" && err != nil {
+    return false
+  }
+  if value, err := r.GetOAuthAdminPassword(namespace); value != "" && err != nil {
+    return false
+  }
+  return true
+}
+
+// GetDefaultAdminUser gets the default admin user for the IAM API from the ReconcileClient's ClientControllerConfig for
+// the provided namespace. Produces an error if the ClientControllerConfig is empty or if the key is not present.
+func (r *ReconcileClient) GetDefaultAdminUser(namespace string) (value string, err error) {
+  value, err = r.config[namespace].getConfigValue(defaultAdminUserKey)
   return
 }
 
 // GetDefaultAdminPassword gets the default admin password for the IAM API from the ReconcileClient's
-// ClientControllerConfig. Produces an error if the ClientControllerConfig is empty or if the key is not present.
-func (r *ReconcileClient) GetDefaultAdminPassword() (value string, err error) {
-  value, err = r.config.getConfigValue(defaultAdminPasswordKey)
+// ClientControllerConfig for the provided namespace. Produces an error if the ClientControllerConfig is empty or if the
+// key is not present.
+func (r *ReconcileClient) GetDefaultAdminPassword(namespace string) (value string, err error) {
+  value, err = r.config[namespace].getConfigValue(defaultAdminPasswordKey)
   return
 }
 
 // GetOauthAdminPassword gets the password for the OAuth Provider oauthadmin account from the ReconcileClient's
-// ClientControllerConfig. Produces an error if the ClientControllerConfig is empty or if the key is not present.
-func (r *ReconcileClient) GetOAuthAdminPassword() (value string, err error) {
-  value, err = r.config.getConfigValue(oAuthAdminPasswordKey)
+// ClientControllerConfig for the provided namespace. Produces an error if the ClientControllerConfig is empty or if the
+// key is not present.
+func (r *ReconcileClient) GetOAuthAdminPassword(namespace string) (value string, err error) {
+  value, err = r.config[namespace].getConfigValue(oAuthAdminPasswordKey)
   return
 }
 
-// GetROKSEnabled gets from the ClientControllerCOnfig whether the controller is enabled to use OpenShift OAuthClients
-// for OIDC Client authentication via legacy configuration; creates and manages OAuthClient objects with names that
+// GetROKSEnabled gets from the ClientControllerConfig for the provided namespace whether the controller is enabled to
+// use OpenShift OAuthClients for OIDC Client authentication via legacy configuration; creates and manages OAuthClient
+// objects with names that match OIDC Client's clientId field. Produces an error if the ClientControllerConfig is empty
+// or if the key is not present.
+func (r *ReconcileClient) GetROKSEnabled(namespace string) (value bool, err error) {
+  valueStr, err := r.config[namespace].getConfigValue(rOKSEnabledKey)
+  if valueStr == "true" {
+    return true, nil
+  }
+  return
+}
+
+// GetOSAuthEnabled gets from the ClientControllerConfig for the provided namespace whether the controller is enabled to
+// use OpenShift OAuthClients for OIDC Client authentication; creates and manages OAuthClient objects with names that
 // match OIDC Client's clientId field. Produces an error if the ClientControllerConfig is empty or if the key is not
 // present.
-func (r *ReconcileClient) GetROKSEnabled() (value bool, err error) {
-  valueStr, err := r.config.getConfigValue(rOKSEnabledKey)
+func (r *ReconcileClient) GetOSAuthEnabled(namespace string) (value bool, err error) {
+  valueStr, err := r.config[namespace].getConfigValue(osAuthEnabledKey)
   if valueStr == "true" {
     return true, nil
   }
   return
 }
 
-// GetOSAuthEnabled gets from the ClientControllerCOnfig whether the controller is enabled to use OpenShift OAuthClients
-// for OIDC Client authentication; creates and manages OAuthClient objects with names that match OIDC Client's clientId
-// field. Produces an error if the ClientControllerConfig is empty or if the key is not present.
-func (r *ReconcileClient) GetOSAuthEnabled() (value bool, err error) {
-  valueStr, err := r.config.getConfigValue(osAuthEnabledKey)
-  if valueStr == "true" {
-    return true, nil
-  }
+// GetIdentityProviderURL gets the Identity Provider URL from the ReconcileClient's ClientControllerConfig for the
+// provided namespace. Produces an error if the ClientControllerConfig is empty or if the key is not present.
+func (r *ReconcileClient) GetIdentityProviderURL(namespace string) (value string, err error) {
+  value, err = r.config[namespace].getConfigValue(identityProviderURLKey)
   return
 }
 
-// GetIdentityProviderURL gets the Identity Provider URL from the ReconcileClient's ClientControllerConfig. Produces an
-// error if the ClientControllerConfig is empty or if the key is not present.
-func (r *ReconcileClient) GetIdentityProviderURL() (value string, err error) {
-  value, err = r.config.getConfigValue(identityProviderURLKey)
+// GetIdentityManagementURL gets the Identity Management URL from the ReconcileClient's ClientControllerConfig for the
+// provided namespace. Produces an error if the ClientControllerConfig is empty or if the key is not present.
+func (r *ReconcileClient) GetIdentityManagementURL(namespace string) (value string, err error) {
+  value, err = r.config[namespace].getConfigValue(identityManagementURLKey)
   return
 }
 
-// GetIdentityManagementURL gets the Identity Management URL from the ReconcileClient's ClientControllerConfig. Produces
-// an error if the ClientControllerConfig is empty or if the key is not present.
-func (r *ReconcileClient) GetIdentityManagementURL() (value string, err error) {
-  value, err = r.config.getConfigValue(identityManagementURLKey)
-  return
-}
-
-// GetAuthServiceURL gets the IAM Auth Service URL from the ReconcileClient's ClientControllerConfig. Produces an error
-// if the ClientControllerConfig is empty or if the key is not present.
-func (r *ReconcileClient) GetAuthServiceURL() (value string, err error) {
-  value, err = r.config.getConfigValue(authServiceURLKey)
+// GetAuthServiceURL gets the IAM Auth Service URL from the ReconcileClient's ClientControllerConfig for the provided
+// namespace. Produces an error if the ClientControllerConfig is empty or if the key is not present.
+func (r *ReconcileClient) GetAuthServiceURL(namespace string) (value string, err error) {
+  value, err = r.config[namespace].getConfigValue(authServiceURLKey)
   return
 }
 

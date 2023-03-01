@@ -546,20 +546,7 @@ spec:
                     - ALL
                   privileged: false
                   readOnlyRootFilesystem: true
-                volumeMounts:
-                - mountPath: /certs
-                  name: cluster-ca-cert
               serviceAccountName: ibm-iam-operator
-              volumes:
-              - name: cluster-ca-cert
-                secret:
-                  defaultMode: 420
-                  items:
-                  - key: tls.key
-                    path: ca.key
-                  - key: tls.crt
-                    path: ca.crt
-                  secretName: cs-ca-certificate-secret
       permissions:
       - rules:
         - apiGroups:

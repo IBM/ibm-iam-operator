@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+  "sync"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	utils "github.com/IBM/ibm-iam-operator/pkg/utils"
@@ -188,9 +189,12 @@ type ReconcileAuthentication struct {
 	client        client.Client
 	scheme        *runtime.Scheme
 	needToRequeue bool
+  Mutex sync.Mutex
 }
 
 func (r *ReconcileAuthentication) addFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
+  r.Mutex.Lock()
+  defer r.Mutex.Unlock()
 	if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 		instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
 		err = r.client.Update(ctx, instance)
@@ -200,6 +204,8 @@ func (r *ReconcileAuthentication) addFinalizer(ctx context.Context, finalizerNam
 
 // removeFinalizer removes the provided finalizer from the Authentication instance.
 func (r *ReconcileAuthentication) removeFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
+  r.Mutex.Lock()
+  defer r.Mutex.Unlock()
 	if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 		instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
 		err = r.client.Update(ctx, instance)
@@ -237,6 +243,13 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 		// Return without requeueing
 		return
 	}
+
+  // Be sure to update status before returning if Authentication is found
+  defer func() {
+    reqLogger.Info("Gather current service status")
+    currentServiceStatus := getCurrentServiceStatus(ctx, r.client, instance)
+    instance.SetService(reconcileCtx, currentServiceStatus, r.client, &r.Mutex)
+  }()
 
 	// Credit: kubebuilder book
 	finalizerName := "authentication.operator.ibm.com"

@@ -52,6 +52,11 @@ func (r *ReconcileAuthentication) iamOperandRole(instance *operatorv1alpha1.Auth
 				Resources: []string{"clients", "clients/finalizers", "clients/status"},
 				Verbs:     []string{"create", "delete", "watch", "get", "list", "patch", "update"},
 			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"secrets", "services", "endpoints"},
+				Verbs:     []string{"create", "delete", "watch", "get", "list", "patch", "update"},
+			},
 		},
 	}
 	return operandRole

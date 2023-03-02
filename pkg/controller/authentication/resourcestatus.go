@@ -93,6 +93,7 @@ func getDeploymentStatus(ctx context.Context, k8sClient client.Client, namespace
     }
     return
   }
+  status.APIVersion = deployment.APIVersion
   for _, condition := range deployment.Status.Conditions {
     if condition.Type == appsv1.DeploymentAvailable && condition.Status == corev1.ConditionTrue {
       status.Status = ResourceReadyState
@@ -132,6 +133,7 @@ func getJobStatus(ctx context.Context, k8sClient client.Client, namespacedName t
     }
     return
   }
+  status.APIVersion = job.APIVersion
   for _, condition := range job.Status.Conditions {
     if condition.Type == batchv1.JobComplete && condition.Status == corev1.ConditionTrue {
       status.Status = ResourceReadyState
@@ -171,6 +173,7 @@ func getRouteStatus(ctx context.Context, k8sClient client.Client, namespacedName
     }
     return
   }
+  status.APIVersion = route.APIVersion
   for _, routeIngress := range route.Status.Ingress {
     for _, condition := range routeIngress.Conditions {
       if condition.Type == routev1.RouteAdmitted && condition.Status != corev1.ConditionTrue {

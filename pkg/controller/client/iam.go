@@ -62,7 +62,7 @@ func getTokenInfoFromResponse(response *http.Response) (tokenInfo *TokenInfo, er
 // in platform-auth-idp-credentials.
 func (r *ReconcileClient) getAuthnTokens(ctx context.Context, client *oidcv1.Client) (tokenInfo *TokenInfo, err error) {
   reqLogger := logf.FromContext(ctx).WithName("getAuthnTokens")
-  identityProviderURL, err := r.GetIdentityProviderURL(client.Namespace)
+  identityProviderURL, err := r.GetIdentityProviderURL()
   if err != nil {
     return nil, err
   }
@@ -83,11 +83,11 @@ func (r *ReconcileClient) getAuthnTokens(ctx context.Context, client *oidcv1.Cli
   } else {
     tokenType = "identitytoken"
     grantType = "password"
-    defaultAdminUser, err = r.GetDefaultAdminUser(client.Namespace)
+    defaultAdminUser, err = r.GetDefaultAdminUser()
     if err != nil {
       return
     }
-    defaultAdminPassword, err = r.GetDefaultAdminPassword(client.Namespace)
+    defaultAdminPassword, err = r.GetDefaultAdminPassword()
     if err != nil {
       return
     }
@@ -99,7 +99,7 @@ func (r *ReconcileClient) getAuthnTokens(ctx context.Context, client *oidcv1.Cli
   var req *http.Request
   var caCertSecret *corev1.Secret
   var httpClient *http.Client
-  oAuthAdminPassword, err := r.GetOAuthAdminPassword(client.Namespace)
+  oAuthAdminPassword, err := r.GetOAuthAdminPassword()
   if err != nil {
     return
   }
@@ -115,7 +115,8 @@ func (r *ReconcileClient) getAuthnTokens(ctx context.Context, client *oidcv1.Cli
     if client.IsCPClientCredentialsEnabled() {
       req.SetBasicAuth("oauthadmin", oAuthAdminPassword)
     }
-    caCertSecret, err = r.getCSCACertificateSecret(ctx, client.Namespace)
+
+    caCertSecret, err = r.getCSCACertificateSecret(ctx, r.sharedServicesNamespace)
     if err != nil {
       return
     }
@@ -169,7 +170,8 @@ func (r *ReconcileClient) invokeIamApi(ctx context.Context, client *oidcv1.Clien
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", bearer)
 	request.Header.Set("Accept", "application/json")
-  caCertSecret, err := r.getCSCACertificateSecret(ctx, client.Namespace)
+
+  caCertSecret, err := r.getCSCACertificateSecret(ctx, r.sharedServicesNamespace)
   if err != nil {
     return nil, fmt.Errorf("failed to get certificate secret for namespace %q: %w", client.Namespace, err)
   }

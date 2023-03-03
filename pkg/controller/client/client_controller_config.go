@@ -18,6 +18,7 @@ package client
 
 import (
 	"fmt"
+  "strings"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -46,17 +47,35 @@ const (
   oAuthAdminPasswordKey string = "OAUTH2_CLIENT_REGISTRATION_SECRET"
 )
 
+// getClusterDomainNameForServiceURL converts the provided URL string from just a Service name to "<service
+// name>.<namespace>.svc"
+func getClusterDomainNameForServiceURL(url string, namespace string) string {
+  suffix := ".svc"
+  splitByColons := strings.Split(url, ":")
+  port := splitByColons[len(splitByColons) - 1]
+  everythingBeforePort := strings.Join(splitByColons[:len(splitByColons) - 1], ":")
+  return everythingBeforePort + "." + namespace + suffix + ":" + port
+}
+
 // ApplyConfigMap takes the key value pairs found in a ConfigMap's Data field and sets the same keys and values in the
 // ClientControllerConfig. Produces an error if the ConfigMap had an empty Data field.
 func (c ClientControllerConfig) ApplyConfigMap(configMap *corev1.ConfigMap, keysList ...string) (err error) {
   if configMap.Data != nil || len(configMap.Data) == 0 {
     if len(keysList) != 0 {
       for _, k := range keysList {
-        c[k] = configMap.Data[k]
+        if k == authServiceURLKey || k == identityProviderURLKey || k == identityManagementURLKey {
+          c[k] = getClusterDomainNameForServiceURL(configMap.Data[k], configMap.Namespace)
+        } else {
+          c[k] = configMap.Data[k]
+        }
       }
     } else {
       for k, v := range configMap.Data {
-        c[k] = v
+        if k == authServiceURLKey || k == identityProviderURLKey || k == identityManagementURLKey {
+          c[k] = getClusterDomainNameForServiceURL(v, configMap.Namespace)
+        } else {
+          c[k] = v
+        }
       }
     }
     return
@@ -96,107 +115,100 @@ func (c ClientControllerConfig) getConfigValue(key string) (value string, err er
   return
 }
 
-// IsConfigured returns whether all mandatory config fields are set for the given namespace.
-func (r *ReconcileClient) IsConfigured(namespace string) bool {
+// IsConfigured returns whether all mandatory config fields are set.
+func (r *ReconcileClient) IsConfigured() bool {
   if r.config == nil || len(r.config) == 0 {
     return false
   }
-  _, ok := r.config[namespace]
-  if !ok || len(r.config[namespace]) == 0 {
+  if value, err := r.GetIdentityManagementURL(); value != "" && err != nil {
     return false
   }
-  if value, err := r.GetIdentityManagementURL(namespace); value != "" && err != nil {
+  if value, err := r.GetIdentityProviderURL(); value != "" && err != nil {
     return false
   }
-  if value, err := r.GetIdentityProviderURL(namespace); value != "" && err != nil {
+  if _, err := r.GetROKSEnabled(); err != nil {
     return false
   }
-  if _, err := r.GetROKSEnabled(namespace); err != nil {
+  if _, err := r.GetOSAuthEnabled(); err != nil {
     return false
   }
-  if _, err := r.GetOSAuthEnabled(namespace); err != nil {
+  if value, err := r.GetAuthServiceURL(); value != "" && err != nil {
     return false
   }
-  if value, err := r.GetAuthServiceURL(namespace); value != "" && err != nil {
+  if value, err := r.GetDefaultAdminUser(); value != "" && err != nil {
     return false
   }
-  if value, err := r.GetDefaultAdminUser(namespace); value != "" && err != nil {
+  if value, err := r.GetDefaultAdminPassword(); value != "" && err != nil {
     return false
   }
-  if value, err := r.GetDefaultAdminPassword(namespace); value != "" && err != nil {
-    return false
-  }
-  if value, err := r.GetOAuthAdminPassword(namespace); value != "" && err != nil {
+  if value, err := r.GetOAuthAdminPassword(); value != "" && err != nil {
     return false
   }
   return true
 }
 
-// GetDefaultAdminUser gets the default admin user for the IAM API from the ReconcileClient's ClientControllerConfig for
-// the provided namespace. Produces an error if the ClientControllerConfig is empty or if the key is not present.
-func (r *ReconcileClient) GetDefaultAdminUser(namespace string) (value string, err error) {
-  value, err = r.config[namespace].getConfigValue(defaultAdminUserKey)
+// GetDefaultAdminUser gets the default admin user for the IAM API from the ReconcileClient's ClientControllerConfig.
+// Produces an error if the ClientControllerConfig is empty or if the key is not present.
+func (r *ReconcileClient) GetDefaultAdminUser() (value string, err error) {
+  value, err = r.config.getConfigValue(defaultAdminUserKey)
   return
 }
 
 // GetDefaultAdminPassword gets the default admin password for the IAM API from the ReconcileClient's
-// ClientControllerConfig for the provided namespace. Produces an error if the ClientControllerConfig is empty or if the
-// key is not present.
-func (r *ReconcileClient) GetDefaultAdminPassword(namespace string) (value string, err error) {
-  value, err = r.config[namespace].getConfigValue(defaultAdminPasswordKey)
+// ClientControllerConfig. Produces an error if the ClientControllerConfig is empty or if the key is not present.
+func (r *ReconcileClient) GetDefaultAdminPassword() (value string, err error) {
+  value, err = r.config.getConfigValue(defaultAdminPasswordKey)
   return
 }
 
 // GetOauthAdminPassword gets the password for the OAuth Provider oauthadmin account from the ReconcileClient's
-// ClientControllerConfig for the provided namespace. Produces an error if the ClientControllerConfig is empty or if the
-// key is not present.
-func (r *ReconcileClient) GetOAuthAdminPassword(namespace string) (value string, err error) {
-  value, err = r.config[namespace].getConfigValue(oAuthAdminPasswordKey)
+// ClientControllerConfig. Produces an error if the ClientControllerConfig is empty or if the key is not present.
+func (r *ReconcileClient) GetOAuthAdminPassword() (value string, err error) {
+  value, err = r.config.getConfigValue(oAuthAdminPasswordKey)
   return
 }
 
-// GetROKSEnabled gets from the ClientControllerConfig for the provided namespace whether the controller is enabled to
-// use OpenShift OAuthClients for OIDC Client authentication via legacy configuration; creates and manages OAuthClient
-// objects with names that match OIDC Client's clientId field. Produces an error if the ClientControllerConfig is empty
-// or if the key is not present.
-func (r *ReconcileClient) GetROKSEnabled(namespace string) (value bool, err error) {
-  valueStr, err := r.config[namespace].getConfigValue(rOKSEnabledKey)
-  if valueStr == "true" {
-    return true, nil
-  }
-  return
-}
-
-// GetOSAuthEnabled gets from the ClientControllerConfig for the provided namespace whether the controller is enabled to
-// use OpenShift OAuthClients for OIDC Client authentication; creates and manages OAuthClient objects with names that
+// GetROKSEnabled gets from the ClientControllerConfig whether the controller is enabled to use OpenShift OAuthClients
+// for OIDC Client authentication via legacy configuration; creates and manages OAuthClient objects with names that
 // match OIDC Client's clientId field. Produces an error if the ClientControllerConfig is empty or if the key is not
 // present.
-func (r *ReconcileClient) GetOSAuthEnabled(namespace string) (value bool, err error) {
-  valueStr, err := r.config[namespace].getConfigValue(osAuthEnabledKey)
+func (r *ReconcileClient) GetROKSEnabled() (value bool, err error) {
+  valueStr, err := r.config.getConfigValue(rOKSEnabledKey)
   if valueStr == "true" {
     return true, nil
   }
   return
 }
 
-// GetIdentityProviderURL gets the Identity Provider URL from the ReconcileClient's ClientControllerConfig for the
-// provided namespace. Produces an error if the ClientControllerConfig is empty or if the key is not present.
-func (r *ReconcileClient) GetIdentityProviderURL(namespace string) (value string, err error) {
-  value, err = r.config[namespace].getConfigValue(identityProviderURLKey)
+// GetOSAuthEnabled gets from the ClientControllerConfig whether the controller is enabled to use OpenShift OAuthClients
+// for OIDC Client authentication; creates and manages OAuthClient objects with names that match OIDC Client's clientId
+// field. Produces an error if the ClientControllerConfig is empty or if the key is not present.
+func (r *ReconcileClient) GetOSAuthEnabled() (value bool, err error) {
+  valueStr, err := r.config.getConfigValue(osAuthEnabledKey)
+  if valueStr == "true" {
+    return true, nil
+  }
   return
 }
 
-// GetIdentityManagementURL gets the Identity Management URL from the ReconcileClient's ClientControllerConfig for the
-// provided namespace. Produces an error if the ClientControllerConfig is empty or if the key is not present.
-func (r *ReconcileClient) GetIdentityManagementURL(namespace string) (value string, err error) {
-  value, err = r.config[namespace].getConfigValue(identityManagementURLKey)
+// GetIdentityProviderURL gets the Identity Provider URL from the ReconcileClient's ClientControllerConfig. Produces an
+// error if the ClientControllerConfig is empty or if the key is not present.
+func (r *ReconcileClient) GetIdentityProviderURL() (value string, err error) {
+  value, err = r.config.getConfigValue(identityProviderURLKey)
   return
 }
 
-// GetAuthServiceURL gets the IAM Auth Service URL from the ReconcileClient's ClientControllerConfig for the provided
-// namespace. Produces an error if the ClientControllerConfig is empty or if the key is not present.
-func (r *ReconcileClient) GetAuthServiceURL(namespace string) (value string, err error) {
-  value, err = r.config[namespace].getConfigValue(authServiceURLKey)
+// GetIdentityManagementURL gets the Identity Management URL from the ReconcileClient's ClientControllerConfig. Produces
+// an error if the ClientControllerConfig is empty or if the key is not present.
+func (r *ReconcileClient) GetIdentityManagementURL() (value string, err error) {
+  value, err = r.config.getConfigValue(identityManagementURLKey)
+  return
+}
+
+// GetAuthServiceURL gets the IAM Auth Service URL from the ReconcileClient's ClientControllerConfig. Produces an error
+// if the ClientControllerConfig is empty or if the key is not present.
+func (r *ReconcileClient) GetAuthServiceURL() (value string, err error) {
+  value, err = r.config.getConfigValue(authServiceURLKey)
   return
 }
 

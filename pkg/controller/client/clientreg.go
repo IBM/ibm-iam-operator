@@ -88,9 +88,11 @@ const (
 
 // CreateClientRegistration registers a new OIDC Client on the OP using information provided in the provided Client CR.
 func (r *ReconcileClient) CreateClientRegistration(ctx context.Context, client *oidcv1.Client, clientCreds *ClientCredentials) (response *http.Response, err error) {
+  reqLogger := logf.FromContext(ctx).WithName("CreateClientRegistration")
   var url, identityProviderURL string
-  identityProviderURL, err = r.GetIdentityProviderURL(client.Namespace)
+  identityProviderURL, err = r.GetIdentityProviderURL()
   if err != nil {
+    reqLogger.Error(err, "Tried to get identity provider url but failed")
     return
   }
   url = strings.Join([]string{identityProviderURL, "v1", "auth", "registration"}, "/")
@@ -108,7 +110,7 @@ func (r *ReconcileClient) CreateClientRegistration(ctx context.Context, client *
 func (r *ReconcileClient) UpdateClientRegistration(ctx context.Context, client *oidcv1.Client, clientCreds *ClientCredentials) (response *http.Response, err error) {
   var url, identityProviderURL string
 	payload := r.generateClientRegistrationPayload(client, clientCreds)
-  identityProviderURL, err = r.GetIdentityProviderURL(client.Namespace)
+  identityProviderURL, err = r.GetIdentityProviderURL()
   if err != nil {
     return
   }
@@ -128,7 +130,7 @@ func (r *ReconcileClient) DeleteClientRegistration(ctx context.Context, client *
   }
 
   var url, identityProviderURL string
-  identityProviderURL, err = r.GetIdentityProviderURL(client.Namespace)
+  identityProviderURL, err = r.GetIdentityProviderURL()
   if err != nil {
     return
   }
@@ -145,7 +147,7 @@ func (r *ReconcileClient) invokeClientRegistrationAPI(ctx context.Context, clien
   reqLogger.Info("params", "requestType", requestType, "requestURL", requestURL)
   oauthAdmin := "oauthadmin"
   var clientRegistrationSecret string
-  clientRegistrationSecret, err = r.GetOAuthAdminPassword(client.Namespace)
+  clientRegistrationSecret, err = r.GetOAuthAdminPassword()
   if err != nil {
     return
   }
@@ -154,7 +156,7 @@ func (r *ReconcileClient) invokeClientRegistrationAPI(ctx context.Context, clien
 	request.Header.Set("Content-Type", "application/json")
 	request.SetBasicAuth(oauthAdmin, clientRegistrationSecret)
 
-  caCertSecret, err := r.getCSCACertificateSecret(ctx, client.Namespace)
+  caCertSecret, err := r.getCSCACertificateSecret(ctx, r.sharedServicesNamespace)
   if err != nil {
     return
   }
@@ -166,14 +168,17 @@ func (r *ReconcileClient) invokeClientRegistrationAPI(ctx context.Context, clien
 
   response, err = httpClient.Do(request)
   if err != nil {
+    reqLogger.Error(err, "Request failed")
     return
+  } else {
+    reqLogger.Info("Request complete", "response", response)
   }
 	return
 }
 
 // GetClientRegistration gets the registered Client from the OP, if it is there.
 func (r *ReconcileClient) GetClientRegistration(ctx context.Context, client *oidcv1.Client) (response *http.Response, err error) {
-  authServiceURL, err := r.GetIdentityProviderURL(client.Namespace)
+  authServiceURL, err := r.GetIdentityProviderURL()
   if err != nil {
     return
   }
@@ -354,7 +359,7 @@ func (r *ReconcileClient) GetZenInstance(ctx context.Context, client *oidcv1.Cli
 		return nil, fmt.Errorf("Zen instance id is required to query a zen instance")
 	}
 
-  identityManagementURL, err := r.GetIdentityManagementURL(client.Namespace)
+  identityManagementURL, err := r.GetIdentityManagementURL()
   if err != nil {
     return
   } 
@@ -397,7 +402,7 @@ func (r *ReconcileClient) DeleteZenInstance(ctx context.Context, client *oidcv1.
 	}
 
   // Get the platform-auth-idp ConfigMap to obtain constant values
-  identityManagementURL, err := r.GetIdentityManagementURL(client.Namespace)
+  identityManagementURL, err := r.GetIdentityManagementURL()
   if err != nil {
     return err
   } 
@@ -438,7 +443,7 @@ func (r *ReconcileClient) CreateZenInstance(ctx context.Context, client *oidcv1.
 	payloadBytes, _ := json.Marshal(payloadJSON)
 	payload := string(payloadBytes[:])
 
-  identityManagementURL, err := r.GetIdentityManagementURL(client.Namespace)
+  identityManagementURL, err := r.GetIdentityManagementURL()
   if err != nil {
     return
   } 

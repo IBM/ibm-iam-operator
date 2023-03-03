@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-  "sync"
+	"sync"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	utils "github.com/IBM/ibm-iam-operator/pkg/utils"
@@ -216,6 +216,16 @@ func (r *ReconcileAuthentication) removeFinalizer(ctx context.Context, finalizer
 	return
 }
 
+// needsAuditServiceDummyDataReset compares the state in an Authentication's .spec.auditService and returns whether it
+// needs to be overwritten with dummy data.
+func needsAuditServiceDummyDataReset(a *operatorv1alpha1.Authentication) bool {
+  return a.Spec.AuditService.ImageName != operatorv1alpha1.AuditServiceIgnoreString ||
+  a.Spec.AuditService.ImageRegistry != operatorv1alpha1.AuditServiceIgnoreString ||
+  a.Spec.AuditService.ImageTag != operatorv1alpha1.AuditServiceIgnoreString ||
+  a.Spec.AuditService.SyslogTlsPath != "" ||
+  a.Spec.AuditService.Resources != nil
+}
+
 // Reconcile reads that state of the cluster for a Authentication object and makes changes based on the state read
 // and what is in the Authentication.Spec
 // TODO(user): Modify this Reconcile function to implement your Controller logic.  This example creates
@@ -243,6 +253,14 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 		// Return without requeueing
 		return
 	}
+
+  if needsAuditServiceDummyDataReset(instance) {
+    instance.SetRequiredDummyData()
+		err = r.client.Update(ctx, instance)
+		if err != nil {
+			return
+		}
+  }
 
   // Be sure to update status before returning if Authentication is found
   defer func() {

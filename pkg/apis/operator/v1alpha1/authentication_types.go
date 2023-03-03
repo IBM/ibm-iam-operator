@@ -35,12 +35,39 @@ type AuthenticationSpec struct {
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
 	OperatorVersion    string                 `json:"operatorVersion"`
 	Replicas           int32                  `json:"replicas"`
+  AuditService       AuditServiceSpec       `json:"auditService"`
 	AuthService        AuthServiceSpec        `json:"authService"`
 	IdentityProvider   IdentityProviderSpec   `json:"identityProvider"`
 	IdentityManager    IdentityManagerSpec    `json:"identityManager"`
 	InitMongodb        InitMongodbSpec        `json:"initMongodb"`
 	ClientRegistration ClientRegistrationSpec `json:"clientRegistration"`
 	Config             ConfigSpec             `json:"config"`
+}
+
+type AuditServiceSpec struct {
+	ImageRegistry string                       `json:"imageRegistry"`
+	ImageName     string                       `json:"imageName"`
+	ImageTag      string                       `json:"imageTag"`
+	SyslogTlsPath string                       `json:"syslogTlsPath,omitempty"`
+	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+const AuditServiceIgnoreString string = "auditService no longer used - ignore"
+
+// setRequiredDummyData writes dummy AuditServiceSpec data to an Authentication in order to maintain backwards- and
+// forwards-compatibility with previous Authentication CRD releases. Running this function ensures that, if an earlier
+// version of the Authentication CRD is installed on a cluster where this version's CRD was previously, the CRs created
+// based upon this version's CRD will not break in a multi-tenancy scenario.
+func (a *Authentication) SetRequiredDummyData() {
+  if a == nil {
+    return
+  }
+
+  a.Spec.AuditService = AuditServiceSpec{
+    ImageRegistry: AuditServiceIgnoreString,
+    ImageName: AuditServiceIgnoreString,
+    ImageTag: AuditServiceIgnoreString,
+  }
 }
 
 type AuthServiceSpec struct {

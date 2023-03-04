@@ -254,14 +254,6 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 		return
 	}
 
-  if needsAuditServiceDummyDataReset(instance) {
-    instance.SetRequiredDummyData()
-		err = r.client.Update(ctx, instance)
-		if err != nil {
-			return
-		}
-  }
-
   // Be sure to update status before returning if Authentication is found
   defer func() {
     reqLogger.Info("Gather current service status")
@@ -356,6 +348,14 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	if err != nil {
 		return
 	}
+
+  if needsAuditServiceDummyDataReset(instance) {
+    instance.SetRequiredDummyData()
+		err = r.client.Update(ctx, instance)
+		if err != nil {
+			return
+		}
+  }
 
 	if r.needToRequeue {
 		return reconcile.Result{Requeue: true}, nil

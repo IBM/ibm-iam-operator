@@ -16,6 +16,22 @@ metadata:
             "name": "example-authentication"
           },
           "spec": {
+            "auditService": {
+              "imageName": "audit-syslog-service",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "1.8.0",
+              "syslogTlsPath": "/etc/audit-tls",
+              "resources": {
+                "limits": {
+                  "cpu": "100m",
+                  "memory": "128Mi"
+                },
+                "requests": {
+                  "cpu": "10m",
+                  "memory": "100Mi"
+                }
+              }
+            },
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
@@ -315,6 +331,11 @@ spec:
       - description: A list defines the catalog information for operator version.
         displayName: OperatorVersion
         path: operatorVersion
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for audit service.
+        displayName: AuditService
+        path: auditService
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
       - description: A list defines the catalog information for auth service.

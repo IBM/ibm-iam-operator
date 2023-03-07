@@ -17,8 +17,12 @@
 package v1alpha1
 
 import (
+  "context"
+  "sync"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -31,12 +35,39 @@ type AuthenticationSpec struct {
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
 	OperatorVersion    string                 `json:"operatorVersion"`
 	Replicas           int32                  `json:"replicas"`
+  AuditService       AuditServiceSpec       `json:"auditService"`
 	AuthService        AuthServiceSpec        `json:"authService"`
 	IdentityProvider   IdentityProviderSpec   `json:"identityProvider"`
 	IdentityManager    IdentityManagerSpec    `json:"identityManager"`
 	InitMongodb        InitMongodbSpec        `json:"initMongodb"`
 	ClientRegistration ClientRegistrationSpec `json:"clientRegistration"`
 	Config             ConfigSpec             `json:"config"`
+}
+
+type AuditServiceSpec struct {
+	ImageRegistry string                       `json:"imageRegistry"`
+	ImageName     string                       `json:"imageName"`
+	ImageTag      string                       `json:"imageTag"`
+	SyslogTlsPath string                       `json:"syslogTlsPath,omitempty"`
+	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+const AuditServiceIgnoreString string = "auditService no longer used - ignore"
+
+// setRequiredDummyData writes dummy AuditServiceSpec data to an Authentication in order to maintain backwards- and
+// forwards-compatibility with previous Authentication CRD releases. Running this function ensures that, if an earlier
+// version of the Authentication CRD is installed on a cluster where this version's CRD was previously, the CRs created
+// based upon this version's CRD will not break in a multi-tenancy scenario.
+func (a *Authentication) SetRequiredDummyData() {
+  if a == nil {
+    return
+  }
+
+  a.Spec.AuditService = AuditServiceSpec{
+    ImageRegistry: AuditServiceIgnoreString,
+    ImageName: AuditServiceIgnoreString,
+    ImageTag: AuditServiceIgnoreString,
+  }
 }
 
 type AuthServiceSpec struct {
@@ -115,12 +146,84 @@ type ConfigSpec struct {
 	AttrMappingFromConfig       bool   `json:"attrMappingFromConfig,omitempty"`
 }
 
+type ManagedResourceStatus struct {
+	ObjectName string `json:"objectName,omitempty"`
+	APIVersion string `json:"apiVersion,omitempty"`
+	Namespace  string `json:"namespace,omitempty"`
+	Kind       string `json:"kind,omitempty"`
+	Status string `json:"status,omitempty"`
+}
+
+type ServiceStatus struct {
+  ObjectName string `json:"objectName,omitempty"`
+  APIVersion string `json:"apiVersion,omitempty"`
+  Namespace  string `json:"namespace,omitempty"`
+  Kind       string `json:"kind,omitempty"`
+  Status string `json:"status,omitempty"`
+  ManagedResources []ManagedResourceStatus `json:"managedResources,omitempty"`
+}
+
+func (a *Authentication) SetService(ctx context.Context, service ServiceStatus, statusClient client.StatusClient, mu sync.Locker) (err error) {
+  reqLogger := logf.FromContext(ctx).WithName("SetService").V(3)
+  mu.Lock()
+  defer mu.Unlock()
+  if a.Status.Service.ObjectName == "" {
+    reqLogger.Info("ObjectName is empty")
+    a.Status.Service = service
+    reqLogger.Info("Updating service", "service", a.Status.Service)
+    err = statusClient.Status().Update(ctx, a)
+    if err != nil {
+      reqLogger.Error(err, "Attempt to update failed")
+    }
+    return
+  }
+  reqLogger.Info("ObjectName is set", "ObjectName", a.Status.Service.ObjectName)
+  for _, managedResource := range service.ManagedResources {
+    if managedResource.ObjectName != "" {
+      reqLogger.Info("Review managed resource", "mangedResource", managedResource)
+      pos, _ := getResourceStatus(a.Status.Service.ManagedResources, managedResource.ObjectName)
+      if pos != -1 {
+        reqLogger.Info("Found in existing status", "prev", a.Status.Service.ManagedResources[pos], "current", managedResource)
+        a.Status.Service.ManagedResources[pos] = managedResource
+        err = statusClient.Status().Update(ctx, a)
+        if err != nil {
+          reqLogger.Error(err, "Attempt to update failed")
+          return
+        }
+      } else {
+        reqLogger.Info("Not found in existing status", "current", managedResource)
+        a.Status.Service.ManagedResources = append(a.Status.Service.ManagedResources, managedResource)
+        err = statusClient.Status().Update(ctx, a)
+        if err != nil {
+          reqLogger.Error(err, "Attempt to update failed")
+          return
+        }
+      }
+    }
+  }
+  if a.Status.Service.Status != service.Status {
+    a.Status.Service.Status = service.Status
+  }
+  err = statusClient.Status().Update(ctx, a)
+  if err != nil {
+    reqLogger.Error(err, "Attempt to update failed")
+  }
+  return
+}
+
+func getResourceStatus(resources []ManagedResourceStatus, name string) (pos int, resourceStatus *ManagedResourceStatus) {
+  for i, r := range resources {
+    if name == resources[i].ObjectName {
+      return i, &r
+    }
+  }
+  return -1, nil
+}
+
 // AuthenticationStatus defines the observed state of Authentication
 type AuthenticationStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
-	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
 	Nodes []string `json:"nodes"`
+  Service ServiceStatus `json:"service,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -131,7 +234,6 @@ type AuthenticationStatus struct {
 type Authentication struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-
 	Spec   AuthenticationSpec   `json:"spec,omitempty"`
 	Status AuthenticationStatus `json:"status,omitempty"`
 }

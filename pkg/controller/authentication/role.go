@@ -24,36 +24,41 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *ReconcileAuthentication) createClusterRole(instance *operatorv1alpha1.Authentication) {
+func (r *ReconcileAuthentication) createRole(instance *operatorv1alpha1.Authentication) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	// Define a new ClusterRole
-	operandClusterRole := r.iamOperandClusterRole(instance)
-	reqLogger.Info("Creating ibm-iam-operand-restricted clusterrole")
-	err := r.client.Create(context.TODO(), operandClusterRole)
+	// Define a new Role
+	operandRole := r.iamOperandRole(instance)
+	reqLogger.Info("Creating ibm-iam-operand-restricted role")
+	err := r.client.Create(context.TODO(), operandRole)
 	if err != nil {
-		reqLogger.Info("Failed to create ibm-iam-operand-restricted clusterrole or its already present")
+		reqLogger.Info("Failed to create ibm-iam-operand-restricted role or its already present")
 	}
-	// ClusterRole created successfully - return and requeue
+	// Role created successfully - return and requeue
 
 }
-func (r *ReconcileAuthentication) iamOperandClusterRole(instance *operatorv1alpha1.Authentication) *rbacv1.ClusterRole {
+func (r *ReconcileAuthentication) iamOperandRole(instance *operatorv1alpha1.Authentication) *rbacv1.Role {
 
 	// reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	operandClusterRole := &rbacv1.ClusterRole{
+	operandRole := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "ibm-iam-operand-restricted",
 			Labels:    map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/managed-by": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"},
-			Namespace: "",
+			Namespace: instance.Namespace,
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
-				APIGroups: []string{"user.openshift.io"},
-				Resources: []string{"users", "groups", "identities"},
-				Verbs:     []string{"get", "list"},
+				APIGroups: []string{"oidc.security.ibm.com"},
+				Resources: []string{"clients", "clients/finalizers", "clients/status"},
+				Verbs:     []string{"create", "delete", "watch", "get", "list", "patch", "update"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"secrets", "services", "endpoints"},
+				Verbs:     []string{"create", "delete", "watch", "get", "list", "patch", "update"},
 			},
 		},
 	}
-	return operandClusterRole
+	return operandRole
 
 }

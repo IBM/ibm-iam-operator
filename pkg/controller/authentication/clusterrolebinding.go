@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *ReconcileAuthentication) handleClusterRoleBinding(instance *operatorv1alpha1.Authentication, clusterRoleBinding *rbacv1.ClusterRoleBinding) {
+func (r *ReconcileAuthentication) createClusterRoleBinding(instance *operatorv1alpha1.Authentication) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	// Define a new ClusterRoleBinding

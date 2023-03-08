@@ -21,9 +21,7 @@ import (
 	"context"
 
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -90,14 +88,20 @@ const (
 
 // CreateClientRegistration registers a new OIDC Client on the OP using information provided in the provided Client CR.
 func (r *ReconcileClient) CreateClientRegistration(ctx context.Context, client *oidcv1.Client, clientCreds *ClientCredentials) (response *http.Response, err error) {
+  reqLogger := logf.FromContext(ctx).WithName("CreateClientRegistration")
   var url, identityProviderURL string
   identityProviderURL, err = r.GetIdentityProviderURL()
   if err != nil {
+    reqLogger.Error(err, "Tried to get identity provider url but failed")
     return
   }
   url = strings.Join([]string{identityProviderURL, "v1", "auth", "registration"}, "/")
 	payload := r.generateClientRegistrationPayload(client, clientCreds)
 	response, err = r.invokeClientRegistrationAPI(ctx, client, PostType, url, payload)
+  if err == nil && response.Status != "201 Created" {
+    err = NewOIDCClientError(response)
+    return nil, err
+  }
   return
 }
 
@@ -112,22 +116,29 @@ func (r *ReconcileClient) UpdateClientRegistration(ctx context.Context, client *
   }
   url = strings.Join([]string{identityProviderURL, "v1", "auth", "registration", clientCreds.ClientID}, "/")
 	response, err = r.invokeClientRegistrationAPI(ctx, client, PutType, url, payload)
+  if err == nil && response.Status != "200 OK" {
+    return nil, NewOIDCClientError(response)
+  }
   return
 }
 
 // DeleteClientRegistration deletes from the OP the OIDC Client registration represented by the Client CR.
 func (r *ReconcileClient) DeleteClientRegistration(ctx context.Context, client *oidcv1.Client) (response *http.Response, err error) {
 	clientId := client.Spec.ClientId
-	if clientId != "" {
-    var url, identityProviderURL string
-    identityProviderURL, err = r.GetIdentityProviderURL()
-    if err != nil {
-      return
-    }
-    url = strings.Join([]string{identityProviderURL, "v1", "auth", "registration", clientId}, "/")
-		response, err = r.invokeClientRegistrationAPI(ctx, client, DeleteType, url, "")
+	if clientId == "" {
+    return nil, fmt.Errorf("empty client ID")
+  }
+
+  var url, identityProviderURL string
+  identityProviderURL, err = r.GetIdentityProviderURL()
+  if err != nil {
     return
-	} 
+  }
+  url = strings.Join([]string{identityProviderURL, "v1", "auth", "registration", clientId}, "/")
+  response, err = r.invokeClientRegistrationAPI(ctx, client, DeleteType, url, "")
+  if err == nil && response.Status != "204 No Content" && response.Status != "404 Not Found" {
+    return nil, NewOIDCClientError(response)
+  }
   return
 }
 
@@ -144,21 +155,29 @@ func (r *ReconcileClient) invokeClientRegistrationAPI(ctx context.Context, clien
 	request, _ := http.NewRequest(requestType, requestURL, bytes.NewBuffer([]byte(payload)))
 	request.Header.Set("Content-Type", "application/json")
 	request.SetBasicAuth(oauthAdmin, clientRegistrationSecret)
-	httpClient, err := createHTTPClient()
+
+  caCertSecret, err := r.getCSCACertificateSecret(ctx, r.sharedServicesNamespace)
+  if err != nil {
+    return
+  }
+
+  httpClient, err := createHTTPClient(caCertSecret.Data[corev1.TLSCertKey])
   if err != nil {
     return
   }
 
   response, err = httpClient.Do(request)
   if err != nil {
+    reqLogger.Error(err, "Request failed")
     return
+  } else {
+    reqLogger.Info("Request complete", "response", response)
   }
 	return
 }
 
 // GetClientRegistration gets the registered Client from the OP, if it is there.
 func (r *ReconcileClient) GetClientRegistration(ctx context.Context, client *oidcv1.Client) (response *http.Response, err error) {
-  reqLogger := logf.FromContext(ctx).WithName("GetClientRegistration")
   authServiceURL, err := r.GetIdentityProviderURL()
   if err != nil {
     return
@@ -168,13 +187,62 @@ func (r *ReconcileClient) GetClientRegistration(ctx context.Context, client *oid
 	if response == nil {
     err = fmt.Errorf("did not receive response from identity provider")
   } else if response.StatusCode >= 400 {
-    defer response.Body.Close()
-    reqLogger.Info("response is non-nil and StatusCode is >=400")
-    responseBody, _ := ioutil.ReadAll(response.Body)
-    err = errors.New(string(responseBody))
+    err = NewOIDCClientError(response)
   } else if response.Status != "200 OK" {
     err = fmt.Errorf("did not get client successfully; received status %q", response.Status)
   }
+  return
+}
+
+// setCSCACertificateSecret caches a copy of the Secret that contains the Common Services CA certificate for the
+// provided namespace. If a Secret has already been cached for the namespace, this function replaces it with the new
+// Secret.
+func (r *ReconcileClient) setCSCACertificateSecret(ctx context.Context, namespace string, secret *corev1.Secret) (err error) {
+  if secret == nil {
+    return fmt.Errorf("provided Secret pointer was nil")
+  }
+  r.csCACertSecrets[namespace] = secret 
+  return
+}
+
+// deleteCSCACertificateSecret deletes the cached copy of the Secret that contains the Common Services CA certificate
+// for the provided namespace.
+func (r *ReconcileClient) deleteCSCACertificateSecret(ctx context.Context, namespace string) {
+  delete(r.csCACertSecrets, namespace)
+}
+
+// getCSCACertificateSecret gets the Secret that contains the Common Services CA certificate for the provided namespace.
+// It will return the ReconcileClient's cached Secret for the namespace if it has one registered, or it will look up and
+// return whatever matching Secret exists in the cluster and cache it for future use.
+func (r *ReconcileClient) getCSCACertificateSecret(ctx context.Context, namespace string) (secret *corev1.Secret, err error) {
+  logger := logf.FromContext(ctx, "namespace", namespace).WithName("getCSCACertificateSecret")
+  var ok bool
+  secret, ok = r.csCACertSecrets[namespace]
+  // Have the secret locally; return it
+  if ok {
+    logger.Info("found CA certificate secret")
+    return
+  }
+  logger.Info("CA certificate secret not found")
+  secret = &corev1.Secret{}
+  // Need to perform lookup of secret in the cluster
+  csCACertificateSecretName := "cs-ca-certificate-secret"
+  logger.Info("Attempt to get secret from namespace", "secretName", csCACertificateSecretName)
+  err = r.client.Get(ctx, types.NamespacedName{Name: csCACertificateSecretName, Namespace: namespace}, secret)
+  if err != nil {
+    logger.Error(err, "failed to get secret", "secretName", csCACertificateSecretName)
+    return nil, err
+  } else {
+    logger.Info("found secret on the cluster")
+  }
+
+  err = r.setCSCACertificateSecret(ctx, namespace, secret)
+  if err != nil {
+    logger.Error(err, "failed to set secret", "secretName", csCACertificateSecretName)
+  } else {
+    logger.Info("found CA certificate secret")
+  }
+  
   return
 }
 

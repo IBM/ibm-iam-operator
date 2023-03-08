@@ -16,6 +16,22 @@ metadata:
             "name": "example-authentication"
           },
           "spec": {
+            "auditService": {
+              "imageName": "audit-syslog-service",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "1.8.0",
+              "syslogTlsPath": "/etc/audit-tls",
+              "resources": {
+                "limits": {
+                  "cpu": "100m",
+                  "memory": "128Mi"
+                },
+                "requests": {
+                  "cpu": "10m",
+                  "memory": "100Mi"
+                }
+              }
+            },
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
@@ -317,6 +333,11 @@ spec:
         path: operatorVersion
         x-descriptors:
         - 'urn:alm:descriptor:com.tectonic.ui:text'
+      - description: A list defines the catalog information for audit service.
+        displayName: AuditService
+        path: auditService
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:text'
       - description: A list defines the catalog information for auth service.
         displayName: authService
         path: authService
@@ -546,20 +567,7 @@ spec:
                     - ALL
                   privileged: false
                   readOnlyRootFilesystem: true
-                volumeMounts:
-                - mountPath: /certs
-                  name: cluster-ca-cert
               serviceAccountName: ibm-iam-operator
-              volumes:
-              - name: cluster-ca-cert
-                secret:
-                  defaultMode: 420
-                  items:
-                  - key: tls.key
-                    path: ca.key
-                  - key: tls.crt
-                    path: ca.crt
-                  secretName: cs-ca-certificate-secret
       permissions:
       - rules:
         - apiGroups:
@@ -743,6 +751,13 @@ spec:
           - patch
           - update
           - watch
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - roles
+          - rolebindings
+          verbs:
+          - create
         serviceAccountName: ibm-iam-operator
     strategy: deployment
   installModes:

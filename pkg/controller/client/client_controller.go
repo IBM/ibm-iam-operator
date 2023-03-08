@@ -19,13 +19,12 @@ package client
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"strings"
 
-	condition "github.com/IBM/ibm-iam-operator/pkg/api/util"
 	oidcv1 "github.com/IBM/ibm-iam-operator/pkg/apis/oidc/v1"
+	v1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	oauthv1 "github.com/openshift/api/oauth/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -37,9 +36,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -54,6 +55,11 @@ const (
   PlatformAuthIDPCredentialsSecretName string = "platform-auth-idp-credentials"
   // PlatformOIDCCredentialsSecretName is the name of the Secret containing the OP admin oauthadmin's password
   PlatformOIDCCredentialsSecretName string = "platform-oidc-credentials"
+  // CSCACertificateSecretName is the name of the Secret created by the installer in the Operand namespace that contains
+  // the Common Services CA certificate and private key details
+  CSCACertificateSecretName string = "cs-ca-certificate-secret"
+  // FinalizerName is the name of the finalizer added to Resources by the Client controller
+  FinalizerName string = "client.oidc.security.ibm.com"
 )
 
 var log = logf.Log.WithName(controllerName)
@@ -73,6 +79,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
     recorder: mgr.GetEventRecorderFor(controllerName),
     scheme: mgr.GetScheme(),
     config: ClientControllerConfig{},
+    csCACertSecrets: map[string]*corev1.Secret{},
   }
 }
 
@@ -80,6 +87,39 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r})
+	if err != nil {
+		return err
+	}
+
+  // Construct predicates that will filter the Secret events this controller watches by both the name of the Secret as
+  // well as its Secret type.
+  csCACertPredicateHelperFunc := func(objPointer *client.Object) bool {
+    obj := *objPointer
+    if obj.GetName() != CSCACertificateSecretName {
+      return false
+    }
+    secret, ok := obj.(*corev1.Secret)
+    if !ok {
+      return false
+    }
+    return secret.Type == corev1.SecretTypeTLS
+  }
+
+  // Watch for Update events 
+  err = c.Watch(
+    &source.Kind{Type: &corev1.Secret{}},
+    &handler.EnqueueRequestForObject{},
+    predicate.Funcs{
+      UpdateFunc: func(e event.UpdateEvent) bool {
+        return csCACertPredicateHelperFunc(&e.ObjectOld)
+      },
+      CreateFunc: func(e event.CreateEvent) bool {
+        return csCACertPredicateHelperFunc(&e.Object)
+      },
+      DeleteFunc: func(e event.DeleteEvent) bool {
+        return csCACertPredicateHelperFunc(&e.Object)
+      },
+    })
 	if err != nil {
 		return err
 	}
@@ -102,6 +142,33 @@ type ReconcileClient struct {
 	recorder record.EventRecorder
 	scheme   *runtime.Scheme
   config   ClientControllerConfig
+  csCACertSecrets map[string]*corev1.Secret
+  sharedServicesNamespace string
+}
+
+// getSharedServicesNamespace determines the namespace that contains the shared services by listing all Authentications
+// in all namespaces where the Operator has visibility. There should only ever be one Authentication CR for a given
+// IM Operator instance, so wherever that one Authentication CR is found is assumed to be where the other Operands are.
+// If no or more than one Authentication CR is found, an error is reported as this is an unsupported usage of the CR.
+func getSharedServicesNamespace(ctx context.Context, k8sClient client.Client) (namespace string, err error) {
+  reqLogger := logf.FromContext(ctx).WithName("getSharedServicesNamespace")
+  authenticationList := &v1alpha1.AuthenticationList{}
+  err = k8sClient.List(ctx, authenticationList)
+  if err != nil {
+    reqLogger.Error(err, "Error encountered while trying to determine shared services namespace")
+    return
+  }
+  if len(authenticationList.Items) != 1 {
+    err = fmt.Errorf("expected to find 1 Authentication but found %d", len(authenticationList.Items))
+    var namespacedNames []types.NamespacedName
+    for _, item := range authenticationList.Items {
+      nsn := types.NamespacedName{Name: item.Name, Namespace: item.Namespace}
+      namespacedNames = append(namespacedNames, nsn)
+    }
+    reqLogger.Error(err, "Error encountered while trying to determine shared services namespace", "AuthenticationList", namespacedNames)
+    return
+  }
+  return authenticationList.Items[0].Namespace, nil
 }
 
 // SetConfig sets the ClientControllerConfig on the ReconcileClient using the platform-auth-idp ConfigMap and
@@ -113,8 +180,14 @@ func (r *ReconcileClient) SetConfig(ctx context.Context, namespace string) (err 
   if !r.IsConfigured(){
     r.config = ClientControllerConfig{}
   }
+  if r.sharedServicesNamespace == "" {
+    r.sharedServicesNamespace, err = getSharedServicesNamespace(ctx, r.client)
+    if err != nil {
+      return fmt.Errorf("failed to get ConfigMap: %w", err)
+    }
+  }
   configMap := &corev1.ConfigMap{}
-  err = r.client.Get(ctx, types.NamespacedName{Name: PlatformAuthIDPConfigMapName, Namespace: namespace}, configMap)
+  err = r.client.Get(ctx, types.NamespacedName{Name: PlatformAuthIDPConfigMapName, Namespace: r.sharedServicesNamespace}, configMap)
   if err != nil {
     return fmt.Errorf("client failed to GET ConfigMap: %w", err)
   }
@@ -123,7 +196,7 @@ func (r *ReconcileClient) SetConfig(ctx context.Context, namespace string) (err 
     return fmt.Errorf("failed to configure: %w", err)
   }
   platformAuthIDPCredentialsSecret := &corev1.Secret{}
-  err = r.client.Get(ctx, types.NamespacedName{Name: PlatformAuthIDPCredentialsSecretName, Namespace: namespace}, platformAuthIDPCredentialsSecret)
+  err = r.client.Get(ctx, types.NamespacedName{Name: PlatformAuthIDPCredentialsSecretName, Namespace: r.sharedServicesNamespace}, platformAuthIDPCredentialsSecret)
   if err != nil {
     return
   }
@@ -132,7 +205,7 @@ func (r *ReconcileClient) SetConfig(ctx context.Context, namespace string) (err 
     return fmt.Errorf("failed to configure: %w", err)
   }
   platformOIDCCredentialsSecret := &corev1.Secret{}
-  err = r.client.Get(ctx, types.NamespacedName{Name: PlatformOIDCCredentialsSecretName, Namespace: namespace}, platformOIDCCredentialsSecret)
+  err = r.client.Get(ctx, types.NamespacedName{Name: PlatformOIDCCredentialsSecretName, Namespace: r.sharedServicesNamespace}, platformOIDCCredentialsSecret)
   if err != nil {
     return
   }
@@ -143,18 +216,70 @@ func (r *ReconcileClient) SetConfig(ctx context.Context, namespace string) (err 
   return
 }
 
+// processCSCACertificateSecretUpdate synchronizes the state of cached certificates from the Common Services CA based
+// upon events received from the cluster.
+func (r *ReconcileClient) processCSCACertificateSecretUpdate(ctx context.Context, namespacedName *types.NamespacedName) (err error) {
+  reqLogger := logf.FromContext(ctx).WithName("processCSCACertificateSecret")
+  currentCertSecret := &corev1.Secret{}
+  namespace := namespacedName.Namespace
+  var verb string
+  err = r.Reader.Get(ctx, *namespacedName, currentCertSecret)
+  if errors.IsNotFound(err) {
+    reqLogger.Info("cs-ca-certificate-secret deleted; removing registered certificate")
+    verb = "delete"
+    r.deleteCSCACertificateSecret(ctx, namespace)
+    reqLogger.Info("certificate registration succeeded", "action", verb)
+    return nil
+  } else if err != nil {
+    // Some other issue arose
+    return
+  }
+
+  var oldCertSecret *corev1.Secret
+  var ok bool
+  oldCertSecret, ok = r.csCACertSecrets[namespace]
+  if !ok {
+    reqLogger.Info("new cs-ca-certificate-secret created; registering certificate")
+    err = r.setCSCACertificateSecret(ctx, namespace, currentCertSecret)
+    verb = "create"
+  } else if currentCertSecret.GetDeletionTimestamp() != nil {
+    reqLogger.Info("cs-ca-certificate-secret deleted; removing registered certificate")
+    r.deleteCSCACertificateSecret(ctx, namespace)
+    verb = "delete"
+  } else {
+    if string(oldCertSecret.Data[corev1.TLSCertKey]) != string(currentCertSecret.Data[corev1.TLSCertKey]) {
+      reqLogger.Info("cs-ca-certificate-secret was updated; registering certificate")
+      err = r.setCSCACertificateSecret(ctx, namespace, currentCertSecret)
+      verb = "update"
+    }
+  }
+  if err != nil {
+    reqLogger.Info("certificate registration failed", "action", verb)
+  } else {
+    reqLogger.Info("certificate registration succeeded", "action", verb)
+  }
+  return
+}
+
 // Reconcile reads that state of the cluster for a Client object and makes changes based on the state read
 // and what is in the Client.Spec
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-func (r *ReconcileClient) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileClient) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, err error) {
 
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+
+  // Handle cs-ca-certificate-secret events
+  if request.Name == CSCACertificateSecretName {
+    err = r.processCSCACertificateSecretUpdate(ctx, &request.NamespacedName)
+    return
+  }
+
 	reqLogger.Info("Reconciling OIDC Client data")
 
 	// Fetch the OIDC Client instance
 	instance := &oidcv1.Client{}
-	err := r.Reader.Get(ctx, request.NamespacedName, instance)
+	err = r.Reader.Get(ctx, request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -206,10 +331,9 @@ func (r *ReconcileClient) createClient(ctx context.Context, client *oidcv1.Clien
   var isOSAuthEnabled bool
   clientCreds = r.generateClientCredentials("")
   reqLogger.Info("generated new client ID/secret pair", "clientId", clientCreds.ClientID)
-  var response *http.Response
-  response, err = r.CreateClientRegistration(ctx, client, clientCreds)
-  if response == nil || response.Status != "201 Created" {
-    handleOIDCClientError(ctx, client, response, err, PostType, r.recorder)
+  _, err = r.CreateClientRegistration(ctx, client, clientCreds)
+  if err != nil {
+    r.handleOIDCClientError(ctx, client, err, PostType)
     err = fmt.Errorf("error occurred during client registration: %w", err)
     return 
   }
@@ -239,7 +363,7 @@ func (r *ReconcileClient) createClient(ctx context.Context, client *oidcv1.Clien
     }
   }
   if err == nil {
-    condition.SetClientCondition(client,
+    SetClientCondition(client,
       oidcv1.ClientConditionReady,
       oidcv1.ConditionTrue,
       ReasonCreateClientSuccessful,
@@ -265,10 +389,9 @@ func (r *ReconcileClient) updateClient(ctx context.Context, client *oidcv1.Clien
       return fmt.Errorf("could not create new ClientCredentials struct: %w", err)
     }
   }
-  var response *http.Response
-  response, err = r.UpdateClientRegistration(ctx, client, clientCreds)
-  if response == nil || response.Status != "200 OK" {
-    handleOIDCClientError(ctx, client, response, err, PutType, r.recorder)
+  _, err = r.UpdateClientRegistration(ctx, client, clientCreds)
+  if err != nil {
+    r.handleOIDCClientError(ctx, client, err, PutType)
     err = fmt.Errorf("error occurred during update oidc client registration: %w", err)
     return
   }
@@ -362,7 +485,7 @@ func (r *ReconcileClient) processZenRegistration(ctx context.Context, client *oi
 	zenReg, err = r.GetZenInstance(ctx, client)
 	if err != nil {
 		//Set the status to false since zen registration cannot be completed
-		condition.SetClientCondition(client, oidcv1.ClientConditionReady, oidcv1.ConditionFalse, ReasonCreateZenRegistrationFailed,
+		SetClientCondition(client, oidcv1.ClientConditionReady, oidcv1.ConditionFalse, ReasonCreateZenRegistrationFailed,
 			MessageCreateZenRegistrationFailed)
 		r.recorder.Event(client, corev1.EventTypeWarning, ReasonCreateZenRegistrationFailed, err.Error())
 		return
@@ -378,7 +501,7 @@ func (r *ReconcileClient) processZenRegistration(ctx context.Context, client *oi
 	err = r.CreateZenInstance(ctx, client, clientCreds)
 	if err != nil {
 		//Set the status to false since zen registration cannot be completed
-		condition.SetClientCondition(client, oidcv1.ClientConditionReady, oidcv1.ConditionFalse, ReasonCreateZenRegistrationFailed,
+		SetClientCondition(client, oidcv1.ClientConditionReady, oidcv1.ConditionFalse, ReasonCreateZenRegistrationFailed,
 			MessageCreateZenRegistrationFailed)
 		r.recorder.Event(client, corev1.EventTypeWarning, ReasonCreateZenRegistrationFailed, err.Error())
 	}
@@ -386,14 +509,27 @@ func (r *ReconcileClient) processZenRegistration(ctx context.Context, client *oi
 	return
 }
 
-// addFinalizer adds a finalizer to the Client if it hasn't already been marked for deletion
+// addFinalizer adds a finalizer to the Client if it hasn't already been marked for deletion.
 func addFinalizer(client *oidcv1.Client) {
 	if client.ObjectMeta.DeletionTimestamp.IsZero() {
-		finalizerName := "finalizer.client.oidc.security.ibm.com"
-		if !containsString(client.ObjectMeta.Finalizers, finalizerName) {
-			client.ObjectMeta.Finalizers = append(client.ObjectMeta.Finalizers, finalizerName)
+		if !containsString(client.ObjectMeta.Finalizers, FinalizerName) {
+			client.ObjectMeta.Finalizers = append(client.ObjectMeta.Finalizers, FinalizerName)
 		}
 	}
+}
+
+// removeFinalizer removes the Client controller's finalizer from a Client resource.
+func removeFinalizer(client *oidcv1.Client) {
+  finalizers := client.ObjectMeta.GetFinalizers()
+  updatedFinalizers := make([]string, 0)
+  for i, finalizer := range finalizers {
+    if finalizer == FinalizerName {
+      updatedFinalizers = append(updatedFinalizers, finalizers[:i]...)
+      updatedFinalizers = append(updatedFinalizers, finalizers[i+1:]...)
+      break
+    }
+  }
+  client.SetFinalizers(updatedFinalizers)
 }
 
 func containsString(slice []string, s string) bool {
@@ -427,10 +563,22 @@ func (r *ReconcileClient) deleteOAuthClient(ctx context.Context, name string) (e
 // Identity Management service will be deleted. If any of the operations attempted produce errors, those are returned.
 func (r *ReconcileClient) deleteClient(ctx context.Context, client *oidcv1.Client) (err error) {
   reqLogger := logf.FromContext(ctx).WithName("deleteClient").WithValues("clientId", client.Spec.ClientId)
-  var response *http.Response
-  response, err = r.DeleteClientRegistration(ctx, client)
-  if response == nil || (response.Status != "204 No Content" && response.Status != "404 Not Found") {
-    handleOIDCClientError(ctx, client, response, err, DeleteType, r.recorder)
+  // In the event that a Client needs to be deleted and it doesn't have a Client ID (meaning it was never properly
+  // registered), remove the finalizer and update.
+  if client.Spec.ClientId == "" {
+    // Remove the finalizers
+    reqLogger.Info("Removing finalizer from Client", "clientId", client.Spec.ClientId)
+    removeFinalizer(client)
+    // Update CR
+    err = r.client.Update(ctx, client)
+    if err != nil {
+      reqLogger.Error(err, "Finalizer update failed")
+    }
+    return
+  }
+  _, err = r.DeleteClientRegistration(ctx, client)
+  if err != nil {
+    r.handleOIDCClientError(ctx, client, err, DeleteType)
     err = fmt.Errorf("error occurred during delete oidc client registration: %w", err)
     return
   }
@@ -461,7 +609,7 @@ func (r *ReconcileClient) deleteClient(ctx context.Context, client *oidcv1.Clien
   }
   // Remove the finalizers
   reqLogger.Info("Removing finalizer from Client", "clientId", client.Spec.ClientId)
-  client.SetFinalizers(nil)
+  removeFinalizer(client)
   // Update CR
   err = r.client.Update(ctx, client)
   if err != nil {

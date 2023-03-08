@@ -23,9 +23,9 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	oidcv1 "github.com/IBM/ibm-iam-operator/pkg/apis/oidc/v1"
+	corev1 "k8s.io/api/core/v1"
 	"strings"
 	"time"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -97,6 +97,7 @@ func (r *ReconcileClient) getAuthnTokens(ctx context.Context, client *oidcv1.Cli
 
 	var tResp *http.Response
   var req *http.Request
+  var caCertSecret *corev1.Secret
   var httpClient *http.Client
   oAuthAdminPassword, err := r.GetOAuthAdminPassword()
   if err != nil {
@@ -114,7 +115,12 @@ func (r *ReconcileClient) getAuthnTokens(ctx context.Context, client *oidcv1.Cli
     if client.IsCPClientCredentialsEnabled() {
       req.SetBasicAuth("oauthadmin", oAuthAdminPassword)
     }
-    httpClient, err = createHTTPClient()
+
+    caCertSecret, err = r.getCSCACertificateSecret(ctx, r.sharedServicesNamespace)
+    if err != nil {
+      return
+    }
+    httpClient, err = createHTTPClient(caCertSecret.Data[corev1.TLSCertKey])
     if err != nil {
       return
     }
@@ -145,11 +151,7 @@ func (r *ReconcileClient) getAuthnTokens(ctx context.Context, client *oidcv1.Cli
 
 // createHTTPClient handles boilerplate of creating an http.Client configured for TLS using the Common Services CA
 // certificate.
-func createHTTPClient() (httpClient *http.Client, err error) {
-	caCert, err := ioutil.ReadFile("/certs/ca.crt")
-	if err != nil {
-		return
-	}
+func createHTTPClient(caCert []byte) (httpClient *http.Client, err error) {
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCert)
 	transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: caCertPool}}
@@ -168,9 +170,14 @@ func (r *ReconcileClient) invokeIamApi(ctx context.Context, client *oidcv1.Clien
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", bearer)
 	request.Header.Set("Accept", "application/json")
-  httpClient, err := createHTTPClient()
+
+  caCertSecret, err := r.getCSCACertificateSecret(ctx, r.sharedServicesNamespace)
   if err != nil {
-    return
+    return nil, fmt.Errorf("failed to get certificate secret for namespace %q: %w", client.Namespace, err)
+  }
+  httpClient, err := createHTTPClient(caCertSecret.Data[corev1.TLSCertKey])
+  if err != nil {
+    return nil, fmt.Errorf("failed to create IAM API HTTP client: %w", err)
   }
 	response, err = httpClient.Do(request)
 	return

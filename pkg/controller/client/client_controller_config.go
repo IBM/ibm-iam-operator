@@ -18,6 +18,7 @@ package client
 
 import (
 	"fmt"
+  "strings"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -46,17 +47,35 @@ const (
   oAuthAdminPasswordKey string = "OAUTH2_CLIENT_REGISTRATION_SECRET"
 )
 
+// getClusterDomainNameForServiceURL converts the provided URL string from just a Service name to "<service
+// name>.<namespace>.svc"
+func getClusterDomainNameForServiceURL(url string, namespace string) string {
+  suffix := ".svc"
+  splitByColons := strings.Split(url, ":")
+  port := splitByColons[len(splitByColons) - 1]
+  everythingBeforePort := strings.Join(splitByColons[:len(splitByColons) - 1], ":")
+  return everythingBeforePort + "." + namespace + suffix + ":" + port
+}
+
 // ApplyConfigMap takes the key value pairs found in a ConfigMap's Data field and sets the same keys and values in the
 // ClientControllerConfig. Produces an error if the ConfigMap had an empty Data field.
 func (c ClientControllerConfig) ApplyConfigMap(configMap *corev1.ConfigMap, keysList ...string) (err error) {
   if configMap.Data != nil || len(configMap.Data) == 0 {
     if len(keysList) != 0 {
       for _, k := range keysList {
-        c[k] = configMap.Data[k]
+        if k == authServiceURLKey || k == identityProviderURLKey || k == identityManagementURLKey {
+          c[k] = getClusterDomainNameForServiceURL(configMap.Data[k], configMap.Namespace)
+        } else {
+          c[k] = configMap.Data[k]
+        }
       }
     } else {
       for k, v := range configMap.Data {
-        c[k] = v
+        if k == authServiceURLKey || k == identityProviderURLKey || k == identityManagementURLKey {
+          c[k] = getClusterDomainNameForServiceURL(v, configMap.Namespace)
+        } else {
+          c[k] = v
+        }
       }
     }
     return
@@ -81,6 +100,19 @@ func (c ClientControllerConfig) ApplySecret(secret *corev1.Secret, keysList ...s
     return
   }
   return fmt.Errorf("found Secret had no \"Data\" field")
+}
+
+// getConfigValue retrieves the value stored at the provided key from the ClientControllerConfig. Produces an error if
+// the ClientControllerConfig is empty or if the key is not present.
+func (c ClientControllerConfig) getConfigValue(key string) (value string, err error) {
+  if len(c) == 0 {
+    return "", fmt.Errorf("config is not set")
+  }
+  value, ok := c[key]
+  if !ok {
+    err = fmt.Errorf("unable to retrieve value for key %q from config", key)
+  }
+  return
 }
 
 // IsConfigured returns whether all mandatory config fields are set.
@@ -115,19 +147,6 @@ func (r *ReconcileClient) IsConfigured() bool {
   return true
 }
 
-// getConfigValue retrieves the value stored at the provided key from the ReconcileClient's config field. Produces an
-// error if the ClientControllerConfig is empty or if the key is not present.
-func (c ClientControllerConfig) getConfigValue(key string) (value string, err error) {
-  if len(c) == 0 {
-    return "", fmt.Errorf("config is not set")
-  }
-  value, ok := c[key]
-  if !ok {
-    err = fmt.Errorf("unable to retrieve value for key %q from config", key)
-  }
-  return
-}
-
 // GetDefaultAdminUser gets the default admin user for the IAM API from the ReconcileClient's ClientControllerConfig.
 // Produces an error if the ClientControllerConfig is empty or if the key is not present.
 func (r *ReconcileClient) GetDefaultAdminUser() (value string, err error) {
@@ -149,7 +168,7 @@ func (r *ReconcileClient) GetOAuthAdminPassword() (value string, err error) {
   return
 }
 
-// GetROKSEnabled gets from the ClientControllerCOnfig whether the controller is enabled to use OpenShift OAuthClients
+// GetROKSEnabled gets from the ClientControllerConfig whether the controller is enabled to use OpenShift OAuthClients
 // for OIDC Client authentication via legacy configuration; creates and manages OAuthClient objects with names that
 // match OIDC Client's clientId field. Produces an error if the ClientControllerConfig is empty or if the key is not
 // present.
@@ -161,7 +180,7 @@ func (r *ReconcileClient) GetROKSEnabled() (value bool, err error) {
   return
 }
 
-// GetOSAuthEnabled gets from the ClientControllerCOnfig whether the controller is enabled to use OpenShift OAuthClients
+// GetOSAuthEnabled gets from the ClientControllerConfig whether the controller is enabled to use OpenShift OAuthClients
 // for OIDC Client authentication; creates and manages OAuthClient objects with names that match OIDC Client's clientId
 // field. Produces an error if the ClientControllerConfig is empty or if the key is not present.
 func (r *ReconcileClient) GetOSAuthEnabled() (value bool, err error) {

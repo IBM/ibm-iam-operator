@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	utils "github.com/IBM/ibm-iam-operator/pkg/utils"
@@ -29,7 +30,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -188,9 +188,12 @@ type ReconcileAuthentication struct {
 	client        client.Client
 	scheme        *runtime.Scheme
 	needToRequeue bool
+  Mutex sync.Mutex
 }
 
 func (r *ReconcileAuthentication) addFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
+  r.Mutex.Lock()
+  defer r.Mutex.Unlock()
 	if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 		instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
 		err = r.client.Update(ctx, instance)
@@ -200,6 +203,8 @@ func (r *ReconcileAuthentication) addFinalizer(ctx context.Context, finalizerNam
 
 // removeFinalizer removes the provided finalizer from the Authentication instance.
 func (r *ReconcileAuthentication) removeFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
+  r.Mutex.Lock()
+  defer r.Mutex.Unlock()
 	if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 		instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
 		err = r.client.Update(ctx, instance)
@@ -208,6 +213,16 @@ func (r *ReconcileAuthentication) removeFinalizer(ctx context.Context, finalizer
 		}
 	}
 	return
+}
+
+// needsAuditServiceDummyDataReset compares the state in an Authentication's .spec.auditService and returns whether it
+// needs to be overwritten with dummy data.
+func needsAuditServiceDummyDataReset(a *operatorv1alpha1.Authentication) bool {
+  return a.Spec.AuditService.ImageName != operatorv1alpha1.AuditServiceIgnoreString ||
+  a.Spec.AuditService.ImageRegistry != operatorv1alpha1.AuditServiceIgnoreString ||
+  a.Spec.AuditService.ImageTag != operatorv1alpha1.AuditServiceIgnoreString ||
+  a.Spec.AuditService.SyslogTlsPath != "" ||
+  a.Spec.AuditService.Resources != nil
 }
 
 // Reconcile reads that state of the cluster for a Authentication object and makes changes based on the state read
@@ -238,6 +253,13 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 		return
 	}
 
+  // Be sure to update status before returning if Authentication is found
+  defer func() {
+    reqLogger.Info("Gather current service status")
+    currentServiceStatus := getCurrentServiceStatus(ctx, r.client, instance)
+    instance.SetService(reconcileCtx, currentServiceStatus, r.client, &r.Mutex)
+  }()
+
 	// Credit: kubebuilder book
 	finalizerName := "authentication.operator.ibm.com"
 	// Determine if the Authentication CR  is going to be deleted
@@ -260,6 +282,9 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	if err != nil {
 		return
 	}
+	// create operand role and role-binding
+	r.createRole(instance)
+	r.createRoleBinding(instance)
 
 	// Check if this Certificate already exists and create it if it doesn't
 	currentCertificate := &certmgr.Certificate{}
@@ -297,12 +322,8 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	}
 	// create clusterrole and clusterrolebinding if OSAuthEnabled is true
 	if r.isOSAuthEnabled(instance) {
-		clusterRole := &rbacv1.ClusterRole{}
-		r.handleClusterRole(instance, clusterRole)
-
-		clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
-		r.handleClusterRoleBinding(instance, clusterRoleBinding)
-
+		r.createClusterRole(instance)
+		r.createClusterRoleBinding(instance)
 	}
 
 	r.ReconcileRemoveIngresses(ctx, instance)
@@ -325,6 +346,14 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	if err != nil {
 		return
 	}
+
+  if needsAuditServiceDummyDataReset(instance) {
+    instance.SetRequiredDummyData()
+		err = r.client.Update(ctx, instance)
+		if err != nil {
+			return
+		}
+  }
 
 	if r.needToRequeue {
 		return reconcile.Result{Requeue: true}, nil

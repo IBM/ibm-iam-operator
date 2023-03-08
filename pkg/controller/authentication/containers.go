@@ -343,17 +343,15 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/oidc/endpoint/OP/.well-known/openid-configuration",
+				TCPSocket: &corev1.TCPSocketAction{
 					Port: intstr.IntOrString{
 						IntVal: authServicePort,
 					},
-					Scheme: "HTTPS",
 				},
 			},
-			InitialDelaySeconds: 60,
+			InitialDelaySeconds: 30,
 			TimeoutSeconds:      10,
-			PeriodSeconds:       30,
+			PeriodSeconds:       15,
 			FailureThreshold:    6,
 		},
 		LivenessProbe: &corev1.Probe{
@@ -366,10 +364,10 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 					Scheme: "HTTPS",
 				},
 			},
-			InitialDelaySeconds: 180,
+			InitialDelaySeconds: 50,
 			TimeoutSeconds:      10,
 			PeriodSeconds:       30,
-			FailureThreshold:    6,
+			FailureThreshold:    7,
 		},
 		Env: envVars,
 	}
@@ -691,8 +689,12 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{"curl", "-k", "https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration"},
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/",
+					Port: intstr.IntOrString{
+						IntVal: identityProviderPort,
+					},
+					Scheme: "HTTPS",
 				},
 			},
 			InitialDelaySeconds: 20,
@@ -703,15 +705,14 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		},
 		LivenessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/",
-					Port: intstr.IntOrString{
-						IntVal: identityProviderPort,
-					},
-					Scheme: "HTTPS",
+				Exec: &corev1.ExecAction{
+					Command: []string{"curl", "-k", "https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration"},
 				},
 			},
-			TimeoutSeconds: 10,
+			InitialDelaySeconds: 30,
+			TimeoutSeconds:      10,
+			PeriodSeconds:       10,
+			FailureThreshold:    3,
 		},
 		Env: envVars,
 	}

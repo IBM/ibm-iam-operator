@@ -105,7 +105,7 @@ func main() {
 	if err != nil {
 		log.Error(err, "")
 		os.Exit(1)
-	}	
+	}
 	var managerOpt manager.Options
 	if strings.Contains(namespace, ",") {
 		namespaces := strings.Split(namespace, ",")
@@ -113,7 +113,7 @@ func main() {
 			MetricsBindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),
 			NewCache:           cache.MultiNamespacedCacheBuilder(namespaces),
 		}
-	}else{
+	} else {
 		managerOpt = manager.Options{
 			Namespace:          namespace,
 			MetricsBindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),

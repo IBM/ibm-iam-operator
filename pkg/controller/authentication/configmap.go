@@ -102,7 +102,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 
 	// Public Cloud to be checked from ibmcloud-cluster-info
 	isPublicCloud := isPublicCloud(r.client, instance.Namespace, "ibmcloud-cluster-info")
-	
+
 	//icpConsoleURL , icpProxyURL to be fetched from ibmcloud-cluster-info
 	proxyConfigMapName := "ibmcloud-cluster-info"
 	proxyConfigMap := &corev1.ConfigMap{}
@@ -123,7 +123,6 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 		return nil
 	}
 	icpConsoleURL, ok := proxyConfigMap.Data["cluster_address"]
-	
 
 	if !ok {
 		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain cluster_address address")

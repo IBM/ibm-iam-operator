@@ -17,13 +17,13 @@
 package v1alpha1
 
 import (
-  "context"
-  "reflect"
-  "sync"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"context"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sync"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -36,7 +36,7 @@ type AuthenticationSpec struct {
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
 	OperatorVersion    string                 `json:"operatorVersion"`
 	Replicas           int32                  `json:"replicas"`
-  AuditService       AuditServiceSpec       `json:"auditService"`
+	AuditService       AuditServiceSpec       `json:"auditService"`
 	AuthService        AuthServiceSpec        `json:"authService"`
 	IdentityProvider   IdentityProviderSpec   `json:"identityProvider"`
 	IdentityManager    IdentityManagerSpec    `json:"identityManager"`
@@ -60,15 +60,15 @@ const AuditServiceIgnoreString string = "auditService no longer used - ignore"
 // version of the Authentication CRD is installed on a cluster where this version's CRD was previously, the CRs created
 // based upon this version's CRD will not break in a multi-tenancy scenario.
 func (a *Authentication) SetRequiredDummyData() {
-  if a == nil {
-    return
-  }
+	if a == nil {
+		return
+	}
 
-  a.Spec.AuditService = AuditServiceSpec{
-    ImageRegistry: AuditServiceIgnoreString,
-    ImageName: AuditServiceIgnoreString,
-    ImageTag: AuditServiceIgnoreString,
-  }
+	a.Spec.AuditService = AuditServiceSpec{
+		ImageRegistry: AuditServiceIgnoreString,
+		ImageName:     AuditServiceIgnoreString,
+		ImageTag:      AuditServiceIgnoreString,
+	}
 }
 
 type AuthServiceSpec struct {
@@ -152,45 +152,45 @@ type ManagedResourceStatus struct {
 	APIVersion string `json:"apiVersion,omitempty"`
 	Namespace  string `json:"namespace,omitempty"`
 	Kind       string `json:"kind,omitempty"`
-	Status string `json:"status,omitempty"`
+	Status     string `json:"status,omitempty"`
 }
 
 type ServiceStatus struct {
-  ObjectName string `json:"objectName,omitempty"`
-  APIVersion string `json:"apiVersion,omitempty"`
-  Namespace  string `json:"namespace,omitempty"`
-  Kind       string `json:"kind,omitempty"`
-  Status string `json:"status,omitempty"`
-  ManagedResources []ManagedResourceStatus `json:"managedResources,omitempty"`
+	ObjectName       string                  `json:"objectName,omitempty"`
+	APIVersion       string                  `json:"apiVersion,omitempty"`
+	Namespace        string                  `json:"namespace,omitempty"`
+	Kind             string                  `json:"kind,omitempty"`
+	Status           string                  `json:"status,omitempty"`
+	ManagedResources []ManagedResourceStatus `json:"managedResources,omitempty"`
 }
 
 func (a *Authentication) SetService(ctx context.Context, service ServiceStatus, statusClient client.StatusClient, mu sync.Locker) (err error) {
-  reqLogger := logf.FromContext(ctx).WithName("SetService")
-  mu.Lock()
-  defer mu.Unlock()
+	reqLogger := logf.FromContext(ctx).WithName("SetService")
+	mu.Lock()
+	defer mu.Unlock()
 
-  updatedServiceStatus := false
-  if !reflect.DeepEqual(service, a.Status.Service) {
-    a.Status.Service = service
-    updatedServiceStatus = true
-  }
+	updatedServiceStatus := false
+	if !reflect.DeepEqual(service, a.Status.Service) {
+		a.Status.Service = service
+		updatedServiceStatus = true
+	}
 
-  if updatedServiceStatus {
-    reqLogger.Info("Status has changed; performing update")
-    err = statusClient.Status().Update(ctx, a)
-  } else {
-    reqLogger.Info("Status is the same; skipping update")
-  }
-  if err != nil {
-    reqLogger.Error(err, "Attempt to update failed")
-  }
-  return nil
+	if updatedServiceStatus {
+		reqLogger.Info("Status has changed; performing update")
+		err = statusClient.Status().Update(ctx, a)
+	} else {
+		reqLogger.Info("Status is the same; skipping update")
+	}
+	if err != nil {
+		reqLogger.Error(err, "Attempt to update failed")
+	}
+	return nil
 }
 
 // AuthenticationStatus defines the observed state of Authentication
 type AuthenticationStatus struct {
-	Nodes []string `json:"nodes"`
-  Service ServiceStatus `json:"service,omitempty"`
+	Nodes   []string      `json:"nodes"`
+	Service ServiceStatus `json:"service,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -201,8 +201,8 @@ type AuthenticationStatus struct {
 type Authentication struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec   AuthenticationSpec   `json:"spec,omitempty"`
-	Status AuthenticationStatus `json:"status,omitempty"`
+	Spec              AuthenticationSpec   `json:"spec,omitempty"`
+	Status            AuthenticationStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

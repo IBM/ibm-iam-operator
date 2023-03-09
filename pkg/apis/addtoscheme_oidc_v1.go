@@ -18,15 +18,15 @@ package apis
 
 import (
 	v1 "github.com/IBM/ibm-iam-operator/pkg/apis/oidc/v1"
-  oauthv1 "github.com/openshift/api/oauth/v1"
-  v1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	v1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	oauthv1 "github.com/openshift/api/oauth/v1"
 )
 
 func init() {
 	// Register the types with the Scheme so the components can map objects to GroupVersionKinds and back
 	AddToSchemes = append(AddToSchemes, v1.SchemeBuilder.AddToScheme)
-  // Register the Scheme that defines OAuthClient so the controller's client can manage them
-  AddToSchemes = append(AddToSchemes, oauthv1.AddToScheme)
-  // Register v1alpha1 to get Authentication/AuthenticationList
-  AddToSchemes = append(AddToSchemes, v1alpha1.SchemeBuilder.AddToScheme)
+	// Register the Scheme that defines OAuthClient so the controller's client can manage them
+	AddToSchemes = append(AddToSchemes, oauthv1.AddToScheme)
+	// Register v1alpha1 to get Authentication/AuthenticationList
+	AddToSchemes = append(AddToSchemes, v1alpha1.SchemeBuilder.AddToScheme)
 }

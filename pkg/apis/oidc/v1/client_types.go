@@ -16,7 +16,7 @@
 package v1
 
 import (
-        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -25,75 +25,75 @@ import (
 // ClientSpec defines the desired state of Client
 // +k8s:openapi-gen=true
 type ClientSpec struct {
-        // INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-        // Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
-        // Add custom validation using kubebuilder tags: https://book.kubebuilder.io/beyond_basics/generating_crd.html
-        OidcLibertyClient OidcLibertyClient `json:"oidcLibertyClient"`
-        Secret            string            `json:"secret"`
-        ClientId          string            `json:"clientId"`
-        ZenAuditUrl       string            `json:"zenAuditUrl,omitempty"`
-        ZenInstanceId     string            `json:"zenInstanceId,omitempty"`
-        ZenProductNameUrl string            `json:"zenProductNameUrl,omitempty"`
-        Roles             []string          `json:"roles,omitempty"`
+	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
+	// Add custom validation using kubebuilder tags: https://book.kubebuilder.io/beyond_basics/generating_crd.html
+	OidcLibertyClient OidcLibertyClient `json:"oidcLibertyClient"`
+	Secret            string            `json:"secret"`
+	ClientId          string            `json:"clientId"`
+	ZenAuditUrl       string            `json:"zenAuditUrl,omitempty"`
+	ZenInstanceId     string            `json:"zenInstanceId,omitempty"`
+	ZenProductNameUrl string            `json:"zenProductNameUrl,omitempty"`
+	Roles             []string          `json:"roles,omitempty"`
 }
 
 type OidcLibertyClient struct {
-        // INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-        // Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
-        // Add custom validation using kubebuilder tags: https://book.kubebuilder.io/beyond_basics/generating_crd.html
-        RedirectUris []string `json:"redirect_uris"`
-        TrustedUris  []string `json:"trusted_uri_prefixes"`
-        LogoutUris   []string `json:"post_logout_redirect_uris"`
+	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
+	// Add custom validation using kubebuilder tags: https://book.kubebuilder.io/beyond_basics/generating_crd.html
+	RedirectUris []string `json:"redirect_uris"`
+	TrustedUris  []string `json:"trusted_uri_prefixes"`
+	LogoutUris   []string `json:"post_logout_redirect_uris"`
 }
 
 // ClientStatus defines the observed state of Client
 // +k8s:openapi-gen=true
 type ClientStatus struct {
-        Conditions []ClientCondition `json:"conditions,omitempty"`
+	Conditions []ClientCondition `json:"conditions,omitempty"`
 
-        // +optional
-        LastFailureTime *metav1.Time `json:"lastFailureTime,omitempty"`
-        // INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-        // Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
-        // Add custom validation using kubebuilder tags: https://book.kubebuilder.io/beyond_basics/generating_crd.html
+	// +optional
+	LastFailureTime *metav1.Time `json:"lastFailureTime,omitempty"`
+	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
+	// Add custom validation using kubebuilder tags: https://book.kubebuilder.io/beyond_basics/generating_crd.html
 }
 
 // CertificateCondition contains condition information for an Certificate.
 type ClientCondition struct {
-        // Type of the condition, currently ('Ready').
-        Type ClientConditionType `json:"type"`
+	// Type of the condition, currently ('Ready').
+	Type ClientConditionType `json:"type"`
 
-        // Status of the condition, one of ('True', 'False', 'Unknown').
-        // +kubebuilder:validation:Enum=True;False;Unknown
-        Status ConditionStatus `json:"status"`
+	// Status of the condition, one of ('True', 'False', 'Unknown').
+	// +kubebuilder:validation:Enum=True;False;Unknown
+	Status ConditionStatus `json:"status"`
 
-        // LastTransitionTime is the timestamp corresponding to the last status
-        // change of this condition.
-        // +optional
-        LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// LastTransitionTime is the timestamp corresponding to the last status
+	// change of this condition.
+	// +optional
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
 
-        // Reason is a brief machine readable explanation for the condition's last
-        // transition.
-        // +optional
-        Reason string `json:"reason,omitempty"`
+	// Reason is a brief machine readable explanation for the condition's last
+	// transition.
+	// +optional
+	Reason string `json:"reason,omitempty"`
 
-        // Message is a human readable description of the details of the last
-        // transition, complementing reason.
-        // +optional
-        Message string `json:"message,omitempty"`
+	// Message is a human readable description of the details of the last
+	// transition, complementing reason.
+	// +optional
+	Message string `json:"message,omitempty"`
 }
 
 // CertificateConditionType represents an Certificate condition value.
 type ClientConditionType string
 
 const (
-        // CertificateConditionReady indicates that a certificate is ready for use.
-        // This is defined as:
-        // - The target secret exists
-        // - The target secret contains a certificate that has not expired
-        // - The target secret contains a private key valid for the certificate
-        // - The commonName and dnsNames attributes match those specified on the Certificate
-        ClientConditionReady ClientConditionType = "Ready"
+	// CertificateConditionReady indicates that a certificate is ready for use.
+	// This is defined as:
+	// - The target secret exists
+	// - The target secret contains a certificate that has not expired
+	// - The target secret contains a private key valid for the certificate
+	// - The commonName and dnsNames attributes match those specified on the Certificate
+	ClientConditionReady ClientConditionType = "Ready"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -102,29 +102,29 @@ const (
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
 type Client struct {
-        metav1.TypeMeta   `json:",inline"`
-        metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-        Spec   ClientSpec   `json:"spec,omitempty"`
-        Status ClientStatus `json:"status,omitempty"`
+	Spec   ClientSpec   `json:"spec,omitempty"`
+	Status ClientStatus `json:"status,omitempty"`
 }
 
 // IsCPClientCredentialsEnabled returns whether the fields required for a Client to be granted authentication tokens
 // with a Client ID and Secret are set.
 func (c *Client) IsCPClientCredentialsEnabled() bool {
-  if len(c.Spec.ZenInstanceId) > 0 {
-    return len(c.Spec.Roles) > 0 && len(c.Spec.ZenAuditUrl) > 0
-  }
-  return len(c.Spec.Roles) > 0
+	if len(c.Spec.ZenInstanceId) > 0 {
+		return len(c.Spec.Roles) > 0 && len(c.Spec.ZenAuditUrl) > 0
+	}
+	return len(c.Spec.Roles) > 0
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClientList contains a list of Client
 type ClientList struct {
-        metav1.TypeMeta `json:",inline"`
-        metav1.ListMeta `json:"metadata,omitempty"`
-        Items           []Client `json:"items"`
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []Client `json:"items"`
 }
 
 // ConditionStatus represents a condition's status.
@@ -136,16 +136,16 @@ type ConditionStatus string
 // condition or not. In the future, we could add other intermediate
 // conditions, e.g. ConditionDegraded.
 const (
-        // ConditionTrue represents the fact that a given condition is true
-        ConditionTrue ConditionStatus = "True"
+	// ConditionTrue represents the fact that a given condition is true
+	ConditionTrue ConditionStatus = "True"
 
-        // ConditionFalse represents the fact that a given condition is false
-        ConditionFalse ConditionStatus = "False"
+	// ConditionFalse represents the fact that a given condition is false
+	ConditionFalse ConditionStatus = "False"
 
-        // ConditionUnknown represents the fact that a given condition is unknown
-        ConditionUnknown ConditionStatus = "Unknown"
+	// ConditionUnknown represents the fact that a given condition is unknown
+	ConditionUnknown ConditionStatus = "Unknown"
 )
 
 func init() {
-        SchemeBuilder.Register(&Client{}, &ClientList{})
+	SchemeBuilder.Register(&Client{}, &ClientList{})
 }

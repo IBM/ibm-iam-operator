@@ -205,7 +205,7 @@ metadata:
     capabilities: Basic Install
     categories: Security
     certified: "false"
-    containerImage: icr.io/cpopen/cpfs/ibm-iam-operator:latest
+    containerImage: icr.io/cpopen/ibm-iam-operator:latest
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
       the lifecycle of IAM services. With this operator, you can simply deploy and
       upgrade the IAM services
@@ -222,7 +222,7 @@ metadata:
 spec:
   relatedImages:
     - name: IBM_IAM_OPERATOR_IMAGE
-      image: icr.io/cpopen/cpfs/ibm-iam-operator@sha256:90e5a5f7c4e7143f71280de4fa689bb9bc23a0c6f44bb44c8120483015033e3f
+      image: icr.io/cpopen/ibm-iam-operator@sha256:90e5a5f7c4e7143f71280de4fa689bb9bc23a0c6f44bb44c8120483015033e3f
     - name: ICP_PLATFORM_AUTH_IMAGE
       image: icr.io/cpopen/cpfs/icp-platform-auth@sha256:12715da7cb32bc60b9869856c8430e4673a95d9d883f96de3afde5c2fe579437
     - name: ICP_IDENTITY_PROVIDER_IMAGE
@@ -531,7 +531,7 @@ spec:
                   value: ""
                 - name: cluster_name
                   value: ""
-                image: icr.io/cpopen/cpfs/ibm-iam-operator:4.0.0
+                image: icr.io/cpopen/ibm-iam-operator:4.0.0
                 imagePullPolicy: Always
                 name: ibm-iam-operator
                 resources:

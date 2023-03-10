@@ -46,7 +46,7 @@ func buildAuditContainer(auditImage string, syslogTlsPath string, resources *cor
 	if len(syslogTlsPath) == 0 {
 		syslogTlsPath = "/etc/audit-tls"
 	}
-	
+
 	return corev1.Container{
 		Name:            "icp-audit-service",
 		Image:           auditImage,

@@ -16,7 +16,5 @@
 
 package resources
 
-
 // New image name for audit sidecar
 var AuditImageName = "audit-syslog-service"
-

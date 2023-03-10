@@ -40,16 +40,16 @@ type OIDCClientWatcherSpec struct {
 }
 
 type OidcInitAuthServiceSpec struct {
-	ImageRegistry string `json:"imageRegistry,omitempty"`
-	ImageName     string `json:"imageName,omitempty"`
-	ImageTag      string `json:"imageTag,omitempty"`
+	ImageRegistry string                       `json:"imageRegistry,omitempty"`
+	ImageName     string                       `json:"imageName,omitempty"`
+	ImageTag      string                       `json:"imageTag,omitempty"`
 	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type OidcInitIdentityProviderSpec struct {
-	ImageRegistry string `json:"imageRegistry,omitempty"`
-	ImageName     string `json:"imageName,omitempty"`
-	ImageTag      string `json:"imageTag,omitempty"`
+	ImageRegistry string                       `json:"imageRegistry,omitempty"`
+	ImageName     string                       `json:"imageName,omitempty"`
+	ImageTag      string                       `json:"imageTag,omitempty"`
 	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 

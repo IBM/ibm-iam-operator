@@ -37,6 +37,28 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
+	// We need to cleanup existing cp2 deployment before the CP3 installation
+	cp2deployment := [5]string{"auth-idp", "auth-pdp", "auth-pap", "secret-watcher", "oidcclient-watcher"}
+
+	// Check for existing CP2 Deployments , Delete those if found
+	for i := 0; i < len(cp2deployment); i++ {
+		err := r.client.Get(context.TODO(), types.NamespacedName{Name: cp2deployment[i], Namespace: instance.Namespace}, currentDeployment)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				reqLogger.Info("Upgrade check : deployment is not found.", "Deployment.Namespace", instance.Namespace, "Deployment.Name", cp2deployment[i])
+			} else {
+				return err
+			}
+		} else {
+			if err = r.client.Delete(context.Background(), currentDeployment); err != nil {
+				reqLogger.Info("Upgrade check : Error while deleting deployment.", "deployment name", currentDeployment, "error message", err)
+				return err
+			} else {
+				reqLogger.Info("Upgrade check : Deleted deployment.", "deployment name", currentDeployment, "error message", err)
+			}
+		}
+	}
+
 	// Check for the presence of dependencies
 	consoleConfigMapName := "ibmcloud-cluster-info"
 	consoleConfigMap := &corev1.ConfigMap{}
@@ -50,6 +72,19 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 			return err
 		}
 	}
+
+	// Check if the ibmcloud-cluster-info created by IM-Operator
+	ownerRefs := consoleConfigMap.OwnerReferences
+	var ownRef string
+	for _, ownRefs := range ownerRefs {
+		ownRef = ownRefs.Kind
+	}
+	if ownRef != "Authentication" {
+		reqLogger.Info("Reconcile Deployment : Can't find ibmcloud-cluster-info Configmap created by IM operator , IM deployment may not proceed", "Configmap.Namespace", consoleConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+		r.needToRequeue = true
+		return nil
+	}
+
 	icpConsoleURL := consoleConfigMap.Data["cluster_address"]
 
 	// Check for the presence of dependencies, for SAAS

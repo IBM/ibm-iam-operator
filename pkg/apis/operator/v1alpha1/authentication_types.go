@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
   "context"
+  "reflect"
   "sync"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	corev1 "k8s.io/api/core/v1"
@@ -164,60 +165,26 @@ type ServiceStatus struct {
 }
 
 func (a *Authentication) SetService(ctx context.Context, service ServiceStatus, statusClient client.StatusClient, mu sync.Locker) (err error) {
-  reqLogger := logf.FromContext(ctx).WithName("SetService").V(3)
+  reqLogger := logf.FromContext(ctx).WithName("SetService")
   mu.Lock()
   defer mu.Unlock()
-  if a.Status.Service.ObjectName == "" {
-    reqLogger.Info("ObjectName is empty")
+
+  updatedServiceStatus := false
+  if !reflect.DeepEqual(service, a.Status.Service) {
     a.Status.Service = service
-    reqLogger.Info("Updating service", "service", a.Status.Service)
+    updatedServiceStatus = true
+  }
+
+  if updatedServiceStatus {
+    reqLogger.Info("Status has changed; performing update")
     err = statusClient.Status().Update(ctx, a)
-    if err != nil {
-      reqLogger.Error(err, "Attempt to update failed")
-    }
-    return
+  } else {
+    reqLogger.Info("Status is the same; skipping update")
   }
-  reqLogger.Info("ObjectName is set", "ObjectName", a.Status.Service.ObjectName)
-  for _, managedResource := range service.ManagedResources {
-    if managedResource.ObjectName != "" {
-      reqLogger.Info("Review managed resource", "mangedResource", managedResource)
-      pos, _ := getResourceStatus(a.Status.Service.ManagedResources, managedResource.ObjectName)
-      if pos != -1 {
-        reqLogger.Info("Found in existing status", "prev", a.Status.Service.ManagedResources[pos], "current", managedResource)
-        a.Status.Service.ManagedResources[pos] = managedResource
-        err = statusClient.Status().Update(ctx, a)
-        if err != nil {
-          reqLogger.Error(err, "Attempt to update failed")
-          return
-        }
-      } else {
-        reqLogger.Info("Not found in existing status", "current", managedResource)
-        a.Status.Service.ManagedResources = append(a.Status.Service.ManagedResources, managedResource)
-        err = statusClient.Status().Update(ctx, a)
-        if err != nil {
-          reqLogger.Error(err, "Attempt to update failed")
-          return
-        }
-      }
-    }
-  }
-  if a.Status.Service.Status != service.Status {
-    a.Status.Service.Status = service.Status
-  }
-  err = statusClient.Status().Update(ctx, a)
   if err != nil {
     reqLogger.Error(err, "Attempt to update failed")
   }
-  return
-}
-
-func getResourceStatus(resources []ManagedResourceStatus, name string) (pos int, resourceStatus *ManagedResourceStatus) {
-  for i, r := range resources {
-    if name == resources[i].ObjectName {
-      return i, &r
-    }
-  }
-  return -1, nil
+  return nil
 }
 
 // AuthenticationStatus defines the observed state of Authentication

@@ -206,7 +206,6 @@ func getCurrentServiceStatus(ctx context.Context, k8sClient client.Client, authe
   statusRetrievals := []statusRetrieval {
     {
       names: []string {
-        "iam-token-service",
         "platform-auth-service",
         "platform-identity-management",
         "platform-identity-provider",

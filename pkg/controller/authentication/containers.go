@@ -688,6 +688,10 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 				Name:      "mongodb-client-cert",
 				MountPath: "/certs/mongodb-client",
 			},
+			{
+				Name:      "saml-cert",
+				MountPath: "/certs/saml-certs",
+			},
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{

@@ -17,10 +17,10 @@
 package apis
 
 import (
+	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	certmgrv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
-	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
-  routev1 "github.com/openshift/api/route/v1"
+	routev1 "github.com/openshift/api/route/v1"
 )
 
 func init() {
@@ -29,5 +29,5 @@ func init() {
 	AddToSchemes = append(AddToSchemes, certmgr.SchemeBuilder.AddToScheme)
 	AddToSchemes = append(AddToSchemes, certmgrv1.SchemeBuilder.AddToScheme)
 	AddToSchemes = append(AddToSchemes, v1alpha1.CertificateSchemeBuilder.AddToScheme)
-  AddToSchemes = append(AddToSchemes, routev1.AddToScheme)
+	AddToSchemes = append(AddToSchemes, routev1.AddToScheme)
 }

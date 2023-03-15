@@ -188,12 +188,12 @@ type ReconcileAuthentication struct {
 	client        client.Client
 	scheme        *runtime.Scheme
 	needToRequeue bool
-  Mutex sync.Mutex
+	Mutex         sync.Mutex
 }
 
 func (r *ReconcileAuthentication) addFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
-  r.Mutex.Lock()
-  defer r.Mutex.Unlock()
+	r.Mutex.Lock()
+	defer r.Mutex.Unlock()
 	if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 		instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
 		err = r.client.Update(ctx, instance)
@@ -203,8 +203,8 @@ func (r *ReconcileAuthentication) addFinalizer(ctx context.Context, finalizerNam
 
 // removeFinalizer removes the provided finalizer from the Authentication instance.
 func (r *ReconcileAuthentication) removeFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
-  r.Mutex.Lock()
-  defer r.Mutex.Unlock()
+	r.Mutex.Lock()
+	defer r.Mutex.Unlock()
 	if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
 		instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
 		err = r.client.Update(ctx, instance)
@@ -218,11 +218,11 @@ func (r *ReconcileAuthentication) removeFinalizer(ctx context.Context, finalizer
 // needsAuditServiceDummyDataReset compares the state in an Authentication's .spec.auditService and returns whether it
 // needs to be overwritten with dummy data.
 func needsAuditServiceDummyDataReset(a *operatorv1alpha1.Authentication) bool {
-  return a.Spec.AuditService.ImageName != operatorv1alpha1.AuditServiceIgnoreString ||
-  a.Spec.AuditService.ImageRegistry != operatorv1alpha1.AuditServiceIgnoreString ||
-  a.Spec.AuditService.ImageTag != operatorv1alpha1.AuditServiceIgnoreString ||
-  a.Spec.AuditService.SyslogTlsPath != "" ||
-  a.Spec.AuditService.Resources != nil
+	return a.Spec.AuditService.ImageName != operatorv1alpha1.AuditServiceIgnoreString ||
+		a.Spec.AuditService.ImageRegistry != operatorv1alpha1.AuditServiceIgnoreString ||
+		a.Spec.AuditService.ImageTag != operatorv1alpha1.AuditServiceIgnoreString ||
+		a.Spec.AuditService.SyslogTlsPath != "" ||
+		a.Spec.AuditService.Resources != nil
 }
 
 // Reconcile reads that state of the cluster for a Authentication object and makes changes based on the state read
@@ -253,12 +253,12 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 		return
 	}
 
-  // Be sure to update status before returning if Authentication is found
-  defer func() {
-    reqLogger.Info("Gather current service status")
-    currentServiceStatus := getCurrentServiceStatus(ctx, r.client, instance)
-    instance.SetService(reconcileCtx, currentServiceStatus, r.client, &r.Mutex)
-  }()
+	// Be sure to update status before returning if Authentication is found
+	defer func() {
+		reqLogger.Info("Gather current service status")
+		currentServiceStatus := getCurrentServiceStatus(ctx, r.client, instance)
+		instance.SetService(reconcileCtx, currentServiceStatus, r.client, &r.Mutex)
+	}()
 
 	// Credit: kubebuilder book
 	finalizerName := "authentication.operator.ibm.com"
@@ -347,13 +347,13 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 		return
 	}
 
-  if needsAuditServiceDummyDataReset(instance) {
-    instance.SetRequiredDummyData()
+	if needsAuditServiceDummyDataReset(instance) {
+		instance.SetRequiredDummyData()
 		err = r.client.Update(ctx, instance)
 		if err != nil {
 			return
 		}
-  }
+	}
 
 	if r.needToRequeue {
 		return reconcile.Result{Requeue: true}, nil

@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-  "time"
+	"time"
 
 	routev1 "github.com/openshift/api/route/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -43,54 +43,54 @@ const DefaultHTTPBackendServiceName = "default-http-backend"
 // data and returns it.
 func (r *ReconcileAuthentication) getCertificateForService(ctx context.Context, serviceName string, instance *operatorv1alpha1.Authentication) (certificate []byte, err error) {
 	reqLogger := log.WithValues("func", "getCertificateForService", "namespace", instance.Namespace)
-  secret := &corev1.Secret{}
-  var secretName string
-  switch serviceName {
-  case PlatformAuthServiceName:
-    secretName = "platform-auth-secret"
-  case PlatformIdentityManagementServiceName:
-    secretName = "platform-identity-management"
-  case PlatformIdentityProviderServiceName:
-    secretName = "identity-provider-secret"
-  default:
-    return nil, fmt.Errorf("service %q does not have a certificate secret managed by this controller", serviceName)
-  }
-  err = r.client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: instance.Namespace}, secret)
+	secret := &corev1.Secret{}
+	var secretName string
+	switch serviceName {
+	case PlatformAuthServiceName:
+		secretName = "platform-auth-secret"
+	case PlatformIdentityManagementServiceName:
+		secretName = "platform-identity-management"
+	case PlatformIdentityProviderServiceName:
+		secretName = "identity-provider-secret"
+	default:
+		return nil, fmt.Errorf("service %q does not have a certificate secret managed by this controller", serviceName)
+	}
+	err = r.client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: instance.Namespace}, secret)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			reqLogger.Info("unable to get route destination certificate, secret does exist. Requeue and try again", "secretName", secretName)
 			r.needToRequeue = true
-      err = nil
+			err = nil
 			return
 		}
 		reqLogger.Error(err, "failed to get route destination certificate", "secretName", secretName)
 		return
 	}
-  certificate, ok := secret.Data["ca.crt"]
-  if !ok || len(certificate) == 0 {
-    err = fmt.Errorf("found secret %q, but \"ca.crt\" was empty", secretName)
-  }
-  return
+	certificate, ok := secret.Data["ca.crt"]
+	if !ok || len(certificate) == 0 {
+		err = fmt.Errorf("found secret %q, but \"ca.crt\" was empty", secretName)
+	}
+	return
 }
 
 type reconcileRouteFields struct {
-  Name string
-  Annotations map[string]string
-  RouteHost string
-  RoutePath string
-  RoutePort int32
-  ServiceName string
-  DestinationCAcert []byte
+	Name              string
+	Annotations       map[string]string
+	RouteHost         string
+	RoutePath         string
+	RoutePort         int32
+	ServiceName       string
+	DestinationCAcert []byte
 }
 
 // signalRequeueIfIsNotFound flags that the reconcile loop needs to be requeued if the error is a IsNotFound error from
 // the Kubernetes controller runtime client. If the flag is set, the error is unset in order to avoid flowing down
 // error-related paths.
 func (r *ReconcileAuthentication) signalRequeueIfIsNotFound(err *error) {
-  if errors.IsNotFound(*err) {
-    r.needToRequeue = true
-    *err = nil
-  }
+	if errors.IsNotFound(*err) {
+		r.needToRequeue = true
+		*err = nil
+	}
 }
 
 func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance *operatorv1alpha1.Authentication) (err error) {
@@ -104,7 +104,7 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
 	clusterInfoConfigMap := &corev1.ConfigMap{}
 	err = r.client.Get(ctx, types.NamespacedName{Name: ClusterInfoConfigmapName, Namespace: instance.Namespace}, clusterInfoConfigMap)
 	if err != nil {
-    r.signalRequeueIfIsNotFound(&err)
+		r.signalRequeueIfIsNotFound(&err)
 		reqLogger.Error(err, "Failed to get cluster info configmap "+ClusterInfoConfigmapName, "requeueNeeded", r.needToRequeue)
 		return
 	}
@@ -113,155 +113,155 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
 		return fmt.Errorf("cluster_address is not set in configmap %s", ClusterInfoConfigmapName)
 	}
 
-  PlatformOIDCCredentialsSecretName := "platform-oidc-credentials"
-  secret := &corev1.Secret{}
-  err = r.client.Get(ctx, types.NamespacedName{Name: PlatformOIDCCredentialsSecretName, Namespace: instance.Namespace}, secret)
+	PlatformOIDCCredentialsSecretName := "platform-oidc-credentials"
+	secret := &corev1.Secret{}
+	err = r.client.Get(ctx, types.NamespacedName{Name: PlatformOIDCCredentialsSecretName, Namespace: instance.Namespace}, secret)
 
 	if err != nil {
-    r.signalRequeueIfIsNotFound(&err)
+		r.signalRequeueIfIsNotFound(&err)
 		reqLogger.Error(err, "Failed to get secret", "secretName", PlatformOIDCCredentialsSecretName, "requeueNeeded", r.needToRequeue)
 		return
 	}
 
 	routeHost = clusterInfoConfigMap.Data["cluster_address"]
-  wlpClientID := string(secret.Data["WLP_CLIENT_ID"][:])
+	wlpClientID := string(secret.Data["WLP_CLIENT_ID"][:])
 
-  now := time.Now().Unix()
-  
-  var (
-    platformAuthCert []byte 
-    platformIdentityManagementCert []byte
-    platformIdentityProviderCert []byte
-  )
-  platformAuthCert, err = r.getCertificateForService(ctx, PlatformAuthServiceName, instance)
-  if err != nil {
-    r.signalRequeueIfIsNotFound(&err)
-    reqLogger.Info("Unable to get certificate for service", "serviceName", PlatformAuthServiceName, "requeueNeeded", r.needToRequeue)
-    return
-  }
-  platformIdentityManagementCert, err = r.getCertificateForService(ctx, PlatformIdentityManagementServiceName, instance)
-  if err != nil {
-    r.signalRequeueIfIsNotFound(&err)
-    reqLogger.Info("Unable to get certificate for service", "serviceName", PlatformIdentityManagementServiceName, "requeueNeeded", r.needToRequeue)
-    return
-  }
-  platformIdentityProviderCert, err = r.getCertificateForService(ctx, PlatformIdentityProviderServiceName, instance)
-  if err != nil {
-    reqLogger.Info("Unable to get certificate for service", "serviceName", PlatformIdentityProviderServiceName, "requeueNeeded", r.needToRequeue)
-    r.signalRequeueIfIsNotFound(&err)
-    return
-  }
+	now := time.Now().Unix()
 
-  //commonAnnotations := map[string]string{
-  //  "haproxy.router.openshift.io/rate-limit-connections": "true",
-  //  "haproxy.router.openshift.io/rate-limit-connections.rate-http": "200",
-  //  "haproxy.router.openshift.io/rate-limit-connections.concurrent-tcp": "10",
-  //  "haproxy.router.openshift.io/timeout": "300s",
-  //}
-  allRoutesFields := map[string]*reconcileRouteFields{
-    "id-mgmt": {
-      Annotations: map[string]string{
-        "haproxy.router.openshift.io/rewrite-target": "/",
-        "haproxy.router.openshift.io/hsts_header": "max-age=31536000;includeSubDomains",
-      },
-      Name: "id-mgmt",
-      RouteHost: routeHost,
-      RoutePath: "/idmgmt/",
-      RoutePort: 4500,
-      ServiceName: PlatformIdentityManagementServiceName,
-      DestinationCAcert: platformIdentityManagementCert,
-    },
-    "platform-auth": {
-      Annotations: map[string]string{
-        "haproxy.router.openshift.io/hsts_header": "max-age=31536000;includeSubDomains",
-        "haproxy.router.openshift.io/rewrite-target": "/v1/auth/",
-      },
-      Name: "platform-auth",
-      RouteHost: routeHost,
-      RoutePath: "/v1/auth/",
-      RoutePort: 4300,
-      DestinationCAcert: platformIdentityProviderCert,
-      ServiceName: PlatformIdentityProviderServiceName,
-    },
-    "platform-id-auth": {
-      Annotations: map[string]string{
-        "haproxy.router.openshift.io/hsts_header": "max-age=31536000;includeSubDomains",
-        "haproxy.router.openshift.io/rewrite-target": "/",
-      },
-      Name: "platform-id-auth",
-      RouteHost: routeHost,
-      RoutePath: "/idauth",
-      RoutePort: 9443,
-      DestinationCAcert: platformAuthCert,
-      ServiceName: PlatformAuthServiceName,
-    },
-    "platform-id-provider": {
-      Annotations: map[string]string{
-        "haproxy.router.openshift.io/hsts_header": "max-age=31536000;includeSubDomains",
-        "haproxy.router.openshift.io/rewrite-target": "/",
-      },
-      Name: "platform-id-provider",
-      RouteHost: routeHost,
-      RoutePath: "/idprovider/",
-      RoutePort: 4300,
-      DestinationCAcert: platformIdentityProviderCert,
-      ServiceName: PlatformIdentityProviderServiceName,
-    },
-    "platform-login": {
-      Annotations: map[string]string{
-        "haproxy.router.openshift.io/hsts_header": "max-age=31536000;includeSubDomains",
-        "haproxy.router.openshift.io/rewrite-target": fmt.Sprintf("/v1/auth/authorize?client_id=%s&redirect_uri=https://%s/auth/liberty/callback&response_type=code&scope=openid+email+profile&state=%d&orig=/login", wlpClientID, routeHost, now),
-      },
-      Name: "platform-login",
-      RouteHost: routeHost,
-      RoutePath: "/login",
-      RoutePort: 4300,
-      DestinationCAcert: platformIdentityProviderCert,
-      ServiceName: PlatformIdentityProviderServiceName,
-    },
-    "platform-oidc": {
-      Annotations: map[string]string{
-        "haproxy.router.openshift.io/hsts_header": "max-age=31536000;includeSubDomains",
-      },
-      Name: "platform-oidc",
-      RouteHost: routeHost,
-      RoutePath: "/oidc",
-      RoutePort: 9443,
-      DestinationCAcert: platformAuthCert,
-      ServiceName: PlatformAuthServiceName,
-    },
-    "saml-ui-callback": {
-      Annotations: map[string]string{
-        "haproxy.router.openshift.io/hsts_header": "max-age=31536000;includeSubDomains",
-        "haproxy.router.openshift.io/rewrite-target": "/ibm/saml20/defaultSP/acs",
-      },
-      Name: "saml-ui-callback",
-      RouteHost: routeHost,
-      RoutePath: "/ibm/saml20/defaultSP/acs",
-      RoutePort: 9443,
-      ServiceName: PlatformAuthServiceName,
-      DestinationCAcert: platformAuthCert,
-    },
-	"social-login-callback": {
-		Annotations: map[string]string{
-		  "haproxy.router.openshift.io/hsts_header": "max-age=31536000;includeSubDomains",
-		  "haproxy.router.openshift.io/rewrite-target": "/ibm/api/social-login",
+	var (
+		platformAuthCert               []byte
+		platformIdentityManagementCert []byte
+		platformIdentityProviderCert   []byte
+	)
+	platformAuthCert, err = r.getCertificateForService(ctx, PlatformAuthServiceName, instance)
+	if err != nil {
+		r.signalRequeueIfIsNotFound(&err)
+		reqLogger.Info("Unable to get certificate for service", "serviceName", PlatformAuthServiceName, "requeueNeeded", r.needToRequeue)
+		return
+	}
+	platformIdentityManagementCert, err = r.getCertificateForService(ctx, PlatformIdentityManagementServiceName, instance)
+	if err != nil {
+		r.signalRequeueIfIsNotFound(&err)
+		reqLogger.Info("Unable to get certificate for service", "serviceName", PlatformIdentityManagementServiceName, "requeueNeeded", r.needToRequeue)
+		return
+	}
+	platformIdentityProviderCert, err = r.getCertificateForService(ctx, PlatformIdentityProviderServiceName, instance)
+	if err != nil {
+		reqLogger.Info("Unable to get certificate for service", "serviceName", PlatformIdentityProviderServiceName, "requeueNeeded", r.needToRequeue)
+		r.signalRequeueIfIsNotFound(&err)
+		return
+	}
+
+	//commonAnnotations := map[string]string{
+	//  "haproxy.router.openshift.io/rate-limit-connections": "true",
+	//  "haproxy.router.openshift.io/rate-limit-connections.rate-http": "200",
+	//  "haproxy.router.openshift.io/rate-limit-connections.concurrent-tcp": "10",
+	//  "haproxy.router.openshift.io/timeout": "300s",
+	//}
+	allRoutesFields := map[string]*reconcileRouteFields{
+		"id-mgmt": {
+			Annotations: map[string]string{
+				"haproxy.router.openshift.io/rewrite-target": "/",
+				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
+			},
+			Name:              "id-mgmt",
+			RouteHost:         routeHost,
+			RoutePath:         "/idmgmt/",
+			RoutePort:         4500,
+			ServiceName:       PlatformIdentityManagementServiceName,
+			DestinationCAcert: platformIdentityManagementCert,
 		},
-		Name: "social-login-callback",
-		RouteHost: routeHost,
-		RoutePath: "/ibm/api/social-login",
-		RoutePort: 9443,
-		ServiceName: PlatformAuthServiceName,
-		DestinationCAcert: platformAuthCert,
-	},
-  }
+		"platform-auth": {
+			Annotations: map[string]string{
+				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
+				"haproxy.router.openshift.io/rewrite-target": "/v1/auth/",
+			},
+			Name:              "platform-auth",
+			RouteHost:         routeHost,
+			RoutePath:         "/v1/auth/",
+			RoutePort:         4300,
+			DestinationCAcert: platformIdentityProviderCert,
+			ServiceName:       PlatformIdentityProviderServiceName,
+		},
+		"platform-id-auth": {
+			Annotations: map[string]string{
+				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
+				"haproxy.router.openshift.io/rewrite-target": "/",
+			},
+			Name:              "platform-id-auth",
+			RouteHost:         routeHost,
+			RoutePath:         "/idauth",
+			RoutePort:         9443,
+			DestinationCAcert: platformAuthCert,
+			ServiceName:       PlatformAuthServiceName,
+		},
+		"platform-id-provider": {
+			Annotations: map[string]string{
+				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
+				"haproxy.router.openshift.io/rewrite-target": "/",
+			},
+			Name:              "platform-id-provider",
+			RouteHost:         routeHost,
+			RoutePath:         "/idprovider/",
+			RoutePort:         4300,
+			DestinationCAcert: platformIdentityProviderCert,
+			ServiceName:       PlatformIdentityProviderServiceName,
+		},
+		"platform-login": {
+			Annotations: map[string]string{
+				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
+				"haproxy.router.openshift.io/rewrite-target": fmt.Sprintf("/v1/auth/authorize?client_id=%s&redirect_uri=https://%s/auth/liberty/callback&response_type=code&scope=openid+email+profile&state=%d&orig=/login", wlpClientID, routeHost, now),
+			},
+			Name:              "platform-login",
+			RouteHost:         routeHost,
+			RoutePath:         "/login",
+			RoutePort:         4300,
+			DestinationCAcert: platformIdentityProviderCert,
+			ServiceName:       PlatformIdentityProviderServiceName,
+		},
+		"platform-oidc": {
+			Annotations: map[string]string{
+				"haproxy.router.openshift.io/hsts_header": "max-age=31536000;includeSubDomains",
+			},
+			Name:              "platform-oidc",
+			RouteHost:         routeHost,
+			RoutePath:         "/oidc",
+			RoutePort:         9443,
+			DestinationCAcert: platformAuthCert,
+			ServiceName:       PlatformAuthServiceName,
+		},
+		"saml-ui-callback": {
+			Annotations: map[string]string{
+				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
+				"haproxy.router.openshift.io/rewrite-target": "/ibm/saml20/defaultSP/acs",
+			},
+			Name:              "saml-ui-callback",
+			RouteHost:         routeHost,
+			RoutePath:         "/ibm/saml20/defaultSP/acs",
+			RoutePort:         9443,
+			ServiceName:       PlatformAuthServiceName,
+			DestinationCAcert: platformAuthCert,
+		},
+		"social-login-callback": {
+			Annotations: map[string]string{
+				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
+				"haproxy.router.openshift.io/rewrite-target": "/ibm/api/social-login",
+			},
+			Name:              "social-login-callback",
+			RouteHost:         routeHost,
+			RoutePath:         "/ibm/api/social-login",
+			RoutePort:         9443,
+			ServiceName:       PlatformAuthServiceName,
+			DestinationCAcert: platformAuthCert,
+		},
+	}
 
-  for _, routeFields := range allRoutesFields {
-    err = r.reconcileRoute(ctx, instance, routeFields)
-    if err != nil {
-      return err
-    }
-  }
+	for _, routeFields := range allRoutesFields {
+		err = r.reconcileRoute(ctx, instance, routeFields)
+		if err != nil {
+			return err
+		}
+	}
 
 	return
 }
@@ -362,57 +362,57 @@ func IsRouteEqual(oldRoute, newRoute *routev1.Route) bool {
 
 	if !reflect.DeepEqual(oldRoute.Spec, newRoute.Spec) {
 		//ugly, but don't print the CA to the log
-    var loggedValues []interface{}
+		var loggedValues []interface{}
 
-    loggedValues = append(loggedValues, "oldHost", oldRoute.Spec.Host, "newHost", newRoute.Spec.Host)
+		loggedValues = append(loggedValues, "oldHost", oldRoute.Spec.Host, "newHost", newRoute.Spec.Host)
 
-    loggedValues = append(loggedValues, "oldPath", oldRoute.Spec.Path, "newHost", newRoute.Spec.Path)
+		loggedValues = append(loggedValues, "oldPath", oldRoute.Spec.Path, "newHost", newRoute.Spec.Path)
 
-    loggedValues = append(loggedValues, "oldWildcardPolicy", oldRoute.Spec.WildcardPolicy, "newWildcardPolicy", newRoute.Spec.WildcardPolicy)
+		loggedValues = append(loggedValues, "oldWildcardPolicy", oldRoute.Spec.WildcardPolicy, "newWildcardPolicy", newRoute.Spec.WildcardPolicy)
 
-    loggedValues = append(loggedValues, "oldPort")
-    if oldRoute.Spec.Port != nil {
-      loggedValues = append(loggedValues, fmt.Sprintf("%v", oldRoute.Spec.Port))
-    } else {
-      loggedValues = append(loggedValues, "unset")
-    }
-    loggedValues = append(loggedValues, "newPort")
-    if oldRoute.Spec.Port != nil {
-      loggedValues = append(loggedValues, fmt.Sprintf("%v", newRoute.Spec.Port))
-    } else {
-      loggedValues = append(loggedValues, "unset")
-    }
+		loggedValues = append(loggedValues, "oldPort")
+		if oldRoute.Spec.Port != nil {
+			loggedValues = append(loggedValues, fmt.Sprintf("%v", oldRoute.Spec.Port))
+		} else {
+			loggedValues = append(loggedValues, "unset")
+		}
+		loggedValues = append(loggedValues, "newPort")
+		if oldRoute.Spec.Port != nil {
+			loggedValues = append(loggedValues, fmt.Sprintf("%v", newRoute.Spec.Port))
+		} else {
+			loggedValues = append(loggedValues, "unset")
+		}
 
-    loggedValues = append(loggedValues, "oldToService", fmt.Sprintf("%v", oldRoute.Spec.To))
-    loggedValues = append(loggedValues, "newToService", fmt.Sprintf("%v", newRoute.Spec.To))
+		loggedValues = append(loggedValues, "oldToService", fmt.Sprintf("%v", oldRoute.Spec.To))
+		loggedValues = append(loggedValues, "newToService", fmt.Sprintf("%v", newRoute.Spec.To))
 
-    loggedValues = append(loggedValues, "old.tls.termination")
-    if oldRoute.Spec.TLS != nil {
-      loggedValues = append(loggedValues, oldRoute.Spec.TLS.Termination)
-    } else {
-      loggedValues = append(loggedValues, "unset")
-    }
-    loggedValues = append(loggedValues, "new.tls.termination")
-    if newRoute.Spec.TLS != nil {
-      loggedValues = append(loggedValues, newRoute.Spec.TLS.Termination)
-    } else {
-      loggedValues = append(loggedValues, "unset")
-    }
+		loggedValues = append(loggedValues, "old.tls.termination")
+		if oldRoute.Spec.TLS != nil {
+			loggedValues = append(loggedValues, oldRoute.Spec.TLS.Termination)
+		} else {
+			loggedValues = append(loggedValues, "unset")
+		}
+		loggedValues = append(loggedValues, "new.tls.termination")
+		if newRoute.Spec.TLS != nil {
+			loggedValues = append(loggedValues, newRoute.Spec.TLS.Termination)
+		} else {
+			loggedValues = append(loggedValues, "unset")
+		}
 
-    loggedValues = append(loggedValues, "old.tls.insecureEdgeTerminationPolicy")
-    if oldRoute.Spec.TLS != nil {
-      loggedValues = append(loggedValues, oldRoute.Spec.TLS.InsecureEdgeTerminationPolicy)
-    } else {
-      loggedValues = append(loggedValues, "unset")
-    }
-    loggedValues = append(loggedValues, "new.tls.insecureEdgeTerminationPolicy")
-    if newRoute.Spec.TLS != nil {
-      loggedValues = append(loggedValues, newRoute.Spec.TLS.InsecureEdgeTerminationPolicy)
-    } else {
-      loggedValues = append(loggedValues, "unset")
-    }
+		loggedValues = append(loggedValues, "old.tls.insecureEdgeTerminationPolicy")
+		if oldRoute.Spec.TLS != nil {
+			loggedValues = append(loggedValues, oldRoute.Spec.TLS.InsecureEdgeTerminationPolicy)
+		} else {
+			loggedValues = append(loggedValues, "unset")
+		}
+		loggedValues = append(loggedValues, "new.tls.insecureEdgeTerminationPolicy")
+		if newRoute.Spec.TLS != nil {
+			loggedValues = append(loggedValues, newRoute.Spec.TLS.InsecureEdgeTerminationPolicy)
+		} else {
+			loggedValues = append(loggedValues, "unset")
+		}
 
-		logger.Info("Specs not equal", loggedValues... )
+		logger.Info("Specs not equal", loggedValues...)
 		return false
 	}
 
@@ -421,9 +421,8 @@ func IsRouteEqual(oldRoute, newRoute *routev1.Route) bool {
 	return true
 }
 
-
 func (r *ReconcileAuthentication) newRoute(instance *operatorv1alpha1.Authentication, fields *reconcileRouteFields) (*routev1.Route, error) {
-  namespace := instance.Namespace
+	namespace := instance.Namespace
 
 	reqLogger := log.WithValues("func", "GetDesiredRoute", "name", fields.Name, "namespace", namespace)
 
@@ -457,13 +456,13 @@ func (r *ReconcileAuthentication) newRoute(instance *operatorv1alpha1.Authentica
 		},
 	}
 
-  if len(fields.DestinationCAcert) > 0 {
-    route.Spec.TLS = &routev1.TLSConfig{
-				Termination:                   routev1.TLSTerminationReencrypt,
-				InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
-				DestinationCACertificate:      string(fields.DestinationCAcert),
-    }
-  }
+	if len(fields.DestinationCAcert) > 0 {
+		route.Spec.TLS = &routev1.TLSConfig{
+			Termination:                   routev1.TLSTerminationReencrypt,
+			InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+			DestinationCACertificate:      string(fields.DestinationCAcert),
+		}
+	}
 
 	err := controllerutil.SetControllerReference(instance, route, r.client.Scheme())
 	if err != nil {

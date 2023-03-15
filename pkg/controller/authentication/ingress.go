@@ -29,20 +29,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-var ingressList []string = []string{ 
-  "ibmid-ui-callback",
-  "id-mgmt",
-  "idmgmt-v2-api",
-  "platform-auth",
-  "platform-id-auth-block",
-  "platform-id-auth",
-  "platform-id-provider",
-  "platform-login",
-  "platform-oidc-block",
-  "platform-oidc",
-  "saml-ui-callback",
-  "version-idmgmt",
-  "social-login-callback",
+var ingressList []string = []string{
+	"ibmid-ui-callback",
+	"id-mgmt",
+	"idmgmt-v2-api",
+	"platform-auth",
+	"platform-id-auth-block",
+	"platform-id-auth",
+	"platform-id-provider",
+	"platform-login",
+	"platform-oidc-block",
+	"platform-oidc",
+	"saml-ui-callback",
+	"version-idmgmt",
+	"social-login-callback",
 }
 
 func (r *ReconcileAuthentication) ReconcileRemoveIngresses(ctx context.Context, instance *operatorv1alpha1.Authentication) {
@@ -50,7 +50,7 @@ func (r *ReconcileAuthentication) ReconcileRemoveIngresses(ctx context.Context, 
 
 	//No error checking as we will just make a best attempt to remove the legacy ingresses
 	//Do not fail based on inability to delete the ingresses
-  //TODO Add ingress names here
+	//TODO Add ingress names here
 	for _, iname := range ingressList {
 		err := r.DeleteIngress(ctx, iname, instance.Namespace)
 		if err != nil {
@@ -86,26 +86,26 @@ func (r *ReconcileAuthentication) DeleteIngress(ctx context.Context, ingressName
 	}
 
 	reqLogger.Info("Deleted legacy ingress")
-  r.needToRequeue = true
+	r.needToRequeue = true
 	return nil
 }
 
 func (r *ReconcileAuthentication) handleIngress(instance *operatorv1alpha1.Authentication, currentIngress *netv1.Ingress) error {
 	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *netv1.Ingress{
-    ibmidUiCallbackIngress,
-    idMgmtIngress,
-    idmgmtV2ApiIngress,
+		ibmidUiCallbackIngress,
+		idMgmtIngress,
+		idmgmtV2ApiIngress,
 		platformAuthIngress,
-    platformIdAuthBlockIngress,
-    platformIdAuthIngress,
-    platformIdProviderIngress,
-    platformLoginIngress,
-    platformOidcBlockIngress,
-    platformOidcIngress,
+		platformIdAuthBlockIngress,
+		platformIdAuthIngress,
+		platformIdProviderIngress,
+		platformLoginIngress,
+		platformOidcBlockIngress,
+		platformOidcIngress,
 		samlUiCallbackIngress,
-    versionIdmgmtIngress,
-    socialLoginCallbackIngress,
-  }
+		versionIdmgmtIngress,
+		socialLoginCallbackIngress,
+	}
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
@@ -132,7 +132,6 @@ func (r *ReconcileAuthentication) handleIngress(instance *operatorv1alpha1.Authe
 	return nil
 
 }
-
 
 func ibmidUiCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *netv1.Ingress {
 	pathType := netv1.PathType("ImplementationSpecific")

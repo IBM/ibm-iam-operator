@@ -23,10 +23,8 @@ ENV OPERATOR=/usr/local/bin/ibm-iam-operator \
 COPY build/_output/bin/ibm-iam-operator-amd64 ${OPERATOR}
 
 COPY build/bin /usr/local/bin
-RUN  /usr/local/bin/user_setup
+RUN  /usr/local/bin/user_setup && mkdir /licenses
 
-# copy licenses
-RUN mkdir /licenses
 COPY LICENSE /licenses
 
 ENTRYPOINT ["/usr/local/bin/entrypoint"]

@@ -348,13 +348,13 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 						},
 						PodAntiAffinity: &corev1.PodAntiAffinity{
 							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
-								corev1.WeightedPodAffinityTerm{
+								{
 									Weight: 100,
 									PodAffinityTerm: corev1.PodAffinityTerm{
 										TopologyKey: "kubernetes.io/hostname",
 										LabelSelector: &metav1.LabelSelector{
 											MatchExpressions: []metav1.LabelSelectorRequirement{
-												metav1.LabelSelectorRequirement{
+												{
 													Key:      "app",
 													Operator: metav1.LabelSelectorOpIn,
 													Values:   []string{"platform-auth-service"},
@@ -479,13 +479,13 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 						},
 						PodAntiAffinity: &corev1.PodAntiAffinity{
 							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
-								corev1.WeightedPodAffinityTerm{
+								{
 									Weight: 100,
 									PodAffinityTerm: corev1.PodAffinityTerm{
 										TopologyKey: "kubernetes.io/hostname",
 										LabelSelector: &metav1.LabelSelector{
 											MatchExpressions: []metav1.LabelSelectorRequirement{
-												metav1.LabelSelectorRequirement{
+												{
 													Key:      "app",
 													Operator: metav1.LabelSelectorOpIn,
 													Values:   []string{"platform-identity-provider"},
@@ -610,13 +610,13 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 						},
 						PodAntiAffinity: &corev1.PodAntiAffinity{
 							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
-								corev1.WeightedPodAffinityTerm{
+								{
 									Weight: 100,
 									PodAffinityTerm: corev1.PodAffinityTerm{
 										TopologyKey: "kubernetes.io/hostname",
 										LabelSelector: &metav1.LabelSelector{
 											MatchExpressions: []metav1.LabelSelectorRequirement{
-												metav1.LabelSelectorRequirement{
+												{
 													Key:      "app",
 													Operator: metav1.LabelSelectorOpIn,
 													Values:   []string{"platform-identity-management"},

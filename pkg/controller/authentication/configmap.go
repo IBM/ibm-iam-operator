@@ -94,7 +94,8 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 			} else {
 				reqLogger.Info("Successfully created ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
 			}
-			//*requeueResult = true
+		} else {
+			reqLogger.Error(err, "Failed to get the ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
 		}
 	} else {
 		labels := currentConfigMap.Labels

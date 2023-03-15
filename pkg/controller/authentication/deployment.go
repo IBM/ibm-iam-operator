@@ -38,15 +38,16 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
 	// We need to cleanup existing cp2 deployment before the CP3 installation
-	cp2deployment := [5]string{"auth-idp", "auth-pdp", "auth-pap", "secret-watcher", "oidcclient-watcher"}
+	cp2deployment := [6]string{"auth-idp", "auth-pdp", "auth-pap", "secret-watcher", "oidcclient-watcher", "iam-policy-controller"}
 
 	// Check for existing CP2 Deployments , Delete those if found
 	for i := 0; i < len(cp2deployment); i++ {
 		err := r.client.Get(context.TODO(), types.NamespacedName{Name: cp2deployment[i], Namespace: instance.Namespace}, currentDeployment)
 		if err != nil {
 			if errors.IsNotFound(err) {
-				reqLogger.Info("Upgrade check : deployment is not found.", "Deployment.Namespace", instance.Namespace, "Deployment.Name", cp2deployment[i])
+				//reqLogger.Info("Upgrade check : deployment is not found.", "Deployment.Namespace", instance.Namespace, "Deployment.Name", cp2deployment[i])
 			} else {
+				reqLogger.Info("Upgrade check : Error while getting depoyment.", "Deployment.Namespace", instance.Namespace, "Deployment.Name", cp2deployment[i], "Error.Message", err)
 				return err
 			}
 		} else {

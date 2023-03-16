@@ -94,10 +94,31 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 			} else {
 				reqLogger.Info("Successfully created ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
 			}
-			//*requeueResult = true
+		} else {
+			reqLogger.Error(err, "Failed to get the ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
 		}
 	} else {
-		reqLogger.Info("Configmap is already exist ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+		labels := currentConfigMap.Labels
+		ownerRefs := currentConfigMap.OwnerReferences
+		var ownRef string
+		for _, ownRefs := range ownerRefs {
+			ownRef = ownRefs.Kind
+		}
+
+		if labels != nil {
+			value, ok := labels["app"]
+			if ok && value == "auth-idp" && ownRef == "Authentication" {
+				reqLogger.Info("ibmcloud-cluster-info Configmap is already created by IM operator", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+			} else if ok && value == "management-ingress" && ownRef == "ManagementIngress" {
+				reqLogger.Info("Configmap is already created by managementingress , IM installation may not proceed further until the configmap is removed", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+				r.needToRequeue = true
+				return nil
+			} else {
+				reqLogger.Info("Can't determine the configmap ownership , IM installation may not proceed further until the configmap is removed", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+				r.needToRequeue = true
+				return nil
+			}
+		}
 	}
 
 	// Public Cloud to be checked from ibmcloud-cluster-info

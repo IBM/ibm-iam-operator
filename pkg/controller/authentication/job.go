@@ -39,6 +39,32 @@ func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentic
 	job := "oidc-client-registration"
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: job, Namespace: instance.Namespace}, currentJob)
 	if err != nil && errors.IsNotFound(err) {
+
+		// Confirm that configmap ibmcloud-cluster-info is created by IM-Operator before further usage
+		consoleConfigMapName := "ibmcloud-cluster-info"
+		consoleConfigMap := &corev1.ConfigMap{}
+		err := r.client.Get(context.TODO(), types.NamespacedName{Name: consoleConfigMapName, Namespace: instance.Namespace}, consoleConfigMap)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				reqLogger.Error(err, "The configmap ", consoleConfigMapName, " is not created yet")
+				return err
+			} else {
+				reqLogger.Error(err, "Failed to get ConfigMap", consoleConfigMapName)
+				return err
+			}
+		}
+		// Verify the owner reference
+		ownerRefs := consoleConfigMap.OwnerReferences
+		var ownRef string
+		for _, ownRefs := range ownerRefs {
+			ownRef = ownRefs.Kind
+		}
+		if ownRef != "Authentication" {
+			reqLogger.Info("Reconcile Job : Can't find ibmcloud-cluster-info Configmap created by IM operator , IM Job creation may not proceed ", "Configmap.Namespace", consoleConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+			r.needToRequeue = true
+			return nil
+		}
+
 		// Define a new Job
 		newJob := generateJobObject(instance, r.scheme, job)
 		reqLogger.Info("Creating a new Job", "Job.Namespace", instance.Namespace, "Job.Name", job)

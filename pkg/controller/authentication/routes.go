@@ -109,6 +109,18 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
 		return
 	}
 
+	// Check if the ibmcloud-cluster-info created by IM-Operator
+	ownerRefs := clusterInfoConfigMap.OwnerReferences
+	var ownRef string
+	for _, ownRefs := range ownerRefs {
+		ownRef = ownRefs.Kind
+	}
+	if ownRef != "Authentication" {
+		reqLogger.Info("Reconcile Routes : Can't find ibmcloud-cluster-info Configmap created by IM operator , IM Route reconcilation may not proceed ", "Configmap.Namespace", clusterInfoConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+		r.needToRequeue = true
+		return nil
+	}
+
 	if clusterInfoConfigMap.Data == nil || len(clusterInfoConfigMap.Data["cluster_address"]) == 0 {
 		return fmt.Errorf("cluster_address is not set in configmap %s", ClusterInfoConfigmapName)
 	}

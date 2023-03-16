@@ -103,9 +103,9 @@ func (r *ReconcileAuthentication) platformAuthService(instance *operatorv1alpha1
 					Port: authPort,
 				},
 				{
- 					Name: "p3100",
- 					Port: dirPort,
- 				},
+					Name: "p3100",
+					Port: dirPort,
+				},
 			},
 			Selector: map[string]string{
 				"k8s-app": "platform-auth-service",

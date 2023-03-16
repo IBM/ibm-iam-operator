@@ -17,9 +17,9 @@
 package client
 
 import (
-  "context"
+	"context"
 	"encoding/json"
-  "io/ioutil"
+	"io/ioutil"
 	"net/http"
 
 	oidcv1 "github.com/IBM/ibm-iam-operator/pkg/apis/oidc/v1"
@@ -31,7 +31,7 @@ type OIDCClientError struct {
 }
 
 func (e *OIDCClientError) Error() string {
-  return e.Description
+	return e.Description
 }
 
 // ConditionStatus represents a condition's status.
@@ -63,23 +63,23 @@ const (
 // NewOIDCClientError produces a new OIDCClientError by attempting to unmarshal the response body JSON into an
 // OIDCClientError's Description field.
 func NewOIDCClientError(response *http.Response) (oidcErr *OIDCClientError) {
-  if response == nil || response.Body == nil {
-    return nil
-  }
-  defer response.Body.Close()
-  bodyBuffer, err := ioutil.ReadAll(response.Body)
-  if err != nil {
-    return &OIDCClientError{
-      Description: MessageUnknown,
-    }
-  }
-  err = json.Unmarshal(bodyBuffer, oidcErr)
-  if err != nil {
-    return &OIDCClientError{
-      Description: MessageUnknown,
-    }
-  }
-  return
+	if response == nil || response.Body == nil {
+		return nil
+	}
+	defer response.Body.Close()
+	bodyBuffer, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return &OIDCClientError{
+			Description: MessageUnknown,
+		}
+	}
+	err = json.Unmarshal(bodyBuffer, oidcErr)
+	if err != nil {
+		return &OIDCClientError{
+			Description: MessageUnknown,
+		}
+	}
+	return
 }
 
 func (r *ReconcileClient) handleOIDCClientError(ctx context.Context, client *oidcv1.Client, err error, requestType string) {
@@ -97,8 +97,7 @@ func (r *ReconcileClient) handleOIDCClientError(ctx context.Context, client *oid
 		reason = ReasonUnknown
 	}
 
-  errorMessage = err.Error()
-
+	errorMessage = err.Error()
 
 	if requestType == PostType {
 		SetClientCondition(client,

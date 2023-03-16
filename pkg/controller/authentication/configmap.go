@@ -325,6 +325,36 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 				} else {
 					currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isOSEnv)
 				}
+
+				// This code would take care updating cp2 specific values into cp3 format
+				idmgmtSVC, keyExists := currentConfigMap.Data["IDENTITY_MGMT_URL"]
+				if keyExists && strings.Contains(idmgmtSVC, "127.0.0.1") {
+					reqLogger.Info("Upgrade check : IDENTITY_MGMT_URL entry would be upgraded to CP3 format ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					currentConfigMap.Data["IDENTITY_MGMT_URL"] = "https://platform-identity-management:4500"
+					cmUpdateRequired = true
+				}
+
+				authSVC, keyExists := currentConfigMap.Data["BASE_OIDC_URL"]
+				if keyExists && strings.Contains(authSVC, "127.0.0.1") {
+					reqLogger.Info("Upgrade check : BASE_OIDC_URL entry would be upgraded to CP3 format ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					currentConfigMap.Data["BASE_OIDC_URL"] = "https://platform-auth-service:9443/oidc/endpoint/OP"
+					cmUpdateRequired = true
+				}
+
+				authdirSVC, keyExists := currentConfigMap.Data["IDENTITY_AUTH_DIRECTORY_URL"]
+				if keyExists && strings.Contains(authdirSVC, "127.0.0.1") {
+					reqLogger.Info("Upgrade check : IDENTITY_AUTH_DIRECTORY_URL entry would be upgraded to CP3 format ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					currentConfigMap.Data["IDENTITY_AUTH_DIRECTORY_URL"] = "https://platform-auth-service:3100"
+					cmUpdateRequired = true
+				}
+
+				idproviderSVC, keyExists := currentConfigMap.Data["IDENTITY_PROVIDER_URL"]
+				if keyExists && strings.Contains(idproviderSVC, "127.0.0.1") {
+					reqLogger.Info("Upgrade check : IDENTITY_PROVIDER_URL entry would be upgraded to CP3 format ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					currentConfigMap.Data["IDENTITY_PROVIDER_URL"] = "https://platform-identity-provider:4300"
+					cmUpdateRequired = true
+				}
+
 				cmUpdateRequired = true
 
 				if cmUpdateRequired {

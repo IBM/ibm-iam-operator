@@ -64,12 +64,12 @@ require (
 	go.uber.org/atomic v1.6.0 // indirect
 	go.uber.org/multierr v1.5.0 // indirect
 	go.uber.org/zap v1.15.0 // indirect
-	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0 // indirect
-	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b // indirect
+	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
+	golang.org/x/net v0.8.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6 // indirect
-	golang.org/x/sys v0.0.0-20210603081109-ebe580a85c40 // indirect
-	golang.org/x/term v0.0.0-20201117132131-f5c789dd3221 // indirect
-	golang.org/x/text v0.3.3 // indirect
+	golang.org/x/sys v0.6.0 // indirect
+	golang.org/x/term v0.6.0 // indirect
+	golang.org/x/text v0.8.0 // indirect
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e // indirect
 	gomodules.xyz/jsonpatch/v2 v2.1.0 // indirect
 	google.golang.org/appengine v1.6.6 // indirect
@@ -92,7 +92,7 @@ replace (
 	github.com/dgrijalva/jwt-go => github.com/dgrijalva/jwt-go/v4 v4.0.0-preview1
 	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.5.1
 	github.com/prometheus-operator/prometheus-operator => github.com/prometheus-operator/prometheus-operator v0.38.0 // indirect
-	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20201216223049-8b5274cf687f
+	golang.org/x/crypto => golang.org/x/crypto v0.7.0
 	k8s.io/api => k8s.io/api v0.19.10
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.19.10
 	k8s.io/apimachinery => k8s.io/apimachinery v0.19.10
@@ -124,3 +124,7 @@ replace github.com/docker/docker => github.com/moby/moby v0.7.3-0.20190826074503
 replace github.com/emicklei/go-restful => github.com/emicklei/go-restful v2.16.0+incompatible
 
 replace github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.11.1
+
+replace golang.org/x/net => golang.org/x/net v0.7.0
+
+replace golang.org/x/sys => golang.org/x/sys v0.6.0

@@ -207,16 +207,6 @@ metadata:
     app.kubernetes.io/managed-by: ibm-iam-operator
     app.kubernetes.io/name: ibm-iam-operator
 rules:
-# token allocation is used in identity provider
-- apiGroups:
-  - oauth.openshift.io
-  resources:
-  - oauthclients
-  verbs:
-  - create
-  - get
-  - update
-  - delete
 - apiGroups:
   - config.openshift.io
   resources:

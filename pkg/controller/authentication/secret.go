@@ -226,7 +226,27 @@ func (r *ReconcileAuthentication) createClusterCACert(i *operatorv1alpha1.Authen
 			reqLogger.Error(err, "failure creating secret for ibmcloud-cluster-ca-cert")
 			return err
 		}
-
+		// Confirm that secret ibmcloud-cluster-ca-cert  is created by IM-Operator before further usage
+		if errors.IsAlreadyExists(err) {
+			current := &corev1.Secret{}
+			existerr := r.client.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: i.Namespace}, current)
+			if existerr == nil {
+				ownerRefs := current.OwnerReferences
+				var ownRef string
+				for _, ownRefs := range ownerRefs {
+					ownRef = ownRefs.Kind
+				}
+				if ownRef == "ManagementIngress" {
+					reqLogger.Error(err, "ibmcloud-cluster-ca-cert secret is already created by managementingress , IM installation may not proceed further until the secret is removed")
+					r.needToRequeue = true
+					return nil
+				} else if ownRef != "Authentication" {
+					reqLogger.Error(err, "Can't determine the secret ownership , IM installation may not proceed further until the secret is removed")
+					r.needToRequeue = true
+					return nil
+				}
+			}
+		}
 		reqLogger.Info("Trying to update secret: as it already existed.", "Certificate.Namespace", i.Namespace, "Secret.Name", secretName)
 
 		// Update config

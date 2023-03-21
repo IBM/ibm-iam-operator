@@ -328,7 +328,6 @@ func (r *ReconcileClient) Reconcile(ctx context.Context, request reconcile.Reque
 func (r *ReconcileClient) createClient(ctx context.Context, client *oidcv1.Client) (err error) {
 	reqLogger := logf.FromContext(ctx).WithName("createClient")
 	var clientCreds *ClientCredentials
-	var isOSAuthEnabled bool
 	clientCreds = r.generateClientCredentials("")
 	reqLogger.Info("generated new client ID/secret pair", "clientId", clientCreds.ClientID)
 	_, err = r.CreateClientRegistration(ctx, client, clientCreds)
@@ -345,14 +344,9 @@ func (r *ReconcileClient) createClient(ctx context.Context, client *oidcv1.Clien
 	if err != nil {
 		return
 	}
-	isOSAuthEnabled, err = r.GetOSAuthEnabled()
-	if err != nil {
-		return
-	}
-	if isOSAuthEnabled {
-		reqLogger.Info("OSAUTH_ENABLED set to true, adding annotations to ibm-iam-operand-restricted ServiceAccount")
-		r.handleServiceAccount(ctx, client)
-	}
+
+	reqLogger.Info("adding annotations to ibm-iam-operand-restricted ServiceAccount")
+	r.handleServiceAccount(ctx, client)
 	if client.Spec.ZenInstanceId == "" {
 		err = r.processZenRegistration(ctx, client, clientCreds)
 		if err != nil {
@@ -403,15 +397,8 @@ func (r *ReconcileClient) updateClient(ctx context.Context, client *oidcv1.Clien
 		}
 	}
 
-	var isOSAuthEnabled bool
-	isOSAuthEnabled, err = r.GetOSAuthEnabled()
-	if err != nil {
-		return err
-	}
-	if isOSAuthEnabled {
-		reqLogger.Info("OSAUTH_ENABLED set to true, updating annotations to ibm-iam-operand-restricted ServiceAccount")
-		r.handleServiceAccount(ctx, client)
-	}
+	reqLogger.Info("OSAUTH_ENABLED set to true, updating annotations to ibm-iam-operand-restricted ServiceAccount")
+	r.handleServiceAccount(ctx, client)
 
 	err = r.processZenRegistration(ctx, client, clientCreds)
 	if err != nil {
@@ -562,15 +549,8 @@ func (r *ReconcileClient) deleteClient(ctx context.Context, client *oidcv1.Clien
 	}
 	reqLogger.Info("Client registration successfully deleted")
 
-	isOSAuthEnabled, err := r.GetOSAuthEnabled()
-	if err != nil {
-		return
-	}
-	// Delete OpenShift OAuthClient resource if it exists
-	if isOSAuthEnabled {
-		reqLogger.Info("OSAUTH_ENABLED set to true, deleting annotations from ibm-iam-operand-restricted ServiceAccount")
-		r.RemoveAnnotationFromSA(ctx, client)
-	}
+	reqLogger.Info("OSAUTH_ENABLED set to true, deleting annotations from ibm-iam-operand-restricted ServiceAccount")
+	r.RemoveAnnotationFromSA(ctx, client)
 	// Delete the zeninstance if it has been specified
 	if client.Spec.ZenInstanceId != "" {
 		reqLogger.Info("Client has a zenInstanceId, attempt to delete the matching Zen instance")

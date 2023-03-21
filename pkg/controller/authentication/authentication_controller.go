@@ -327,11 +327,8 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	}
 
 	r.ReconcileRemoveIngresses(ctx, instance)
-
-	// update serviceaccount with annotation if Openshift authentication is enabled
-	if r.isOSAuthEnabled(instance) {
-		r.handleServiceAccount(instance)
-	}
+	// updates redirecturi annotations to serviceaccount
+	r.handleServiceAccount(instance)
 
 	err = r.reconcileRoutes(ctx, instance)
 	if err != nil {

@@ -433,15 +433,6 @@ spec:
       clusterPermissions:
       - rules:
         - apiGroups:
-          - oauth.openshift.io
-          resources:
-          - oauthclients
-          verbs:
-          - create
-          - get
-          - update
-          - delete
-        - apiGroups:
           - config.openshift.io
           resources:
           - ingresses

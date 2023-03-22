@@ -152,7 +152,7 @@ metadata:
                     "name": "ibm-mongodb-operator"
                   },
                   {
-                    "name": "ibm-commonui-operator"
+                    "name": "ibm-idp-config-ui-operator"
                   }
                 ],
                 "registry": "common-service"

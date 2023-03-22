@@ -31,5 +31,6 @@ remote="$1"
 url="$2"
 
 .git/hooks/make_lint-all.sh
+gofmt -w -s -l .
 
 exit $?

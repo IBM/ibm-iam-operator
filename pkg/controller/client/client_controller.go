@@ -323,8 +323,7 @@ func (r *ReconcileClient) Reconcile(ctx context.Context, request reconcile.Reque
 }
 
 // createClient handles all aspects of tying out the creation of a new OIDC client, including registering the client in
-// the OP, updates the ibm-iam-operand-restricted ServiceAccount with new redirect uris from client CR if OSAUTH_ENABLED is set to true in the
-// platform-auth-idp ConfigMap, and registers the Zen instance in IAM if the required fields are supplied.
+// the OP, updates the ibm-iam-operand-restricted ServiceAccount with new redirect uris from client CR  and registers the Zen instance in IAM if the required fields are supplied.
 func (r *ReconcileClient) createClient(ctx context.Context, client *oidcv1.Client) (err error) {
 	reqLogger := logf.FromContext(ctx).WithName("createClient")
 	var clientCreds *ClientCredentials
@@ -397,7 +396,7 @@ func (r *ReconcileClient) updateClient(ctx context.Context, client *oidcv1.Clien
 		}
 	}
 
-	reqLogger.Info("OSAUTH_ENABLED set to true, updating annotations to ibm-iam-operand-restricted ServiceAccount")
+	reqLogger.Info("Updating annotations to ibm-iam-operand-restricted ServiceAccount")
 	r.handleServiceAccount(ctx, client)
 
 	err = r.processZenRegistration(ctx, client, clientCreds)
@@ -522,9 +521,8 @@ func containsString(slice []string, s string) bool {
 }
 
 // deleteClient deletes any registrations or resources created as a result of the provided Client
-// resource's installation. By default, only the Client's registration in the OP will be deleted. If OSAUTH_ENABLED is set
-// to true in the ReconcileClient's ClientControllerConfig, the OAuthClient with a name matching the Client's ID will be
-// looked up and deleted. If the Client is for a particular Zen instance, that Zen instance's registration in the
+// resource's installation. By default, only the Client's registration in the OP will be deleted.
+// If the Client is for a particular Zen instance, that Zen instance's registration in the
 // Identity Management service will be deleted. If any of the operations attempted produce errors, those are returned.
 func (r *ReconcileClient) deleteClient(ctx context.Context, client *oidcv1.Client) (err error) {
 	reqLogger := logf.FromContext(ctx).WithName("deleteClient").WithValues("clientId", client.Spec.ClientId)
@@ -549,7 +547,7 @@ func (r *ReconcileClient) deleteClient(ctx context.Context, client *oidcv1.Clien
 	}
 	reqLogger.Info("Client registration successfully deleted")
 
-	reqLogger.Info("OSAUTH_ENABLED set to true, deleting annotations from ibm-iam-operand-restricted ServiceAccount")
+	reqLogger.Info("Deleting annotations from ibm-iam-operand-restricted ServiceAccount")
 	r.RemoveAnnotationFromSA(ctx, client)
 	// Delete the zeninstance if it has been specified
 	if client.Spec.ZenInstanceId != "" {
@@ -644,6 +642,7 @@ func (r *ReconcileClient) createNewSecretForClient(ctx context.Context, client *
 	return secret, nil
 }
 
+// handleServiceAccount updates ibm-iam-operand-restricted SA with redirecturi's present present in the Client CR for updateClient Call
 func (r *ReconcileClient) handleServiceAccount(ctx context.Context, client *oidcv1.Client) {
 
 	reqLogger := logf.FromContext(ctx).WithValues("Request.Namespace", client.Namespace, "client.Name", client.Name)
@@ -674,6 +673,8 @@ func (r *ReconcileClient) handleServiceAccount(ctx context.Context, client *oidc
 	}
 
 }
+
+// RemoveAnnotationFromSA removes respective redirecturi annotation present in ibm-iam-operand-restricted SA for deleteClient Call
 func (r *ReconcileClient) RemoveAnnotationFromSA(ctx context.Context, client *oidcv1.Client) {
 
 	reqLogger := logf.FromContext(ctx).WithValues("Request.Namespace", client.Namespace, "client.Name", client.Name)

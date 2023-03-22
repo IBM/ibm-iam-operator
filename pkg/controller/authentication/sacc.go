@@ -120,6 +120,7 @@ func generateSAObject(instance *operatorv1alpha1.Authentication, scheme *runtime
 	return operandSA
 }
 
+// getConsoleURL retrives the cp-console host
 func (r *ReconcileAuthentication) getConsoleURL(instance *operatorv1alpha1.Authentication) string {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)

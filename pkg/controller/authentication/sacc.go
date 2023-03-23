@@ -58,6 +58,14 @@ func (r *ReconcileAuthentication) createSA(instance *operatorv1alpha1.Authentica
 func (r *ReconcileAuthentication) handleServiceAccount(instance *operatorv1alpha1.Authentication) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	// step 1. Get console url to form redirecturi
+	consoleURL := r.getConsoleURL(instance)
+	var redirectURI string
+	if consoleURL == "" {
+		reqLogger.Info("Problem retriving consoleURL")
+	} else {
+		redirectURI = "https://" + consoleURL + "/auth/liberty/callback"
+	}
 	// Get exsting annotations from SA
 	sAccName := "ibm-iam-operand-restricted"
 	serviceAccount := &corev1.ServiceAccount{}
@@ -66,10 +74,10 @@ func (r *ReconcileAuthentication) handleServiceAccount(instance *operatorv1alpha
 		reqLogger.Error(err, "failed to GET ServiceAccount ibm-iam-operand-restricted")
 	} else if !res.IsOAuthAnnotationExists(serviceAccount.ObjectMeta.Annotations) {
 		if serviceAccount.ObjectMeta.Annotations != nil {
-			serviceAccount.ObjectMeta.Annotations["serviceaccounts.openshift.io/oauth-redirectreference.first"] = "{\"kind\":\"OAuthRedirectReference\",\"apiVersion\":\"v1\",\"reference\":{\"kind\":\"Route\",\"name\":\"common-web-ui-callback\"}}"
+			serviceAccount.ObjectMeta.Annotations["serviceaccounts.openshift.io/oauth-redirecturi.first"] = redirectURI
 		} else {
 			serviceAccount.ObjectMeta.Annotations = make(map[string]string)
-			serviceAccount.ObjectMeta.Annotations["serviceaccounts.openshift.io/oauth-redirectreference.first"] = "{\"kind\":\"OAuthRedirectReference\",\"apiVersion\":\"v1\",\"reference\":{\"kind\":\"Route\",\"name\":\"common-web-ui-callback\"}}"
+			serviceAccount.ObjectMeta.Annotations["serviceaccounts.openshift.io/oauth-redirecturi.first"] = redirectURI
 		}
 		// update the SAcc with this annotation
 		errUpdate := r.client.Update(context.TODO(), serviceAccount)
@@ -110,4 +118,32 @@ func generateSAObject(instance *operatorv1alpha1.Authentication, scheme *runtime
 		return nil
 	}
 	return operandSA
+}
+
+// getConsoleURL retrives the cp-console host
+func (r *ReconcileAuthentication) getConsoleURL(instance *operatorv1alpha1.Authentication) string {
+
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	proxyConfigMapName := "ibmcloud-cluster-info"
+	proxyConfigMap := &corev1.ConfigMap{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: proxyConfigMapName, Namespace: instance.Namespace}, proxyConfigMap)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Error(err, "The configmap ", proxyConfigMapName, " is not created yet")
+			return ""
+		}
+		reqLogger.Error(err, "Failed to get ConfigMap", proxyConfigMapName)
+		r.needToRequeue = true
+		return ""
+	}
+
+	icpConsoleURL, ok := proxyConfigMap.Data["cluster_address"]
+
+	if !ok {
+		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain cluster_address address")
+		r.needToRequeue = true
+		return ""
+	}
+	return icpConsoleURL
+
 }

@@ -18,8 +18,9 @@ package client
 
 import (
 	"fmt"
-	corev1 "k8s.io/api/core/v1"
 	"strings"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 // ClientControllerConfig maintains state used while reconciling OIDC Client objects
@@ -63,18 +64,22 @@ func (c ClientControllerConfig) ApplyConfigMap(configMap *corev1.ConfigMap, keys
 	if configMap.Data != nil || len(configMap.Data) == 0 {
 		if len(keysList) != 0 {
 			for _, k := range keysList {
-				if k == authServiceURLKey || k == identityProviderURLKey || k == identityManagementURLKey {
+				if (k == authServiceURLKey || k == identityProviderURLKey || k == identityManagementURLKey) && !strings.Contains(configMap.Data[k], "127.0.0.1") {
 					c[k] = getClusterDomainNameForServiceURL(configMap.Data[k], configMap.Namespace)
-				} else {
+				} else if !strings.Contains(configMap.Data[k], "127.0.0.1") {
 					c[k] = configMap.Data[k]
+				} else {
+					return fmt.Errorf("found ConfigMap service data with cp2 format : 127.0.0.1")
 				}
 			}
 		} else {
 			for k, v := range configMap.Data {
-				if k == authServiceURLKey || k == identityProviderURLKey || k == identityManagementURLKey {
+				if (k == authServiceURLKey || k == identityProviderURLKey || k == identityManagementURLKey) && !strings.Contains(configMap.Data[k], "127.0.0.1") {
 					c[k] = getClusterDomainNameForServiceURL(v, configMap.Namespace)
-				} else {
+				} else if !strings.Contains(configMap.Data[k], "127.0.0.1") {
 					c[k] = v
+				} else {
+					return fmt.Errorf("found ConfigMap service data with cp2 format : 127.0.0.1")
 				}
 			}
 		}
@@ -120,10 +125,10 @@ func (r *ReconcileClient) IsConfigured() bool {
 	if r.config == nil || len(r.config) == 0 {
 		return false
 	}
-	if value, err := r.GetIdentityManagementURL(); value != "" && err != nil {
+	if value, err := r.GetIdentityManagementURL(); value != "" && err != nil && strings.Contains(value, "127.0.0.1") {
 		return false
 	}
-	if value, err := r.GetIdentityProviderURL(); value != "" && err != nil {
+	if value, err := r.GetIdentityProviderURL(); value != "" && err != nil && strings.Contains(value, "127.0.0.1") {
 		return false
 	}
 	if _, err := r.GetROKSEnabled(); err != nil {
@@ -132,7 +137,7 @@ func (r *ReconcileClient) IsConfigured() bool {
 	if _, err := r.GetOSAuthEnabled(); err != nil {
 		return false
 	}
-	if value, err := r.GetAuthServiceURL(); value != "" && err != nil {
+	if value, err := r.GetAuthServiceURL(); value != "" && err != nil && strings.Contains(value, "127.0.0.1") {
 		return false
 	}
 	if value, err := r.GetDefaultAdminUser(); value != "" && err != nil {

@@ -59,7 +59,9 @@ const (
 	// the Common Services CA certificate and private key details
 	CSCACertificateSecretName string = "cs-ca-certificate-secret"
 	// FinalizerName is the name of the finalizer added to Resources by the Client controller
-	FinalizerName string = "client.oidc.security.ibm.com"
+	CP3FinalizerName  string = "client.oidc.security.ibm.com"
+	CP2FinalizerName  string = "fynalyzer.client.oidc.security.ibm.com"
+	AdministratorRole string = "Administrator"
 )
 
 var log = logf.Log.WithName(controllerName)
@@ -292,6 +294,7 @@ func (r *ReconcileClient) Reconcile(ctx context.Context, request reconcile.Reque
 	}
 
 	reqLogger.Info("checking to see if controller is fully configured")
+
 	if !r.IsConfigured() {
 		err = r.SetConfig(ctx, request.Namespace)
 		if err != nil {
@@ -369,6 +372,9 @@ func (r *ReconcileClient) updateClient(ctx context.Context, client *oidcv1.Clien
 	reqLogger := logf.FromContext(ctx).WithValues("clientId", client.Spec.ClientId)
 	var secret *corev1.Secret
 	var clientCreds *ClientCredentials
+
+	cp3RoleFinalizerUpdate(client)
+
 	secret, err = r.getSecretFromClient(ctx, client)
 	if err != nil {
 		clientCreds = r.generateClientCredentials(client.Spec.ClientId)
@@ -491,18 +497,36 @@ func (r *ReconcileClient) processZenRegistration(ctx context.Context, client *oi
 // addFinalizer adds a finalizer to the Client if it hasn't already been marked for deletion.
 func addFinalizer(client *oidcv1.Client) {
 	if client.ObjectMeta.DeletionTimestamp.IsZero() {
-		if !containsString(client.ObjectMeta.Finalizers, FinalizerName) {
-			client.ObjectMeta.Finalizers = append(client.ObjectMeta.Finalizers, FinalizerName)
+		if !containsString(client.ObjectMeta.Finalizers, CP3FinalizerName) {
+			client.ObjectMeta.Finalizers = append(client.ObjectMeta.Finalizers, CP3FinalizerName)
 		}
 	}
 }
 
+// cp2 specific handling during cp3 upgrade
+func cp3RoleFinalizerUpdate(client *oidcv1.Client) {
+
+	reqLogger := log.WithValues("Request.Namespace", client.Namespace, "Request.Name", client.Name)
+
+	if len(client.Spec.ZenInstanceId) == 0 && len(client.Spec.Roles) == 0 && containsString(client.ObjectMeta.Finalizers, CP2FinalizerName) {
+		reqLogger.Info("Upgrade check : Non-ZEN cp2 Client CR Role would be updated : ", "Role", AdministratorRole)
+		client.Spec.Roles = append(client.Spec.Roles, AdministratorRole)
+		reqLogger.Info("Upgrade check : Non-ZEN CP2 Client CR Finalizers would be updated : ", "Finalizer", CP3FinalizerName)
+		addFinalizer(client)
+		removeFinalizer(client, CP2FinalizerName)
+	} else if len(client.Spec.ZenInstanceId) > 0 && containsString(client.ObjectMeta.Finalizers, CP2FinalizerName) {
+		reqLogger.Info("Upgrade check : ZEN cp2 Client CR Finalizers would be updated : ", "Finalizer", CP3FinalizerName)
+		addFinalizer(client)
+		removeFinalizer(client, CP2FinalizerName)
+	}
+}
+
 // removeFinalizer removes the Client controller's finalizer from a Client resource.
-func removeFinalizer(client *oidcv1.Client) {
+func removeFinalizer(client *oidcv1.Client, finalizerName string) {
 	finalizers := client.ObjectMeta.GetFinalizers()
 	updatedFinalizers := make([]string, 0)
 	for i, finalizer := range finalizers {
-		if finalizer == FinalizerName {
+		if finalizer == finalizerName {
 			updatedFinalizers = append(updatedFinalizers, finalizers[:i]...)
 			updatedFinalizers = append(updatedFinalizers, finalizers[i+1:]...)
 			break
@@ -531,7 +555,13 @@ func (r *ReconcileClient) deleteClient(ctx context.Context, client *oidcv1.Clien
 	if client.Spec.ClientId == "" {
 		// Remove the finalizers
 		reqLogger.Info("Removing finalizer from Client", "clientId", client.Spec.ClientId)
-		removeFinalizer(client)
+		// This condition is to handle deleteEvent during upgrade , when we still have cp2 finalizers
+		if containsString(client.ObjectMeta.Finalizers, CP2FinalizerName) {
+			removeFinalizer(client, CP2FinalizerName)
+		}
+		if containsString(client.ObjectMeta.Finalizers, CP3FinalizerName) {
+			removeFinalizer(client, CP3FinalizerName)
+		}
 		// Update CR
 		err = r.client.Update(ctx, client)
 		if err != nil {
@@ -561,7 +591,14 @@ func (r *ReconcileClient) deleteClient(ctx context.Context, client *oidcv1.Clien
 	}
 	// Remove the finalizers
 	reqLogger.Info("Removing finalizer from Client", "clientId", client.Spec.ClientId)
-	removeFinalizer(client)
+
+	// This condition is to handle deleteEvent during upgrade , when we still have cp2 finalizers
+	if containsString(client.ObjectMeta.Finalizers, CP2FinalizerName) {
+		removeFinalizer(client, CP2FinalizerName)
+	}
+	if containsString(client.ObjectMeta.Finalizers, CP3FinalizerName) {
+		removeFinalizer(client, CP3FinalizerName)
+	}
 	// Update CR
 	err = r.client.Update(ctx, client)
 	if err != nil {

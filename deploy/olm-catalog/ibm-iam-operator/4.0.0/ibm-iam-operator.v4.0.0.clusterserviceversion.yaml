@@ -152,7 +152,7 @@ metadata:
                     "name": "ibm-mongodb-operator"
                   },
                   {
-                    "name": "ibm-commonui-operator"
+                    "name": "ibm-idp-config-ui-operator"
                   }
                 ],
                 "registry": "common-service"
@@ -432,15 +432,6 @@ spec:
     spec:
       clusterPermissions:
       - rules:
-        - apiGroups:
-          - oauth.openshift.io
-          resources:
-          - oauthclients
-          verbs:
-          - create
-          - get
-          - update
-          - delete
         - apiGroups:
           - config.openshift.io
           resources:

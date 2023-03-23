@@ -18,6 +18,7 @@ package authentication
 
 import (
 	"context"
+	"fmt"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -46,6 +47,8 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Service")
 		return err
+	} else {
+		r.validateCP3PodSelectorAndLabel(currentService)
 	}
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "platform-identity-provider", Namespace: instance.Namespace}, currentService)
@@ -63,6 +66,8 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Service")
 		return err
+	} else {
+		r.validateCP3PodSelectorAndLabel(currentService)
 	}
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "platform-identity-management", Namespace: instance.Namespace}, currentService)
@@ -80,9 +85,50 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Service")
 		return err
+	} else {
+		r.validateCP3PodSelectorAndLabel(currentService)
 	}
-	return nil
 
+	return nil
+}
+
+// validateCP3ServicePodSelectorAndLabel takes a *Service and attempts to update that Service's selectors and
+// labels if they do not match the desired CP3 values. Returns an error if the update fails or if the provided
+// *Service is nil or lacks a name or namespace.
+func (r *ReconcileAuthentication) validateCP3PodSelectorAndLabel(currentService *corev1.Service) (err error) {
+
+	if currentService == nil || currentService.Name == "" || currentService.Namespace == "" {
+		return fmt.Errorf("received invalid Service")
+	}
+
+	reqLogger := log.WithValues("Instance.Namespace", currentService.Namespace, "Instance.Name", currentService.Name)
+
+	var cp2podselector bool = false
+	var cp2podlabel bool = false
+	podSelector := currentService.Spec.Selector
+	value, ok := podSelector["k8s-app"]
+	if ok && value != currentService.Name {
+		currentService.Spec.Selector = map[string]string{"k8s-app": currentService.Name}
+		cp2podselector = true
+	}
+	// Going to validate label for CP3 upgrade
+	label := currentService.Labels
+	value, ok = label["app"]
+	if ok && value != currentService.Name {
+		currentService.Labels = map[string]string{"app": currentService.Name}
+		cp2podlabel = true
+	}
+	if cp2podselector || cp2podlabel {
+		err = r.client.Update(context.Background(), currentService)
+		if err != nil {
+			reqLogger.Error(err, "Upgrade check : Failed to update service podSelector , label details ", "Service.Namespace", currentService.Namespace, "Service.Name", currentService.Name, "Error.message", err)
+			r.needToRequeue = true
+			return
+		} else {
+			reqLogger.Info("Upgrade check : Successfully updated service podSelector , label details ", "Service.Name", currentService.Name)
+		}
+	}
+	return
 }
 
 func (r *ReconcileAuthentication) platformAuthService(instance *operatorv1alpha1.Authentication) *corev1.Service {

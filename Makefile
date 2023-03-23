@@ -127,7 +127,7 @@ endif
 
 build: ## Build the Operator binary for the host OS and architecture
 	@echo "Building the ibm-iam-operator binary"
-	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/_output/bin/$(IMG) ./cmd/manager
+	@CGO_ENABLED=0 go build -o build/_output/bin/$(IMG) ./cmd/manager
 	@strip $(STRIP_FLAGS) build/_output/bin/$(IMG)
 
 build-image: build $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on amd64

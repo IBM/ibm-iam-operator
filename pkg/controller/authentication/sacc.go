@@ -29,37 +29,37 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *ReconcileAuthentication) createSA(instance *operatorv1alpha1.Authentication, currentSA *corev1.ServiceAccount) error {
+func (r *ReconcileAuthentication) createSA(instance *operatorv1alpha1.Authentication, currentSA *corev1.ServiceAccount, needToRequeue *bool) (err error) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	var err error
 	operandSAName := "ibm-iam-operand-restricted"
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: operandSAName, Namespace: instance.Namespace}, currentSA)
 	if err != nil && errors.IsNotFound(err) {
+		reqLogger.Info("Did not find ServiceAccount", "name", operandSAName, "namespace", instance.Namespace)
 		// Define a new operand ServiceAccount
 		operandSA := generateSAObject(instance, r.scheme, operandSAName)
 		reqLogger.Info("Creating a ibm-iam-operand-restricted serviceaccount")
 		err = r.client.Create(context.TODO(), operandSA)
 		if err != nil {
 			reqLogger.Error(err, "Failed to create ibm-iam-operand-restricted serviceaccount")
-			return err
+			return
 		}
 		// serviceaccount created successfully - return and requeue
-		r.needToRequeue = true
+		*needToRequeue = true
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get serviceaccount")
-		return err
+		return
 	}
 
-	return nil
+	return
 }
 
-func (r *ReconcileAuthentication) handleServiceAccount(instance *operatorv1alpha1.Authentication) {
+func (r *ReconcileAuthentication) handleServiceAccount(instance *operatorv1alpha1.Authentication, needToRequeue *bool) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	// step 1. Get console url to form redirecturi
-	consoleURL := r.getConsoleURL(instance)
+	consoleURL := r.getConsoleURL(instance, needToRequeue)
 	var redirectURI string
 	if consoleURL == "" {
 		reqLogger.Info("Problem retriving consoleURL")
@@ -93,6 +93,7 @@ func (r *ReconcileAuthentication) handleServiceAccount(instance *operatorv1alpha
 		//do nothing
 	}
 
+	return
 }
 
 func generateSAObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, operndSAName string) *corev1.ServiceAccount {
@@ -121,7 +122,7 @@ func generateSAObject(instance *operatorv1alpha1.Authentication, scheme *runtime
 }
 
 // getConsoleURL retrives the cp-console host
-func (r *ReconcileAuthentication) getConsoleURL(instance *operatorv1alpha1.Authentication) string {
+func (r *ReconcileAuthentication) getConsoleURL(instance *operatorv1alpha1.Authentication, needToRequeue *bool) (icpConsoleURL string) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	proxyConfigMapName := "ibmcloud-cluster-info"
@@ -130,20 +131,19 @@ func (r *ReconcileAuthentication) getConsoleURL(instance *operatorv1alpha1.Authe
 	if err != nil {
 		if errors.IsNotFound(err) {
 			reqLogger.Error(err, "The configmap ", proxyConfigMapName, " is not created yet")
-			return ""
+			return
 		}
 		reqLogger.Error(err, "Failed to get ConfigMap", proxyConfigMapName)
-		r.needToRequeue = true
-		return ""
+		*needToRequeue = true
+		return
 	}
-
-	icpConsoleURL, ok := proxyConfigMap.Data["cluster_address"]
+	var ok bool
+	icpConsoleURL, ok = proxyConfigMap.Data["cluster_address"]
 
 	if !ok {
 		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain cluster_address address")
-		r.needToRequeue = true
-		return ""
+		*needToRequeue = true
+		return
 	}
-	return icpConsoleURL
-
+	return
 }

@@ -45,21 +45,21 @@ var ingressList []string = []string{
 	"social-login-callback",
 }
 
-func (r *ReconcileAuthentication) ReconcileRemoveIngresses(ctx context.Context, instance *operatorv1alpha1.Authentication) {
+func (r *ReconcileAuthentication) ReconcileRemoveIngresses(ctx context.Context, instance *operatorv1alpha1.Authentication, needToRequeue *bool) {
 	reqLogger := log.WithValues("func", "ReconcileRemoveIngresses")
 
 	//No error checking as we will just make a best attempt to remove the legacy ingresses
 	//Do not fail based on inability to delete the ingresses
 	//TODO Add ingress names here
 	for _, iname := range ingressList {
-		err := r.DeleteIngress(ctx, iname, instance.Namespace)
+		err := r.DeleteIngress(ctx, iname, instance.Namespace, needToRequeue)
 		if err != nil {
 			reqLogger.Info("Failed to delete legacy ingress " + iname)
 		}
 	}
 }
 
-func (r *ReconcileAuthentication) DeleteIngress(ctx context.Context, ingressName string, ingressNS string) error {
+func (r *ReconcileAuthentication) DeleteIngress(ctx context.Context, ingressName string, ingressNS string, needToRequeue *bool) error {
 	reqLogger := log.WithValues("func", "deleteIngress", "Name", ingressName, "Namespace", ingressNS)
 
 	ingress := &netv1.Ingress{
@@ -86,11 +86,11 @@ func (r *ReconcileAuthentication) DeleteIngress(ctx context.Context, ingressName
 	}
 
 	reqLogger.Info("Deleted legacy ingress")
-	r.needToRequeue = true
+	*needToRequeue = true
 	return nil
 }
 
-func (r *ReconcileAuthentication) handleIngress(instance *operatorv1alpha1.Authentication, currentIngress *netv1.Ingress) error {
+func (r *ReconcileAuthentication) handleIngress(instance *operatorv1alpha1.Authentication, currentIngress *netv1.Ingress, needToRequeue *bool) error {
 	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *netv1.Ingress{
 		ibmidUiCallbackIngress,
 		idMgmtIngress,
@@ -122,7 +122,7 @@ func (r *ReconcileAuthentication) handleIngress(instance *operatorv1alpha1.Authe
 				return err
 			}
 			// Ingress created successfully - return and requeue, just sets the pointer to true
-			r.needToRequeue = true
+			*needToRequeue = true
 		} else if err != nil {
 			reqLogger.Error(err, "Failed to get Ingress")
 			return err

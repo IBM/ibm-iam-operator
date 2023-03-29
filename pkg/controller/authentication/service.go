@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authentication, currentService *corev1.Service) error {
+func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authentication, currentService *corev1.Service, needToRequeue *bool) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "platform-auth-service", Namespace: instance.Namespace}, currentService)
@@ -43,12 +43,12 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 			return err
 		}
 		// Service created successfully - return and requeue
-		r.needToRequeue = true
+		*needToRequeue = true
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Service")
 		return err
 	} else {
-		r.validateCP3PodSelectorAndLabel(currentService)
+		r.validateCP3PodSelectorAndLabel(currentService, needToRequeue)
 	}
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "platform-identity-provider", Namespace: instance.Namespace}, currentService)
@@ -62,12 +62,12 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 			return err
 		}
 		// Service created successfully - return and requeue
-		r.needToRequeue = true
+		*needToRequeue = true
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Service")
 		return err
 	} else {
-		r.validateCP3PodSelectorAndLabel(currentService)
+		r.validateCP3PodSelectorAndLabel(currentService, needToRequeue)
 	}
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "platform-identity-management", Namespace: instance.Namespace}, currentService)
@@ -81,12 +81,12 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 			return err
 		}
 		// Service created successfully - return and requeue
-		r.needToRequeue = true
+		*needToRequeue = true
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Service")
 		return err
 	} else {
-		r.validateCP3PodSelectorAndLabel(currentService)
+		r.validateCP3PodSelectorAndLabel(currentService, needToRequeue)
 	}
 
 	return nil
@@ -95,7 +95,7 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 // validateCP3ServicePodSelectorAndLabel takes a *Service and attempts to update that Service's selectors and
 // labels if they do not match the desired CP3 values. Returns an error if the update fails or if the provided
 // *Service is nil or lacks a name or namespace.
-func (r *ReconcileAuthentication) validateCP3PodSelectorAndLabel(currentService *corev1.Service) (err error) {
+func (r *ReconcileAuthentication) validateCP3PodSelectorAndLabel(currentService *corev1.Service, needToRequeue *bool) (err error) {
 
 	if currentService == nil || currentService.Name == "" || currentService.Namespace == "" {
 		return fmt.Errorf("received invalid Service")
@@ -122,7 +122,7 @@ func (r *ReconcileAuthentication) validateCP3PodSelectorAndLabel(currentService 
 		err = r.client.Update(context.Background(), currentService)
 		if err != nil {
 			reqLogger.Error(err, "Upgrade check : Failed to update service podSelector , label details ", "Service.Namespace", currentService.Namespace, "Service.Name", currentService.Name, "Error.message", err)
-			r.needToRequeue = true
+			*needToRequeue = true
 			return
 		} else {
 			reqLogger.Info("Upgrade check : Successfully updated service podSelector , label details ", "Service.Name", currentService.Name)

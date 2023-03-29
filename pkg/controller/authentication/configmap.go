@@ -42,9 +42,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentConfigMap *corev1.ConfigMap) error {
+func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentConfigMap *corev1.ConfigMap, needToRequeue *bool) (err error) {
 
-	var err error
 	var isOSEnv bool
 	var domainName string
 	var newConfigMap *corev1.ConfigMap
@@ -62,10 +61,10 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	if err != nil {
 		if errors.IsNotFound(err) {
 			reqLogger.Error(err, "The configmap ", globalConfigMapName, " is not created yet")
-			return err
+			return
 		}
 		reqLogger.Error(err, "Failed to get ConfigMap", globalConfigMapName)
-		return err
+		return
 	}
 
 	clusterType, ok := globalConfigMap.Data["kubernetes_cluster_type"]
@@ -90,7 +89,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 			err = r.client.Create(context.TODO(), newConfigMap)
 			if err != nil {
 				reqLogger.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
-				return err
+				return
 			} else {
 				reqLogger.Info("Successfully created ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
 			}
@@ -111,12 +110,12 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 				reqLogger.Info("ibmcloud-cluster-info Configmap is already created by IM operator", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
 			} else if ok && value == "management-ingress" && ownRef == "ManagementIngress" {
 				reqLogger.Info("Configmap is already created by managementingress , IM installation may not proceed further until the configmap is removed", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
-				r.needToRequeue = true
-				return nil
+				*needToRequeue = true
+				return
 			} else {
 				reqLogger.Info("Can't determine the configmap ownership , IM installation may not proceed further until the configmap is removed", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
-				r.needToRequeue = true
-				return nil
+				*needToRequeue = true
+				return
 			}
 		}
 	}
@@ -131,24 +130,25 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	if err != nil {
 		if errors.IsNotFound(err) {
 			reqLogger.Error(err, "The configmap ", proxyConfigMapName, " is not created yet")
-			return err
+			return
 		}
 		reqLogger.Error(err, "Failed to get ConfigMap", proxyConfigMapName)
-		r.needToRequeue = true
-		return nil
+		*needToRequeue = true
+		err = nil
+		return
 	}
 	icpProxyURL, ok := proxyConfigMap.Data["proxy_address"]
 	if !ok {
 		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain proxy address")
-		r.needToRequeue = true
-		return nil
+		*needToRequeue = true
+		return
 	}
 	icpConsoleURL, ok := proxyConfigMap.Data["cluster_address"]
 
 	if !ok {
 		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain cluster_address address")
-		r.needToRequeue = true
-		return nil
+		*needToRequeue = true
+		return
 	}
 
 	// Creation the default configmaps
@@ -206,13 +206,13 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 				err = r.client.Create(context.TODO(), newConfigMap)
 				if err != nil {
 					reqLogger.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
-					return err
+					return
 				}
 				// ConfigMap created successfully - return and requeue
-				r.needToRequeue = true
+				*needToRequeue = true
 			} else {
 				reqLogger.Error(err, "Failed to get ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
-				return err
+				return
 			}
 		} else {
 			// @posriniv - find a more efficient solution
@@ -361,7 +361,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					err = r.client.Update(context.TODO(), currentConfigMap)
 					if err != nil {
 						reqLogger.Error(err, "Failed to update an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "Configmap.Name", currentConfigMap.Name)
-						return err
+						return
 					}
 				}
 			}

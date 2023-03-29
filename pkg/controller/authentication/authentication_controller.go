@@ -185,10 +185,9 @@ var _ reconcile.Reconciler = &ReconcileAuthentication{}
 type ReconcileAuthentication struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client        client.Client
-	scheme        *runtime.Scheme
-	needToRequeue bool
-	Mutex         sync.Mutex
+	client client.Client
+	scheme *runtime.Scheme
+	Mutex  sync.Mutex
 }
 
 func (r *ReconcileAuthentication) addFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
@@ -234,9 +233,18 @@ func needsAuditServiceDummyDataReset(a *operatorv1alpha1.Authentication) bool {
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, err error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	needToRequeue := false
+
 	reconcileCtx := logf.IntoContext(ctx, reqLogger)
 	// Set default result
 	result = reconcile.Result{}
+	// Set Requeue to true if requeue is needed at end of reconcile loop
+	defer func() {
+		if needToRequeue {
+			result.Requeue = true
+		}
+	}()
+
 	reqLogger.Info("Reconciling Authentication")
 
 	// Fetch the Authentication instance
@@ -278,7 +286,7 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	// Check if this Certificate already exists and create it if it doesn't
 	reqLogger.Info("Creating ibm-iam-operand-restricted serviceaccount")
 	currentSA := &corev1.ServiceAccount{}
-	err = r.createSA(instance, currentSA)
+	err = r.createSA(instance, currentSA, &needToRequeue)
 	if err != nil {
 		return
 	}
@@ -288,35 +296,35 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 
 	// Check if this Certificate already exists and create it if it doesn't
 	currentCertificate := &certmgr.Certificate{}
-	err = r.handleCertificate(instance, currentCertificate)
+	err = r.handleCertificate(instance, currentCertificate, &needToRequeue)
 	if err != nil {
 		return
 	}
 
 	//Check if this ConfigMap already exists and create it if it doesn't
 	currentConfigMap := &corev1.ConfigMap{}
-	err = r.handleConfigMap(instance, wlpClientID, wlpClientSecret, currentConfigMap)
+	err = r.handleConfigMap(instance, wlpClientID, wlpClientSecret, currentConfigMap, &needToRequeue)
 	if err != nil {
 		return
 	}
 
 	// Check if this Service already exists and create it if it doesn't
 	currentService := &corev1.Service{}
-	err = r.handleService(instance, currentService)
+	err = r.handleService(instance, currentService, &needToRequeue)
 	if err != nil {
 		return
 	}
 
 	// Check if this Secret already exists and create it if it doesn't
 	currentSecret := &corev1.Secret{}
-	err = r.handleSecret(instance, wlpClientID, wlpClientSecret, currentSecret)
+	err = r.handleSecret(instance, wlpClientID, wlpClientSecret, currentSecret, &needToRequeue)
 	if err != nil {
 		return
 	}
 
 	// Check if this Job already exists and create it if it doesn't
 	currentJob := &batchv1.Job{}
-	err = r.handleJob(instance, currentJob)
+	err = r.handleJob(instance, currentJob, &needToRequeue)
 	if err != nil {
 		return
 	}
@@ -326,12 +334,12 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 		r.createClusterRoleBinding(instance)
 	}
 
-	r.ReconcileRemoveIngresses(ctx, instance)
+	r.ReconcileRemoveIngresses(ctx, instance, &needToRequeue)
 	// updates redirecturi annotations to serviceaccount
-	r.handleServiceAccount(instance)
+	r.handleServiceAccount(instance, &needToRequeue)
 
-	err = r.reconcileRoutes(ctx, instance)
-	if err != nil {
+	err = r.handleRoutes(ctx, instance, &needToRequeue)
+	if err != nil && !errors.IsNotFound(err) {
 		return
 	}
 
@@ -339,7 +347,7 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	currentDeployment := &appsv1.Deployment{}
 	currentProviderDeployment := &appsv1.Deployment{}
 	currentManagerDeployment := &appsv1.Deployment{}
-	err = r.handleDeployment(instance, currentDeployment, currentProviderDeployment, currentManagerDeployment)
+	err = r.handleDeployment(instance, currentDeployment, currentProviderDeployment, currentManagerDeployment, &needToRequeue)
 	if err != nil {
 		return
 	}
@@ -350,10 +358,6 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 		if err != nil {
 			return
 		}
-	}
-
-	if r.needToRequeue {
-		return reconcile.Result{Requeue: true}, nil
 	}
 
 	return

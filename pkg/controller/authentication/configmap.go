@@ -344,7 +344,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 				authdirSVC, keyExists := currentConfigMap.Data["IDENTITY_AUTH_DIRECTORY_URL"]
 				if keyExists && strings.Contains(authdirSVC, "127.0.0.1") {
 					reqLogger.Info("Upgrade check : IDENTITY_AUTH_DIRECTORY_URL entry would be upgraded to CP3 format ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["IDENTITY_AUTH_DIRECTORY_URL"] = "https://platform-auth-service:3100"
+					currentConfigMap.Data["IDENTITY_AUTH_DIRECTORY_URL"] = "https://platform-auth-service:9443"
 					cmUpdateRequired = true
 				}
 
@@ -395,7 +395,7 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"BASE_OIDC_URL":                      "https://platform-auth-service:9443/oidc/endpoint/OP",
 			"CLUSTER_NAME":                       instance.Spec.Config.ClusterName,
 			"HTTP_ONLY":                          "false",
-			"IDENTITY_AUTH_DIRECTORY_URL":        "https://platform-auth-service:3100",
+			"IDENTITY_AUTH_DIRECTORY_URL":        "https://platform-auth-service:9443",
 			"IDENTITY_PROVIDER_URL":              "https://platform-identity-provider:4300",
 			"IDENTITY_MGMT_URL":                  "https://platform-identity-management:4500",
 			"MASTER_HOST":                        instance.Spec.Config.ClusterCADomain,
@@ -404,7 +404,6 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"AUDIT_ENABLED_IDMGMT":               "false",
 			"AUDIT_DETAIL":                       "false",
 			"LOG_LEVEL_IDPROVIDER":               "info",
-			"LOG_LEVEL_AUTHSVC":                  "info",
 			"LOG_LEVEL_IDMGMT":                   "info",
 			"LOG_LEVEL_MW":                       "info",
 			"IDTOKEN_LIFETIME":                   "12h",

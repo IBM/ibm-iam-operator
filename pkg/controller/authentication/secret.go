@@ -17,6 +17,7 @@
 package authentication
 
 import (
+	"bytes"
 	"context"
 	"reflect"
 	"time"
@@ -29,7 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var rule2 = `^([a-zA-Z0-9]){32,}$`
@@ -84,11 +87,11 @@ func generateSecretData(instance *operatorv1alpha1.Authentication, wlpClientID s
 	return secretData
 }
 
-func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentSecret *corev1.Secret) error {
+func (r *ReconcileAuthentication) handleSecret(ctx context.Context, instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentSecret *corev1.Secret, needToRequeue *bool) error {
 
 	secretData := generateSecretData(instance, wlpClientID, wlpClientSecret)
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := logf.FromContext(ctx).WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 
 	for secret := range secretData {
@@ -104,7 +107,7 @@ func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authen
 					return err
 				}
 				// Secret created successfully - return and requeue
-				r.needToRequeue = true
+				*needToRequeue = true
 			} else {
 				reqLogger.Error(err, "Failed to get Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
 				return err
@@ -120,10 +123,46 @@ func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authen
 				}
 			}
 			if secretUpdateRequired {
-				err = r.client.Update(context.TODO(), currentSecret)
+				err = r.client.Update(ctx, currentSecret)
 				if err != nil {
 					reqLogger.Error(err, "Failed to update an existing Secret", "Secret.Namespace", currentSecret.Namespace, "Secret.Name", currentSecret.Name)
 					return err
+				}
+			}
+			if secret == "platform-auth-idp-credentials" {
+				if adminUsername, ok := currentSecret.Data["admin_username"]; ok {
+					if !bytes.Equal(adminUsername, secretData[secret]["admin_username"]) {
+						reqLogger.Info("Default admin username has been updated, restarting Pods")
+						for _, deployment := range []string{"platform-auth-service", "platform-identity-provider"} {
+							opts := []client.DeleteAllOfOption{
+								client.InNamespace(instance.Namespace),
+								client.MatchingLabels(map[string]string{"k8s-app": deployment}),
+							}
+							err = r.client.DeleteAllOf(ctx, &corev1.Pod{}, opts...)
+							if err != nil {
+								if !errors.IsNotFound(err) {
+									reqLogger.Error(err, "Failed to initiate Pod restart for Deployment", "deployment", deployment)
+									return err
+								}
+								reqLogger.Info("Failed to find Pods for Deployment", "deployment", deployment)
+								err = nil
+							}
+							*needToRequeue = true
+						}
+						instance.Spec.Config.DefaultAdminUser = string(currentSecret.Data["admin_username"])
+						reqLogger.Info("Update .spec.config.defaultAdminUser on Authentication")
+						err = r.client.Update(ctx, instance)
+						if err != nil {
+							if !errors.IsNotFound(err) {
+								reqLogger.Error(err, "Update Authentication failed")
+								return err
+							}
+							reqLogger.Error(err, "Update Authentication failed: could not find Authentication")
+							err = nil
+							return err
+						}
+						reqLogger.Info("Update Authentication successful")
+					}
 				}
 			}
 		}
@@ -143,7 +182,7 @@ func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authen
 	var caCert = secret.Data["ca.crt"]
 
 	// Create or update secret ibmcloud-cluster-ca-cert with ca.crt from platform-auth-secret
-	if err := r.createClusterCACert(instance, r.scheme, ClusterSecretName, instance.Namespace, caCert); err != nil {
+	if err := r.createClusterCACert(instance, r.scheme, ClusterSecretName, instance.Namespace, caCert, needToRequeue); err != nil {
 		reqLogger.Error(err, "failure creating or updating ibmcloud-cluster-ca-cert secret")
 		return err
 	}
@@ -190,7 +229,7 @@ func (r *ReconcileAuthentication) waitForSecret(instance *operatorv1alpha1.Authe
 }
 
 // create ibmcloud-cluster-ca-cert
-func (r *ReconcileAuthentication) createClusterCACert(i *operatorv1alpha1.Authentication, scheme *runtime.Scheme, secretName, ns string, caCert []byte) error {
+func (r *ReconcileAuthentication) createClusterCACert(i *operatorv1alpha1.Authentication, scheme *runtime.Scheme, secretName, ns string, caCert []byte, needToRequeue *bool) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", i.Namespace, "Instance.Name", i.Name)
 
@@ -238,11 +277,11 @@ func (r *ReconcileAuthentication) createClusterCACert(i *operatorv1alpha1.Authen
 				}
 				if ownRef == "ManagementIngress" {
 					reqLogger.Error(err, "ibmcloud-cluster-ca-cert secret is already created by managementingress , IM installation may not proceed further until the secret is removed")
-					r.needToRequeue = true
+					*needToRequeue = true
 					return nil
 				} else if ownRef != "Authentication" {
 					reqLogger.Error(err, "Can't determine the secret ownership , IM installation may not proceed further until the secret is removed")
-					r.needToRequeue = true
+					*needToRequeue = true
 					return nil
 				}
 			}

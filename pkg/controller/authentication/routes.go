@@ -41,7 +41,7 @@ const DefaultHTTPBackendServiceName = "default-http-backend"
 
 // getCertificateForService uses the provided Service name to determine which Secret contains the matching certificate
 // data and returns it.
-func (r *ReconcileAuthentication) getCertificateForService(ctx context.Context, serviceName string, instance *operatorv1alpha1.Authentication) (certificate []byte, err error) {
+func (r *ReconcileAuthentication) getCertificateForService(ctx context.Context, serviceName string, instance *operatorv1alpha1.Authentication, needToRequeue *bool) (certificate []byte, err error) {
 	reqLogger := log.WithValues("func", "getCertificateForService", "namespace", instance.Namespace)
 	secret := &corev1.Secret{}
 	var secretName string
@@ -53,13 +53,14 @@ func (r *ReconcileAuthentication) getCertificateForService(ctx context.Context, 
 	case PlatformIdentityProviderServiceName:
 		secretName = "identity-provider-secret"
 	default:
-		return nil, fmt.Errorf("service %q does not have a certificate secret managed by this controller", serviceName)
+		err = fmt.Errorf("service %q does not have a certificate secret managed by this controller", serviceName)
+		return
 	}
 	err = r.client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: instance.Namespace}, secret)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			reqLogger.Info("unable to get route destination certificate, secret does exist. Requeue and try again", "secretName", secretName)
-			r.needToRequeue = true
+			*needToRequeue = true
 			err = nil
 			return
 		}
@@ -83,17 +84,7 @@ type reconcileRouteFields struct {
 	DestinationCAcert []byte
 }
 
-// signalRequeueIfIsNotFound flags that the reconcile loop needs to be requeued if the error is a IsNotFound error from
-// the Kubernetes controller runtime client. If the flag is set, the error is unset in order to avoid flowing down
-// error-related paths.
-func (r *ReconcileAuthentication) signalRequeueIfIsNotFound(err *error) {
-	if errors.IsNotFound(*err) {
-		r.needToRequeue = true
-		*err = nil
-	}
-}
-
-func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance *operatorv1alpha1.Authentication) (err error) {
+func (r *ReconcileAuthentication) handleRoutes(ctx context.Context, instance *operatorv1alpha1.Authentication, needToRequeue *bool) (err error) {
 
 	reqLogger := log.WithValues("func", "ReconcileRoutes", "namespace", instance.Namespace)
 
@@ -104,8 +95,13 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
 	clusterInfoConfigMap := &corev1.ConfigMap{}
 	err = r.client.Get(ctx, types.NamespacedName{Name: ClusterInfoConfigmapName, Namespace: instance.Namespace}, clusterInfoConfigMap)
 	if err != nil {
-		r.signalRequeueIfIsNotFound(&err)
-		reqLogger.Error(err, "Failed to get cluster info configmap "+ClusterInfoConfigmapName, "requeueNeeded", r.needToRequeue)
+		if errors.IsNotFound(err) {
+			*needToRequeue = true
+		}
+		reqLogger.Error(err, "Failed to get cluster info configmap "+ClusterInfoConfigmapName, "requeueNeeded", needToRequeue)
+		if errors.IsNotFound(err) {
+			err = nil
+		}
 		return
 	}
 
@@ -117,12 +113,13 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
 	}
 	if ownRef != "Authentication" {
 		reqLogger.Info("Reconcile Routes : Can't find ibmcloud-cluster-info Configmap created by IM operator , IM Route reconcilation may not proceed ", "Configmap.Namespace", clusterInfoConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
-		r.needToRequeue = true
-		return nil
+		*needToRequeue = true
+		return
 	}
 
 	if clusterInfoConfigMap.Data == nil || len(clusterInfoConfigMap.Data["cluster_address"]) == 0 {
-		return fmt.Errorf("cluster_address is not set in configmap %s", ClusterInfoConfigmapName)
+		err = fmt.Errorf("cluster_address is not set in configmap %s", ClusterInfoConfigmapName)
+		return
 	}
 
 	PlatformOIDCCredentialsSecretName := "platform-oidc-credentials"
@@ -130,8 +127,13 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
 	err = r.client.Get(ctx, types.NamespacedName{Name: PlatformOIDCCredentialsSecretName, Namespace: instance.Namespace}, secret)
 
 	if err != nil {
-		r.signalRequeueIfIsNotFound(&err)
-		reqLogger.Error(err, "Failed to get secret", "secretName", PlatformOIDCCredentialsSecretName, "requeueNeeded", r.needToRequeue)
+		if errors.IsNotFound(err) {
+			*needToRequeue = true
+		}
+		reqLogger.Error(err, "Failed to get secret", "secretName", PlatformOIDCCredentialsSecretName, "requeueNeeded", *needToRequeue)
+		if errors.IsNotFound(err) {
+			err = nil
+		}
 		return
 	}
 
@@ -145,22 +147,19 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
 		platformIdentityManagementCert []byte
 		platformIdentityProviderCert   []byte
 	)
-	platformAuthCert, err = r.getCertificateForService(ctx, PlatformAuthServiceName, instance)
+	platformAuthCert, err = r.getCertificateForService(ctx, PlatformAuthServiceName, instance, needToRequeue)
 	if err != nil {
-		r.signalRequeueIfIsNotFound(&err)
-		reqLogger.Info("Unable to get certificate for service", "serviceName", PlatformAuthServiceName, "requeueNeeded", r.needToRequeue)
+		reqLogger.Info("Unable to get certificate for service", "serviceName", PlatformAuthServiceName, "requeueNeeded", *needToRequeue)
 		return
 	}
-	platformIdentityManagementCert, err = r.getCertificateForService(ctx, PlatformIdentityManagementServiceName, instance)
+	platformIdentityManagementCert, err = r.getCertificateForService(ctx, PlatformIdentityManagementServiceName, instance, needToRequeue)
 	if err != nil {
-		r.signalRequeueIfIsNotFound(&err)
-		reqLogger.Info("Unable to get certificate for service", "serviceName", PlatformIdentityManagementServiceName, "requeueNeeded", r.needToRequeue)
+		reqLogger.Info("Unable to get certificate for service", "serviceName", PlatformIdentityManagementServiceName, "requeueNeeded", *needToRequeue)
 		return
 	}
-	platformIdentityProviderCert, err = r.getCertificateForService(ctx, PlatformIdentityProviderServiceName, instance)
+	platformIdentityProviderCert, err = r.getCertificateForService(ctx, PlatformIdentityProviderServiceName, instance, needToRequeue)
 	if err != nil {
-		reqLogger.Info("Unable to get certificate for service", "serviceName", PlatformIdentityProviderServiceName, "requeueNeeded", r.needToRequeue)
-		r.signalRequeueIfIsNotFound(&err)
+		reqLogger.Info("Unable to get certificate for service", "serviceName", PlatformIdentityProviderServiceName, "requeueNeeded", *needToRequeue)
 		return
 	}
 
@@ -198,7 +197,7 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
 		"platform-id-auth": {
 			Annotations: map[string]string{
 				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
-				"haproxy.router.openshift.io/balance": "source",
+				"haproxy.router.openshift.io/balance":        "source",
 				"haproxy.router.openshift.io/rewrite-target": "/",
 			},
 			Name:              "platform-id-auth",
@@ -235,7 +234,7 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
 		"platform-oidc": {
 			Annotations: map[string]string{
 				"haproxy.router.openshift.io/hsts_header": "max-age=31536000;includeSubDomains",
-				"haproxy.router.openshift.io/balance": "source",
+				"haproxy.router.openshift.io/balance":     "source",
 			},
 			Name:              "platform-oidc",
 			RouteHost:         routeHost,
@@ -247,7 +246,7 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
 		"saml-ui-callback": {
 			Annotations: map[string]string{
 				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
-				"haproxy.router.openshift.io/balance": "source",
+				"haproxy.router.openshift.io/balance":        "source",
 				"haproxy.router.openshift.io/rewrite-target": "/ibm/saml20/defaultSP/acs",
 			},
 			Name:              "saml-ui-callback",
@@ -260,7 +259,7 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
 		"social-login-callback": {
 			Annotations: map[string]string{
 				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
-				"haproxy.router.openshift.io/balance": "source",
+				"haproxy.router.openshift.io/balance":        "source",
 				"haproxy.router.openshift.io/rewrite-target": "/ibm/api/social-login",
 			},
 			Name:              "social-login-callback",
@@ -273,16 +272,16 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
 	}
 
 	for _, routeFields := range allRoutesFields {
-		err = r.reconcileRoute(ctx, instance, routeFields)
+		err = r.reconcileRoute(ctx, instance, routeFields, needToRequeue)
 		if err != nil {
-			return err
+			return
 		}
 	}
 
 	return
 }
 
-func (r *ReconcileAuthentication) reconcileRoute(ctx context.Context, instance *operatorv1alpha1.Authentication, fields *reconcileRouteFields) error {
+func (r *ReconcileAuthentication) reconcileRoute(ctx context.Context, instance *operatorv1alpha1.Authentication, fields *reconcileRouteFields, needToRequeue *bool) (err error) {
 
 	namespace := instance.Namespace
 	reqLogger := log.WithValues("func", "ReconcileRoute", "name", fields.Name, "namespace", namespace)
@@ -292,14 +291,14 @@ func (r *ReconcileAuthentication) reconcileRoute(ctx context.Context, instance *
 	desiredRoute, err := r.newRoute(instance, fields)
 	if err != nil {
 		reqLogger.Error(err, "Error creating desired route for reconcilition")
-		return err
+		return
 	}
 
 	route := &routev1.Route{}
 	err = r.client.Get(ctx, types.NamespacedName{Name: fields.Name, Namespace: namespace}, route)
 	if err != nil && !errors.IsNotFound(err) {
 		reqLogger.Error(err, "Failed to get existing route for reconciliation")
-		return err
+		return
 	}
 
 	if err != nil && errors.IsNotFound(err) {
@@ -310,15 +309,15 @@ func (r *ReconcileAuthentication) reconcileRoute(ctx context.Context, instance *
 			if errors.IsAlreadyExists(err) {
 				// Route already exists from a previous reconcile
 				reqLogger.Info("Route already exists")
-				r.needToRequeue = true
+				*needToRequeue = true
 			} else {
 				// Failed to create a new route
 				reqLogger.Error(err, "Failed to create new route")
-				return err
+				return
 			}
 		} else {
 			// Requeue after creating new route
-			r.needToRequeue = true
+			*needToRequeue = true
 		}
 	} else {
 		// Determine if current route has changed
@@ -329,16 +328,16 @@ func (r *ReconcileAuthentication) reconcileRoute(ctx context.Context, instance *
 			err = r.client.Delete(ctx, route)
 			if err != nil {
 				reqLogger.Error(err, "Route host changed, unable to delete existing route for recreate")
-				return err
+				return
 			}
 			//Recreate the route
 			err = r.client.Create(ctx, desiredRoute)
 			if err != nil {
 				reqLogger.Error(err, "Route host changed, unable to create new route")
-				return err
+				return
 			}
-			r.needToRequeue = true
-			return nil
+			*needToRequeue = true
+			return
 		}
 
 		if !IsRouteEqual(route, desiredRoute) {
@@ -351,11 +350,11 @@ func (r *ReconcileAuthentication) reconcileRoute(ctx context.Context, instance *
 			err = r.client.Update(ctx, route)
 			if err != nil {
 				reqLogger.Error(err, "Failed to update route")
-				return err
+				return
 			}
 		}
 	}
-	return nil
+	return
 }
 
 // Use DeepEqual to determine if 2 routes are equal.

@@ -31,26 +31,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentication, currentJob *batchv1.Job) error {
+func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentication, currentJob *batchv1.Job, needToRequeue *bool) (err error) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	var err error
 
 	job := "oidc-client-registration"
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: job, Namespace: instance.Namespace}, currentJob)
 	if err != nil && errors.IsNotFound(err) {
-
+		reqLogger.Info("Job not found", "name", job, "namespace", instance.Namespace)
 		// Confirm that configmap ibmcloud-cluster-info is created by IM-Operator before further usage
 		consoleConfigMapName := "ibmcloud-cluster-info"
 		consoleConfigMap := &corev1.ConfigMap{}
-		err := r.client.Get(context.TODO(), types.NamespacedName{Name: consoleConfigMapName, Namespace: instance.Namespace}, consoleConfigMap)
+		err = r.client.Get(context.TODO(), types.NamespacedName{Name: consoleConfigMapName, Namespace: instance.Namespace}, consoleConfigMap)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				reqLogger.Error(err, "The configmap ", consoleConfigMapName, " is not created yet")
-				return err
+				return
 			} else {
 				reqLogger.Error(err, "Failed to get ConfigMap", consoleConfigMapName)
-				return err
+				return
 			}
 		}
 		// Verify the owner reference
@@ -61,8 +60,8 @@ func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentic
 		}
 		if ownRef != "Authentication" {
 			reqLogger.Info("Reconcile Job : Can't find ibmcloud-cluster-info Configmap created by IM operator , IM Job creation may not proceed ", "Configmap.Namespace", consoleConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
-			r.needToRequeue = true
-			return nil
+			*needToRequeue = true
+			return
 		}
 
 		// Define a new Job
@@ -71,16 +70,16 @@ func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentic
 		err = r.client.Create(context.TODO(), newJob)
 		if err != nil {
 			reqLogger.Error(err, "Failed to create new Job", "Job.Namespace", instance.Namespace, "Job.Name", job)
-			return err
+			return
 		}
 		// Job created successfully - return and requeue
-		r.needToRequeue = true
+		*needToRequeue = true
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Job")
-		return err
+		return
 	}
 
-	return nil
+	return
 
 }
 

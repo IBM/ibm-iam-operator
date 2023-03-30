@@ -59,12 +59,11 @@ func generateCertificateData(instance *operatorv1alpha1.Authentication) {
 	}
 }
 
-func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.Authentication, currentCertificate *certmgrv1.Certificate) error {
+func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.Authentication, currentCertificate *certmgrv1.Certificate, needToRequeue *bool) (err error) {
 
 	generateCertificateData(instance)
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	var err error
 
 	for certificate := range certificateData {
 		// Delete v1alpha1 Certificate
@@ -77,17 +76,17 @@ func (r *ReconcileAuthentication) handleCertificate(instance *operatorv1alpha1.A
 			err = r.client.Create(context.TODO(), newCertificate)
 			if err != nil {
 				reqLogger.Error(err, "Failed to create new Certificate", "Certificate.Namespace", instance.Namespace, "Certificate.Name", certificate)
-				return err
+				return
 			}
 			// Certificate created successfully - return and requeue
-			r.needToRequeue = true
+			*needToRequeue = true
 		} else if err != nil {
 			reqLogger.Error(err, "Failed to get Certificate")
-			return err
+			return
 		}
 
 	}
-	return nil
+	return
 }
 
 func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, certificateName string) *certmgrv1.Certificate {

@@ -198,7 +198,7 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
 		"platform-id-auth": {
 			Annotations: map[string]string{
 				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
-				"haproxy.router.openshift.io/balance": "source",
+				"haproxy.router.openshift.io/balance":        "source",
 				"haproxy.router.openshift.io/rewrite-target": "/",
 			},
 			Name:              "platform-id-auth",
@@ -235,7 +235,7 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
 		"platform-oidc": {
 			Annotations: map[string]string{
 				"haproxy.router.openshift.io/hsts_header": "max-age=31536000;includeSubDomains",
-				"haproxy.router.openshift.io/balance": "source",
+				"haproxy.router.openshift.io/balance":     "source",
 			},
 			Name:              "platform-oidc",
 			RouteHost:         routeHost,
@@ -247,7 +247,7 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
 		"saml-ui-callback": {
 			Annotations: map[string]string{
 				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
-				"haproxy.router.openshift.io/balance": "source",
+				"haproxy.router.openshift.io/balance":        "source",
 				"haproxy.router.openshift.io/rewrite-target": "/ibm/saml20/defaultSP/acs",
 			},
 			Name:              "saml-ui-callback",
@@ -260,7 +260,7 @@ func (r *ReconcileAuthentication) reconcileRoutes(ctx context.Context, instance 
 		"social-login-callback": {
 			Annotations: map[string]string{
 				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
-				"haproxy.router.openshift.io/balance": "source",
+				"haproxy.router.openshift.io/balance":        "source",
 				"haproxy.router.openshift.io/rewrite-target": "/ibm/api/social-login",
 			},
 			Name:              "social-login-callback",

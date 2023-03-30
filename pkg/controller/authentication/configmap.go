@@ -486,6 +486,26 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 	tempRegistrationJson = strings.ReplaceAll(tempRegistrationJson, "WLP_CLIENT_SECRET", wlpClientSecret)
 	tempRegistrationJson = strings.ReplaceAll(tempRegistrationJson, "ICP_CONSOLE_URL", icpConsoleURL)
 
+	//Logic to update registrationJson in constants.go based on icpConsoleURL has port 443 #55171
+	//If icpConsoleURL has 443 in url (example : "cp-console.apps.tamil-dev.cp.fyre.ibm.com:443" need to update redirect url as below
+	// "https://cp-console.apps.tamil-dev.cp.fyre.ibm.com/auth/liberty/callback","https://cp-console.apps.tamil-dev.cp.fyre.ibm.com:443/auth/liberty/callback"
+	//else "https://cp-console.apps.tamil-dev.cp.fyre.ibm.com/auth/liberty/callback"
+
+	var icpConsoleURLFinal string
+	const apiRegistrationPath = "/auth/liberty/callback"
+	reqLogger.Info("ICP console url for registrationJsonConfigMap ", icpConsoleURL)
+	parseConsoleURL := strings.Split(icpConsoleURL, ":")
+	if len(parseConsoleURL) > 1 {
+		if parseConsoleURL[1] == "443" {
+			icpConsoleURLFinal = "\"https://" + parseConsoleURL[0] + apiRegistrationPath + "\",\"https://" + icpConsoleURL + apiRegistrationPath + "\""
+		} else {
+			icpConsoleURLFinal = "\"https://" + icpConsoleURL + apiRegistrationPath + "\""
+		}
+	} else {
+		icpConsoleURLFinal = "\"https://" + parseConsoleURL[0] + apiRegistrationPath + "\""
+	}
+	tempRegistrationJson = strings.ReplaceAll(tempRegistrationJson, "ICP_REGISTRATION_CONSOLE_URL", icpConsoleURLFinal)
+	reqLogger.Info("Updated ICP console redirect url for registrationJson  ", icpConsoleURLFinal)
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "registration-json",

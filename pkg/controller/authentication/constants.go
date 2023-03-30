@@ -86,7 +86,7 @@ var registrationJson string = `{
    "introspect_tokens":true,
    "functional_user_groupIds": ["Administrator"],
    "trusted_uri_prefixes":["https://ICP_CONSOLE_URL"],
-   "redirect_uris":["https://ICP_CONSOLE_URL/auth/liberty/callback","https://127.0.0.1:443/idauth/oidc/endpoint/OP"]
+   "redirect_uris":[ICP_REGISTRATION_CONSOLE_URL,"https://127.0.0.1:443/idauth/oidc/endpoint/OP"]
 }
 `
 

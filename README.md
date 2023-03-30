@@ -155,4 +155,4 @@ The IAM operator does not define any specific custom pod security requirements.
 
 ## Custom SecurityContextConstraints definition:
 
-The IAM operator service runs under a restricted security context constraint with a non root uid.
+The IAM operator runs under a restricted security context constraint with a non root uid.

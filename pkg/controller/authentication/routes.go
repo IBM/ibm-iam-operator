@@ -163,17 +163,10 @@ func (r *ReconcileAuthentication) handleRoutes(ctx context.Context, instance *op
 		return
 	}
 
-	//commonAnnotations := map[string]string{
-	//  "haproxy.router.openshift.io/rate-limit-connections": "true",
-	//  "haproxy.router.openshift.io/rate-limit-connections.rate-http": "200",
-	//  "haproxy.router.openshift.io/rate-limit-connections.concurrent-tcp": "10",
-	//  "haproxy.router.openshift.io/timeout": "300s",
-	//}
 	allRoutesFields := map[string]*reconcileRouteFields{
 		"id-mgmt": {
 			Annotations: map[string]string{
 				"haproxy.router.openshift.io/rewrite-target": "/",
-				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
 			},
 			Name:              "id-mgmt",
 			RouteHost:         routeHost,
@@ -184,7 +177,6 @@ func (r *ReconcileAuthentication) handleRoutes(ctx context.Context, instance *op
 		},
 		"platform-auth": {
 			Annotations: map[string]string{
-				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
 				"haproxy.router.openshift.io/rewrite-target": "/v1/auth/",
 			},
 			Name:              "platform-auth",
@@ -196,7 +188,6 @@ func (r *ReconcileAuthentication) handleRoutes(ctx context.Context, instance *op
 		},
 		"platform-id-auth": {
 			Annotations: map[string]string{
-				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
 				"haproxy.router.openshift.io/balance":        "source",
 				"haproxy.router.openshift.io/rewrite-target": "/",
 			},
@@ -209,7 +200,6 @@ func (r *ReconcileAuthentication) handleRoutes(ctx context.Context, instance *op
 		},
 		"platform-id-provider": {
 			Annotations: map[string]string{
-				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
 				"haproxy.router.openshift.io/rewrite-target": "/",
 			},
 			Name:              "platform-id-provider",
@@ -221,7 +211,6 @@ func (r *ReconcileAuthentication) handleRoutes(ctx context.Context, instance *op
 		},
 		"platform-login": {
 			Annotations: map[string]string{
-				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
 				"haproxy.router.openshift.io/rewrite-target": fmt.Sprintf("/v1/auth/authorize?client_id=%s&redirect_uri=https://%s/auth/liberty/callback&response_type=code&scope=openid+email+profile&state=%d&orig=/login", wlpClientID, routeHost, now),
 			},
 			Name:              "platform-login",
@@ -233,8 +222,7 @@ func (r *ReconcileAuthentication) handleRoutes(ctx context.Context, instance *op
 		},
 		"platform-oidc": {
 			Annotations: map[string]string{
-				"haproxy.router.openshift.io/hsts_header": "max-age=31536000;includeSubDomains",
-				"haproxy.router.openshift.io/balance":     "source",
+				"haproxy.router.openshift.io/balance": "source",
 			},
 			Name:              "platform-oidc",
 			RouteHost:         routeHost,
@@ -245,7 +233,6 @@ func (r *ReconcileAuthentication) handleRoutes(ctx context.Context, instance *op
 		},
 		"saml-ui-callback": {
 			Annotations: map[string]string{
-				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
 				"haproxy.router.openshift.io/balance":        "source",
 				"haproxy.router.openshift.io/rewrite-target": "/ibm/saml20/defaultSP/acs",
 			},
@@ -258,7 +245,6 @@ func (r *ReconcileAuthentication) handleRoutes(ctx context.Context, instance *op
 		},
 		"social-login-callback": {
 			Annotations: map[string]string{
-				"haproxy.router.openshift.io/hsts_header":    "max-age=31536000;includeSubDomains",
 				"haproxy.router.openshift.io/balance":        "source",
 				"haproxy.router.openshift.io/rewrite-target": "/ibm/api/social-login",
 			},
@@ -270,8 +256,20 @@ func (r *ReconcileAuthentication) handleRoutes(ctx context.Context, instance *op
 			DestinationCAcert: platformAuthCert,
 		},
 	}
+	commonAnnotations := map[string]string{
+		"haproxy.router.openshift.io/timeout":                               "180s",
+		"haproxy.router.openshift.io/pod-concurrent-connections":            "200",
+		"haproxy.router.openshift.io/rate-limit-connections":                "true",
+		"haproxy.router.openshift.io/rate-limit-connections.concurrent-tcp": "200",
+		"haproxy.router.openshift.io/rate-limit-connections.rate-tcp":       "200",
+		"haproxy.router.openshift.io/rate-limit-connections.rate-http":      "200",
+		"haproxy.router.openshift.io/hsts_header":                           "max-age=31536000;includeSubDomains",
+	}
 
 	for _, routeFields := range allRoutesFields {
+		for annotation, value := range commonAnnotations {
+			routeFields.Annotations[annotation] = value
+		}
 		err = r.reconcileRoute(ctx, instance, routeFields, needToRequeue)
 		if err != nil {
 			return
@@ -288,14 +286,14 @@ func (r *ReconcileAuthentication) reconcileRoute(ctx context.Context, instance *
 
 	reqLogger.Info("Reconciling route", "annotations", fields.Annotations, "routeHost", fields.RouteHost, "routePath", fields.RoutePath)
 
-	desiredRoute, err := r.newRoute(instance, fields)
+	defaultRoute, err := r.newRoute(instance, fields)
 	if err != nil {
 		reqLogger.Error(err, "Error creating desired route for reconcilition")
 		return
 	}
 
-	route := &routev1.Route{}
-	err = r.client.Get(ctx, types.NamespacedName{Name: fields.Name, Namespace: namespace}, route)
+	observedRoute := &routev1.Route{}
+	err = r.client.Get(ctx, types.NamespacedName{Name: fields.Name, Namespace: namespace}, observedRoute)
 	if err != nil && !errors.IsNotFound(err) {
 		reqLogger.Error(err, "Failed to get existing route for reconciliation")
 		return
@@ -304,7 +302,7 @@ func (r *ReconcileAuthentication) reconcileRoute(ctx context.Context, instance *
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Route not found - creating")
 
-		err = r.client.Create(ctx, desiredRoute)
+		err = r.client.Create(ctx, defaultRoute)
 		if err != nil {
 			if errors.IsAlreadyExists(err) {
 				// Route already exists from a previous reconcile
@@ -323,15 +321,24 @@ func (r *ReconcileAuthentication) reconcileRoute(ctx context.Context, instance *
 		// Determine if current route has changed
 		reqLogger.Info("Comparing current and desired routes")
 
+		// Preserve custom annotation settings observed in the cluster; skip changes to rewrite-target
+		for annotation, value := range observedRoute.Annotations {
+			if annotation != "haproxy.router.openshift.io/rewrite-target" {
+				defaultRoute.Annotations[annotation] = value
+			} else {
+				reqLogger.Info("Attempted change to \"haproxy.router.openshift.io/rewrite-target\" prevented")
+			}
+		}
+
 		//routeHost is immutable so it must be checked first and the route recreated if it has changed
-		if route.Spec.Host != desiredRoute.Spec.Host {
-			err = r.client.Delete(ctx, route)
+		if observedRoute.Spec.Host != defaultRoute.Spec.Host {
+			err = r.client.Delete(ctx, observedRoute)
 			if err != nil {
 				reqLogger.Error(err, "Route host changed, unable to delete existing route for recreate")
 				return
 			}
 			//Recreate the route
-			err = r.client.Create(ctx, desiredRoute)
+			err = r.client.Create(ctx, defaultRoute)
 			if err != nil {
 				reqLogger.Error(err, "Route host changed, unable to create new route")
 				return
@@ -340,18 +347,19 @@ func (r *ReconcileAuthentication) reconcileRoute(ctx context.Context, instance *
 			return
 		}
 
-		if !IsRouteEqual(route, desiredRoute) {
+		if !IsRouteEqual(defaultRoute, observedRoute) {
 			reqLogger.Info("Updating route")
 
-			route.ObjectMeta.Name = desiredRoute.ObjectMeta.Name
-			route.ObjectMeta.Annotations = desiredRoute.ObjectMeta.Annotations
-			route.Spec = desiredRoute.Spec
+			observedRoute.ObjectMeta.Name = defaultRoute.ObjectMeta.Name
+			observedRoute.ObjectMeta.Annotations = defaultRoute.ObjectMeta.Annotations
+			observedRoute.Spec = defaultRoute.Spec
 
-			err = r.client.Update(ctx, route)
+			err = r.client.Update(ctx, observedRoute)
 			if err != nil {
 				reqLogger.Error(err, "Failed to update route")
 				return
 			}
+			*needToRequeue = true
 		}
 	}
 	return
@@ -361,7 +369,7 @@ func (r *ReconcileAuthentication) reconcileRoute(ctx context.Context, instance *
 // Check annotations and Spec.
 // If there are any differences, return false. Otherwise, return true.
 func IsRouteEqual(oldRoute, newRoute *routev1.Route) bool {
-	logger := log.WithValues("func", "IsRouteEqual")
+	logger := log.WithValues("func", "IsRouteEqual", "name", oldRoute.Name, "namespace", oldRoute.Namespace)
 
 	if !reflect.DeepEqual(oldRoute.ObjectMeta.Name, newRoute.ObjectMeta.Name) {
 		logger.Info("Names not equal", "old", oldRoute.ObjectMeta.Name, "new", newRoute.ObjectMeta.Name)

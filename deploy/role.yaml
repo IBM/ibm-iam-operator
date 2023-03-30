@@ -38,6 +38,12 @@ rules:
   - ""
   resources:
   - pods
+  verbs:
+  - deletecollection
+- apiGroups:
+  - ""
+  resources:
+  - pods
   - services
   - services/finalizers
   - endpoints

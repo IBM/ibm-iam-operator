@@ -588,6 +588,12 @@ spec:
           - update
           - watch
         - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - deletecollection
+        - apiGroups:
           - apps
           resources:
           - deployments

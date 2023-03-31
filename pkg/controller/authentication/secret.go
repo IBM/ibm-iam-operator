@@ -84,7 +84,7 @@ func generateSecretData(instance *operatorv1alpha1.Authentication, wlpClientID s
 	return secretData
 }
 
-func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentSecret *corev1.Secret) error {
+func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentSecret *corev1.Secret, needToRequeue *bool) error {
 
 	secretData := generateSecretData(instance, wlpClientID, wlpClientSecret)
 
@@ -104,7 +104,7 @@ func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authen
 					return err
 				}
 				// Secret created successfully - return and requeue
-				r.needToRequeue = true
+				*needToRequeue = true
 			} else {
 				reqLogger.Error(err, "Failed to get Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
 				return err
@@ -143,7 +143,7 @@ func (r *ReconcileAuthentication) handleSecret(instance *operatorv1alpha1.Authen
 	var caCert = secret.Data["ca.crt"]
 
 	// Create or update secret ibmcloud-cluster-ca-cert with ca.crt from platform-auth-secret
-	if err := r.createClusterCACert(instance, r.scheme, ClusterSecretName, instance.Namespace, caCert); err != nil {
+	if err := r.createClusterCACert(instance, r.scheme, ClusterSecretName, instance.Namespace, caCert, needToRequeue); err != nil {
 		reqLogger.Error(err, "failure creating or updating ibmcloud-cluster-ca-cert secret")
 		return err
 	}
@@ -190,7 +190,7 @@ func (r *ReconcileAuthentication) waitForSecret(instance *operatorv1alpha1.Authe
 }
 
 // create ibmcloud-cluster-ca-cert
-func (r *ReconcileAuthentication) createClusterCACert(i *operatorv1alpha1.Authentication, scheme *runtime.Scheme, secretName, ns string, caCert []byte) error {
+func (r *ReconcileAuthentication) createClusterCACert(i *operatorv1alpha1.Authentication, scheme *runtime.Scheme, secretName, ns string, caCert []byte, needToRequeue *bool) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", i.Namespace, "Instance.Name", i.Name)
 
@@ -238,11 +238,11 @@ func (r *ReconcileAuthentication) createClusterCACert(i *operatorv1alpha1.Authen
 				}
 				if ownRef == "ManagementIngress" {
 					reqLogger.Error(err, "ibmcloud-cluster-ca-cert secret is already created by managementingress , IM installation may not proceed further until the secret is removed")
-					r.needToRequeue = true
+					*needToRequeue = true
 					return nil
 				} else if ownRef != "Authentication" {
 					reqLogger.Error(err, "Can't determine the secret ownership , IM installation may not proceed further until the secret is removed")
-					r.needToRequeue = true
+					*needToRequeue = true
 					return nil
 				}
 			}

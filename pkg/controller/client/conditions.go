@@ -42,13 +42,13 @@ func ClientHasCondition(client *oidcv1.Client, c oidcv1.ClientCondition) bool {
 }
 
 // SetClientCondition will set a 'condition' on the given Client.
-// - If no condition of the same type already exists, the condition will be
-//   inserted with the LastTransitionTime set to the current time.
-// - If a condition of the same type and state already exists, the condition
-//   will be updated but the LastTransitionTime will not be modified.
-// - If a condition of the same type and different state already exists, the
-//   condition will be updated and the LastTransitionTime set to the current
-//   time.
+//   - If no condition of the same type already exists, the condition will be
+//     inserted with the LastTransitionTime set to the current time.
+//   - If a condition of the same type and state already exists, the condition
+//     will be updated but the LastTransitionTime will not be modified.
+//   - If a condition of the same type and different state already exists, the
+//     condition will be updated and the LastTransitionTime set to the current
+//     time.
 func SetClientCondition(client *oidcv1.Client, conditionType oidcv1.ClientConditionType, status oidcv1.ConditionStatus, reason, message string) {
 	newCondition := oidcv1.ClientCondition{
 		Type:    conditionType,

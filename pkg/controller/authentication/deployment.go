@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Authentication, currentDeployment *appsv1.Deployment, currentProviderDeployment *appsv1.Deployment, currentManagerDeployment *appsv1.Deployment) error {
+func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Authentication, currentDeployment *appsv1.Deployment, currentProviderDeployment *appsv1.Deployment, currentManagerDeployment *appsv1.Deployment, needToRequeue *bool) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
@@ -80,7 +80,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 	}
 	if ownRef != "Authentication" {
 		reqLogger.Info("Reconcile Deployment : Can't find ibmcloud-cluster-info Configmap created by IM operator , IM deployment may not proceed", "Configmap.Namespace", consoleConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
-		r.needToRequeue = true
+		*needToRequeue = true
 		return nil
 	}
 
@@ -123,7 +123,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 				return err
 			}
 			// Deployment created successfully - return and requeue
-			r.needToRequeue = true
+			*needToRequeue = true
 		} else {
 			return err
 		}
@@ -175,7 +175,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 				return err
 			}
 			// Deployment created successfully - return and requeue
-			r.needToRequeue = true
+			*needToRequeue = true
 		} else {
 			return err
 		}
@@ -230,7 +230,7 @@ func (r *ReconcileAuthentication) handleDeployment(instance *operatorv1alpha1.Au
 				return err
 			}
 			// Deployment created successfully - return and requeue
-			r.needToRequeue = true
+			*needToRequeue = true
 		} else {
 			return err
 		}

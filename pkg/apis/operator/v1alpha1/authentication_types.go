@@ -18,12 +18,13 @@ package v1alpha1
 
 import (
 	"context"
+	"reflect"
+	"sync"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sync"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -128,7 +129,6 @@ type ConfigSpec struct {
 	ICPPort                     int32  `json:"icpPort"`
 	FIPSEnabled                 bool   `json:"fipsEnabled"`
 	ROKSEnabled                 bool   `json:"roksEnabled"`
-	OSAuthEnabled               bool   `json:"osAuthEnabled"`
 	IBMCloudSaas                bool   `json:"ibmCloudSaas,omitempty"`
 	OnPremMultipleDeploy        bool   `json:"onPremMultipleDeploy,omitempty"`
 	SaasClientRedirectUrl       string `json:"saasClientRedirectUrl,omitempty"`

@@ -37,7 +37,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/coreos/prometheus-operator v0.38.1-0.20200424145508-7e176fda06cc // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
+	github.com/emicklei/go-restful v2.16.0+incompatible // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect

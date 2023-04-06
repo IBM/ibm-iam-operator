@@ -18,6 +18,7 @@ package authentication
 
 import (
 	"context"
+	"fmt"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -28,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authentication, currentService *corev1.Service, requeueResult *bool) error {
+func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authentication, currentService *corev1.Service, needToRequeue *bool) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "platform-auth-service", Namespace: instance.Namespace}, currentService)
@@ -42,10 +43,12 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 			return err
 		}
 		// Service created successfully - return and requeue
-		*requeueResult = true
+		*needToRequeue = true
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Service")
 		return err
+	} else {
+		r.validateCP3PodSelectorAndLabel(currentService, needToRequeue)
 	}
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "platform-identity-provider", Namespace: instance.Namespace}, currentService)
@@ -59,10 +62,12 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 			return err
 		}
 		// Service created successfully - return and requeue
-		*requeueResult = true
+		*needToRequeue = true
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Service")
 		return err
+	} else {
+		r.validateCP3PodSelectorAndLabel(currentService, needToRequeue)
 	}
 
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "platform-identity-management", Namespace: instance.Namespace}, currentService)
@@ -76,40 +81,54 @@ func (r *ReconcileAuthentication) handleService(instance *operatorv1alpha1.Authe
 			return err
 		}
 		// Service created successfully - return and requeue
-		*requeueResult = true
-	} else if err != nil {
-		reqLogger.Error(err, "Failed to get Service")
-		return err
-	}
-
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "iam-token-service", Namespace: instance.Namespace}, currentService)
-	if err != nil && errors.IsNotFound(err) {
-		// Define a new service
-		iamTokenService := r.iamTokenService(instance)
-		reqLogger.Info("Creating a new Service", "Service.Namespace", instance.Namespace, "Service.Name", "iam-token-service")
-		err = r.client.Create(context.TODO(), iamTokenService)
-		if err != nil {
-			reqLogger.Error(err, "Failed to create new Service", "Service.Namespace", instance.Namespace, "Service.Name", "iam-token-service")
-			return err
-		}
-		// Service created successfully - return and requeue
-		*requeueResult = true
+		*needToRequeue = true
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Service")
 		return err
 	} else {
-		if currentService.Spec.Ports[0].TargetPort.IntVal == 443 {
-			currentService.Spec.Ports[0].TargetPort = intstr.FromString("https")
-			err = r.client.Update(context.TODO(), currentService)
-			if err != nil {
-				reqLogger.Error(err, "Failed to update an existing Service", "Service.Namespace", currentService.Namespace, "Service.Name", currentService.Name)
-				return err
-			}
-		}
+		r.validateCP3PodSelectorAndLabel(currentService, needToRequeue)
 	}
 
 	return nil
+}
 
+// validateCP3ServicePodSelectorAndLabel takes a *Service and attempts to update that Service's selectors and
+// labels if they do not match the desired CP3 values. Returns an error if the update fails or if the provided
+// *Service is nil or lacks a name or namespace.
+func (r *ReconcileAuthentication) validateCP3PodSelectorAndLabel(currentService *corev1.Service, needToRequeue *bool) (err error) {
+
+	if currentService == nil || currentService.Name == "" || currentService.Namespace == "" {
+		return fmt.Errorf("received invalid Service")
+	}
+
+	reqLogger := log.WithValues("Instance.Namespace", currentService.Namespace, "Instance.Name", currentService.Name)
+
+	var cp2podselector bool = false
+	var cp2podlabel bool = false
+	podSelector := currentService.Spec.Selector
+	value, ok := podSelector["k8s-app"]
+	if ok && value != currentService.Name {
+		currentService.Spec.Selector = map[string]string{"k8s-app": currentService.Name}
+		cp2podselector = true
+	}
+	// Going to validate label for CP3 upgrade
+	label := currentService.Labels
+	value, ok = label["app"]
+	if ok && value != currentService.Name {
+		currentService.Labels = map[string]string{"app": currentService.Name}
+		cp2podlabel = true
+	}
+	if cp2podselector || cp2podlabel {
+		err = r.client.Update(context.Background(), currentService)
+		if err != nil {
+			reqLogger.Error(err, "Upgrade check : Failed to update service podSelector , label details ", "Service.Namespace", currentService.Namespace, "Service.Name", currentService.Name, "Error.message", err)
+			*needToRequeue = true
+			return
+		} else {
+			reqLogger.Info("Upgrade check : Successfully updated service podSelector , label details ", "Service.Name", currentService.Name)
+		}
+	}
+	return
 }
 
 func (r *ReconcileAuthentication) platformAuthService(instance *operatorv1alpha1.Authentication) *corev1.Service {
@@ -121,7 +140,7 @@ func (r *ReconcileAuthentication) platformAuthService(instance *operatorv1alpha1
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-auth-service",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-auth-service"},
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
@@ -135,7 +154,7 @@ func (r *ReconcileAuthentication) platformAuthService(instance *operatorv1alpha1
 				},
 			},
 			Selector: map[string]string{
-				"k8s-app": "auth-idp",
+				"k8s-app": "platform-auth-service",
 			},
 			Type:            "ClusterIP",
 			SessionAffinity: corev1.ServiceAffinityClientIP,
@@ -161,7 +180,7 @@ func (r *ReconcileAuthentication) identityManagementService(instance *operatorv1
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-identity-management",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-identity-management"},
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
@@ -179,7 +198,7 @@ func (r *ReconcileAuthentication) identityManagementService(instance *operatorv1
 				},
 			},
 			Selector: map[string]string{
-				"k8s-app": "auth-idp",
+				"k8s-app": "platform-identity-management",
 			},
 			Type:            "ClusterIP",
 			SessionAffinity: corev1.ServiceAffinityClientIP,
@@ -200,12 +219,11 @@ func (r *ReconcileAuthentication) identityProviderService(instance *operatorv1al
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var idproviderPort int32 = 4300
-	var redirectPort int32 = 9443
 	identityProviderService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-identity-provider",
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
+			Labels:    map[string]string{"app": "platform-identity-provider"},
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
@@ -213,13 +231,9 @@ func (r *ReconcileAuthentication) identityProviderService(instance *operatorv1al
 					Name: "p4300",
 					Port: idproviderPort,
 				},
-				{
-					Name: "p9443",
-					Port: redirectPort,
-				},
 			},
 			Selector: map[string]string{
-				"k8s-app": "auth-idp",
+				"k8s-app": "platform-identity-provider",
 			},
 			Type:            "ClusterIP",
 			SessionAffinity: corev1.ServiceAffinityClientIP,
@@ -233,42 +247,5 @@ func (r *ReconcileAuthentication) identityProviderService(instance *operatorv1al
 		return nil
 	}
 	return identityProviderService
-
-}
-
-func (r *ReconcileAuthentication) iamTokenService(instance *operatorv1alpha1.Authentication) *corev1.Service {
-
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	var redirectPort int32 = 10443
-	iamTokenService := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "iam-token-service",
-			Namespace: instance.Namespace,
-			Labels:    map[string]string{"component": "auth-idp"},
-		},
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "p10443",
-					Port:       redirectPort,
-					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromString("https"),
-				},
-			},
-			Selector: map[string]string{
-				"component": "management-ingress",
-			},
-			Type:            "ClusterIP",
-			SessionAffinity: corev1.ServiceAffinityClientIP,
-		},
-	}
-
-	// Set Authentication instance as the owner and controller of the Service
-	err := controllerutil.SetControllerReference(instance, iamTokenService, r.scheme)
-	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Service")
-		return nil
-	}
-	return iamTokenService
 
 }

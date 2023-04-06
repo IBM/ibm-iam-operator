@@ -31,8 +31,11 @@ IMAGE_BUILD_OPTS=--build-arg "VCS_REF=$(GIT_COMMIT_ID)" --build-arg "VCS_URL=$(G
 # Image URL to use all building/pushing image targets;
 # Use your own docker registry and image name for dev/test by overridding the IMG and REGISTRY environment variable.
 IMG ?= ibm-iam-operator
-REGISTRY ?= "hyc-cloud-private-integration-docker-local.artifactory.swg-devops.com/ibmcom"
-CSV_VERSION ?= 3.23.1
+REGISTRY ?= "docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-integration-docker-local/ibmcom"
+CONTAINER_CLI ?= docker
+
+CSV_VERSION ?= 4.0.0
+
 
 QUAY_USERNAME ?=
 QUAY_PASSWORD ?=
@@ -69,14 +72,7 @@ install: ## Install all resources (CR/CRD's, RBCA and Operator)
 	- oc create namespace ${NAMESPACE}
 	@echo ....... Applying CRDS and Operator .......
 	- oc apply -f deploy/crds/operator.ibm.com_authentications_crd.yaml
-	- oc apply -f deploy/crds/operator.ibm.com_oidcclientwatchers_crd.yaml
-	- oc apply -f deploy/crds/operator.ibm.com_paps_crd.yaml
-	- oc apply -f deploy/crds/operator.ibm.com_policycontrollers_crd.yaml
-	- oc apply -f deploy/crds/operator.ibm.com_policydecisions_crd.yaml
-	- oc apply -f deploy/crds/operator.ibm.com_secretwatchers_crd.yaml
-	- oc apply -f deploy/crds/operator.ibm.com_securityonboardings_crd.yaml
-	- oc apply -f deploy/crds/iam.policies_v1alpha1_iampolicy.yaml
-	- oc apply -f deploy/crds/oidc_v1_client_crd.yaml
+	- oc apply -f deploy/crds/oidc.security.ibm.com_clients_crd.yaml
 	@echo ....... Applying RBAC .......
 	- oc apply -f deploy/service_account.yaml -n ${NAMESPACE}
 	- oc apply -f deploy/role.yaml -n ${NAMESPACE}
@@ -85,37 +81,23 @@ install: ## Install all resources (CR/CRD's, RBCA and Operator)
 	- oc apply -f deploy/operator.yaml -n ${NAMESPACE}
 	@echo ....... Creating the Instance .......
 	- oc apply -f deploy/crds/operator.ibm.com_v1alpha1_authentication_cr.yaml -n ${NAMESPACE}
-	- oc apply -f deploy/crds/operator.ibm.com_v1alpha1_oidcclientwatcher_cr.yaml -n ${NAMESPACE}
-	- oc apply -f deploy/crds/operator.ibm.com_v1alpha1_pap_cr.yaml -n ${NAMESPACE}
-	- oc apply -f deploy/crds/operator.ibm.com_v1alpha1_policycontroller_cr.yaml -n ${NAMESPACE}
-	- oc apply -f deploy/crds/operator.ibm.com_v1alpha1_policydecision_cr.yaml -n ${NAMESPACE}
-	- oc apply -f deploy/crds/operator.ibm.com_v1alpha1_secretwatcher_cr.yaml -n ${NAMESPACE}
-	- oc apply -f deploy/crds/operator.ibm.com_v1alpha1_securityonboarding_cr.yaml -n ${NAMESPACE}
 
 uninstall: ## Uninstall all that all performed in the $ make install
 	@echo ....... Uninstalling .......
 	@echo ....... Deleting CR .......
 	- oc delete -f deploy/crds/operator.ibm.com_v1alpha1_authentication_cr.yaml -n ${NAMESPACE}
-	- oc delete -f deploy/crds/operator.ibm.com_v1alpha1_oidcclientwatcher_cr.yaml -n ${NAMESPACE}
-	- oc delete -f deploy/crds/operator.ibm.com_v1alpha1_pap_cr.yaml -n ${NAMESPACE}
-	- oc delete -f deploy/crds/operator.ibm.com_v1alpha1_policycontroller_cr.yaml -n ${NAMESPACE}
-	- oc delete -f deploy/crds/operator.ibm.com_v1alpha1_policydecision_cr.yaml -n ${NAMESPACE}
-	- oc delete -f deploy/crds/operator.ibm.com_v1alpha1_secretwatcher_cr.yaml -n ${NAMESPACE}
-	- oc delete -f deploy/crds/operator.ibm.com_v1alpha1_securityonboarding_cr.yaml -n ${NAMESPACE}
 	@echo ....... Deleting Operator .......
 	- oc delete -f deploy/operator.yaml -n ${NAMESPACE}
 	@echo ....... Deleting CRDs.......
 	- oc delete -f deploy/crds/operator.ibm.com_authentications_crd.yaml
-	- oc delete -f deploy/crds/operator.ibm.com_oidcclientwatchers_crd.yaml
-	- oc delete -f deploy/crds/operator.ibm.com_paps_crd.yaml
-	- oc delete -f deploy/crds/operator.ibm.com_policycontrollers_crd.yaml
-	- oc delete -f deploy/crds/operator.ibm.com_policydecisions_crd.yaml
-	- oc delete -f deploy/crds/operator.ibm.com_secretwatchers_crd.yaml
-	- oc delete -f deploy/crds/operator.ibm.com_securityonboardings_crd.yaml
-	@echo ....... Deleting Rules and Service Account .......
+	- oc delete -f deploy/crds/oidc.security.ibm.com_clients_crd.yaml
+	@echo ....... Deleting Roles and Service Account .......
 	- oc delete -f deploy/role_binding.yaml -n ${NAMESPACE}
+	- oc delete rolebinding ibm-iam-operand-restricted
+	- oc delete clusterrolebinding ibm-iam-operand-restricted
 	- oc delete -f deploy/service_account.yaml -n ${NAMESPACE}
 	- oc delete -f deploy/role.yaml -n ${NAMESPACE}
+	- oc delete clusterrole ibm-iam-operand-restricted
 	@echo ....... Deleting namespace ${NAMESPACE}.......
 	#- oc delete namespace ${NAMESPACE}
 
@@ -144,40 +126,39 @@ endif
 
 ##@ Build
 
-build:
+build: ## Build the Operator binary for the host OS and architecture
 	@echo "Building the ibm-iam-operator binary"
 	@CGO_ENABLED=0 go build -o build/_output/bin/$(IMG) ./cmd/manager
 	@strip $(STRIP_FLAGS) build/_output/bin/$(IMG)
 
-build-image: build $(CONFIG_DOCKER_TARGET)
+build-image: build $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on amd64
 	$(eval ARCH := $(shell uname -m|sed 's/x86_64/amd64/'))
-	docker build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-$(ARCH):$(VERSION) -f build/Dockerfile .
+	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-$(ARCH):$(VERSION) -f build/Dockerfile .
 	@\rm -f build/_output/bin/ibm-iam-operator
-	@if [ $(BUILD_LOCALLY) -ne 1 ] && [ "$(ARCH)" = "amd64" ]; then docker push $(REGISTRY)/$(IMG)-$(ARCH):$(VERSION); fi
+	@if [ $(BUILD_LOCALLY) -ne 1 ] && [ "$(ARCH)" = "amd64" ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-$(ARCH):$(VERSION); fi
+
+build-image-amd64: build $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on amd64
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/_output/bin/ibm-iam-operator-amd64 ./cmd/manager
+	$(CONTAINER_CLI) run --rm --privileged multiarch/qemu-user-static:register --reset
+	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-amd64:$(VERSION) -f build/Dockerfile.amd64 .
+	@\rm -f build/_output/bin/ibm-iam-operator-amd64
+	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-amd64:$(VERSION); fi
 
 # runs on amd64 machine
-build-image-ppc64le: $(CONFIG_DOCKER_TARGET)
-ifeq ($(LOCAL_OS),Linux)
-ifeq ($(LOCAL_ARCH),x86_64)
+build-image-ppc64le: $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on ppc64le
 	GOOS=linux GOARCH=ppc64le CGO_ENABLED=0 go build -o build/_output/bin/ibm-iam-operator-ppc64le ./cmd/manager
-	docker run --rm --privileged multiarch/qemu-user-static:register --reset
-	docker build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-ppc64le:$(VERSION) -f build/Dockerfile.ppc64le .
+	$(CONTAINER_CLI) run --rm --privileged multiarch/qemu-user-static:register --reset
+	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-ppc64le:$(VERSION) -f build/Dockerfile.ppc64le .
 	@\rm -f build/_output/bin/ibm-iam-operator-ppc64le
-	@if [ $(BUILD_LOCALLY) -ne 1 ]; then docker push $(REGISTRY)/$(IMG)-ppc64le:$(VERSION); fi
-endif
-endif
+	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-ppc64le:$(VERSION); fi
 
 # runs on amd64 machine
-build-image-s390x: $(CONFIG_DOCKER_TARGET)
-ifeq ($(LOCAL_OS),Linux)
-ifeq ($(LOCAL_ARCH),x86_64)
+build-image-s390x: $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on s390x
 	GOOS=linux GOARCH=s390x CGO_ENABLED=0 go build -o build/_output/bin/ibm-iam-operator-s390x ./cmd/manager
-	docker run --rm --privileged multiarch/qemu-user-static:register --reset
-	docker build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-s390x:$(VERSION) -f build/Dockerfile.s390x .
+	$(CONTAINER_CLI) run --rm --privileged multiarch/qemu-user-static:register --reset
+	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS}  -t $(REGISTRY)/$(IMG)-s390x:$(VERSION) -f build/Dockerfile.s390x .
 	@\rm -f build/_output/bin/ibm-iam-operator-s390x
-	@if [ $(BUILD_LOCALLY) -ne 1 ]; then docker push $(REGISTRY)/$(IMG)-s390x:$(VERSION); fi
-endif
-endif
+	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-s390x:$(VERSION); fi
 
 ##@ Test
 
@@ -198,14 +179,10 @@ scorecard: ## Run scorecard test
 ##@ Release
 
 images: build-image build-image-ppc64le build-image-s390x
-ifeq ($(LOCAL_OS),Linux)
-ifeq ($(LOCAL_ARCH),x86_64)
-	@curl -L -o /tmp/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.3/manifest-tool-linux-amd64
+	@curl -L -o /tmp/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.3/manifest-tool-$(TARGET_OS)-amd64
 	@chmod +x /tmp/manifest-tool
 	/tmp/manifest-tool push from-args --platforms linux/amd64,linux/ppc64le,linux/s390x --template $(REGISTRY)/$(IMG)-ARCH:$(VERSION) --target $(REGISTRY)/$(IMG) --ignore-missing
 	/tmp/manifest-tool push from-args --platforms linux/amd64,linux/ppc64le,linux/s390x --template $(REGISTRY)/$(IMG)-ARCH:$(VERSION) --target $(REGISTRY)/$(IMG):$(VERSION) --ignore-missing
-endif
-endif
 
 csv: ## Push CSV package to the catalog
 	@RELEASE=${CSV_VERSION} common/scripts/push-csv.sh

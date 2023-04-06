@@ -57,72 +57,6 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 	}
 }
 
-func buildAuditContainer(auditImage string, syslogTlsPath string, resources *corev1.ResourceRequirements) corev1.Container {
-
-	if resources == nil {
-
-		resources = &corev1.ResourceRequirements{
-			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu100,
-				corev1.ResourceMemory: *memory128},
-			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu10,
-				corev1.ResourceMemory: *memory32},
-		}
-	}
-
-	if len(syslogTlsPath) == 0 {
-		syslogTlsPath = "/etc/audit-tls"
-	}
-
-	return corev1.Container{
-		Name:            "icp-audit-service",
-		Image:           auditImage,
-		ImagePullPolicy: corev1.PullAlways,
-		Env: []corev1.EnvVar{
-			{
-				Name:  "AUDIT_DIR",
-				Value: "/var/log/audit",
-			},
-		},
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      "shared",
-				MountPath: "/var/log/audit",
-			},
-			{
-				Name:      "audit-server-certs",
-				MountPath: syslogTlsPath,
-			},
-			{
-				Name:      "audit-ingest",
-				MountPath: "/etc/audit-ingest/",
-			},
-			{
-				Name:      "logrotate",
-				MountPath: "/etc/logrotate.d/audit",
-				SubPath:   "audit",
-			},
-			{
-				Name:      "logrotate-conf",
-				MountPath: "/etc/logrotate.conf",
-				SubPath:   "logrotate.conf",
-			},
-		},
-		SecurityContext: &corev1.SecurityContext{
-			Privileged:               &falseVar,
-			RunAsNonRoot:             &trueVar,
-			ReadOnlyRootFilesystem:   &trueVar,
-			AllowPrivilegeEscalation: &falseVar,
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL"},
-			},
-		},
-		Resources: *resources,
-	}
-
-}
-
 // This function divides the memory request of auth-service container in MB by 2
 // and returns it to liberty in the format that it accepts
 func convertToLibertyFormat(memory string) string {
@@ -403,14 +337,14 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 				MountPath: "/certs/mongodb-client",
 			},
 			{
-				Name:      "router-certs",
-				MountPath: "/certs/router-certs",
+				Name:      "saml-cert",
+				MountPath: "/certs/saml-certs",
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/iam/oidc/keys",
+					Path: "/oidc/endpoint/OP/.well-known/openid-configuration",
 					Port: intstr.IntOrString{
 						IntVal: authServicePort,
 					},
@@ -423,9 +357,9 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			FailureThreshold:    6,
 		},
 		LivenessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/iam/oidc/keys",
+					Path: "/oidc/endpoint/OP/.well-known/openid-configuration",
 					Port: intstr.IntOrString{
 						IntVal: authServicePort,
 					},
@@ -609,15 +543,8 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
 		},
 		{
-			Name: "roksClientId",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_ID",
-				},
-			},
+			Name:  "roksClientId",
+			Value: "system:serviceaccount:" + instance.Namespace + ":ibm-iam-operand-restricted",
 		},
 		{
 			Name: "roksClientSecret",
@@ -654,7 +581,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		},
 		{
 			Name:  "IDMGMT_KUBEDNS_NAME",
-			Value: "127.0.0.1",
+			Value: "platform-identity-management",
 		},
 		{
 			Name: "OAUTH2_CLIENT_REGISTRATION_SECRET",
@@ -695,7 +622,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		},
 		{
 			Name:  "IAM_OIDC_TOKEN_SERVICE_URL",
-			Value: "https://127.0.0.1:9443/iam",
+			Value: "https://platform-auth-service:9443/iam",
 		},
 		{
 			Name:  "MASTER_HOST",
@@ -703,8 +630,8 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		},
 	}
 
-	idpEnvVarList := []string{"NODE_ENV", "LOG_LEVEL_IDPROVIDER", "LOG_LEVEL_MW", "PROVIDER_ISSUER_URL", "PREFERRED_LOGIN", "IDTOKEN_LIFETIME", "SAAS_CLIENT_REDIRECT_URL", "IBM_CLOUD_SAAS", "ROKS_ENABLED", "ROKS_URL", "ROKS_USER_PREFIX", "OS_TOKEN_LENGTH", "LIBERTY_TOKEN_LENGTH",
-		"IDENTITY_PROVIDER_URL", "BASE_AUTH_URL", "BASE_OIDC_URL", "SCOPE_CLAIM", "OIDC_ISSUER_URL", "HTTP_ONLY"}
+	idpEnvVarList := []string{"NODE_ENV", "LOG_LEVEL_IDPROVIDER", "LOG_LEVEL_MW", "PROVIDER_ISSUER_URL", "PREFERRED_LOGIN", "IDTOKEN_LIFETIME", "SAAS_CLIENT_REDIRECT_URL", "IBM_CLOUD_SAAS", "ROKS_ENABLED", "OSAUTH_ENABLED", "ROKS_URL", "ROKS_USER_PREFIX", "OS_TOKEN_LENGTH", "LIBERTY_TOKEN_LENGTH",
+		"IDENTITY_PROVIDER_URL", "BASE_AUTH_URL", "BASE_OIDC_URL", "SCOPE_CLAIM", "OIDC_ISSUER_URL", "HTTP_ONLY", "IGNORE_LDAP_FILTERS_VALIDATION", "LDAP_ATTR_CACHE_SIZE", "LDAP_ATTR_CACHE_TIMEOUT", "LDAP_ATTR_CACHE_ENABLED", "LDAP_ATTR_CACHE_SIZELIMIT", "LDAP_SEARCH_CACHE_SIZE", "LDAP_SEARCH_CACHE_TIMEOUT", "LDAP_SEARCH_CACHE_ENABLED", "LDAP_SEARCH_CACHE_SIZELIMIT", "LDAP_SEARCH_EXCLUDE_WILDCARD_CHARS", "LDAP_SEARCH_SIZE_LIMIT", "LDAP_SEARCH_TIME_LIMIT", "LDAP_SEARCH_CN_ATTR_ONLY", "LDAP_SEARCH_ID_ATTR_ONLY"}
 
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
 
@@ -737,7 +664,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		SecurityContext: &corev1.SecurityContext{
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
-			ReadOnlyRootFilesystem:   &trueVar,
+			ReadOnlyRootFilesystem:   &falseVar,
 			AllowPrivilegeEscalation: &falseVar,
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
@@ -748,10 +675,6 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			{
 				Name:      "auth-key",
 				MountPath: "/opt/ibm/identity-provider/server/boot/auth-key",
-			},
-			{
-				Name:      "shared",
-				MountPath: "/var/log/audit",
 			},
 			{
 				Name:      "identity-provider-cert",
@@ -765,21 +688,25 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 				Name:      "mongodb-client-cert",
 				MountPath: "/certs/mongodb-client",
 			},
+			{
+				Name:      "saml-cert",
+				MountPath: "/certs/saml-certs",
+			},
 		},
 		ReadinessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/",
-					Port: intstr.IntOrString{
-						IntVal: identityProviderPort,
-					},
-					Scheme: "HTTPS",
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{"curl", "-k", "https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration"},
 				},
 			},
-			TimeoutSeconds: 10,
+			InitialDelaySeconds: 20,
+			PeriodSeconds:       15,
+			TimeoutSeconds:      10,
+			SuccessThreshold:    1,
+			FailureThreshold:    5,
 		},
 		LivenessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/",
 					Port: intstr.IntOrString{
@@ -884,6 +811,21 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			},
 		},
 		{
+			Name: "OAUTH2_CLIENT_REGISTRATION_SECRET",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-oidc-credentials",
+					},
+					Key: "OAUTH2_CLIENT_REGISTRATION_SECRET",
+				},
+			},
+		},
+		{
+			Name:  "AUTHZ_DISABLED",
+			Value: "true",
+		},
+		{
 			Name: "MONGO_PASSWORD",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
@@ -925,15 +867,8 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
 		},
 		{
-			Name: "roksClientId",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_ID",
-				},
-			},
+			Name:  "roksClientId",
+			Value: "system:serviceaccount:" + instance.Namespace + ":ibm-iam-operand-restricted",
 		},
 		{
 			Name: "roksClientSecret",
@@ -992,11 +927,11 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		},
 		{
 			Name:  "IDPROVIDER_KUBEDNS_NAME",
-			Value: "https://127.0.0.1",
+			Value: "https://platform-identity-provider",
 		},
 		{
 			Name:  "IAM_TOKEN_SERVICE_URL",
-			Value: "https://127.0.0.1:9443",
+			Value: "https://platform-auth-service:9443",
 		},
 		{
 			Name:  "MASTER_NODES_LIST",
@@ -1057,21 +992,10 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			Name:  "MASTER_HOST",
 			Value: icpConsoleURL,
 		},
-		{
-			Name: "NAMESPACES",
-			ValueFrom: &corev1.EnvVarSource{
-				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "namespace-scope",
-					},
-					Key: "namespaces",
-				},
-			},
-		},
 	}
 
 	idpEnvVarList := []string{"NODE_ENV", "LOG_LEVEL_IDMGMT", "LOG_LEVEL_MW", "IBM_CLOUD_SAAS", "IBMID_PROFILE_URL", "IBMID_PROFILE_CLIENT_ID", "IBMID_PROFILE_FIELDS", "AUDIT_DETAIL",
-		"ROKS_ENABLED", "ROKS_USER_PREFIX", "IDENTITY_AUTH_DIRECTORY_URL", "OIDC_ISSUER_URL", "BOOTSTRAP_USERID", "CLUSTER_NAME", "HTTP_ONLY", "LDAP_SEARCH_SIZE_LIMIT", "LDAP_SEARCH_TIME_LIMIT",
+		"ROKS_ENABLED", "OSAUTH_ENABLED", "ROKS_USER_PREFIX", "IDENTITY_AUTH_DIRECTORY_URL", "OIDC_ISSUER_URL", "BOOTSTRAP_USERID", "CLUSTER_NAME", "HTTP_ONLY", "LDAP_SEARCH_SIZE_LIMIT", "LDAP_SEARCH_TIME_LIMIT",
 		"LDAP_SEARCH_CN_ATTR_ONLY", "LDAP_SEARCH_ID_ATTR_ONLY", "LDAP_SEARCH_EXCLUDE_WILDCARD_CHARS", "IGNORE_LDAP_FILTERS_VALIDATION", "AUTH_SVC_LDAP_CONFIG_TIMEOUT",
 		"SCIM_LDAP_SEARCH_SIZE_LIMIT", "SCIM_LDAP_SEARCH_TIME_LIMIT", "SCIM_ASYNC_PARALLEL_LIMIT", "SCIM_GET_DISPLAY_FOR_GROUP_USERS", "ATTR_MAPPING_FROM_CONFIG", "SCIM_AUTH_CACHE_MAX_SIZE", "SCIM_AUTH_CACHE_TTL_VALUE"}
 
@@ -1106,7 +1030,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 	}
 
 	return corev1.Container{
-		Name:            "platform-identity-manager",
+		Name:            "platform-identity-management",
 		Image:           identityManagerImage,
 		ImagePullPolicy: corev1.PullAlways,
 		SecurityContext: &corev1.SecurityContext{
@@ -1129,10 +1053,6 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 				MountPath: "/opt/ibm/identity-mgmt/server/certs",
 			},
 			{
-				Name:      "shared",
-				MountPath: "/var/log/audit",
-			},
-			{
 				Name:      "mongodb-ca-cert",
 				MountPath: "/certs/mongodb-ca",
 			},
@@ -1146,19 +1066,19 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/",
-					Port: intstr.IntOrString{
-						IntVal: identityManagerPort,
-					},
-					Scheme: "HTTPS",
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{"curl", "-k", "https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration"},
 				},
 			},
-			TimeoutSeconds: 10,
+			InitialDelaySeconds: 20,
+			PeriodSeconds:       15,
+			TimeoutSeconds:      10,
+			SuccessThreshold:    1,
+			FailureThreshold:    5,
 		},
 		LivenessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/",
 					Port: intstr.IntOrString{
@@ -1174,15 +1094,27 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 
 }
 
-func buildContainers(instance *operatorv1alpha1.Authentication, auditImage string, authServiceImage string, identityProviderImage string, identityManagerImage string, syslogTlsPath string, icpConsoleURL string, saasCrnId string) []corev1.Container {
+func buildContainers(instance *operatorv1alpha1.Authentication, authServiceImage string) []corev1.Container {
 
-	auditResources := instance.Spec.AuditService.Resources
-	auditContainer := buildAuditContainer(auditImage, syslogTlsPath, auditResources)
 	authServiceContainer := buildAuthServiceContainer(instance, authServiceImage)
-	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId)
+	//identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId)
+	//identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL)
+
+	return []corev1.Container{authServiceContainer}
+}
+
+func buildManagerContainers(instance *operatorv1alpha1.Authentication, identityManagerImage string, icpConsoleURL string) []corev1.Container {
+
 	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL)
 
-	return []corev1.Container{auditContainer, authServiceContainer, identityProviderContainer, identityManagerContainer}
+	return []corev1.Container{identityManagerContainer}
+}
+
+func buildProviderContainers(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string, saasCrnId string) []corev1.Container {
+
+	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId)
+
+	return []corev1.Container{identityProviderContainer}
 }
 
 func buildIdpEnvVars(envVarList []string) []corev1.EnvVar {

@@ -16,11 +16,9 @@
 
 FROM alpine as builder
 
-RUN wget -O /qemu-s390x-static https://github.com/multiarch/qemu-user-static/releases/download/v5.2.0-2/qemu-s390x-static
+RUN wget -O /qemu-s390x-static https://github.com/multiarch/qemu-user-static/releases/download/v5.2.0-2/qemu-s390x-static && chmod +x /qemu-s390x-static
 
-RUN chmod +x /qemu-s390x-static
-
-FROM hyc-cloud-private-edge-docker-local.artifactory.swg-devops.com/build-images/ubi8-minimal:latest-s390x
+FROM docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-edge-docker-local/build-images/ubi8-minimal:latest-s390x
 
 ARG VCS_REF
 ARG VCS_URL
@@ -47,10 +45,8 @@ COPY --from=builder /qemu-s390x-static /usr/bin/
 COPY build/_output/bin/ibm-iam-operator-s390x ${OPERATOR}
 
 COPY build/bin /usr/local/bin
-RUN  /usr/local/bin/user_setup
+RUN  /usr/local/bin/user_setup && mkdir /licenses
 
-# copy licenses
-RUN mkdir /licenses
 COPY LICENSE /licenses
 
 ENTRYPOINT ["/usr/local/bin/entrypoint"]

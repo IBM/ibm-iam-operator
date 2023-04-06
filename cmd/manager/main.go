@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -31,6 +32,7 @@ import (
 	"github.com/IBM/ibm-iam-operator/pkg/apis"
 	"github.com/IBM/ibm-iam-operator/pkg/controller"
 	"github.com/IBM/ibm-iam-operator/version"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	kubemetrics "github.com/operator-framework/operator-sdk/pkg/kube-metrics"
@@ -90,7 +92,6 @@ func main() {
 		log.Error(err, "Failed to get watch namespace")
 		os.Exit(1)
 	}
-
 	// Get a config to talk to the apiserver
 	cfg, err := config.GetConfig()
 	if err != nil {
@@ -105,17 +106,26 @@ func main() {
 		log.Error(err, "")
 		os.Exit(1)
 	}
+	var managerOpt manager.Options
+	if strings.Contains(namespace, ",") {
+		namespaces := strings.Split(namespace, ",")
+		managerOpt = manager.Options{
+			MetricsBindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),
+			NewCache:           cache.MultiNamespacedCacheBuilder(namespaces),
+		}
+	} else {
+		managerOpt = manager.Options{
+			Namespace:          namespace,
+			MetricsBindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),
+		}
+	}
 
 	// Create a new Cmd to provide shared dependencies and start components
-	mgr, err := manager.New(cfg, manager.Options{
-		Namespace:          namespace,
-		MetricsBindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),
-	})
+	mgr, err := manager.New(cfg, managerOpt)
 	if err != nil {
 		log.Error(err, "")
 		os.Exit(1)
 	}
-
 	log.Info("Registering Components.")
 
 	// Setup Scheme for all resources

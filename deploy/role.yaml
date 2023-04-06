@@ -9,6 +9,32 @@ metadata:
     app.kubernetes.io/name: ibm-iam-operator
 rules:
 - apiGroups:
+  - route.openshift.io
+  resources:
+  - routes
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update
+  - patch
+- apiGroups:
+  - route.openshift.io
+  resources:
+  - routes/custom-host
+  verbs:
+  - create
+- apiGroups:
+  - route.openshift.io
+  resources:
+  - routes/status
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - ""
   resources:
   - pods
@@ -34,6 +60,20 @@ rules:
   - daemonsets
   - replicasets
   - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - oidc.security.ibm.com
+  resources:
+  - clients
+  - clients/finalizers
+  - clients/status
   verbs:
   - create
   - delete
@@ -75,11 +115,26 @@ rules:
   resources:
   - '*'
   - policydecisions
-  - oidcclientwatchers
   - authentications
   - policycontrollers
   - paps
   - securityonboardings
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cert-manager.io
+  resources:
+  - certificates
+  - certificaterequests
+  - orders
+  - challenges
+  - issuers
   verbs:
   - create
   - delete
@@ -94,12 +149,9 @@ rules:
   - '*'
   - certificates
   verbs:
-  - create
   - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - networking.k8s.io
@@ -126,6 +178,24 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  - rolebindings
+  verbs:
+  - create
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -138,237 +208,26 @@ metadata:
     app.kubernetes.io/name: ibm-iam-operator
 rules:
 - apiGroups:
-  - admissionregistration.k8s.io
+  - config.openshift.io
   resources:
-  - mutatingwebhookconfigurations
-  #iam.hooks.securityenforcement.admission.cloud.ibm.com used by oidcclient-watcher 
+  - ingresses
   verbs:
   - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-# Investigate further whether we can avoid the creation of clusteroles and clusterrolbeindings
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - clusterroles
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-  - escalate
-  - bind
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - clusterrolebindings
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - user.openshift.io
-  resources:
-  - users
-  # The default admin user has to be created
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - update
-  - watch
-  - delete
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  creationTimestamp: null
-  name: ibm-iam-operand-restricted
-  labels:
-    app.kubernetes.io/instance: ibm-iam-operator
-    app.kubernetes.io/managed-by: ibm-iam-operator
-    app.kubernetes.io/name: ibm-iam-operator
-rules:
 - apiGroups:
   - ""
   resources:
-  - pods
-  - services
-  - services/finalizers
-  - endpoints
-  - persistentvolumeclaims
-  - events
   - configmaps
-  - secrets
+  resourceNames:
+  - console-config
   verbs:
-  - create
-  - delete
   - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  - daemonsets
-  - replicasets
-  - statefulsets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-# used by oidcclient watcher
-- apiGroups:
-  - oidc.security.ibm.com
-  resources:
-  - clients
-  - clients/finalizers
-  - clients/status
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - roles
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - rolebindings
-  - rolebindings/finalizers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-# this is used by iam poliy controller
-- apiGroups:
-  - iam.policies.ibm.com
-  resources:
-  - iampolicies
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - update
-  - watch
-  - delete
-# this is used by identity provider to create/delete rolebinding for zen user
-- apiGroups:
-  - authorization.openshift.io
-  resources:
-  - rolebindings
-  - rolebindings/finalizers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: ibm-iam-operand-restricted
-  labels:
-    app.kubernetes.io/instance: ibm-iam-operator
-    app.kubernetes.io/managed-by: ibm-iam-operator
-    app.kubernetes.io/name: ibm-iam-operator
-rules:
-- apiGroups:
-  - ""
-  resources:
-  #the namespaces are being watched by the oidcclientwatcher
-  - namespaces
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-# used in identity manager
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - clusterroles
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-  - escalate
-  - bind
-- apiGroups:
-  - authorization.openshift.io
-  resources:
   - clusterrolebindings
   verbs:
   - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-# Used by oidcclient-watcher
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - clusterrolebindings
-  - clusterrolebindings/finalizers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-# fetch users call is used in identity manager
 - apiGroups:
   - user.openshift.io
   resources:
@@ -376,37 +235,5 @@ rules:
   - groups
   - identities
   verbs:
-  - create
   - get
   - list
-  - patch
-  - update
-  - watch
-  - delete
-# token allocation is used in identity provider
-- apiGroups:
-  - oauth.openshift.io
-  resources:
-  - oauthaccesstokens
-  - oauthclients
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - update
-  - watch
-  - delete
-# this is used by iam poliy controller
-- apiGroups:
-  - iam.policies.ibm.com
-  resources:
-  - iampolicies
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - update
-  - watch
-  - delete

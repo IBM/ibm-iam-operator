@@ -31,30 +31,55 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentication, currentJob *batchv1.Job, requeueResult *bool) error {
+func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentication, currentJob *batchv1.Job, needToRequeue *bool) (err error) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	var err error
 
 	job := "oidc-client-registration"
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: job, Namespace: instance.Namespace}, currentJob)
 	if err != nil && errors.IsNotFound(err) {
+		reqLogger.Info("Job not found", "name", job, "namespace", instance.Namespace)
+		// Confirm that configmap ibmcloud-cluster-info is created by IM-Operator before further usage
+		consoleConfigMapName := "ibmcloud-cluster-info"
+		consoleConfigMap := &corev1.ConfigMap{}
+		err = r.client.Get(context.TODO(), types.NamespacedName{Name: consoleConfigMapName, Namespace: instance.Namespace}, consoleConfigMap)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				reqLogger.Error(err, "The configmap ", consoleConfigMapName, " is not created yet")
+				return
+			} else {
+				reqLogger.Error(err, "Failed to get ConfigMap", consoleConfigMapName)
+				return
+			}
+		}
+		// Verify the owner reference
+		ownerRefs := consoleConfigMap.OwnerReferences
+		var ownRef string
+		for _, ownRefs := range ownerRefs {
+			ownRef = ownRefs.Kind
+		}
+		if ownRef != "Authentication" {
+			reqLogger.Info("Reconcile Job : Can't find ibmcloud-cluster-info Configmap created by IM operator , IM Job creation may not proceed ", "Configmap.Namespace", consoleConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+			*needToRequeue = true
+			return
+		}
+
 		// Define a new Job
 		newJob := generateJobObject(instance, r.scheme, job)
 		reqLogger.Info("Creating a new Job", "Job.Namespace", instance.Namespace, "Job.Name", job)
 		err = r.client.Create(context.TODO(), newJob)
 		if err != nil {
 			reqLogger.Error(err, "Failed to create new Job", "Job.Namespace", instance.Namespace, "Job.Name", job)
-			return err
+			return
 		}
 		// Job created successfully - return and requeue
-		*requeueResult = true
+		*needToRequeue = true
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Job")
-		return err
+		return
 	}
 
-	return nil
+	return
 
 }
 
@@ -92,7 +117,7 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 						"productName":                        "IBM Cloud Platform Common Services",
 						"productID":                          "068a62892a1e4db39641342e592daa25",
 						"productMetric":                      "FREE",
-						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb, icp-management-ingress",
+						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -243,9 +268,9 @@ func buildContainer(jobName string, image string, resources *corev1.ResourceRequ
 					ValueFrom: &corev1.EnvVarSource{
 						ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "management-ingress-info",
+								Name: "ibmcloud-cluster-info",
 							},
-							Key: "MANAGEMENT_INGRESS_ROUTE_HOST",
+							Key: "cluster_address",
 						},
 					},
 				},

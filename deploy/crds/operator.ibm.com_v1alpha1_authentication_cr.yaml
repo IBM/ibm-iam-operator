@@ -9,24 +9,12 @@ metadata:
 spec:
   operatorVersion: "0.14.1"
   replicas: 1
-  auditService: 
-    imageRegistry: "quay.io/opencloudio"
-    imageName: "audit-syslog-service"
-    imageTag: "1.0.5"
-    syslogTlsPath: "/etc/audit-tls"
-    resources:
-      limits:
-        cpu: 100m
-        memory: 128Mi
-      requests:
-        cpu: 10m
-        memory: 100Mi
   authService:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
     imageTag: "3.3.7"
     ldapsCACert: "platform-auth-ldaps-ca-cert"
-    routerCertSecret: "route-tls-secret"
+    routerCertSecret: "saml-auth-secret"
     resources:
       limits:
         cpu: 1000m
@@ -87,7 +75,7 @@ spec:
     clusterInternalAddress: "10.0.0.1"
     clusterName: "mycluster"
     defaultAdminPassword: "password"
-    defaultAdminUser: "admin"
+    defaultAdminUser: "cpadmin"
     scimAdminPassword: "scimpassword"
     scimAdminUser: "scimadmin"
     enableImpersonation: false
@@ -97,6 +85,7 @@ spec:
     isOpenshiftEnv: true
     openshiftPort: 443
     roksEnabled: true
+    osAuthEnabled: false
     ibmCloudSaas: false
     attrMappingFromConfig: false
     saasClientRedirectUrl: ""

@@ -16,3 +16,4 @@
 
 # Launches fmt and lint checks
 make lint-all
+#make lint-scripts

@@ -16,6 +16,24 @@
 
 package authentication
 
+const (
+	// ClusterConfigName ... ibmcloud-cluster-info
+	ClusterAddr          string = "cluster_address"
+	ClusterEP            string = "cluster_endpoint"
+	RouteHTTPPort        string = "cluster_router_http_port"
+	RouteHTTPSPort       string = "cluster_router_https_port"
+	RouteHTTPPortValue   string = "80"
+	RouteHTTPSPortValue  string = "443"
+	ClusterName          string = "cluster_name"
+	ClusterNameValue     string = "mycluster"
+	ClusterAPIServerHost string = "cluster_kube_apiserver_host"
+	ClusterAPIServerPort string = "cluster_kube_apiserver_port"
+	ClusterSecretName    string = "ibmcloud-cluster-ca-cert"
+	ProxyAddress         string = "proxy_address"
+	ProviderSVC          string = "im_idprovider_endpoint"
+	IDMgmtSVC            string = "im_idmgmt_endpoint"
+)
+
 const registerClientScript = `#!/bin/sh
 HTTP_CODE=""
 while true
@@ -66,6 +84,7 @@ var registrationJson string = `{
    "post_logout_redirect_uris":["https://ICP_CONSOLE_URL/console/logout"],
    "preauthorized_scope":"openid profile email general",
    "introspect_tokens":true,
+   "functional_user_groupIds": ["Administrator"],
    "trusted_uri_prefixes":["https://ICP_CONSOLE_URL"],
    "redirect_uris":[ICP_REGISTRATION_CONSOLE_URL,"https://127.0.0.1:443/idauth/oidc/endpoint/OP"]
 }

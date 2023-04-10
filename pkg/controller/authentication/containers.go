@@ -57,6 +57,38 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 	}
 }
 
+func buildInitForMngrAndProvider(mongoDBImage string) []corev1.Container {
+	return []corev1.Container{
+		{
+			Name:            "init-mongodb",
+			Image:           mongoDBImage,
+			ImagePullPolicy: corev1.PullAlways,
+			Command: []string{
+				"bash",
+				"-c",
+				"AUTH=`echo -n \"oauthadmin:$OAUTH2_CLIENT_REGISTRATION_SECRET\"|base64`; until </dev/tcp/mongodb/27017 && curl -k https://platform-auth-service:9443/IBMJMXConnectorREST/api --header \"Authorization: Basic $AUTH\"; do sleep 5; done;",
+			},
+			SecurityContext: &corev1.SecurityContext{
+				Privileged:               &falseVar,
+				RunAsNonRoot:             &trueVar,
+				ReadOnlyRootFilesystem:   &trueVar,
+				AllowPrivilegeEscalation: &falseVar,
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+			},
+			Resources: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    *cpu100,
+					corev1.ResourceMemory: *memory128},
+			},
+		},
+	}
+}
+
 // This function divides the memory request of auth-service container in MB by 2
 // and returns it to liberty in the format that it accepts
 func convertToLibertyFormat(memory string) string {

@@ -344,7 +344,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/oidc/endpoint/OP/.well-known/openid-configuration",
+					Path: "/IBMJMXConnectorREST/api",
 					Port: intstr.IntOrString{
 						IntVal: authServicePort,
 					},

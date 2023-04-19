@@ -25,6 +25,7 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	utils "github.com/IBM/ibm-iam-operator/pkg/utils"
 	certmgr "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	osconfigv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -37,9 +38,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"github.com/IBM/ibm-iam-operator/pkg/resources"
 
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -141,24 +144,28 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource ConfigMap and requeue the owner Authentication
-	err = c.Watch(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &operatorv1alpha1.Authentication{},
-	})
+	err = c.Watch(&source.Kind{Type: &corev1.ConfigMap{}},
+		handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []reconcile.Request {
+			ownerRefs := obj.GetOwnerReferences()
+			if len(ownerRefs) > 0 && ownerRefs[0].Kind == "Authentication" &&
+				ownerRefs[0].APIVersion == "operator.ibm.com/v1alpha1" &&
+				*ownerRefs[0].Controller {
+				return []reconcile.Request{
+					{NamespacedName: types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}},
+				}
+			}
+			return []reconcile.Request{
+				{NamespacedName: types.NamespacedName{Name: "CNCF_DOMAIN_UPDATE", Namespace: "CNCF_DOMAIN_UPDATE"}},
+			}
+
+		}),
+		predicate.Or(CPPConfigDomainChangedPredicate{}, OwnedByAuthentication))
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to secondary resource Ingress and requeue the owner Authentication
 	err = c.Watch(&source.Kind{Type: &net.Ingress{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &operatorv1alpha1.Authentication{},
-	})
-	if err != nil {
-		return err
-	}
-
-	err = c.Watch(&source.Kind{Type: &routev1.Route{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &operatorv1alpha1.Authentication{},
 	})
@@ -175,6 +182,34 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	clusterType, err := resources.GetClusterType(context.Background())
+	if err != nil {
+		return err
+	}
+	if clusterType == resources.OpenShift {
+		err = c.Watch(&source.Kind{Type: &routev1.Route{}}, &handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &operatorv1alpha1.Authentication{},
+		})
+		if err != nil {
+			return err
+		}
+		err = c.Watch(&source.Kind{Type: &osconfigv1.Ingress{}},
+			handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []reconcile.Request {
+				return []reconcile.Request{
+					{
+						NamespacedName: types.NamespacedName{
+							Name:      "OS_DOMAIN_UPDATE",
+							Namespace: "OS_DOMAIN_UPDATE",
+						},
+					},
+				}
+			}), ClusterIngressDomainChangedPredicate{})
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -185,9 +220,22 @@ var _ reconcile.Reconciler = &ReconcileAuthentication{}
 type ReconcileAuthentication struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client client.Client
-	scheme *runtime.Scheme
-	Mutex  sync.Mutex
+	client  client.Client
+	scheme  *runtime.Scheme
+	Mutex   sync.Mutex
+	clusterType resources.ClusterType
+}
+
+func (r *ReconcileAuthentication) runningOnOpenShiftCluster() bool {
+	return r.clusterType == resources.OpenShift
+}
+
+func (r *ReconcileAuthentication) runningOnCNCFCluster() bool {
+	return r.clusterType == resources.CNCF
+}
+
+func (r *ReconcileAuthentication) runningOnUnknownCluster() bool {
+	return r.clusterType == resources.Unknown
 }
 
 func (r *ReconcileAuthentication) addFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
@@ -244,6 +292,15 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 			result.Requeue = true
 		}
 	}()
+
+	// Determine the type of cluster that the Operator is installed on
+	if r.runningOnUnknownCluster() {
+		r.clusterType, err = resources.GetClusterType(reconcileCtx)
+		if err != nil {
+			reqLogger.Error(err, "Failed to determine cluster platform")
+			return
+		}
+	}
 
 	reqLogger.Info("Reconciling Authentication")
 
@@ -338,9 +395,11 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	// updates redirecturi annotations to serviceaccount
 	r.handleServiceAccount(instance, &needToRequeue)
 
-	err = r.handleRoutes(ctx, instance, &needToRequeue)
-	if err != nil && !errors.IsNotFound(err) {
-		return
+	if r.runningOnOpenShiftCluster() {
+		err = r.handleRoutes(ctx, instance, &needToRequeue)
+		if err != nil && !errors.IsNotFound(err) {
+			return
+		}
 	}
 
 	// Check if this Deployment already exists and create it if it doesn't

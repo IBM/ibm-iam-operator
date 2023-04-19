@@ -144,6 +144,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		IsController: true,
 		OwnerType:    &operatorv1alpha1.Authentication{},
 	})
+
 	if err != nil {
 		return err
 	}

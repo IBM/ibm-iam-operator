@@ -27,19 +27,26 @@ import (
 
 	oidcv1 "github.com/IBM/ibm-iam-operator/pkg/apis/oidc/v1"
 	pkgCommon "github.com/IBM/ibm-iam-operator/pkg/common"
+	ctrlCommon "github.com/IBM/ibm-iam-operator/pkg/controller/common"
+	//"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	corev1 "k8s.io/api/core/v1"
+
+	//appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	//k8sJSON "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -75,11 +82,13 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+	rule := `^([a-z0-9]){32,}$`
 	return &ReconcileClient{
-		client:   mgr.GetClient(),
-		Reader:   mgr.GetAPIReader(),
-		recorder: mgr.GetEventRecorderFor(controllerName),
-		scheme:   mgr.GetScheme(),
+		client:    mgr.GetClient(),
+		Reader:    mgr.GetAPIReader(),
+		recorder:  mgr.GetEventRecorderFor(controllerName),
+		scheme:    mgr.GetScheme(),
+		deleteKey: ctrlCommon.GenerateRandomString(rule),
 	}
 }
 
@@ -91,8 +100,82 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	rc, ok := r.(*ReconcileClient)
+	if !ok {
+		return fmt.Errorf("controller initialized with unknown Reconciler")
+	}
+
+	// Watch for Secret events; when the Secret is owned by a Client, enqueue a request for that Client.
+	err = c.Watch(
+		&source.Kind{Type: &corev1.Secret{}},
+		handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []reconcile.Request {
+			if isOwnedByClient(obj) {
+				ownerRef := obj.GetOwnerReferences()[0]
+				return []reconcile.Request{
+					{NamespacedName: types.NamespacedName{
+						Name:      ownerRef.Name,
+						Namespace: obj.GetNamespace(),
+					}},
+				}
+
+			}
+			return []reconcile.Request{{NamespacedName: types.NamespacedName{
+				Name:      "CACHE_UPDATE",
+				Namespace: obj.GetNamespace(),
+			}}}
+		}),
+		predicate.Or(
+			newCSCACertSecretPredicate(rc.sharedServicesNamespace),
+			PlatformAuthIDPCredentialsPredicate,
+			PlatformOIDCCredentialsPredicate,
+			OwnedByClientPredicate,
+		))
+	if err != nil {
+		return err
+	}
+
+	// Watch for ConfigMap events involving platform-auth-idp specifically
+	err = c.Watch(
+		&source.Kind{Type: &corev1.ConfigMap{}},
+		handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []reconcile.Request {
+			return []reconcile.Request{{NamespacedName: types.NamespacedName{
+				Name:      "CACHE_UPDATE",
+				Namespace: obj.GetNamespace(),
+			}}}
+		}),
+		PlatformAuthIDPPredicate)
+	if err != nil {
+		return err
+	}
+
 	// Watch for changes to primary resource Client
-	err = c.Watch(&source.Kind{Type: &oidcv1.Client{}}, &handler.EnqueueRequestForObject{})
+	// Below is a hack that allows for cleanup of obsolete registration data when a registration is deleted without
+	// the need for finalizers - the object targeted for deletion is contained within the DeleteEvent, so it
+	// can be used to obtain the details for deleting Client and Zen registrations and relevant ServiceAccount
+	// annotations. This is done within the predicate because the object passed to the event handler may not have
+	// the deletion timestamp to indicate that the current event being handled is a DeleteEvent.
+	err = c.Watch(&source.Kind{Type: &oidcv1.Client{}}, &handler.EnqueueRequestForObject{},
+		predicate.Funcs{
+			DeleteFunc: func(e event.DeleteEvent) bool {
+				c, ok := e.Object.(*oidcv1.Client)
+				if !ok {
+					return false
+				}
+
+				if c.Spec.ClientId != "" {
+					log.Info("Client was deleted; clean up registrations", "name", c.GetName(), "namespace", c.GetNamespace(), "clientId", c.Spec.ClientId)
+					deleteCtx := logf.IntoContext(context.Background(), log)
+					err := rc.deleteClient(deleteCtx, c)
+					if err != nil {
+						log.Error(err, "Failed to clean up Client after deletion", "name", c.GetName(), "namespace", c.GetNamespace(), "clientId", c.Spec.ClientId)
+					} else {
+						log.Info("Cleaned up Client after deletion", "name", c.GetName(), "namespace", c.GetNamespace(), "clientId", c.Spec.ClientId)
+					}
+					return false
+				}
+				return false
+			},
+		})
 	if err != nil {
 		return err
 	}
@@ -110,6 +193,7 @@ type ReconcileClient struct {
 	scheme                  *runtime.Scheme
 	config                  ClientControllerConfig
 	sharedServicesNamespace string
+	deleteKey               string
 }
 
 // SetConfig sets the ClientControllerConfig on the ReconcileClient using the platform-auth-idp ConfigMap and
@@ -172,8 +256,22 @@ func (r *ReconcileClient) Reconcile(ctx context.Context, request reconcile.Reque
 		// Return error if the attempt to configure the ReconcileClient did not work
 		return reconcile.Result{}, fmt.Errorf("failed to set controller config: %w", err)
 	} else {
-		reqLogger.Info("successfully set config for controller")
+		reqLogger.Info("Successfully set config for controller")
 	}
+
+	if strings.HasPrefix(request.Name, "DELETE_") && request.Namespace == r.deleteKey {
+		clientId := strings.SplitN(request.Name, "_", 2)[1]
+		reqLogger.Info("Client registration cleanup needed", "clientId", clientId)
+		client := &oidcv1.Client{
+			Spec: oidcv1.ClientSpec{ClientId: clientId},
+		}
+		err = r.deleteClient(ctx, client)
+		if err != nil {
+			reqLogger.Error(err, "Error occurred while deleting oidc registration")
+		}
+		return
+	}
+
 	// If this is a cache update only, return
 	if request.Name == "CACHE_UPDATE" {
 		return reconcile.Result{}, nil
@@ -290,12 +388,12 @@ func (r *ReconcileClient) updateClient(ctx context.Context, client *oidcv1.Clien
 		err = fmt.Errorf("error occurred during update oidc client registration: %w", err)
 		return
 	}
-	responseBody, err := ioutil.ReadAll(response.Body)
+	_, err = ioutil.ReadAll(response.Body)
 	if err != nil {
 		log.Error(err, "Failed to read response body")
 		err = nil
 	}
-	reqLogger.Info("Received response", "body", responseBody)
+	reqLogger.Info("Received response")
 
 	// secret is nil if getSecretFromClient produces an error, which we assume to mean that the Secret sought after didn't
 	// turn up. If this happens, try to create a new secret using the clientCreds that were freshly generated and used for
@@ -334,15 +432,13 @@ func (r *ReconcileClient) processOidcRegistration(ctx context.Context, client *o
 	// Attempt to get the Client registration; if it isn't there, create a new one, otherwise, update
 	_, err = r.GetClientRegistration(ctx, client)
 	if err != nil {
+		err = nil
 		reqLogger.Info("Client not found, create new Client")
 		err = r.createClient(ctx, client)
 	} else {
 		reqLogger.Info("Client found, update Client")
 		err = r.updateClient(ctx, client)
 	}
-
-	// add finalizer if not already present
-	addFinalizer(client)
 
 	//Hit a strange issue ... the code above possibly updates both the spec fields and the status, however when
 	//client.Update is called, this is reloading the client object from the server which is over-writing the changed
@@ -418,11 +514,11 @@ func (r *ReconcileClient) cp3RoleFinalizerUpdate(ctx context.Context, client *oi
 		reqLogger.Info("Upgrade check : Non-ZEN cp2 Client CR Role would be updated : ", "Role", AdministratorRole)
 		client.Spec.Roles = append(client.Spec.Roles, AdministratorRole)
 		reqLogger.Info("Upgrade check : Non-ZEN CP2 Client CR Finalizers would be updated : ", "Finalizer", CP3FinalizerName)
-		addFinalizer(client)
+		//addFinalizer(client)
 		removeFinalizer(client, CP2FinalizerName)
 	} else if len(client.Spec.ZenInstanceId) > 0 && containsString(client.ObjectMeta.Finalizers, CP2FinalizerName) {
 		reqLogger.Info("Upgrade check : ZEN cp2 Client CR Finalizers would be updated : ", "Finalizer", CP3FinalizerName)
-		addFinalizer(client)
+		//addFinalizer(client)
 		removeFinalizer(client, CP2FinalizerName)
 	}
 }
@@ -461,17 +557,22 @@ func (r *ReconcileClient) deleteClient(ctx context.Context, client *oidcv1.Clien
 	if client.Spec.ClientId == "" {
 		// Remove the finalizers
 		reqLogger.Info("Removing finalizer from Client", "clientId", client.Spec.ClientId)
+		removedFinalizer := false
 		// This condition is to handle deleteEvent during upgrade , when we still have cp2 finalizers
 		if containsString(client.ObjectMeta.Finalizers, CP2FinalizerName) {
 			removeFinalizer(client, CP2FinalizerName)
+			removedFinalizer = true
 		}
 		if containsString(client.ObjectMeta.Finalizers, CP3FinalizerName) {
 			removeFinalizer(client, CP3FinalizerName)
+			removedFinalizer = true
 		}
-		// Update CR
-		err = r.client.Update(ctx, client)
-		if err != nil {
-			reqLogger.Error(err, "Finalizer update failed")
+		// Update CR if finalizer removed
+		if removedFinalizer {
+			err = r.client.Update(ctx, client)
+			if err != nil {
+				reqLogger.Error(err, "Finalizer update failed")
+			}
 		}
 		return
 	}
@@ -505,11 +606,6 @@ func (r *ReconcileClient) deleteClient(ctx context.Context, client *oidcv1.Clien
 	}
 	if containsString(client.ObjectMeta.Finalizers, CP3FinalizerName) {
 		removeFinalizer(client, CP3FinalizerName)
-	}
-	// Update CR
-	err = r.client.Update(ctx, client)
-	if err != nil {
-		reqLogger.Error(err, "Finalizer update failed")
 	}
 	return
 }

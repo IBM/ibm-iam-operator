@@ -56,7 +56,7 @@ var _ fmt.Stringer = OpenShift
 // GetClusterType attempts to determine whether the Operator is running on Openshift versus a CNCF cluster. Exits in the
 // event that the cluster config can't be obtained to make queries or if the watch namespace can't be obtained.
 func GetClusterType(ctx context.Context, cmName string) (clusterType ClusterType, err error) {
-	logger := logf.FromContext(ctx).WithName("OnOpenShift")
+	logger := logf.FromContext(ctx).WithName("GetClusterType")
 	logger.Info("Get cluster config")
 	// Assume OpenShift as the default
 	cfg, err := config.GetConfig()

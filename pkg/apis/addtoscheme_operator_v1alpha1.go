@@ -17,10 +17,14 @@
 package apis
 
 import (
+	"context"
 	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	certmgrv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	routev1 "github.com/openshift/api/route/v1"
+	"github.com/operator-framework/operator-sdk/pkg/log/zap"
+	"os"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 func init() {
@@ -29,5 +33,14 @@ func init() {
 	AddToSchemes = append(AddToSchemes, certmgr.SchemeBuilder.AddToScheme)
 	AddToSchemes = append(AddToSchemes, certmgrv1.SchemeBuilder.AddToScheme)
 	AddToSchemes = append(AddToSchemes, v1alpha1.CertificateSchemeBuilder.AddToScheme)
-	AddToSchemes = append(AddToSchemes, routev1.AddToScheme)
+
+	// This code races with cmd's main function, so attempt to set the logger here, just in case
+	logf.SetLogger(zap.Logger())
+	logger := logf.Log.WithName("operator_v1alpha1_init")
+	ctx := logf.IntoContext(context.Background(), logger)
+	err := addAPIsIfOnOpenShift(ctx, routev1.AddToScheme)
+	if err != nil {
+		logger.Error(nil, "Exiting due to failure to detect cluster type")
+		os.Exit(1)
+	}
 }

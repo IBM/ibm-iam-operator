@@ -195,8 +195,8 @@ func getAllRouteStatus(ctx context.Context, k8sClient client.Client, names []str
 	return
 }
 
-func getCurrentServiceStatus(ctx context.Context, k8sClient client.Client, authentication *operatorv1alpha1.Authentication) (status operatorv1alpha1.ServiceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getCurrentServiceStatus").V(3)
+func (r *ReconcileAuthentication) getCurrentServiceStatus(ctx context.Context, k8sClient client.Client, authentication *operatorv1alpha1.Authentication) (status operatorv1alpha1.ServiceStatus) {
+	reqLogger := logf.FromContext(ctx).WithName("getCurrentServiceStatus")
 	type statusRetrieval struct {
 		names []string
 		f     statusRetrievalFunc
@@ -223,19 +223,27 @@ func getCurrentServiceStatus(ctx context.Context, k8sClient client.Client, authe
 			names: []string{"oidc-client-registration"},
 			f:     getAllJobStatus,
 		},
-		{
-			names: []string{
-				"id-mgmt",
-				"platform-auth",
-				"platform-id-auth",
-				"platform-id-provider",
-				"platform-login",
-				"platform-oidc",
-				"saml-ui-callback",
-				"social-login-callback",
-			},
-			f: getAllRouteStatus,
+	}
+
+	routeStatusRetrieval := statusRetrieval{
+		names: []string{
+			"id-mgmt",
+			"platform-auth",
+			"platform-id-auth",
+			"platform-id-provider",
+			"platform-login",
+			"platform-oidc",
+			"saml-ui-callback",
+			"social-login-callback",
 		},
+		f: getAllRouteStatus,
+	}
+
+	if r.RunningOnOpenShiftCluster() {
+		reqLogger.Info("Is running on OpenShift; will check Route status")
+		statusRetrievals = append(statusRetrievals, routeStatusRetrieval)
+	} else {
+		reqLogger.Info("Is not running on OpenShift; will skip checking Route status")
 	}
 
 	kind := "Authentication"

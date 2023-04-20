@@ -1,5 +1,5 @@
 //
-// Copyright 2020 IBM Corporation
+// Copyright 2022 IBM Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,21 +14,7 @@
 // limitations under the License.
 //
 
-package utils
+package common
 
-import (
-	"math/rand"
-	"time"
-
-	regen "github.com/zach-klippenstein/goregen"
-)
-
-// GenerateRandomString generates a random string based upon a string that is a valid regex pattern.
-func GenerateRandomString(rule string) string {
-
-	generator, _ := regen.NewGenerator(rule, &regen.GeneratorArgs{
-		RngSource:               rand.NewSource(time.Now().UnixNano()),
-		MaxUnboundedRepeatCount: 1})
-	randomString := generator.Generate()
-	return randomString
-}
+const GlobalConfigMapName string = "ibm-cpp-config"
+const CommonServiceName string = "common-service"

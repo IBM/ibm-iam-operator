@@ -20,7 +20,8 @@ import (
 	"context"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
-	res "github.com/IBM/ibm-iam-operator/pkg/resources"
+	"github.com/IBM/ibm-iam-operator/pkg/controller/common"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,7 +73,7 @@ func (r *ReconcileAuthentication) handleServiceAccount(instance *operatorv1alpha
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: sAccName, Namespace: instance.Namespace}, serviceAccount)
 	if err != nil {
 		reqLogger.Error(err, "failed to GET ServiceAccount ibm-iam-operand-restricted")
-	} else if !res.IsOAuthAnnotationExists(serviceAccount.ObjectMeta.Annotations) {
+	} else if !common.IsOAuthAnnotationExists(serviceAccount.ObjectMeta.Annotations) {
 		if serviceAccount.ObjectMeta.Annotations != nil {
 			serviceAccount.ObjectMeta.Annotations["serviceaccounts.openshift.io/oauth-redirecturi.first"] = redirectURI
 		} else {

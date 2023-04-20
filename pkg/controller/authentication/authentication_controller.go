@@ -23,7 +23,8 @@ import (
 	"sync"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
-	utils "github.com/IBM/ibm-iam-operator/pkg/utils"
+	pkgCommon "github.com/IBM/ibm-iam-operator/pkg/common"
+	common "github.com/IBM/ibm-iam-operator/pkg/controller/common"
 	certmgr "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -66,8 +67,8 @@ var memory350 = resource.NewQuantity(350*1024*1024, resource.BinarySI)   // 350M
 var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024Mi
 
 var rule = `^([a-z0-9]){32,}$`
-var wlpClientID = utils.GenerateRandomString(rule)
-var wlpClientSecret = utils.GenerateRandomString(rule)
+var wlpClientID = common.GenerateRandomString(rule)
+var wlpClientSecret = common.GenerateRandomString(rule)
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -158,14 +159,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	err = c.Watch(&source.Kind{Type: &routev1.Route{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &operatorv1alpha1.Authentication{},
-	})
-	if err != nil {
-		return err
-	}
-
 	// Watch for changes to secondary resource Deployment and requeue the owner Authentication
 	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
@@ -173,6 +166,20 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	})
 	if err != nil {
 		return err
+	}
+
+	clusterType, err := pkgCommon.GetClusterType(context.Background(), pkgCommon.GlobalConfigMapName)
+	if err != nil {
+		return err
+	}
+	if clusterType == pkgCommon.OpenShift {
+		err = c.Watch(&source.Kind{Type: &routev1.Route{}}, &handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &operatorv1alpha1.Authentication{},
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -185,9 +192,25 @@ var _ reconcile.Reconciler = &ReconcileAuthentication{}
 type ReconcileAuthentication struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client client.Client
-	scheme *runtime.Scheme
-	Mutex  sync.Mutex
+	client      client.Client
+	scheme      *runtime.Scheme
+	Mutex       sync.Mutex
+	clusterType pkgCommon.ClusterType
+}
+
+// RunningOnOpenShiftCluster returns whether the Operator is running on an OpenShift cluster
+func (r *ReconcileAuthentication) RunningOnOpenShiftCluster() bool {
+	return r.clusterType == pkgCommon.OpenShift
+}
+
+// RunningOnCNCFCluster returns whether the Operator is running on a CNCF cluster
+func (r *ReconcileAuthentication) RunningOnCNCFCluster() bool {
+	return r.clusterType == pkgCommon.CNCF
+}
+
+// RunningOnUnknownCluster returns whether the Operator is running on an unknown cluster type
+func (r *ReconcileAuthentication) RunningOnUnknownCluster() bool {
+	return r.clusterType == pkgCommon.Unknown
 }
 
 func (r *ReconcileAuthentication) addFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
@@ -245,6 +268,17 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 		}
 	}()
 
+	// Determine the type of cluster that the Operator is installed on
+	if r.RunningOnUnknownCluster() {
+		r.clusterType, err = pkgCommon.GetClusterType(reconcileCtx, pkgCommon.GlobalConfigMapName)
+		if err != nil {
+			reqLogger.Error(err, "Failed to determine cluster platform")
+			return
+		} else {
+			reqLogger.Info("Set cluster type", "clusterType", r.clusterType)
+		}
+	}
+
 	reqLogger.Info("Reconciling Authentication")
 
 	// Fetch the Authentication instance
@@ -264,7 +298,7 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	// Be sure to update status before returning if Authentication is found
 	defer func() {
 		reqLogger.Info("Gather current service status")
-		currentServiceStatus := getCurrentServiceStatus(ctx, r.client, instance)
+		currentServiceStatus := r.getCurrentServiceStatus(ctx, r.client, instance)
 		instance.SetService(reconcileCtx, currentServiceStatus, r.client, &r.Mutex)
 	}()
 
@@ -338,9 +372,11 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	// updates redirecturi annotations to serviceaccount
 	r.handleServiceAccount(instance, &needToRequeue)
 
-	err = r.handleRoutes(ctx, instance, &needToRequeue)
-	if err != nil && !errors.IsNotFound(err) {
-		return
+	if r.RunningOnOpenShiftCluster() {
+		err = r.handleRoutes(ctx, instance, &needToRequeue)
+		if err != nil && !errors.IsNotFound(err) {
+			return
+		}
 	}
 
 	// Check if this Deployment already exists and create it if it doesn't

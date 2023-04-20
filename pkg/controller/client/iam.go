@@ -116,7 +116,7 @@ func (r *ReconcileClient) getAuthnTokens(ctx context.Context, client *oidcv1.Cli
 			req.SetBasicAuth("oauthadmin", oAuthAdminPassword)
 		}
 
-		caCertSecret, err = r.getCSCACertificateSecret(ctx, r.sharedServicesNamespace)
+		caCertSecret, err = r.getCSCACertificateSecret(ctx)
 		if err != nil {
 			return
 		}
@@ -171,7 +171,7 @@ func (r *ReconcileClient) invokeIamApi(ctx context.Context, client *oidcv1.Clien
 	request.Header.Set("Authorization", bearer)
 	request.Header.Set("Accept", "application/json")
 
-	caCertSecret, err := r.getCSCACertificateSecret(ctx, r.sharedServicesNamespace)
+	caCertSecret, err := r.getCSCACertificateSecret(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get certificate secret for namespace %q: %w", client.Namespace, err)
 	}

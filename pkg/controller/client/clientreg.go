@@ -69,6 +69,7 @@ type ZenInstance struct {
 	InstanceId     string `json:"instanceId"`
 	ProductNameUrl string `json:"productNameUrl"`
 	Namespace      string `json:"namespace"`
+	ZenAuditUrl    string `json:"zenAuditUrl"`
 }
 
 const (
@@ -429,6 +430,7 @@ func (r *ReconcileClient) CreateZenInstance(ctx context.Context, client *oidcv1.
 		"instanceId":     client.Spec.ZenInstanceId,
 		"productNameUrl": client.Spec.ZenProductNameUrl,
 		"namespace":      client.Namespace,
+		"zenAuditUrl":    client.Spec.ZenAuditUrl,
 	}
 	payloadBytes, _ := json.Marshal(payloadJSON)
 	payload := string(payloadBytes[:])

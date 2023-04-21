@@ -286,7 +286,7 @@ func (r *ReconcileAuthentication) reconcileRoute(ctx context.Context, instance *
 
 	reqLogger.Info("Reconciling route", "annotations", fields.Annotations, "routeHost", fields.RouteHost, "routePath", fields.RoutePath)
 
-	defaultRoute, err := r.newRoute(instance, fields)
+	calculatedRoute, err := r.newRoute(instance, fields)
 	if err != nil {
 		reqLogger.Error(err, "Error creating desired route for reconcilition")
 		return
@@ -302,7 +302,7 @@ func (r *ReconcileAuthentication) reconcileRoute(ctx context.Context, instance *
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Route not found - creating")
 
-		err = r.client.Create(ctx, defaultRoute)
+		err = r.client.Create(ctx, calculatedRoute)
 		if err != nil {
 			if errors.IsAlreadyExists(err) {
 				// Route already exists from a previous reconcile
@@ -324,21 +324,22 @@ func (r *ReconcileAuthentication) reconcileRoute(ctx context.Context, instance *
 		// Preserve custom annotation settings observed in the cluster; skip changes to rewrite-target
 		for annotation, value := range observedRoute.Annotations {
 			if annotation != "haproxy.router.openshift.io/rewrite-target" {
-				defaultRoute.Annotations[annotation] = value
-			} else {
-				reqLogger.Info("Attempted change to \"haproxy.router.openshift.io/rewrite-target\" prevented")
+				calculatedRoute.Annotations[annotation] = value
+			} else if calculatedRoute.Annotations[annotation] != value {
+				// Log when a rewrite-target annotation change has been ignored
+				reqLogger.Info("Attempted change to \"haproxy.router.openshift.io/rewrite-target\" prevented", "value", value)
 			}
 		}
 
 		//routeHost is immutable so it must be checked first and the route recreated if it has changed
-		if observedRoute.Spec.Host != defaultRoute.Spec.Host {
+		if observedRoute.Spec.Host != calculatedRoute.Spec.Host {
 			err = r.client.Delete(ctx, observedRoute)
 			if err != nil {
 				reqLogger.Error(err, "Route host changed, unable to delete existing route for recreate")
 				return
 			}
 			//Recreate the route
-			err = r.client.Create(ctx, defaultRoute)
+			err = r.client.Create(ctx, calculatedRoute)
 			if err != nil {
 				reqLogger.Error(err, "Route host changed, unable to create new route")
 				return
@@ -347,12 +348,12 @@ func (r *ReconcileAuthentication) reconcileRoute(ctx context.Context, instance *
 			return
 		}
 
-		if !IsRouteEqual(defaultRoute, observedRoute) {
+		if !IsRouteEqual(calculatedRoute, observedRoute) {
 			reqLogger.Info("Updating route")
 
-			observedRoute.ObjectMeta.Name = defaultRoute.ObjectMeta.Name
-			observedRoute.ObjectMeta.Annotations = defaultRoute.ObjectMeta.Annotations
-			observedRoute.Spec = defaultRoute.Spec
+			observedRoute.ObjectMeta.Name = calculatedRoute.ObjectMeta.Name
+			observedRoute.ObjectMeta.Annotations = calculatedRoute.ObjectMeta.Annotations
+			observedRoute.Spec = calculatedRoute.Spec
 
 			err = r.client.Update(ctx, observedRoute)
 			if err != nil {

@@ -22,13 +22,11 @@ import (
 
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"strings"
-	"time"
 
 	oidcv1 "github.com/IBM/ibm-iam-operator/pkg/apis/oidc/v1"
-	regen "github.com/zach-klippenstein/goregen"
+	"github.com/IBM/ibm-iam-operator/pkg/controller/common"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -109,6 +107,7 @@ func (r *ReconcileClient) CreateClientRegistration(ctx context.Context, client *
 // UpdateClientRegistration updates the OIDC Client registration represented by the Client CR to use the credentials
 // stored in the provided Secret.
 func (r *ReconcileClient) UpdateClientRegistration(ctx context.Context, client *oidcv1.Client, clientCreds *ClientCredentials) (response *http.Response, err error) {
+	logger := logf.FromContext(ctx).WithName("UpdateClientRegistration")
 	var url, identityProviderURL string
 	payload := r.generateClientRegistrationPayload(client, clientCreds)
 	identityProviderURL, err = r.GetIdentityProviderURL()
@@ -118,8 +117,10 @@ func (r *ReconcileClient) UpdateClientRegistration(ctx context.Context, client *
 	url = strings.Join([]string{identityProviderURL, "v1", "auth", "registration", clientCreds.ClientID}, "/")
 	response, err = r.invokeClientRegistrationAPI(ctx, client, PutType, url, payload)
 	if err == nil && response.Status != "200 OK" {
+		logger.Error(err, "Client registration update failed")
 		return nil, NewOIDCClientError(response)
 	}
+	logger.Info("Client registration update successful", "response", response)
 	return
 }
 
@@ -157,7 +158,7 @@ func (r *ReconcileClient) invokeClientRegistrationAPI(ctx context.Context, clien
 	request.Header.Set("Content-Type", "application/json")
 	request.SetBasicAuth(oauthAdmin, clientRegistrationSecret)
 
-	caCertSecret, err := r.getCSCACertificateSecret(ctx, r.sharedServicesNamespace)
+	caCertSecret, err := r.getCSCACertificateSecret(ctx)
 	if err != nil {
 		return
 	}
@@ -198,48 +199,46 @@ func (r *ReconcileClient) GetClientRegistration(ctx context.Context, client *oid
 // setCSCACertificateSecret caches a copy of the Secret that contains the Common Services CA certificate for the
 // provided namespace. If a Secret has already been cached for the namespace, this function replaces it with the new
 // Secret.
-func (r *ReconcileClient) setCSCACertificateSecret(ctx context.Context, namespace string, secret *corev1.Secret) (err error) {
+func (r *ReconcileClient) setCSCACertificateSecret(ctx context.Context, secret *corev1.Secret) (err error) {
 	if secret == nil {
 		return fmt.Errorf("provided Secret pointer was nil")
 	}
-	r.csCACertSecrets[namespace] = secret
+	r.csCACertSecret = secret
 	return
 }
 
 // deleteCSCACertificateSecret deletes the cached copy of the Secret that contains the Common Services CA certificate
 // for the provided namespace.
-func (r *ReconcileClient) deleteCSCACertificateSecret(ctx context.Context, namespace string) {
-	delete(r.csCACertSecrets, namespace)
+func (r *ReconcileClient) deleteCSCACertificateSecret(ctx context.Context) {
+	r.csCACertSecret = nil
 }
 
 // getCSCACertificateSecret gets the Secret that contains the Common Services CA certificate for the provided namespace.
 // It will return the ReconcileClient's cached Secret for the namespace if it has one registered, or it will look up and
 // return whatever matching Secret exists in the cluster and cache it for future use.
-func (r *ReconcileClient) getCSCACertificateSecret(ctx context.Context, namespace string) (secret *corev1.Secret, err error) {
-	logger := logf.FromContext(ctx, "namespace", namespace).WithName("getCSCACertificateSecret")
-	var ok bool
-	secret, ok = r.csCACertSecrets[namespace]
+func (r *ReconcileClient) getCSCACertificateSecret(ctx context.Context) (secret *corev1.Secret, err error) {
+	logger := logf.FromContext(ctx).WithName("getCSCACertificateSecret")
+	secret = r.csCACertSecret
 	// Have the secret locally; return it
-	if ok {
+	if secret != nil {
 		logger.Info("found CA certificate secret")
 		return
 	}
 	logger.Info("CA certificate secret not found")
 	secret = &corev1.Secret{}
 	// Need to perform lookup of secret in the cluster
-	csCACertificateSecretName := "cs-ca-certificate-secret"
-	logger.Info("Attempt to get secret from namespace", "secretName", csCACertificateSecretName)
-	err = r.client.Get(ctx, types.NamespacedName{Name: csCACertificateSecretName, Namespace: namespace}, secret)
+	logger.Info("Attempt to get secret from namespace", "secretName", CSCACertificateSecretName)
+	err = r.client.Get(ctx, types.NamespacedName{Name: CSCACertificateSecretName, Namespace: r.sharedServicesNamespace}, secret)
 	if err != nil {
-		logger.Error(err, "failed to get secret", "secretName", csCACertificateSecretName)
+		logger.Error(err, "failed to get secret", "secretName", CSCACertificateSecretName)
 		return nil, err
 	} else {
 		logger.Info("found secret on the cluster")
 	}
 
-	err = r.setCSCACertificateSecret(ctx, namespace, secret)
+	err = r.setCSCACertificateSecret(ctx, secret)
 	if err != nil {
-		logger.Error(err, "failed to set secret", "secretName", csCACertificateSecretName)
+		logger.Error(err, "failed to set secret", "secretName", CSCACertificateSecretName)
 	} else {
 		logger.Info("found CA certificate secret")
 	}
@@ -293,21 +292,13 @@ func (r *ReconcileClient) generateClientCredentials(clientID string) *ClientCred
 	rule := `^([a-z0-9]){32,}$`
 	// If clientID is empty, generate a new Client ID
 	if len(clientID) == 0 {
-		clientID = generateRandomString(rule)
+		clientID = common.GenerateRandomString(rule)
 	}
-	clientSecret := generateRandomString(rule)
+	clientSecret := common.GenerateRandomString(rule)
 	return &ClientCredentials{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 	}
-}
-
-func generateRandomString(rule string) string {
-	generator, _ := regen.NewGenerator(rule, &regen.GeneratorArgs{
-		RngSource:               rand.NewSource(time.Now().UnixNano()),
-		MaxUnboundedRepeatCount: 1})
-	randomString := generator.Generate()
-	return randomString
 }
 
 func (r *ReconcileClient) generateClientRegistrationPayload(client *oidcv1.Client, clientCred *ClientCredentials) (payload string) {

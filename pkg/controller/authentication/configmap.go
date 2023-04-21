@@ -29,6 +29,7 @@ import (
 	"strings"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	pkgCommon "github.com/IBM/ibm-iam-operator/pkg/common"
 	osconfigv1 "github.com/openshift/api/config/v1"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
@@ -54,9 +55,9 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
 	// Check cluster type if CNCF or OCP
-	globalConfigMapName := "ibm-cpp-config"
+	globalConfigMapName := pkgCommon.GlobalConfigMapName
 	globalConfigMap := &corev1.ConfigMap{}
-	reqLogger.Info("Query global cm", "Configmap.Namespace", instance.Namespace, "Global Configmap", globalConfigMapName)
+	reqLogger.Info("Query global cm", "Configmap.Namespace", instance.Namespace, "ConfigMap.Name", globalConfigMapName)
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: globalConfigMapName, Namespace: instance.Namespace}, globalConfigMap)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -67,16 +68,13 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 		return
 	}
 
-	clusterType, ok := globalConfigMap.Data["kubernetes_cluster_type"]
-	reqLogger.Info("Reading cluster type from global cm", "Configmap.Namespace", instance.Namespace, "ClusterType", clusterType)
-	if ok {
-		isOSEnv = !strings.EqualFold(clusterType, "cncf")
-		reqLogger.Info("Detected cluster type as", "Configmap.Namespace", instance.Namespace, "ConfigMap.Name", isOSEnv)
-		domainName := globalConfigMap.Data["domain_name"]
-		reqLogger.Info("Reading domainName from global cm", "Configmap.Namespace", instance.Namespace, "domainName", domainName)
+	pkgCommon.GetClusterType(context.Background(), pkgCommon.GlobalConfigMapName)
 
-	} else if !ok {
-		isOSEnv = (instance.Spec.Config.IsOpenshiftEnv)
+	if r.RunningOnCNCFCluster() {
+		isOSEnv = false
+		reqLogger.Info("Checked cluster type", "Configmap.Namespace", instance.Namespace, "ConfigMap.Name", globalConfigMapName, "clusterType", r.clusterType)
+		domainName := globalConfigMap.Data["domain_name"]
+		reqLogger.Info("Reading domainName from global cm", "Configmap.Namespace", instance.Namespace, "ConfigMap.Name", globalConfigMapName, "domainName", domainName)
 	}
 
 	// Reconcile ibmcloud-cluster-info configmap if not created already
@@ -85,7 +83,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 		if errors.IsNotFound(err) {
 			reqLogger.Info("Configmap is not found ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
 			reqLogger.Info("Going to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
-			newConfigMap = r.ibmcloudClusterInfoConfigMap(r.client, instance, isOSEnv, domainName, r.scheme)
+			newConfigMap = r.ibmcloudClusterInfoConfigMap(r.client, instance, r.RunningOnOpenShiftCluster(), domainName, r.scheme)
 			err = r.client.Create(context.TODO(), newConfigMap)
 			if err != nil {
 				reqLogger.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
@@ -193,7 +191,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 						// Detect cluster type - cncf or openshift
 						// if global cm, ignore CR, and populate auth-idp with value from global
 						// if no global cm, take value from CR - NOT REQD.
-						newConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isOSEnv)
+						newConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(r.RunningOnOpenShiftCluster())
 
 					} else {
 						//user specifies roksEnabled and roksURL, but not roksPrefix, then we set prefix to IAM# (consistent with previous release behavior)
@@ -316,14 +314,13 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 				}
 
 				_, keyExists := currentConfigMap.Data["IS_OPENSHIFT_ENV"]
-				//currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isOSEnv)
 				if keyExists {
 					reqLogger.Info("Current configmap", "Current Value", currentConfigMap.Data["IS_OPENSHIFT_ENV"])
-					if currentConfigMap.Data["IS_OPENSHIFT_ENV"] != strconv.FormatBool(isOSEnv) {
-						currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isOSEnv)
+					if currentConfigMap.Data["IS_OPENSHIFT_ENV"] != strconv.FormatBool(r.RunningOnOpenShiftCluster()) {
+						currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(r.RunningOnOpenShiftCluster())
 					}
 				} else {
-					currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(isOSEnv)
+					currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(r.RunningOnOpenShiftCluster())
 				}
 
 				// This code would take care updating cp2 specific values into cp3 format

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"time"
 )
 
 var certificateData map[string]map[string]string
@@ -112,6 +113,12 @@ func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme
 			IssuerRef: cmmeta.ObjectReference{
 				Name: DefaultClusterIssuer,
 				Kind: certmgrv1.IssuerKind,
+			},
+			Duration: &metav1.Duration{
+				Duration: 9552 * time.Hour, /* 398 days */
+			},
+			RenewBefore: &metav1.Duration{
+				Duration: 2880 * time.Hour, /* 120 days (3 months) */
 			},
 		},
 	}

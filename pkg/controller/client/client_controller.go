@@ -193,7 +193,7 @@ func (r *ReconcileClient) SetConfig(ctx context.Context, namespace string) (err 
 	if err != nil {
 		return fmt.Errorf("client failed to GET ConfigMap: %w", err)
 	}
-	err = r.config.ApplyConfigMap(configMap, identityManagementURLKey, identityProviderURLKey, rOKSEnabledKey, authServiceURLKey, osAuthEnabledKey)
+	err = r.config.ApplyConfigMap(configMap, identityManagementURLKey, identityProviderURLKey, rOKSEnabledKey, authServiceURLKey)
 	if err != nil {
 		return fmt.Errorf("failed to configure: %w", err)
 	}

@@ -12,8 +12,8 @@ LABEL org.label-schema.vendor="IBM" \
     org.label-schema.schema-version="1.0" \
     name="ibm-iam-operator" \
     vendor="IBM" \
-    description="IBM IM Operator" \
-    summary="IBM IM Operator"
+    description="IBM IAM Operator" \
+    summary="IBM IAM Operator"
 
 ENV OPERATOR=/usr/local/bin/ibm-iam-operator \
     USER_UID=1001 \

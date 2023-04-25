@@ -66,7 +66,7 @@ func buildInitForMngrAndProvider(mongoDBImage string) []corev1.Container {
 			Command: []string{
 				"bash",
 				"-c",
-				"AUTH=`echo -n \"oauthadmin:$OAUTH2_CLIENT_REGISTRATION_SECRET\"|base64`; until </dev/tcp/mongodb/27017 && curl -k https://platform-auth-service:9443/IBMJMXConnectorREST/api --header \"Authorization: Basic $AUTH\"; do sleep 5; done;",
+				"AUTH=`echo -n \"oauthadmin:$OAUTH2_CLIENT_REGISTRATION_SECRET\"|base64`; until </dev/tcp/mongodb/27017 && curl -X GET -k https://platform-auth-service:9443/IBMJMXConnectorREST/api --header \"Authorization: Basic $AUTH\"; do sleep 5; done;",
 			},
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
@@ -375,12 +375,12 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/oidc/endpoint/OP/.well-known/openid-configuration",
-					Port: intstr.IntOrString{
-						IntVal: authServicePort,
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"bash",
+						"-c",
+						"AUTH=`echo -n \"oauthadmin:$OAUTH2_CLIENT_REGISTRATION_SECRET\"|base64`;curl -X GET -k https://platform-auth-service:9443/IBMJMXConnectorREST/api --header \"Authorization: Basic $AUTH\"",
 					},
-					Scheme: "HTTPS",
 				},
 			},
 			InitialDelaySeconds: 60,
@@ -398,10 +398,10 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 					Scheme: "HTTPS",
 				},
 			},
-			InitialDelaySeconds: 180,
+			InitialDelaySeconds: 90,
 			TimeoutSeconds:      10,
 			PeriodSeconds:       30,
-			FailureThreshold:    6,
+			FailureThreshold:    12,
 		},
 		Env: envVars,
 	}

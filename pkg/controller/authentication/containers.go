@@ -379,7 +379,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 					Command: []string{
 						"bash",
 						"-c",
-						"AUTH=`echo -n \"oauthadmin:$OAUTH2_CLIENT_REGISTRATION_SECRET\"|base64`;curl -X GET -k https://platform-auth-service:9443/IBMJMXConnectorREST/api --header \"Authorization: Basic $AUTH\"",
+						"AUTH=`echo -n \"oauthadmin:$OAUTH2_CLIENT_REGISTRATION_SECRET\"|base64`;curl -X GET -k https://localhost:9443/IBMJMXConnectorREST/api --header \"Authorization: Basic $AUTH\"",
 					},
 				},
 			},

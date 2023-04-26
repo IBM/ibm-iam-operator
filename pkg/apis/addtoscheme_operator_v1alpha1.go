@@ -38,9 +38,14 @@ func init() {
 	logf.SetLogger(zap.Logger())
 	logger := logf.Log.WithName("operator_v1alpha1_init")
 	ctx := logf.IntoContext(context.Background(), logger)
-	err := addAPIsIfOnOpenShift(ctx, routev1.AddToScheme)
+	routeAddToSchemeTest := &addToSchemeTest{
+		AddToScheme:  routev1.AddToScheme,
+		ListType:     &routev1.RouteList{},
+		GroupVersion: routev1.GroupVersion,
+	}
+	err := addAPIfRegistered(ctx, routeAddToSchemeTest)
 	if err != nil {
-		logger.Error(nil, "Exiting due to failure to detect cluster type")
+		logger.Error(nil, "Exiting due to failure to while trying to verify APIs")
 		os.Exit(1)
 	}
 }

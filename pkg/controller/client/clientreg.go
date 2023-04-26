@@ -172,9 +172,8 @@ func (r *ReconcileClient) invokeClientRegistrationAPI(ctx context.Context, clien
 	if err != nil {
 		reqLogger.Error(err, "Request failed")
 		return
-	} else {
-		reqLogger.Info("Request complete", "response", response)
 	}
+	reqLogger.Info("Request complete")
 	return
 }
 

@@ -50,21 +50,3 @@ func IsCsConfigAnnotationExists(annotations map[string]string) bool {
 	}
 	return false
 }
-
-func IsOAuthAnnotationExists(annotations map[string]string) bool {
-	if len(annotations) == 0 {
-		return false
-	}
-	csOauthAnnotationFound := false
-	reg, _ := regexp.Compile(`^(.*)\/oauth-redirectreference`)
-	for anno := range annotations {
-		if reg.MatchString(anno) {
-			csOauthAnnotationFound = true
-			break
-		}
-	}
-	if csOauthAnnotationFound {
-		return true
-	}
-	return false
-}

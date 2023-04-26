@@ -288,7 +288,9 @@ func (r *ReconcileClient) createClient(ctx context.Context, client *oidcv1.Clien
 	}
 
 	reqLogger.Info("adding annotations to ibm-iam-operand-restricted ServiceAccount")
-	r.handleServiceAccount(ctx, client)
+	reqLogger.Info("SharedServicesNamespace is", "iamoperandnamespace", r.sharedServicesNamespace)
+
+	r.handleServiceAccount(ctx, client, r.sharedServicesNamespace)
 	if client.Spec.ZenInstanceId == "" {
 		err = r.processZenRegistration(ctx, client, clientCreds)
 		if err != nil {
@@ -358,7 +360,8 @@ func (r *ReconcileClient) updateClient(ctx context.Context, client *oidcv1.Clien
 	}
 
 	reqLogger.Info("Updating annotations to ibm-iam-operand-restricted ServiceAccount")
-	r.handleServiceAccount(ctx, client)
+	reqLogger.Info("SharedServicesNamespace is", "iamoperandnamespace", r.sharedServicesNamespace)
+	r.handleServiceAccount(ctx, client, r.sharedServicesNamespace)
 
 	err = r.processZenRegistration(ctx, client, clientCreds)
 	if err != nil {
@@ -533,7 +536,8 @@ func (r *ReconcileClient) deleteClient(ctx context.Context, client *oidcv1.Clien
 	reqLogger.Info("Client registration successfully deleted")
 
 	reqLogger.Info("Deleting annotations from ibm-iam-operand-restricted ServiceAccount")
-	r.RemoveAnnotationFromSA(ctx, client)
+	reqLogger.Info("SharedServicesNamespace is", "iamoperandnamespace", r.sharedServicesNamespace)
+	r.RemoveAnnotationFromSA(ctx, client, r.sharedServicesNamespace)
 	// Delete the zeninstance if it has been specified
 	if client.Spec.ZenInstanceId != "" {
 		reqLogger.Info("Client has a zenInstanceId, attempt to delete the matching Zen instance")
@@ -635,14 +639,14 @@ func (r *ReconcileClient) createNewSecretForClient(ctx context.Context, client *
 }
 
 // handleServiceAccount updates ibm-iam-operand-restricted SA with redirecturi's present present in the Client CR for updateClient Call
-func (r *ReconcileClient) handleServiceAccount(ctx context.Context, client *oidcv1.Client) {
+func (r *ReconcileClient) handleServiceAccount(ctx context.Context, client *oidcv1.Client, sAccNamespace string) {
 
 	reqLogger := logf.FromContext(ctx).WithValues("Request.Namespace", client.Namespace, "client.Name", client.Name)
 	clientName := client.ObjectMeta.Name
 	redirectURIs := client.Spec.OidcLibertyClient.RedirectUris
 	sAccName := "ibm-iam-operand-restricted"
 	serviceAccount := &corev1.ServiceAccount{}
-	err := r.client.Get(ctx, types.NamespacedName{Name: sAccName, Namespace: client.Namespace}, serviceAccount)
+	err := r.client.Get(ctx, types.NamespacedName{Name: sAccName, Namespace: sAccNamespace}, serviceAccount)
 	if err != nil {
 		reqLogger.Error(err, "failed to GET ServiceAccount ibm-iam-operand-restricted")
 		return
@@ -667,14 +671,14 @@ func (r *ReconcileClient) handleServiceAccount(ctx context.Context, client *oidc
 }
 
 // RemoveAnnotationFromSA removes respective redirecturi annotation present in ibm-iam-operand-restricted SA for deleteClient Call
-func (r *ReconcileClient) RemoveAnnotationFromSA(ctx context.Context, client *oidcv1.Client) {
+func (r *ReconcileClient) RemoveAnnotationFromSA(ctx context.Context, client *oidcv1.Client, sAccNamespace string) {
 
 	reqLogger := logf.FromContext(ctx).WithValues("Request.Namespace", client.Namespace, "client.Name", client.Name)
 	clientName := client.ObjectMeta.Name
 	redirectURIs := client.Spec.OidcLibertyClient.RedirectUris
 	sAccName := "ibm-iam-operand-restricted"
 	serviceAccount := &corev1.ServiceAccount{}
-	err := r.client.Get(ctx, types.NamespacedName{Name: sAccName, Namespace: client.Namespace}, serviceAccount)
+	err := r.client.Get(ctx, types.NamespacedName{Name: sAccName, Namespace: sAccNamespace}, serviceAccount)
 	if err != nil {
 		reqLogger.Error(err, "failed to GET ServiceAccount ibm-iam-operand-restricted")
 		return

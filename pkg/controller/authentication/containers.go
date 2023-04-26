@@ -66,7 +66,7 @@ func buildInitForMngrAndProvider(mongoDBImage string) []corev1.Container {
 			Command: []string{
 				"bash",
 				"-c",
-				"AUTH=`echo -n \"oauthadmin:$OAUTH2_CLIENT_REGISTRATION_SECRET\"|base64`; until </dev/tcp/mongodb/27017 && curl -k https://platform-auth-service:9443/IBMJMXConnectorREST/api --header \"Authorization: Basic $AUTH\"; do sleep 5; done;",
+				until </dev/tcp/mongodb/27017 && curl -k https://platform-auth-service:9443/oidc/endpoint/OP/.well-known-openid-configuration; do sleep 5; done;",
 			},
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,

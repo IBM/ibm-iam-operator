@@ -193,7 +193,7 @@ func (r *ReconcileClient) checkCSCACertificateSecret(ctx context.Context) (err e
 		r.deleteCSCACertificateSecret(ctx)
 		verb = "delete"
 	} else {
-		if reflect.DeepEqual(oldCertSecret.Data, currentCertSecret.Data]) {
+		if reflect.DeepEqual(oldCertSecret.Data, currentCertSecret.Data) {
 		//if string(oldCertSecret.Data[corev1.TLSCertKey]) != string(currentCertSecret.Data[corev1.TLSCertKey]) {
 			reqLogger.Info("cs-ca-certificate-secret was updated; caching updated certificate")
 			err = r.setCSCACertificateSecret(ctx, currentCertSecret)

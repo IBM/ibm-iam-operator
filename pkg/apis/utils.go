@@ -18,6 +18,8 @@ package apis
 
 import (
 	"context"
+	"fmt"
+
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -41,7 +43,7 @@ func addAPIfRegistered(ctx context.Context, addToSchemeTests ...*addToSchemeTest
 	logger := logf.FromContext(ctx).WithName("addRouteV1APIfRegistered")
 	cfg, err := config.GetConfig()
 	if err != nil {
-		logger.Error(err, "Could not obtain cluster config")
+		err = fmt.Errorf("could not obtain cluster config: %w", err)
 		return
 	}
 	addToSchemes := []func(s *runtime.Scheme) error{}
@@ -52,13 +54,13 @@ func addAPIfRegistered(ctx context.Context, addToSchemeTests ...*addToSchemeTest
 	scheme := runtime.NewScheme()
 	err = sb.AddToScheme(scheme)
 	if err != nil {
-		logger.Error(err, "Failed to construct test schema")
+		err = fmt.Errorf("failed to construct test schema: %w", err)
 		return
 	}
 
 	apiDetectClient, err := client.New(cfg, client.Options{Scheme: scheme})
 	if err != nil {
-		logger.Error(err, "Failed to create test client")
+		err = fmt.Errorf("failed to create test client: %w", err)
 		return
 	}
 
@@ -68,14 +70,10 @@ func addAPIfRegistered(ctx context.Context, addToSchemeTests ...*addToSchemeTest
 	}
 	for _, test := range addToSchemeTests {
 		err = apiDetectClient.List(ctx, test.ListType, opts...)
-		if runtime.IsNotRegisteredError(err) {
-			logger.Info("API group not found on the cluster; skipping scheme", "groupversion", test.GroupVersion)
+		if err != nil {
+			logger.Info("API group could not be retrieved from the cluster; skipping scheme", "groupversion", test.GroupVersion)
 			err = nil
 			continue
-		}
-		if err != nil {
-			logger.Error(err, "An unexpected error was encountered while trying to find API group on cluster", "groupversion", test.GroupVersion)
-			return
 		}
 		logger.Info("API group found on the cluster", "groupversion", test.GroupVersion)
 		AddToSchemes = append(AddToSchemes, test.AddToScheme)

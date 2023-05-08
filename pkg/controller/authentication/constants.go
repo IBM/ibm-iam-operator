@@ -62,33 +62,32 @@ fi
 `
 
 var registrationJson string = `{
-   "token_endpoint_auth_method":"client_secret_basic",
-   "client_id": "WLP_CLIENT_ID",
-   "client_secret": "WLP_CLIENT_SECRET",
-   "scope":"openid profile email",
-   "grant_types":[
-      "authorization_code",
-      "client_credentials",
-      "password",
-      "implicit",
-      "refresh_token",
-      "urn:ietf:params:oauth:grant-type:jwt-bearer"
-   ],
-   "response_types":[
-      "code",
-      "token",
-      "id_token token"
-   ],
-   "application_type":"web",
-   "subject_type":"public",
-   "post_logout_redirect_uris":["https://ICP_CONSOLE_URL/console/logout"],
-   "preauthorized_scope":"openid profile email general",
-   "introspect_tokens":true,
-   "functional_user_groupIds": ["Administrator"],
-   "trusted_uri_prefixes":["https://ICP_CONSOLE_URL"],
-   "redirect_uris":[ICP_REGISTRATION_CONSOLE_URL,"https://127.0.0.1:443/idauth/oidc/endpoint/OP"]
-}
-`
+  "token_endpoint_auth_method": "client_secret_basic",
+  "client_id": {{printf "%q" .WLPClientID}},
+  "client_secret": {{printf "%q" .WLPClientSecret}},
+  "scope": "openid profile email",
+  "grant_types": [
+    "authorization_code",
+    "client_credentials",
+    "password",
+    "implicit",
+    "refresh_token",
+    "urn:ietf:params:oauth:grant-type:jwt-bearer"
+  ],
+  "response_types": [
+    "code",
+    "token",
+    "id_token token"
+  ],
+  "application_type": "web",
+  "subject_type": "public",
+  "post_logout_redirect_uris": ["https://{{.ICPConsoleURL}}/console/logout"],
+  "preauthorized_scope": "openid profile email general",
+  "introspect_tokens": true,
+  "functional_user_groupIds": ["Administrator"],
+  "trusted_uri_prefixes": ["https://{{.ICPConsoleURL}}"],
+  "redirect_uris": [{{ range $_, $url := .ICPRegistrationConsoleURIs}}{{printf "%q" $url}}{{", "}}{{end}}"https://127.0.0.1:443/idauth/oidc/endpoint/OP"]
+}`
 
 var scimLdapAttributesMapping string = `{
     "default": {

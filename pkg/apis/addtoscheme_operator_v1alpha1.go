@@ -23,7 +23,6 @@ import (
 	certmgrv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/operator-framework/operator-sdk/pkg/log/zap"
-	"os"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -45,7 +44,7 @@ func init() {
 	}
 	err := addAPIfRegistered(ctx, routeAddToSchemeTest)
 	if err != nil {
-		logger.Error(nil, "Exiting due to failure to while trying to verify APIs")
-		os.Exit(1)
+		logger.Error(err, "Some or all OpenShift-specific schemes were not added")
+		err = nil
 	}
 }

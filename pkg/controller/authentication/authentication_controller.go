@@ -19,7 +19,6 @@ package authentication
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"sync"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
@@ -34,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -362,11 +360,9 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	if err != nil {
 		return
 	}
-	// create clusterrole and clusterrolebinding if OSAuthEnabled is true
-	if r.isOSAuthEnabled(instance) {
-		r.createClusterRole(instance)
-		r.createClusterRoleBinding(instance)
-	}
+	// create clusterrole and clusterrolebinding
+	r.createClusterRole(instance)
+	r.createClusterRoleBinding(instance)
 
 	r.ReconcileRemoveIngresses(ctx, instance, &needToRequeue)
 	// updates redirecturi annotations to serviceaccount
@@ -417,21 +413,4 @@ func removeString(slice []string, s string) (result []string) {
 		result = append(result, item)
 	}
 	return
-}
-
-func (r *ReconcileAuthentication) isOSAuthEnabled(instance *operatorv1alpha1.Authentication) bool {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	authIdpConfigMapName := "platform-auth-idp"
-	authIdpConfigMap := &corev1.ConfigMap{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: authIdpConfigMapName, Namespace: instance.Namespace}, authIdpConfigMap)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			reqLogger.Error(err, "The configmap "+authIdpConfigMapName+" is not created yet")
-			return false
-		}
-		reqLogger.Error(err, "Failed to get ConfigMap"+authIdpConfigMapName)
-		return false
-	}
-	isOSAuthEnabled, _ := strconv.ParseBool(authIdpConfigMap.Data["OSAUTH_ENABLED"])
-	return isOSAuthEnabled
 }

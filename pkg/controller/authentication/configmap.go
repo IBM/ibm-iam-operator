@@ -708,7 +708,7 @@ func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(client client.Cli
 			},
 			Data: map[string]string{
 				ClusterAddr:          DomainName,
-				ClusterEP:            DomainName,
+				ClusterEP:            "https://" + DomainName,
 				RouteHTTPPort:        rhttpPort,
 				RouteHTTPSPort:       rhttpsPort,
 				ClusterName:          cname,

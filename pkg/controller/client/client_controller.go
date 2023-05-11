@@ -27,16 +27,12 @@ import (
 
 	oidcv1 "github.com/IBM/ibm-iam-operator/pkg/apis/oidc/v1"
 	pkgCommon "github.com/IBM/ibm-iam-operator/pkg/common"
-	ctrlCommon "github.com/IBM/ibm-iam-operator/pkg/controller/common"
-	//"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	corev1 "k8s.io/api/core/v1"
 
-	//appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	//k8sJSON "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -82,13 +78,11 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	rule := `^([a-z0-9]){32,}$`
 	return &ReconcileClient{
-		client:    mgr.GetClient(),
-		Reader:    mgr.GetAPIReader(),
-		recorder:  mgr.GetEventRecorderFor(controllerName),
-		scheme:    mgr.GetScheme(),
-		deleteKey: ctrlCommon.GenerateRandomString(rule),
+		client:   mgr.GetClient(),
+		Reader:   mgr.GetAPIReader(),
+		recorder: mgr.GetEventRecorderFor(controllerName),
+		scheme:   mgr.GetScheme(),
 	}
 }
 
@@ -105,45 +99,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return fmt.Errorf("controller initialized with unknown Reconciler")
 	}
 
-	// Watch for Secret events; when the Secret is owned by a Client, enqueue a request for that Client.
+	// Watch for Secret events for Secrets owned by a Client
 	err = c.Watch(
 		&source.Kind{Type: &corev1.Secret{}},
-		handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []reconcile.Request {
-			if isOwnedByClient(obj) {
-				ownerRef := obj.GetOwnerReferences()[0]
-				return []reconcile.Request{
-					{NamespacedName: types.NamespacedName{
-						Name:      ownerRef.Name,
-						Namespace: obj.GetNamespace(),
-					}},
-				}
-
-			}
-			return []reconcile.Request{{NamespacedName: types.NamespacedName{
-				Name:      "CACHE_UPDATE",
-				Namespace: obj.GetNamespace(),
-			}}}
-		}),
-		predicate.Or(
-			newCSCACertSecretPredicate(rc.sharedServicesNamespace),
-			PlatformAuthIDPCredentialsPredicate,
-			PlatformOIDCCredentialsPredicate,
-			OwnedByClientPredicate,
-		))
-	if err != nil {
-		return err
-	}
-
-	// Watch for ConfigMap events involving platform-auth-idp specifically
-	err = c.Watch(
-		&source.Kind{Type: &corev1.ConfigMap{}},
-		handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []reconcile.Request {
-			return []reconcile.Request{{NamespacedName: types.NamespacedName{
-				Name:      "CACHE_UPDATE",
-				Namespace: obj.GetNamespace(),
-			}}}
-		}),
-		PlatformAuthIDPPredicate)
+		&handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &oidcv1.Client{},
+		})
 	if err != nil {
 		return err
 	}
@@ -193,7 +155,6 @@ type ReconcileClient struct {
 	scheme                  *runtime.Scheme
 	config                  ClientControllerConfig
 	sharedServicesNamespace string
-	deleteKey               string
 }
 
 // SetConfig sets the ClientControllerConfig on the ReconcileClient using the platform-auth-idp ConfigMap and
@@ -249,7 +210,7 @@ func (r *ReconcileClient) SetConfig(ctx context.Context, namespace string) (err 
 func (r *ReconcileClient) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, err error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 
-	reqLogger.Info("Gathering objects from the cluster to see if any updates to cache needed")
+	reqLogger.Info("Gathering secondary objects from the cluster")
 
 	err = r.SetConfig(ctx, request.Namespace)
 	if err != nil {
@@ -257,24 +218,6 @@ func (r *ReconcileClient) Reconcile(ctx context.Context, request reconcile.Reque
 		return reconcile.Result{}, fmt.Errorf("failed to set controller config: %w", err)
 	} else {
 		reqLogger.Info("Successfully set config for controller")
-	}
-
-	if strings.HasPrefix(request.Name, "DELETE_") && request.Namespace == r.deleteKey {
-		clientId := strings.SplitN(request.Name, "_", 2)[1]
-		reqLogger.Info("Client registration cleanup needed", "clientId", clientId)
-		client := &oidcv1.Client{
-			Spec: oidcv1.ClientSpec{ClientId: clientId},
-		}
-		err = r.deleteClient(ctx, client)
-		if err != nil {
-			reqLogger.Error(err, "Error occurred while deleting oidc registration")
-		}
-		return
-	}
-
-	// If this is a cache update only, return
-	if request.Name == "CACHE_UPDATE" {
-		return reconcile.Result{}, nil
 	}
 
 	reqLogger.Info("Reconciling OIDC Client data")
@@ -514,11 +457,9 @@ func (r *ReconcileClient) cp3RoleFinalizerUpdate(ctx context.Context, client *oi
 		reqLogger.Info("Upgrade check : Non-ZEN cp2 Client CR Role would be updated : ", "Role", AdministratorRole)
 		client.Spec.Roles = append(client.Spec.Roles, AdministratorRole)
 		reqLogger.Info("Upgrade check : Non-ZEN CP2 Client CR Finalizers would be updated : ", "Finalizer", CP3FinalizerName)
-		//addFinalizer(client)
 		removeFinalizer(client, CP2FinalizerName)
 	} else if len(client.Spec.ZenInstanceId) > 0 && containsString(client.ObjectMeta.Finalizers, CP2FinalizerName) {
 		reqLogger.Info("Upgrade check : ZEN cp2 Client CR Finalizers would be updated : ", "Finalizer", CP3FinalizerName)
-		//addFinalizer(client)
 		removeFinalizer(client, CP2FinalizerName)
 	}
 }
@@ -576,6 +517,18 @@ func (r *ReconcileClient) deleteClient(ctx context.Context, client *oidcv1.Clien
 		}
 		return
 	}
+
+	// Delete the zeninstance if it has been specified
+	if client.Spec.ZenInstanceId != "" {
+		reqLogger.Info("Client has a zenInstanceId, attempt to delete the matching Zen instance")
+		err = r.DeleteZenInstance(ctx, client)
+		if err != nil {
+			reqLogger.Error(err, "Zen instance deletion failed", "zenInstanceId", client.Spec.ZenInstanceId)
+			return
+		}
+		reqLogger.Info("Zen instance deletion succeeded", "ZenInstanceId", client.Spec.ZenInstanceId)
+	}
+
 	_, err = r.DeleteClientRegistration(ctx, client)
 	if err != nil {
 		r.handleOIDCClientError(ctx, client, err, DeleteType)
@@ -587,16 +540,6 @@ func (r *ReconcileClient) deleteClient(ctx context.Context, client *oidcv1.Clien
 	reqLogger.Info("Deleting annotations from ibm-iam-operand-restricted ServiceAccount")
 	reqLogger.Info("SharedServicesNamespace is", "iamoperandnamespace", r.sharedServicesNamespace)
 	r.RemoveAnnotationFromSA(ctx, client, r.sharedServicesNamespace)
-	// Delete the zeninstance if it has been specified
-	if client.Spec.ZenInstanceId != "" {
-		reqLogger.Info("Client has a zenInstanceId, attempt to delete the matching Zen instance")
-		err = r.DeleteZenInstance(ctx, client)
-		if err != nil {
-			reqLogger.Error(err, "Zen instance deletion failed", "zenInstanceId", client.Spec.ZenInstanceId)
-			return
-		}
-		reqLogger.Info("Zen instance deletion succeeded", "ZenInstanceId", client.Spec.ZenInstanceId)
-	}
 	// Remove the finalizers
 	reqLogger.Info("Removing finalizer from Client", "clientId", client.Spec.ClientId)
 

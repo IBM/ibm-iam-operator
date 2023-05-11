@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	corev1 "k8s.io/api/core/v1"
@@ -95,27 +96,32 @@ func GetClusterType(ctx context.Context, cmName string) (clusterType ClusterType
 		logger.Error(err, "Failed to create client")
 		return
 	}
+	waitInterval := time.Second * 5
 	cm := &corev1.ConfigMap{}
-	for _, namespace := range namespaces {
-		logger.Info("Try to find ConfigMap", "name", cmName, "namespace", namespace)
-		err = osDetectClient.Get(ctx, types.NamespacedName{Name: cmName, Namespace: namespace}, cm)
-		if err != nil {
-			logger.Info("Did not find it", "namespace", namespace)
-			continue
+	logger = logger.WithValues("name", cmName)
+	for {
+		for _, namespace := range namespaces {
+			logger.Info("Try to get ConfigMap", "namespace", namespace)
+			err = osDetectClient.Get(ctx, types.NamespacedName{Name: cmName, Namespace: namespace}, cm)
+			if err != nil {
+				logger.Error(err, "Failed to get the ConfigMap", "namespace", namespace)
+				err = nil
+				continue
+			}
+			logger.Info("Got the ConfigMap", "namespace", namespace)
+			clusterTypeValue, ok := cm.Data["kubernetes_cluster_type"]
+			// Only assume CNCF cluster if the field is set and it case-insensitively matches "cncf"
+			if ok && strings.EqualFold(clusterTypeValue, "cncf") {
+				clusterType = CNCF
+			} else {
+				clusterType = OpenShift
+			}
+			logger.Info("Looked for kubernetes_cluster_type", "ok", ok, "value", clusterTypeValue, "clusterType", clusterType, "namespace", namespace)
+			return
 		}
-		logger.Info("Found ConfigMap", "name", cmName, "namespace", namespace)
-		clusterTypeValue, ok := cm.Data["kubernetes_cluster_type"]
-		// Only assume CNCF cluster if the field is set and it case-insensitively matches "cncf"
-		if ok && strings.EqualFold(clusterTypeValue, "cncf") {
-			clusterType = CNCF
-		} else {
-			clusterType = OpenShift
-		}
-		logger.Info("Looked for kubernetes_cluster_type", "ok", ok, "value", clusterTypeValue, "clusterType", clusterType)
-		return
+		logger.Info("Could not find ConfigMap; retrying in 5 seconds", "isOSEnv", Unknown)
+		time.Sleep(waitInterval)
 	}
-	logger.Info("Could not find ConfigMap", "name", cmName, "isOSEnv", Unknown)
-	return
 }
 
 // GetSharedServicesNamespace returns the name of the shared services namespace for the Common Services instance that

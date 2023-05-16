@@ -113,7 +113,12 @@ rules:
 - apiGroups:
   - operator.ibm.com
   resources:
+  - '*'
+  - policydecisions
   - authentications
+  - policycontrollers
+  - paps
+  - securityonboardings
   verbs:
   - create
   - delete
@@ -122,13 +127,6 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - operator.ibm.com
-  resources:
-  - commonservices
-  verbs:
-  - get
-  - list
 - apiGroups:
   - cert-manager.io
   resources:
@@ -148,6 +146,7 @@ rules:
 - apiGroups:
   - certmanager.k8s.io
   resources:
+  - '*'
   - certificates
   verbs:
   - delete
@@ -157,6 +156,7 @@ rules:
 - apiGroups:
   - networking.k8s.io
   resources:
+  - '*'
   - ingresses
   verbs:
   - create

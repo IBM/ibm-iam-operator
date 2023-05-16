@@ -499,7 +499,7 @@ spec:
                 - ibm-iam-operator
                 env:
                 - name: ICP_PLATFORM_AUTH_IMAGE
-                  value: icr.io/cpopen/cpfs/icp-platform-auth:4.0.0
+                  value: icr.io/cpopen/cpfs/icp-platform-auth:3.10.0
                 - name: ICP_IDENTITY_PROVIDER_IMAGE
                   value: icr.io/cpopen/cpfs/icp-identity-provider:4.0.0
                 - name: ICP_IDENTITY_MANAGER_IMAGE
@@ -646,7 +646,12 @@ spec:
         - apiGroups:
           - operator.ibm.com
           resources:
+          - '*'
+          - policydecisions
           - authentications
+          - policycontrollers
+          - paps
+          - securityonboardings
           verbs:
           - create
           - delete
@@ -655,13 +660,6 @@ spec:
           - patch
           - update
           - watch
-        - apiGroups:
-          - operator.ibm.com
-          resources:
-          - commonservices
-          verbs:
-          - get
-          - list
         - apiGroups:
           - cert-manager.io
           resources:
@@ -681,6 +679,7 @@ spec:
         - apiGroups:
           - certmanager.k8s.io
           resources:
+          - '*'
           - certificates
           verbs:
           - delete
@@ -690,6 +689,7 @@ spec:
         - apiGroups:
           - networking.k8s.io
           resources:
+          - '*'
           - ingresses
           verbs:
           - create

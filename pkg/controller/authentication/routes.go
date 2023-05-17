@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"time"
 
 	routev1 "github.com/openshift/api/route/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -140,8 +139,6 @@ func (r *ReconcileAuthentication) handleRoutes(ctx context.Context, instance *op
 	routeHost = clusterInfoConfigMap.Data["cluster_address"]
 	wlpClientID := string(secret.Data["WLP_CLIENT_ID"][:])
 
-	now := time.Now().Unix()
-
 	var (
 		platformAuthCert               []byte
 		platformIdentityManagementCert []byte
@@ -211,7 +208,7 @@ func (r *ReconcileAuthentication) handleRoutes(ctx context.Context, instance *op
 		},
 		"platform-login": {
 			Annotations: map[string]string{
-				"haproxy.router.openshift.io/rewrite-target": fmt.Sprintf("/v1/auth/authorize?client_id=%s&redirect_uri=https://%s/auth/liberty/callback&response_type=code&scope=openid+email+profile&state=%d&orig=/login", wlpClientID, routeHost, now),
+				"haproxy.router.openshift.io/rewrite-target": fmt.Sprintf("/v1/auth/authorize?client_id=%s&redirect_uri=https://%s/auth/liberty/callback&response_type=code&scope=openid+email+profile&orig=/login", wlpClientID, routeHost),
 			},
 			Name:              "platform-login",
 			RouteHost:         routeHost,

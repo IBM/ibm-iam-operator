@@ -73,7 +73,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	if r.RunningOnCNCFCluster() {
 		isOSEnv = false
 		reqLogger.Info("Checked cluster type", "Configmap.Namespace", instance.Namespace, "ConfigMap.Name", globalConfigMapName, "clusterType", r.clusterType)
-		domainName := globalConfigMap.Data["domain_name"]
+		domainName = globalConfigMap.Data["domain_name"]
 		reqLogger.Info("Reading domainName from global cm", "Configmap.Namespace", instance.Namespace, "ConfigMap.Name", globalConfigMapName, "domainName", domainName)
 	}
 
@@ -81,7 +81,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ibmcloud-cluster-info", Namespace: instance.Namespace}, currentConfigMap)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			reqLogger.Info("Configmap is not found ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+			reqLogger.Info("Configmap is not found ", "Configmap.Namespace", instance.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
 			reqLogger.Info("Going to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
 			newConfigMap = r.ibmcloudClusterInfoConfigMap(r.client, instance, r.RunningOnOpenShiftCluster(), domainName, r.scheme)
 			err = r.client.Create(context.TODO(), newConfigMap)
@@ -256,12 +256,6 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["MONGO_POOL_MAX_SIZE"] = newConfigMap.Data["MONGO_POOL_MAX_SIZE"]
 					cmUpdateRequired = true
 				}
-				if _, keyExists := currentConfigMap.Data["OSAUTH_ENABLED"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					newConfigMap = functionList[index](instance, r.scheme)
-					currentConfigMap.Data["OSAUTH_ENABLED"] = newConfigMap.Data["OSAUTH_ENABLED"]
-					cmUpdateRequired = true
-				}
 				if _, keyExists := currentConfigMap.Data["OS_TOKEN_LENGTH"]; keyExists {
 					if currentConfigMap.Data["OS_TOKEN_LENGTH"] == "45" {
 						newConfigMap = functionList[index](instance, r.scheme)
@@ -411,7 +405,6 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"FIPS_ENABLED":                       strconv.FormatBool(instance.Spec.Config.FIPSEnabled),
 			"NONCE_ENABLED":                      strconv.FormatBool(instance.Spec.Config.NONCEEnabled),
 			"ROKS_ENABLED":                       strconv.FormatBool(instance.Spec.Config.ROKSEnabled),
-			"OSAUTH_ENABLED":                     strconv.FormatBool(instance.Spec.Config.OSAuthEnabled),
 			"IBM_CLOUD_SAAS":                     strconv.FormatBool(instance.Spec.Config.IBMCloudSaas),
 			"ATTR_MAPPING_FROM_CONFIG":           strconv.FormatBool(instance.Spec.Config.AttrMappingFromConfig),
 			"SAAS_CLIENT_REDIRECT_URL":           instance.Spec.Config.SaasClientRedirectUrl,
@@ -610,8 +603,8 @@ func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(client client.Cli
 				RouteHTTPSPort: rhttpsPort,
 				ClusterName:    cname,
 				ProxyAddress:   ClusterAddress,
-				ProviderSVC:    "https://platform-identity-provider" + "." + instance.Namespace + ".svc:443",
-				IDMgmtSVC:      "https://platform-identity-management" + "." + instance.Namespace + ".svc:443",
+				ProviderSVC:    "https://platform-identity-provider" + "." + instance.Namespace + ".svc:4300",
+				IDMgmtSVC:      "https://platform-identity-management" + "." + instance.Namespace + ".svc:4500",
 			},
 		}
 
@@ -715,7 +708,7 @@ func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(client client.Cli
 			},
 			Data: map[string]string{
 				ClusterAddr:          DomainName,
-				ClusterEP:            DomainName,
+				ClusterEP:            "https://" + DomainName,
 				RouteHTTPPort:        rhttpPort,
 				RouteHTTPSPort:       rhttpsPort,
 				ClusterName:          cname,
@@ -723,7 +716,7 @@ func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(client client.Cli
 				ClusterAPIServerPort: apiaddr[pos+1:],
 				ProxyAddress:         ProxyDomainName,
 				ProviderSVC:          "https://platform-identity-provider" + "." + instance.Namespace + ".svc:4300",
-				IDMgmtSVC:            "https://platform-identity-management" + "." + instance.Namespace + ".svc:443",
+				IDMgmtSVC:            "https://platform-identity-management" + "." + instance.Namespace + ".svc:4500",
 			},
 		}
 

@@ -23,7 +23,6 @@ import (
 	certmgrv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/operator-framework/operator-sdk/pkg/log/zap"
-	"os"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -38,9 +37,14 @@ func init() {
 	logf.SetLogger(zap.Logger())
 	logger := logf.Log.WithName("operator_v1alpha1_init")
 	ctx := logf.IntoContext(context.Background(), logger)
-	err := addAPIsIfOnOpenShift(ctx, routev1.AddToScheme)
+	routeAddToSchemeTest := &addToSchemeTest{
+		AddToScheme:  routev1.AddToScheme,
+		ListType:     &routev1.RouteList{},
+		GroupVersion: routev1.GroupVersion,
+	}
+	err := addAPIfRegistered(ctx, routeAddToSchemeTest)
 	if err != nil {
-		logger.Error(nil, "Exiting due to failure to detect cluster type")
-		os.Exit(1)
+		logger.Error(err, "Some or all OpenShift-specific schemes were not added")
+		err = nil
 	}
 }

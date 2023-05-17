@@ -658,6 +658,21 @@ spec:
         - apiGroups:
           - operator.ibm.com
           resources:
+          - authentications/finalizers
+          verbs:
+          - update
+          - patch
+        - apiGroups:
+          - operator.ibm.com
+          resources:
+          - authentications/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - operator.ibm.com
+          resources:
           - commonservices
           verbs:
           - get

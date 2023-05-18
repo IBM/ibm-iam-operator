@@ -522,7 +522,7 @@ spec:
                 - name: cluster_name
                   value: ""
                 image: icr.io/cpopen/ibm-iam-operator:4.0.0
-                imagePullPolicy: Always
+                imagePullPolicy: IfNotPresent
                 name: ibm-iam-operator
                 resources:
                   limits:

@@ -17,7 +17,9 @@
 package common
 
 import (
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"regexp"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var CsConfigAnnotationSuffix = "common-service/config"
@@ -49,4 +51,71 @@ func IsCsConfigAnnotationExists(annotations map[string]string) bool {
 		return true
 	}
 	return false
+}
+
+func isOwnerOf(owner client.Object, ownerRef v1.OwnerReference) (isOwner bool) {
+	ownerGVK := owner.GetObjectKind().GroupVersionKind()
+	if ownerRef.Kind == ownerGVK.Kind && ownerRef.UID == owner.GetUID() && ownerRef.Name == owner.GetName() && ownerRef.APIVersion == ownerGVK.GroupVersion().String() {
+		return true
+	}
+	return
+}
+
+func isControllerOf(controller client.Object, ownerRef v1.OwnerReference) (isController bool) {
+	if isOwnerOf(controller, ownerRef) && *ownerRef.Controller {
+		return true
+	}
+	return
+}
+
+// IsOwnerOf determines whether one object is listed in another object's OwnerReferences.
+func IsOwnerOf(owner, owned client.Object) (isOwner bool) {
+	ownerRefs := owned.GetOwnerReferences()
+	if len(ownerRefs) == 0 {
+		return
+	}
+	for _, ownerRef := range ownerRefs {
+		if isOwnerOf(owner, ownerRef) {
+			return true
+		}
+	}
+	return
+}
+
+// IsControllerOf determines whether one object is listed as the controller of another object within its
+// OwnerReferences.
+func IsControllerOf(controller, controlled client.Object) (isController bool) {
+	ownerRefs := controlled.GetOwnerReferences()
+	if len(ownerRefs) == 0 {
+		return
+	}
+	for _, ownerRef := range ownerRefs {
+		if isControllerOf(controller, ownerRef) {
+			return true
+		}
+	}
+	return
+}
+
+func GetControllerKind(controlled client.Object) (kind string) {
+	index := GetControllerRefIndex(controlled)
+	if index == -1 {
+		return
+	}
+	return controlled.GetOwnerReferences()[index].Kind
+}
+
+func GetControllerRefIndex(controlled client.Object) (index int) {
+	index = -1
+	ownerRefs := controlled.GetOwnerReferences()
+	if len(ownerRefs) == 0 {
+		return
+	}
+
+	for i, ownerRef := range ownerRefs {
+		if *ownerRef.Controller {
+			return i
+		}
+	}
+	return
 }

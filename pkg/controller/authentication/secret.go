@@ -23,6 +23,7 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	common "github.com/IBM/ibm-iam-operator/pkg/controller/common"
+	ctrlCommon "github.com/IBM/ibm-iam-operator/pkg/controller/common"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -190,9 +191,9 @@ func (r *ReconcileAuthentication) waitForSecret(instance *operatorv1alpha1.Authe
 }
 
 // create ibmcloud-cluster-ca-cert
-func (r *ReconcileAuthentication) createClusterCACert(i *operatorv1alpha1.Authentication, scheme *runtime.Scheme, secretName, ns string, caCert []byte, needToRequeue *bool) error {
+func (r *ReconcileAuthentication) createClusterCACert(i *operatorv1alpha1.Authentication, scheme *runtime.Scheme, secretName, ns string, caCert []byte, needToRequeue *bool) (err error) {
 
-	reqLogger := log.WithValues("Instance.Namespace", i.Namespace, "Instance.Name", i.Name)
+	reqLogger := log.WithName("createClusterCACert").WithValues("Instance.Namespace", i.Namespace, "Instance.Name", i.Name, "Secret.Name", secretName)
 
 	// create ibmcloud-cluster-ca-cert
 	labels := map[string]string{
@@ -217,62 +218,56 @@ func (r *ReconcileAuthentication) createClusterCACert(i *operatorv1alpha1.Authen
 		},
 	}
 
-	if err := controllerutil.SetControllerReference(i, clusterSecret, scheme); err != nil {
-		reqLogger.Error(err, "Error setting controller reference on secret:")
+	if err = controllerutil.SetControllerReference(i, clusterSecret, scheme); err != nil {
+		reqLogger.Error(err, "Failed to create secret")
+		return
 	}
-	err := r.client.Create(context.TODO(), clusterSecret)
+	err = r.client.Create(context.TODO(), clusterSecret)
+	if err == nil {
+		reqLogger.Info("Successfully created secret")
+		return
+	} else if !errors.IsAlreadyExists(err) {
+		reqLogger.Error(err, "Failed to create secret")
+		return err
+	}
+
+	// Confirm that the secret, ibmcloud-cluster-ca-cert, is created by IM-Operator before further usage
+	current := &corev1.Secret{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: i.Namespace}, current)
 	if err != nil {
-		if !errors.IsAlreadyExists(err) {
-			reqLogger.Error(err, "failure creating secret for ibmcloud-cluster-ca-cert")
-			return err
-		}
-		// Confirm that secret ibmcloud-cluster-ca-cert  is created by IM-Operator before further usage
-		if errors.IsAlreadyExists(err) {
-			current := &corev1.Secret{}
-			existerr := r.client.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: i.Namespace}, current)
-			if existerr == nil {
-				ownerRefs := current.OwnerReferences
-				var ownRef string
-				for _, ownRefs := range ownerRefs {
-					ownRef = ownRefs.Kind
-				}
-				if ownRef == "ManagementIngress" {
-					reqLogger.Error(err, "ibmcloud-cluster-ca-cert secret is already created by managementingress , IM installation may not proceed further until the secret is removed")
-					*needToRequeue = true
-					return nil
-				} else if ownRef != "Authentication" {
-					reqLogger.Error(err, "Can't determine the secret ownership , IM installation may not proceed further until the secret is removed")
-					*needToRequeue = true
-					return nil
-				}
-			}
-		}
-		reqLogger.Info("Trying to update secret: as it already existed.", "Certificate.Namespace", i.Namespace, "Secret.Name", secretName)
-
-		// Update config
-		current := &corev1.Secret{}
-		err := r.client.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: i.Namespace}, current)
-		if err != nil {
-			reqLogger.Error(err, "failure getting secret ibmcloud-cluster-ca-cert")
-			return err
-		}
-
-		// no data change, just return
-		if reflect.DeepEqual(clusterSecret.Data, current.Data) {
-			reqLogger.Info("No change found from the secret: skip updating current secret.", "Certificate.Namespace", i.Namespace, "Secret.Name", secretName)
-			return nil
-		}
-		reqLogger.Info("Found change from secret %s, trying to update it", "Certificate.Namespace", i.Namespace, "Secret.Name", secretName)
-		current.Data = clusterSecret.Data
-
-		// Apply the latest change to configmap
-		if err = r.client.Update(context.TODO(), current); err != nil {
-			reqLogger.Error(err, "failure updating secret ibmcloud-cluster-ca-cert")
-			return err
-		}
+		reqLogger.Error(err, "Failed to get existing secret")
+		return
 	}
-	reqLogger.Info("Successfully created or updated secret", "Certificate.Namespace", i.Namespace, "Secret.Name", secretName)
-	return nil
+
+	reqLogger.Info("Comparing calculated to observed secret")
+	// If data and ownership are the same, return
+	if reflect.DeepEqual(clusterSecret.Data, current.Data) && reflect.DeepEqual(clusterSecret.GetOwnerReferences(), current.GetOwnerReferences()) {
+		reqLogger.Info("No significant changes found; skipping update.")
+		return
+	}
+
+	if !ctrlCommon.IsControllerOf(i, current) {
+		reqLogger.Info("The secret is already controlled by another object; deleting it and recreating in another loop")
+		err = r.client.Delete(context.TODO(), current)
+		if err != nil {
+			reqLogger.Error(err, "Failed to delete the secret")
+		} else {
+			*needToRequeue = true
+		}
+		return
+	}
+
+	reqLogger.Info("Detected change, trying to update it")
+	current.Data = clusterSecret.Data
+
+	// Apply the latest change to configmap
+	if err = r.client.Update(context.TODO(), current); err != nil {
+		reqLogger.Error(err, "Failed to update secret")
+		return err
+	}
+	reqLogger.Info("Secret updated")
+
+	return
 }
 
 // waitForTimeout returns a stop channel that closes when the specified timeout is reached

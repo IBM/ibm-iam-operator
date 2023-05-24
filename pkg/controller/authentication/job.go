@@ -33,7 +33,7 @@ import (
 
 func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentication, currentJob *batchv1.Job, needToRequeue *bool) (err error) {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := log.WithName("handleJob").WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
 	job := "oidc-client-registration"
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: job, Namespace: instance.Namespace}, currentJob)
@@ -45,23 +45,27 @@ func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentic
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: consoleConfigMapName, Namespace: instance.Namespace}, consoleConfigMap)
 		if err != nil {
 			if errors.IsNotFound(err) {
-				reqLogger.Error(err, "The configmap ", consoleConfigMapName, " is not created yet")
+				reqLogger.Error(err, "The configmap is not created yet", "ConfigMap.Name", consoleConfigMapName)
 				return
 			} else {
-				reqLogger.Error(err, "Failed to get ConfigMap", consoleConfigMapName)
+				reqLogger.Error(err, "Failed to get ConfigMap", "ConfigMap.Name", consoleConfigMapName)
 				return
 			}
 		}
-		// Verify the owner reference
-		ownerRefs := consoleConfigMap.OwnerReferences
-		var ownRef string
-		for _, ownRefs := range ownerRefs {
-			ownRef = ownRefs.Kind
-		}
-		if ownRef != "Authentication" {
-			reqLogger.Info("Reconcile Job : Can't find ibmcloud-cluster-info Configmap created by IM operator , IM Job creation may not proceed ", "Configmap.Namespace", consoleConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
-			*needToRequeue = true
-			return
+		// Idempotently assign controller reference to Job and return a failure in the event that it cannot be
+		// done (e.g. Controller reference already set)
+		if err = controllerutil.SetControllerReference(instance, consoleConfigMap, r.client.Scheme()); err != nil {
+			reqLogger.Error(err, "ConfigMap is not owned by this Authentication instance; setting controller reference by force", "ConfigMap.Name", consoleConfigMapName, "Instance.UID", instance.UID)
+			for _, ownerRef := range consoleConfigMap.OwnerReferences {
+				if *ownerRef.Controller {
+					*ownerRef.Controller = false
+					break
+				}
+			}
+			if err = controllerutil.SetControllerReference(instance, consoleConfigMap, r.client.Scheme()); err != nil {
+				reqLogger.Error(err, "Could not force setting controller reference", "ConfigMap.Name", consoleConfigMapName, "Instance.UID", instance.UID)
+				return
+			}
 		}
 
 		// Define a new Job

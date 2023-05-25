@@ -35,6 +35,7 @@ import (
 	pkgCommon "github.com/IBM/ibm-iam-operator/pkg/common"
 	osconfigv1 "github.com/openshift/api/config/v1"
 	"gopkg.in/yaml.v2"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -395,7 +396,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					reqLogger.Error(err, "Failed to unmarshal observed ConfigMap")
 					return
 				}
-				var needsUpdate bool
+				var updatedJSON, updatedOwnerRefs bool
 				if !reflect.DeepEqual(newRegistrationJSON, currentRegistrationJSON) {
 					reqLogger.Info("Difference found in observed vs calculated platform-oidc-registration.json")
 					var newJSON []byte
@@ -404,20 +405,36 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 						return
 					}
 					currentConfigMap.Data["platform-oidc-registration.json"] = string(newJSON[:])
-					needsUpdate = true
+					updatedJSON = true
 				}
 				if !reflect.DeepEqual(newConfigMap.GetOwnerReferences(), currentConfigMap.GetOwnerReferences()) {
 					reqLogger.Info("Difference found in observed vs calculated OwnerReferences")
 					currentConfigMap.OwnerReferences = newConfigMap.GetOwnerReferences()
-					needsUpdate = true
+					updatedOwnerRefs = true
 				}
-				if needsUpdate {
+				if updatedJSON || updatedOwnerRefs {
 					reqLogger.Info("Updating ConfigMap")
 					if err = r.client.Update(context.Background(), currentConfigMap); err != nil {
 						reqLogger.Error(err, "Failed to update ConfigMap", "Name", "registration-json", "Namespace", instance.Namespace)
 						return
 					}
 					reqLogger.Info("ConfigMap successfully updated")
+					if updatedJSON {
+						reqLogger.Info("Deleting Job to re-run with upated ConfigMap", "Job.Name", "oidc-client-registration")
+					
+						job := &batchv1.Job{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "oidc-client-registration",
+								Namespace: instance.Namespace,
+							},
+						}
+						if err = r.client.Delete(context.TODO(), job); err != nil {
+							reqLogger.Error(err, "Could not delete job", "Job.Name", "oidc-client-registration")
+							return
+						}
+						reqLogger.Info("Deleted Job", "Job.Name", "oidc-client-registration")
+						return
+					}
 				} else {
 					reqLogger.Info("No ConfigMap update required")
 				}

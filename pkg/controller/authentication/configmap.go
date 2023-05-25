@@ -17,6 +17,7 @@
 package authentication
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -25,13 +26,16 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
+	"text/template"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	pkgCommon "github.com/IBM/ibm-iam-operator/pkg/common"
 	osconfigv1 "github.com/openshift/api/config/v1"
 	"gopkg.in/yaml.v2"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -157,6 +161,10 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 				// Define a new ConfigMap
 				if configMapList[index] == "registration-json" {
 					newConfigMap = registrationJsonConfigMap(instance, wlpClientID, wlpClientSecret, icpConsoleURL, r.scheme)
+					if newConfigMap == nil {
+						err = fmt.Errorf("an error occurred during registration-json generation")
+						return err
+					}
 				} else if configMapList[index] == "oauth-client-map" {
 					newConfigMap = oauthClientConfigMap(instance, icpConsoleURL, icpProxyURL, r.scheme)
 				} else {
@@ -355,13 +363,103 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 						return
 					}
 				}
+			} else if configMapList[index] == "registration-json" {
+				platformOIDCCredentials := &corev1.Secret{}
+				var servicesNamespace string
+				servicesNamespace, err = pkgCommon.GetSharedServicesNamespace(context.Background(), "common-service")
+				if err != nil {
+					reqLogger.Error(err, "Failed to get services namespace")
+					return
+				}
+				objectKey := types.NamespacedName{Name: "platform-oidc-credentials", Namespace: servicesNamespace}
+				err = r.client.Get(context.Background(), objectKey, platformOIDCCredentials)
+				if err != nil {
+					reqLogger.Error(err, "Failed to get Secret for registration-json update")
+					return
+				}
+				latestWLPClientID := platformOIDCCredentials.Data["WLP_CLIENT_ID"]
+				latestWLPClientSecret := platformOIDCCredentials.Data["WLP_CLIENT_SECRET"]
+				newConfigMap = registrationJsonConfigMap(instance, string(latestWLPClientID[:]), string(latestWLPClientSecret[:]), icpConsoleURL, r.scheme)
+				if newConfigMap == nil {
+					err = fmt.Errorf("an error occurred during registration-json generation")
+					return err
+				}
+				reqLogger.Info("Calculated new platform-oidc-registration.json", "json", newConfigMap.Data["platform-oidc-registration.json"])
+				var currentRegistrationJSON, newRegistrationJSON *registrationJSONData
+				newRegistrationJSON = &registrationJSONData{}
+				currentRegistrationJSON = &registrationJSONData{}
+				if err = json.Unmarshal([]byte(newConfigMap.Data["platform-oidc-registration.json"]), newRegistrationJSON); err != nil {
+					reqLogger.Error(err, "Failed to unmarshal calculated ConfigMap")
+					return
+				}
+				if err = json.Unmarshal([]byte(currentConfigMap.Data["platform-oidc-registration.json"]), currentRegistrationJSON); err != nil {
+					reqLogger.Error(err, "Failed to unmarshal observed ConfigMap")
+					return
+				}
+				var updatedJSON, updatedOwnerRefs bool
+				if !reflect.DeepEqual(newRegistrationJSON, currentRegistrationJSON) {
+					reqLogger.Info("Difference found in observed vs calculated platform-oidc-registration.json")
+					var newJSON []byte
+					if newJSON, err = json.MarshalIndent(newRegistrationJSON, "", "  "); err != nil {
+						reqLogger.Error(err, "Failed to marshal JSON for registration-json update")
+						return
+					}
+					currentConfigMap.Data["platform-oidc-registration.json"] = string(newJSON[:])
+					updatedJSON = true
+				}
+				if !reflect.DeepEqual(newConfigMap.GetOwnerReferences(), currentConfigMap.GetOwnerReferences()) {
+					reqLogger.Info("Difference found in observed vs calculated OwnerReferences")
+					currentConfigMap.OwnerReferences = newConfigMap.GetOwnerReferences()
+					updatedOwnerRefs = true
+				}
+				if updatedJSON || updatedOwnerRefs {
+					reqLogger.Info("Updating ConfigMap")
+					if err = r.client.Update(context.Background(), currentConfigMap); err != nil {
+						reqLogger.Error(err, "Failed to update ConfigMap", "Name", "registration-json", "Namespace", instance.Namespace)
+						return
+					}
+					reqLogger.Info("ConfigMap successfully updated")
+					if updatedJSON {
+						reqLogger.Info("Deleting Job to re-run with upated ConfigMap", "Job.Name", "oidc-client-registration")
+					
+						job := &batchv1.Job{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "oidc-client-registration",
+								Namespace: instance.Namespace,
+							},
+						}
+						if err = r.client.Delete(context.TODO(), job); err != nil {
+							reqLogger.Error(err, "Could not delete job", "Job.Name", "oidc-client-registration")
+							return
+						}
+						reqLogger.Info("Deleted Job", "Job.Name", "oidc-client-registration")
+						return
+					}
+				} else {
+					reqLogger.Info("No ConfigMap update required")
+				}
 			}
 		}
-
 	}
 
 	return nil
+}
 
+type registrationJSONData struct {
+	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method"`
+	ClientID                string   `json:"client_id"`
+	ClientSecret            string   `json:"client_secret"`
+	Scope                   string   `json:"scope"`
+	GrantTypes              []string `json:"grant_types"`
+	ResponseTypes           []string `json:"response_types"`
+	ApplicationType         string   `json:"application_type"`
+	SubjectType             string   `json:"subject_type"`
+	PostLogoutRedirectURIs  []string `json:"post_logout_redirect_uris"`
+	PreauthorizedScope      string   `json:"preauthorized_scope"`
+	IntrospectTokens        bool     `json:"introspect_tokens"`
+	FunctionalUserGroupIDs  []string `json:"functional_user_groupIds"`
+	TrustedURIPrefixes      []string `json:"trusted_uri_prefixes"`
+	RedirectURIs            []string `json:"redirect_uris"`
 }
 
 func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
@@ -470,32 +568,36 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 }
 
 func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, icpConsoleURL string, scheme *runtime.Scheme) *corev1.ConfigMap {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	tempRegistrationJson := registrationJson
-	tempRegistrationJson = strings.ReplaceAll(tempRegistrationJson, "WLP_CLIENT_ID", wlpClientID)
-	tempRegistrationJson = strings.ReplaceAll(tempRegistrationJson, "WLP_CLIENT_SECRET", wlpClientSecret)
-	tempRegistrationJson = strings.ReplaceAll(tempRegistrationJson, "ICP_CONSOLE_URL", icpConsoleURL)
+	reqLogger := log.WithName("registrationJsonConfigMap").WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
-	//Logic to update registrationJson in constants.go based on icpConsoleURL has port 443 #55171
-	//If icpConsoleURL has 443 in url (example : "cp-console.apps.tamil-dev.cp.fyre.ibm.com:443" need to update redirect url as below
-	// "https://cp-console.apps.tamil-dev.cp.fyre.ibm.com/auth/liberty/callback","https://cp-console.apps.tamil-dev.cp.fyre.ibm.com:443/auth/liberty/callback"
-	//else "https://cp-console.apps.tamil-dev.cp.fyre.ibm.com/auth/liberty/callback"
-
-	var icpConsoleURLFinal string
+	// Calculate the ICP Registration Console URI(s)
+	icpRegistrationConsoleURIs := []string{}
 	const apiRegistrationPath = "/auth/liberty/callback"
-	reqLogger.Info("ICP console url for registrationJsonConfigMap ", icpConsoleURL)
+	icpRegistrationConsoleURIs = append(icpRegistrationConsoleURIs, strings.Join([]string{"https://", icpConsoleURL, apiRegistrationPath}, ""))
 	parseConsoleURL := strings.Split(icpConsoleURL, ":")
-	if len(parseConsoleURL) > 1 {
-		if parseConsoleURL[1] == "443" {
-			icpConsoleURLFinal = "\"https://" + parseConsoleURL[0] + apiRegistrationPath + "\",\"https://" + icpConsoleURL + apiRegistrationPath + "\""
-		} else {
-			icpConsoleURLFinal = "\"https://" + icpConsoleURL + apiRegistrationPath + "\""
-		}
-	} else {
-		icpConsoleURLFinal = "\"https://" + parseConsoleURL[0] + apiRegistrationPath + "\""
+	// If the console URI is using port 443, a copy of the URI without the port number needs to be included as well
+	// so that both URIs with and without the port number work
+	if len(parseConsoleURL) > 1 && parseConsoleURL[1] == "443" {
+		icpRegistrationConsoleURIs = append(icpRegistrationConsoleURIs, strings.Join([]string{"https://", parseConsoleURL[0], apiRegistrationPath}, ""))
 	}
-	tempRegistrationJson = strings.ReplaceAll(tempRegistrationJson, "ICP_REGISTRATION_CONSOLE_URL", icpConsoleURLFinal)
-	reqLogger.Info("Updated ICP console redirect url for registrationJson  ", icpConsoleURLFinal)
+
+	type tmpRegistrationJsonVals struct {
+		WLPClientID, WLPClientSecret, ICPConsoleURL string
+		ICPRegistrationConsoleURIs                  []string
+	}
+	vals := tmpRegistrationJsonVals{
+		wlpClientID,
+		wlpClientSecret,
+		icpConsoleURL,
+		icpRegistrationConsoleURIs,
+	}
+	registrationJsonTpl := template.Must(template.New("registrationJson").Parse(registrationJson))
+	var registrationJsonBytes bytes.Buffer
+	if err := registrationJsonTpl.Execute(&registrationJsonBytes, vals); err != nil {
+		reqLogger.Error(err, "Failed to execute registrationJson template")
+		return nil
+	}
+
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "registration-json",
@@ -503,7 +605,7 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 			Labels:    map[string]string{"app": "platform-auth-service"},
 		},
 		Data: map[string]string{
-			"platform-oidc-registration.json": tempRegistrationJson,
+			"platform-oidc-registration.json": registrationJsonBytes.String(),
 		},
 	}
 

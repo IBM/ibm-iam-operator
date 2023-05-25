@@ -18,26 +18,66 @@ package apis
 
 import (
 	"context"
-	"github.com/IBM/ibm-iam-operator/pkg/common"
+	"fmt"
+
+	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// addAPIsIfOnOpenShift adds the provided AddToScheme functions to the AddToSchemes SchemeBuilder only if the cluster
-// this Operator is running on is an OpenShift cluster. This is done to avoid issues where OpenShift-specific CRDs are
+// addToSchemeTest structs contain an AddToScheme function for SchemeBuilders as well as list of types to test client
+// calls on.
+type addToSchemeTest struct {
+	AddToScheme  func(s *runtime.Scheme) error
+	ListType     client.ObjectList
+	GroupVersion schema.GroupVersion
+}
+
+// addAPIfRegistered adds the provided API's AddToScheme function to the AddToSchemes SchemeBuilder only if the cluster
+// this Operator is running on has the API registered. This is done to avoid issues where OpenShift-specific kinds are
 // not installed on the cluster, which lead to failures to start the controller.
-func addAPIsIfOnOpenShift(ctx context.Context, addToSchemeFuncs ...func(s *runtime.Scheme) error) (err error) {
-	logger := logf.FromContext(ctx).WithName("addAPIsIfOnOpenShift")
-	clusterType, err := common.GetClusterType(ctx, common.GlobalConfigMapName)
+func addAPIfRegistered(ctx context.Context, addToSchemeTests ...*addToSchemeTest) (err error) {
+	logger := logf.FromContext(ctx).WithName("addRouteV1APIfRegistered")
+	cfg, err := config.GetConfig()
 	if err != nil {
-		logger.Error(err, "Failed to detect cluster type")
+		err = fmt.Errorf("could not obtain cluster config: %w", err)
 		return
 	}
-	if clusterType == common.OpenShift {
-		logger.Info("Running on OpenShift - adding relevant schemes")
-		AddToSchemes = append(AddToSchemes, addToSchemeFuncs...)
-	} else {
-		logger.Info("Not running on OpenShift - skipping OpenShift-specific schemes")
+	addToSchemes := []func(s *runtime.Scheme) error{}
+	for _, test := range addToSchemeTests {
+		addToSchemes = append(addToSchemes, test.AddToScheme)
 	}
+	sb := runtime.NewSchemeBuilder(addToSchemes...)
+	scheme := runtime.NewScheme()
+	err = sb.AddToScheme(scheme)
+	if err != nil {
+		err = fmt.Errorf("failed to construct test schema: %w", err)
+		return
+	}
+
+	apiDetectClient, err := client.New(cfg, client.Options{Scheme: scheme})
+	if err != nil {
+		err = fmt.Errorf("failed to create test client: %w", err)
+		return
+	}
+
+	operatorNs, _ := k8sutil.GetOperatorNamespace()
+	opts := []client.ListOption{
+		client.InNamespace(operatorNs),
+	}
+	for _, test := range addToSchemeTests {
+		err = apiDetectClient.List(ctx, test.ListType, opts...)
+		if err != nil {
+			logger.Info("API group could not be retrieved from the cluster; skipping scheme", "groupversion", test.GroupVersion)
+			err = nil
+			continue
+		}
+		logger.Info("API group found on the cluster", "groupversion", test.GroupVersion)
+		AddToSchemes = append(AddToSchemes, test.AddToScheme)
+	}
+
 	return
 }

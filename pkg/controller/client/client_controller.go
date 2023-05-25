@@ -109,7 +109,6 @@ type ReconcileClient struct {
 	recorder                record.EventRecorder
 	scheme                  *runtime.Scheme
 	config                  ClientControllerConfig
-	csCACertSecret          *corev1.Secret
 	sharedServicesNamespace string
 }
 
@@ -129,17 +128,12 @@ func (r *ReconcileClient) SetConfig(ctx context.Context, namespace string) (err 
 		}
 	}
 
-	err = r.checkCSCACertificateSecret(ctx)
-	if err != nil {
-		return
-	}
-
 	configMap := &corev1.ConfigMap{}
 	err = r.client.Get(ctx, types.NamespacedName{Name: PlatformAuthIDPConfigMapName, Namespace: r.sharedServicesNamespace}, configMap)
 	if err != nil {
 		return fmt.Errorf("client failed to GET ConfigMap: %w", err)
 	}
-	err = r.config.ApplyConfigMap(configMap, identityManagementURLKey, identityProviderURLKey, rOKSEnabledKey, authServiceURLKey, osAuthEnabledKey)
+	err = r.config.ApplyConfigMap(configMap, identityManagementURLKey, identityProviderURLKey, rOKSEnabledKey, authServiceURLKey)
 	if err != nil {
 		return fmt.Errorf("failed to configure: %w", err)
 	}
@@ -160,52 +154,6 @@ func (r *ReconcileClient) SetConfig(ctx context.Context, namespace string) (err 
 	err = r.config.ApplySecret(platformOIDCCredentialsSecret, oAuthAdminPasswordKey)
 	if err != nil {
 		return fmt.Errorf("failed to configure: %w", err)
-	}
-	return
-}
-
-// checkCSCACertificateSecret synchronizes the state of cached certificates from the Common Services CA based
-// upon events received from the cluster.
-func (r *ReconcileClient) checkCSCACertificateSecret(ctx context.Context) (err error) {
-	reqLogger := logf.FromContext(ctx).WithName("checkCSCACertificateSecret")
-	currentCertSecret := &corev1.Secret{}
-	namespacedName := types.NamespacedName{Name: CSCACertificateSecretName, Namespace: r.sharedServicesNamespace}
-	var verb string
-	err = r.Reader.Get(ctx, namespacedName, currentCertSecret)
-	if errors.IsNotFound(err) {
-		reqLogger.Info("cs-ca-certificate-secret not found; removing cached certificate")
-		verb = "delete"
-		r.deleteCSCACertificateSecret(ctx)
-		reqLogger.Info("certificate registration succeeded", "action", verb)
-		return nil
-	} else if err != nil {
-		// Some other issue arose
-		return
-	}
-
-	oldCertSecret := r.csCACertSecret
-	if oldCertSecret == nil {
-		reqLogger.Info("cs-ca-certificate-secret not registered; caching certificate")
-		err = r.setCSCACertificateSecret(ctx, currentCertSecret)
-		verb = "create"
-	} else if currentCertSecret.GetDeletionTimestamp() != nil {
-		reqLogger.Info("cs-ca-certificate-secret deleted; removing cached certificate")
-		r.deleteCSCACertificateSecret(ctx)
-		verb = "delete"
-	} else {
-		if string(oldCertSecret.Data[corev1.TLSCertKey]) != string(currentCertSecret.Data[corev1.TLSCertKey]) {
-			reqLogger.Info("cs-ca-certificate-secret was updated; caching updated certificate")
-			err = r.setCSCACertificateSecret(ctx, currentCertSecret)
-			verb = "update"
-		} else {
-			reqLogger.Info("cs-ca-certificate-secret has not changed")
-			return
-		}
-	}
-	if err != nil {
-		reqLogger.Info("certificate registration failed", "action", verb)
-	} else {
-		reqLogger.Info("certificate registration succeeded", "action", verb)
 	}
 	return
 }
@@ -288,7 +236,9 @@ func (r *ReconcileClient) createClient(ctx context.Context, client *oidcv1.Clien
 	}
 
 	reqLogger.Info("adding annotations to ibm-iam-operand-restricted ServiceAccount")
-	r.handleServiceAccount(ctx, client)
+	reqLogger.Info("SharedServicesNamespace is", "iamoperandnamespace", r.sharedServicesNamespace)
+
+	r.handleServiceAccount(ctx, client, r.sharedServicesNamespace)
 	if client.Spec.ZenInstanceId == "" {
 		err = r.processZenRegistration(ctx, client, clientCreds)
 		if err != nil {
@@ -358,7 +308,8 @@ func (r *ReconcileClient) updateClient(ctx context.Context, client *oidcv1.Clien
 	}
 
 	reqLogger.Info("Updating annotations to ibm-iam-operand-restricted ServiceAccount")
-	r.handleServiceAccount(ctx, client)
+	reqLogger.Info("SharedServicesNamespace is", "iamoperandnamespace", r.sharedServicesNamespace)
+	r.handleServiceAccount(ctx, client, r.sharedServicesNamespace)
 
 	err = r.processZenRegistration(ctx, client, clientCreds)
 	if err != nil {
@@ -533,7 +484,8 @@ func (r *ReconcileClient) deleteClient(ctx context.Context, client *oidcv1.Clien
 	reqLogger.Info("Client registration successfully deleted")
 
 	reqLogger.Info("Deleting annotations from ibm-iam-operand-restricted ServiceAccount")
-	r.RemoveAnnotationFromSA(ctx, client)
+	reqLogger.Info("SharedServicesNamespace is", "iamoperandnamespace", r.sharedServicesNamespace)
+	r.RemoveAnnotationFromSA(ctx, client, r.sharedServicesNamespace)
 	// Delete the zeninstance if it has been specified
 	if client.Spec.ZenInstanceId != "" {
 		reqLogger.Info("Client has a zenInstanceId, attempt to delete the matching Zen instance")
@@ -635,14 +587,14 @@ func (r *ReconcileClient) createNewSecretForClient(ctx context.Context, client *
 }
 
 // handleServiceAccount updates ibm-iam-operand-restricted SA with redirecturi's present present in the Client CR for updateClient Call
-func (r *ReconcileClient) handleServiceAccount(ctx context.Context, client *oidcv1.Client) {
+func (r *ReconcileClient) handleServiceAccount(ctx context.Context, client *oidcv1.Client, sAccNamespace string) {
 
 	reqLogger := logf.FromContext(ctx).WithValues("Request.Namespace", client.Namespace, "client.Name", client.Name)
 	clientName := client.ObjectMeta.Name
 	redirectURIs := client.Spec.OidcLibertyClient.RedirectUris
 	sAccName := "ibm-iam-operand-restricted"
 	serviceAccount := &corev1.ServiceAccount{}
-	err := r.client.Get(ctx, types.NamespacedName{Name: sAccName, Namespace: client.Namespace}, serviceAccount)
+	err := r.client.Get(ctx, types.NamespacedName{Name: sAccName, Namespace: sAccNamespace}, serviceAccount)
 	if err != nil {
 		reqLogger.Error(err, "failed to GET ServiceAccount ibm-iam-operand-restricted")
 		return
@@ -667,14 +619,14 @@ func (r *ReconcileClient) handleServiceAccount(ctx context.Context, client *oidc
 }
 
 // RemoveAnnotationFromSA removes respective redirecturi annotation present in ibm-iam-operand-restricted SA for deleteClient Call
-func (r *ReconcileClient) RemoveAnnotationFromSA(ctx context.Context, client *oidcv1.Client) {
+func (r *ReconcileClient) RemoveAnnotationFromSA(ctx context.Context, client *oidcv1.Client, sAccNamespace string) {
 
 	reqLogger := logf.FromContext(ctx).WithValues("Request.Namespace", client.Namespace, "client.Name", client.Name)
 	clientName := client.ObjectMeta.Name
 	redirectURIs := client.Spec.OidcLibertyClient.RedirectUris
 	sAccName := "ibm-iam-operand-restricted"
 	serviceAccount := &corev1.ServiceAccount{}
-	err := r.client.Get(ctx, types.NamespacedName{Name: sAccName, Namespace: client.Namespace}, serviceAccount)
+	err := r.client.Get(ctx, types.NamespacedName{Name: sAccName, Namespace: sAccNamespace}, serviceAccount)
 	if err != nil {
 		reqLogger.Error(err, "failed to GET ServiceAccount ibm-iam-operand-restricted")
 		return

@@ -36,9 +36,6 @@ const (
 	// rOKSEnabledKey is the key in the ClientControllerConfig corresponding to a boolean string value that enables or
 	// disables the automatic creation of an Openshift OAuthClients (legacy)
 	rOKSEnabledKey string = "ROKS_ENABLED"
-	// osAuthEnabledKey is the key in the ClientControllerConfig corresponding to a boolean string value that enables or
-	// disables OpenShift authentication using OAuthClients
-	osAuthEnabledKey string = "OSAUTH_ENABLED"
 	// defaultAdminUserKey is the key in the ClientControllerConfig corresponding to the default admin username for the IAM API
 	defaultAdminUserKey string = "admin_username"
 	// defaultAdminPasswordKey is the key in the ClientControllerConfig corresponding to the default admin password for the IAM API
@@ -134,9 +131,6 @@ func (r *ReconcileClient) IsConfigured() bool {
 	if _, err := r.GetROKSEnabled(); err != nil {
 		return false
 	}
-	if _, err := r.GetOSAuthEnabled(); err != nil {
-		return false
-	}
 	if value, err := r.GetAuthServiceURL(); value != "" && err != nil && strings.Contains(value, "127.0.0.1") {
 		return false
 	}
@@ -179,17 +173,6 @@ func (r *ReconcileClient) GetOAuthAdminPassword() (value string, err error) {
 // present.
 func (r *ReconcileClient) GetROKSEnabled() (value bool, err error) {
 	valueStr, err := r.config.getConfigValue(rOKSEnabledKey)
-	if valueStr == "true" {
-		return true, nil
-	}
-	return
-}
-
-// GetOSAuthEnabled gets from the ClientControllerConfig whether the controller is enabled to use OpenShift OAuthClients
-// for OIDC Client authentication; creates and manages OAuthClient objects with names that match OIDC Client's clientId
-// field. Produces an error if the ClientControllerConfig is empty or if the key is not present.
-func (r *ReconcileClient) GetOSAuthEnabled() (value bool, err error) {
-	valueStr, err := r.config.getConfigValue(osAuthEnabledKey)
 	if valueStr == "true" {
 		return true, nil
 	}

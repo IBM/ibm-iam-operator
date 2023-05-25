@@ -172,9 +172,8 @@ func (r *ReconcileClient) invokeClientRegistrationAPI(ctx context.Context, clien
 	if err != nil {
 		reqLogger.Error(err, "Request failed")
 		return
-	} else {
-		reqLogger.Info("Request complete", "response", response)
 	}
+	reqLogger.Info("Request complete")
 	return
 }
 
@@ -196,51 +195,18 @@ func (r *ReconcileClient) GetClientRegistration(ctx context.Context, client *oid
 	return
 }
 
-// setCSCACertificateSecret caches a copy of the Secret that contains the Common Services CA certificate for the
-// provided namespace. If a Secret has already been cached for the namespace, this function replaces it with the new
-// Secret.
-func (r *ReconcileClient) setCSCACertificateSecret(ctx context.Context, secret *corev1.Secret) (err error) {
-	if secret == nil {
-		return fmt.Errorf("provided Secret pointer was nil")
-	}
-	r.csCACertSecret = secret
-	return
-}
-
-// deleteCSCACertificateSecret deletes the cached copy of the Secret that contains the Common Services CA certificate
-// for the provided namespace.
-func (r *ReconcileClient) deleteCSCACertificateSecret(ctx context.Context) {
-	r.csCACertSecret = nil
-}
-
 // getCSCACertificateSecret gets the Secret that contains the Common Services CA certificate for the provided namespace.
 // It will return the ReconcileClient's cached Secret for the namespace if it has one registered, or it will look up and
 // return whatever matching Secret exists in the cluster and cache it for future use.
 func (r *ReconcileClient) getCSCACertificateSecret(ctx context.Context) (secret *corev1.Secret, err error) {
-	logger := logf.FromContext(ctx).WithName("getCSCACertificateSecret")
-	secret = r.csCACertSecret
-	// Have the secret locally; return it
-	if secret != nil {
-		logger.Info("found CA certificate secret")
-		return
-	}
-	logger.Info("CA certificate secret not found")
+	logger := logf.FromContext(ctx).WithName("getCSCACertificateSecret").WithValues("secretName", CSCACertificateSecretName)
 	secret = &corev1.Secret{}
-	// Need to perform lookup of secret in the cluster
-	logger.Info("Attempt to get secret from namespace", "secretName", CSCACertificateSecretName)
 	err = r.client.Get(ctx, types.NamespacedName{Name: CSCACertificateSecretName, Namespace: r.sharedServicesNamespace}, secret)
 	if err != nil {
-		logger.Error(err, "failed to get secret", "secretName", CSCACertificateSecretName)
+		logger.Error(err, "Failed to get secret")
 		return nil, err
 	} else {
-		logger.Info("found secret on the cluster")
-	}
-
-	err = r.setCSCACertificateSecret(ctx, secret)
-	if err != nil {
-		logger.Error(err, "failed to set secret", "secretName", CSCACertificateSecretName)
-	} else {
-		logger.Info("found CA certificate secret")
+		logger.Info("Got secret")
 	}
 
 	return

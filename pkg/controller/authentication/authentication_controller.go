@@ -333,13 +333,6 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 		return
 	}
 
-	//Check if this ConfigMap already exists and create it if it doesn't
-	currentConfigMap := &corev1.ConfigMap{}
-	err = r.handleConfigMap(instance, wlpClientID, wlpClientSecret, currentConfigMap, &needToRequeue)
-	if err != nil {
-		return
-	}
-
 	// Check if this Service already exists and create it if it doesn't
 	currentService := &corev1.Service{}
 	err = r.handleService(instance, currentService, &needToRequeue)
@@ -350,6 +343,13 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	// Check if this Secret already exists and create it if it doesn't
 	currentSecret := &corev1.Secret{}
 	err = r.handleSecret(instance, wlpClientID, wlpClientSecret, currentSecret, &needToRequeue)
+	if err != nil {
+		return
+	}
+
+	//Check if this ConfigMap already exists and create it if it doesn't
+	currentConfigMap := &corev1.ConfigMap{}
+	err = r.handleConfigMap(instance, wlpClientID, wlpClientSecret, currentConfigMap, &needToRequeue)
 	if err != nil {
 		return
 	}

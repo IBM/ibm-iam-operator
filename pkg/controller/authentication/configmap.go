@@ -392,7 +392,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					err = fmt.Errorf("an error occurred during registration-json generation")
 					return err
 				}
-				reqLogger.Info("Calculated new platform-oidc-registration.json", "json", newConfigMap.Data["platform-oidc-registration.json"])
+				reqLogger.Info("Calculated new platform-oidc-registration.json")
 				var currentRegistrationJSON, newRegistrationJSON *registrationJSONData
 				newRegistrationJSON = &registrationJSONData{}
 				currentRegistrationJSON = &registrationJSONData{}

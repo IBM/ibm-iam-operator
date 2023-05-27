@@ -290,12 +290,12 @@ func (r *ReconcileClient) updateClient(ctx context.Context, client *oidcv1.Clien
 		err = fmt.Errorf("error occurred during update oidc client registration: %w", err)
 		return
 	}
-	responseBody, err := ioutil.ReadAll(response.Body)
+	_, err = ioutil.ReadAll(response.Body)
 	if err != nil {
 		log.Error(err, "Failed to read response body")
 		err = nil
 	}
-	reqLogger.Info("Received response", "body", responseBody)
+	reqLogger.Info("Received non-empty response")
 
 	// secret is nil if getSecretFromClient produces an error, which we assume to mean that the Secret sought after didn't
 	// turn up. If this happens, try to create a new secret using the clientCreds that were freshly generated and used for

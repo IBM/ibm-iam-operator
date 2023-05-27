@@ -120,7 +120,7 @@ func (r *ReconcileClient) UpdateClientRegistration(ctx context.Context, client *
 		logger.Error(err, "Client registration update failed")
 		return nil, NewOIDCClientError(response)
 	}
-	logger.Info("Client registration update successful", "response", response)
+	logger.Info("Client registration update successful")
 	return
 }
 

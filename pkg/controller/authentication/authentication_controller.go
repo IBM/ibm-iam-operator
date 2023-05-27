@@ -294,7 +294,6 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 		return
 	}
 
-	var instanceUpdated bool
 	// Credit: kubebuilder book
 	finalizerName := "authentication.operator.ibm.com"
 	// Determine if the Authentication CR  is going to be deleted
@@ -307,30 +306,43 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 		}
 		afterFinalizerCount := len(instance.GetFinalizers())
 		if afterFinalizerCount > beforeFinalizerCount {
-			instanceUpdated, needToRequeue = true, true
+			needToRequeue = true
 			return
 		}
 	} else {
 		// Object scheduled to be deleted
 		err = r.removeFinalizer(reconcileCtx, finalizerName, instance)
-		instanceUpdated = true
 		return
 	}
 
 	// Be sure to update status before returning if Authentication is found (but only if the Authentication hasn't
 	// already been updated, e.g. finalizer update
 	defer func() {
-		if instanceUpdated {
-			return
-		}
+		reqLogger.Info("Update status before finishing loop.")
 		if reflect.DeepEqual(instance.Status, operatorv1alpha1.AuthenticationStatus{}) {
 			instance.Status = operatorv1alpha1.AuthenticationStatus{
 				Nodes: []string{},
 			}
 		}
-		reqLogger.Info("Gather current service status")
 		currentServiceStatus := r.getCurrentServiceStatus(ctx, r.client, instance)
-		instance.SetService(reconcileCtx, currentServiceStatus, r.client, &r.Mutex)
+		if !reflect.DeepEqual(currentServiceStatus, instance.Status.Service) {
+			instance.Status.Service = currentServiceStatus
+			reqLogger.Info("Current status does not reflect current state; updating")
+		}
+		err = r.client.Status().Update(ctx, instance)
+		if err != nil {
+			reqLogger.Error(err, "Failed to update status; trying again")
+			currentInstance := &operatorv1alpha1.Authentication{}
+			r.client.Get(ctx, request.NamespacedName, currentInstance)
+			currentInstance.Status.Service = currentServiceStatus
+			err = r.client.Status().Update(ctx, currentInstance)
+			if err != nil {
+				reqLogger.Error(err, "Retry failed; returning error")
+				return
+			}
+		} else {
+			reqLogger.Info("Updated status")
+		}
 	}()
 
 	// Check if this Certificate already exists and create it if it doesn't

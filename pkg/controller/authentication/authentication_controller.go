@@ -19,6 +19,7 @@ package authentication
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
@@ -293,20 +294,19 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 		return
 	}
 
-	// Be sure to update status before returning if Authentication is found
-	defer func() {
-		reqLogger.Info("Gather current service status")
-		currentServiceStatus := r.getCurrentServiceStatus(ctx, r.client, instance)
-		instance.SetService(reconcileCtx, currentServiceStatus, r.client, &r.Mutex)
-	}()
-
 	// Credit: kubebuilder book
 	finalizerName := "authentication.operator.ibm.com"
 	// Determine if the Authentication CR  is going to be deleted
 	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Object not being deleted, but add our finalizer so we know to remove this object later when it is going to be deleted
+		beforeFinalizerCount := len(instance.GetFinalizers())
 		err = r.addFinalizer(reconcileCtx, finalizerName, instance)
 		if err != nil {
+			return
+		}
+		afterFinalizerCount := len(instance.GetFinalizers())
+		if afterFinalizerCount > beforeFinalizerCount {
+			needToRequeue = true
 			return
 		}
 	} else {
@@ -314,6 +314,36 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 		err = r.removeFinalizer(reconcileCtx, finalizerName, instance)
 		return
 	}
+
+	// Be sure to update status before returning if Authentication is found (but only if the Authentication hasn't
+	// already been updated, e.g. finalizer update
+	defer func() {
+		reqLogger.Info("Update status before finishing loop.")
+		if reflect.DeepEqual(instance.Status, operatorv1alpha1.AuthenticationStatus{}) {
+			instance.Status = operatorv1alpha1.AuthenticationStatus{
+				Nodes: []string{},
+			}
+		}
+		currentServiceStatus := r.getCurrentServiceStatus(ctx, r.client, instance)
+		if !reflect.DeepEqual(currentServiceStatus, instance.Status.Service) {
+			instance.Status.Service = currentServiceStatus
+			reqLogger.Info("Current status does not reflect current state; updating")
+		}
+		err = r.client.Status().Update(ctx, instance)
+		if err != nil {
+			reqLogger.Error(err, "Failed to update status; trying again")
+			currentInstance := &operatorv1alpha1.Authentication{}
+			r.client.Get(ctx, request.NamespacedName, currentInstance)
+			currentInstance.Status.Service = currentServiceStatus
+			err = r.client.Status().Update(ctx, currentInstance)
+			if err != nil {
+				reqLogger.Error(err, "Retry failed; returning error")
+				return
+			}
+		} else {
+			reqLogger.Info("Updated status")
+		}
+	}()
 
 	// Check if this Certificate already exists and create it if it doesn't
 	reqLogger.Info("Creating ibm-iam-operand-restricted serviceaccount")

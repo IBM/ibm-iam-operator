@@ -33,6 +33,7 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	pkgCommon "github.com/IBM/ibm-iam-operator/pkg/common"
+	ctrlCommon "github.com/IBM/ibm-iam-operator/pkg/controller/common"
 	osconfigv1 "github.com/openshift/api/config/v1"
 	"gopkg.in/yaml.v2"
 	batchv1 "k8s.io/api/batch/v1"
@@ -100,22 +101,29 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 		}
 	} else {
 		labels := currentConfigMap.Labels
-		ownerRefs := currentConfigMap.OwnerReferences
-		var ownRef string
-		for _, ownRefs := range ownerRefs {
-			ownRef = ownRefs.Kind
-		}
 
 		if labels != nil {
 			value, ok := labels["app"]
-			if ok && value == "auth-idp" && ownRef == "Authentication" {
+			if ok && value == "auth-idp" && ctrlCommon.IsControllerOf(instance, currentConfigMap) {
 				reqLogger.Info("ibmcloud-cluster-info Configmap is already created by IM operator", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
-			} else if ok && value == "management-ingress" && ownRef == "ManagementIngress" {
+			} else if ok && value == "management-ingress" && ctrlCommon.GetControllerKind(currentConfigMap) == "ManagementIngress" {
 				reqLogger.Info("Configmap is already created by managementingress , IM installation may not proceed further until the configmap is removed", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
 				*needToRequeue = true
 				return
 			} else {
-				reqLogger.Info("Can't determine the configmap ownership , IM installation may not proceed further until the configmap is removed", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+				reqLogger.Info("ConfigMap is not owned by the current Authentication or a ManagementIngress; will attempt to become controller", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+				if err = controllerutil.SetControllerReference(instance, currentConfigMap, r.client.Scheme()); err != nil {
+					reqLogger.Error(err, "Could not become the controller of the ConfigMap; it may need to be removed", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+					return
+				}
+				currentConfigMap.Labels["app"] = "auth-idp"
+				reqLogger.Info("Became controller and labeled to indicate association with IM; attempting update", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+				err = r.client.Update(context.TODO(), currentConfigMap)
+				if err != nil {
+					reqLogger.Error(err, "Failed to update ConfigMap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+					return
+				}
+				reqLogger.Info("Successfully updated ConfigMap; requeueing reconcile", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
 				*needToRequeue = true
 				return
 			}
@@ -384,7 +392,7 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					err = fmt.Errorf("an error occurred during registration-json generation")
 					return err
 				}
-				reqLogger.Info("Calculated new platform-oidc-registration.json", "json", newConfigMap.Data["platform-oidc-registration.json"])
+				reqLogger.Info("Calculated new platform-oidc-registration.json")
 				var currentRegistrationJSON, newRegistrationJSON *registrationJSONData
 				newRegistrationJSON = &registrationJSONData{}
 				currentRegistrationJSON = &registrationJSONData{}
@@ -421,14 +429,18 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					reqLogger.Info("ConfigMap successfully updated")
 					if updatedJSON {
 						reqLogger.Info("Deleting Job to re-run with upated ConfigMap", "Job.Name", "oidc-client-registration")
-					
+
 						job := &batchv1.Job{
 							ObjectMeta: metav1.ObjectMeta{
-								Name: "oidc-client-registration",
+								Name:      "oidc-client-registration",
 								Namespace: instance.Namespace,
 							},
 						}
 						if err = r.client.Delete(context.TODO(), job); err != nil {
+							if errors.IsNotFound(err) {
+								reqLogger.Info("Job not found on cluster; continuing", "Job.Name", "oidc-client-registration")
+								return nil
+							}
 							reqLogger.Error(err, "Could not delete job", "Job.Name", "oidc-client-registration")
 							return
 						}

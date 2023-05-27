@@ -39,7 +39,7 @@ const (
 )
 
 func getServiceStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getServiceStatus")
+	reqLogger := logf.FromContext(ctx).WithName("getServiceStatus").V(3)
 	kind := "Service"
 	status = operatorv1alpha1.ManagedResourceStatus{
 		ObjectName: namespacedName.Name,
@@ -74,7 +74,7 @@ func getAllServiceStatus(ctx context.Context, k8sClient client.Client, names []s
 }
 
 func getDeploymentStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getDeploymentStatus")
+	reqLogger := logf.FromContext(ctx).WithName("getDeploymentStatus").V(3)
 	kind := "Deployment"
 	status = operatorv1alpha1.ManagedResourceStatus{
 		ObjectName: namespacedName.Name,
@@ -114,7 +114,7 @@ func getAllDeploymentStatus(ctx context.Context, k8sClient client.Client, names 
 }
 
 func getJobStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getJobStatus")
+	reqLogger := logf.FromContext(ctx).WithName("getJobStatus").V(3)
 	kind := "Job"
 	status = operatorv1alpha1.ManagedResourceStatus{
 		ObjectName: namespacedName.Name,
@@ -154,7 +154,7 @@ func getAllJobStatus(ctx context.Context, k8sClient client.Client, names []strin
 }
 
 func getRouteStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getRouteStatus")
+	reqLogger := logf.FromContext(ctx).WithName("getRouteStatus").V(3)
 	kind := "Route"
 	status = operatorv1alpha1.ManagedResourceStatus{
 		ObjectName: namespacedName.Name,
@@ -196,7 +196,7 @@ func getAllRouteStatus(ctx context.Context, k8sClient client.Client, names []str
 }
 
 func (r *ReconcileAuthentication) getCurrentServiceStatus(ctx context.Context, k8sClient client.Client, authentication *operatorv1alpha1.Authentication) (status operatorv1alpha1.ServiceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getCurrentServiceStatus")
+	reqLogger := logf.FromContext(ctx).WithName("getCurrentServiceStatus").V(3)
 	type statusRetrieval struct {
 		names []string
 		f     statusRetrievalFunc

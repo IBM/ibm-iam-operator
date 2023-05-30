@@ -339,14 +339,9 @@ func (r *ReconcileAuthentication) reconcileRoute(ctx context.Context, instance *
 			InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
 			DestinationCACertificate:      string(fields.DestinationCAcert),
 		}*/
-			/*calculatedRoute.Spec.TLS.Key = observedRoute.Spec.TLS.Key
+			calculatedRoute.Spec.TLS.Key = observedRoute.Spec.TLS.Key
 			calculatedRoute.Spec.TLS.Certificate = observedRoute.Spec.TLS.Certificate
-			calculatedRoute.Spec.TLS.CACertificate = observedRoute.Spec.TLS.CACertificate*/
-			calculatedRoute.Spec.TLS.Certificate, calculatedRoute.Spec.TLS.CACertificate, calculatedRoute.Spec.TLS.Key, err = r.getTlsFromSecret(ctx, instance, needToRequeue)
-			if err != nil {
-				reqLogger.Info("Unable to get certificate for service", "serviceName", PlatformAuthServiceName, "requeueNeeded", *needToRequeue)
-				return
-			}
+			calculatedRoute.Spec.TLS.CACertificate = observedRoute.Spec.TLS.CACertificate
 		}
 
 		//routeHost is immutable so it must be checked first and the route recreated if it has changed
@@ -381,42 +376,6 @@ func (r *ReconcileAuthentication) reconcileRoute(ctx context.Context, instance *
 			*needToRequeue = true
 		}
 	}
-	return
-}
-
-func (r *ReconcileAuthentication) getTlsFromSecret(ctx context.Context, instance *operatorv1alpha1.Authentication, needToRequeue *bool) (certificate string, caCertificate string, crtKey string, err error) {
-	reqLogger := log.WithValues("func", "getCertificateForService", "namespace", instance.Namespace)
-	secret := &corev1.Secret{}
-	var secretName string
-	secretName = "custom-tls-secret"
-
-	err = r.client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: instance.Namespace}, secret)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			reqLogger.Info("unable to get route destination certificate, secret does exist. Requeue and try again", "secretName", secretName)
-			*needToRequeue = true
-			err = nil
-			return
-		}
-		reqLogger.Error(err, "failed to get route destination certificate", "secretName", secretName)
-		return
-	}
-
-	caCrt, ok := secret.Data["ca.crt"]
-	if !ok || len(caCrt) == 0 {
-		err = fmt.Errorf("found secret %q, but \"ca.crt\" was empty", secretName)
-	}
-	cert, ok := secret.Data["cert.crt"]
-	if !ok || len(cert) == 0 {
-		err = fmt.Errorf("found secret %q, but \"cert.crt\" was empty", secretName)
-	}
-	key, ok := secret.Data["cert.key"]
-	if !ok || len(key) == 0 {
-		err = fmt.Errorf("found secret %q, but \"cert.key\" was empty", secretName)
-	}
-	caCertificate = string(caCrt)
-	certificate = string(cert)
-	crtKey = string(key)
 	return
 }
 

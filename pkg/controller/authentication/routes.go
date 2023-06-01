@@ -328,6 +328,14 @@ func (r *ReconcileAuthentication) reconcileRoute(ctx context.Context, instance *
 			}
 		}
 
+		// if observed route contains certificate, caCertificate and key we must keep these values
+		if observedRoute.Spec.TLS.Key != "" && observedRoute.Spec.TLS.Certificate != "" && observedRoute.Spec.TLS.CACertificate != "" {
+			reqLogger.Info("Updating route with TLS key, certificate and caCertificate")
+			calculatedRoute.Spec.TLS.Key = observedRoute.Spec.TLS.Key
+			calculatedRoute.Spec.TLS.Certificate = observedRoute.Spec.TLS.Certificate
+			calculatedRoute.Spec.TLS.CACertificate = observedRoute.Spec.TLS.CACertificate
+		}
+
 		//routeHost is immutable so it must be checked first and the route recreated if it has changed
 		if observedRoute.Spec.Host != calculatedRoute.Spec.Host {
 			err = r.client.Delete(ctx, observedRoute)

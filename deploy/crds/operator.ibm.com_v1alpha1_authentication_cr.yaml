@@ -9,6 +9,10 @@ metadata:
 spec:
   operatorVersion: "0.14.1"
   replicas: 1
+  auditService:
+    imageRegistry: "quay.io/opencloudio"
+    imageName: "icp-auth-service-dummy"
+    imageTag: "icp-auth-service-dummy"
   authService:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"

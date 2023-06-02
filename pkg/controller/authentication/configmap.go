@@ -700,7 +700,7 @@ func (r *ReconcileAuthentication) ibmcloudClusterInfoConfigMap(client client.Cli
 	if !isOSEnv {
 		reqLogger.Info("Env type is CNCF")
 
-		ClusterAddress := strings.Join([]string{"cp-console", domainName}, ".")
+		ClusterAddress := strings.Join([]string{strings.Join([]string{"cp-console", instance.Namespace}, "-"), domainName}, ".")
 		// to be checked for CNCF
 		ep := "https://icp-management-ingress" + "." + instance.Namespace + ".svc:443"
 

@@ -328,9 +328,10 @@ func (r *ReconcileAuthentication) reconcileRoute(ctx context.Context, instance *
 			}
 		}
 
-		// if observed route contains certificate, caCertificate and key we must keep these values
-		if observedRoute.Spec.TLS.Key != "" && observedRoute.Spec.TLS.Certificate != "" && observedRoute.Spec.TLS.CACertificate != "" {
-			reqLogger.Info("Updating route with TLS key, certificate and caCertificate")
+		// if observed route contains a non-empty certificate, caCertificate, and key, these values must be
+		// retained
+		if observedRoute.Spec.TLS != nil && observedRoute.Spec.TLS.Key != "" && observedRoute.Spec.TLS.Certificate != "" && observedRoute.Spec.TLS.CACertificate != "" {
+			reqLogger.Info("Keeping custom TLS key, certificate, and CA certificate from observed Route in calculated Route")
 			calculatedRoute.Spec.TLS.Key = observedRoute.Spec.TLS.Key
 			calculatedRoute.Spec.TLS.Certificate = observedRoute.Spec.TLS.Certificate
 			calculatedRoute.Spec.TLS.CACertificate = observedRoute.Spec.TLS.CACertificate

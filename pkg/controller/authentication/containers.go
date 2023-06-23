@@ -30,7 +30,7 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 		{
 			Name:            "init-mongodb",
 			Image:           mongoDBImage,
-			ImagePullPolicy: corev1.PullAlways,
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"bash",
 				"-c",

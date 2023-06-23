@@ -24,7 +24,7 @@ metadata:
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.10.0",
+              "imageTag": "4.1.0",
               "ldapsCACert": "platform-auth-ldaps-ca-cert",
               "resources": {
                 "limits": {
@@ -39,9 +39,9 @@ metadata:
               "routerCertSecret": "saml-auth-secret"
             },
             "clientRegistration": {
-              "imageName": "icp-platform-auth",
+              "imageName": "im-initcontainer",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.10.0",
+              "imageTag": "4.1.0",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -119,9 +119,9 @@ metadata:
               }
             },
             "initMongodb": {
-              "imageName": "icp-platform-auth",
+              "imageName": "im-initcontainer",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.10.0",
+              "imageTag": "4.1.0",
               "resources": {
                 "limits": {
                   "cpu": "100m",
@@ -221,13 +221,15 @@ metadata:
 spec:
   relatedImages:
     - name: IBM_IAM_OPERATOR_IMAGE
-      image: icr.io/cpopen/ibm-iam-operator@sha256:90e5a5f7c4e7143f71280de4fa689bb9bc23a0c6f44bb44c8120483015033e3f
+      image: icr.io/cpopen/ibm-iam-operator:4.1.0
     - name: ICP_PLATFORM_AUTH_IMAGE
-      image: icr.io/cpopen/cpfs/icp-platform-auth@sha256:12715da7cb32bc60b9869856c8430e4673a95d9d883f96de3afde5c2fe579437
+      image: icr.io/cpopen/cpfs/icp-platform-auth:4.1.0
     - name: ICP_IDENTITY_PROVIDER_IMAGE
-      image: icr.io/cpopen/cpfs/icp-identity-provider@sha256:15c8a1c9b2384bfa4cff1ae38bf0261492a4fef4d9a4907de3b0e7411cd3c0dd
+      image: icr.io/cpopen/cpfs/icp-identity-provider:4.1.0
     - name: ICP_IDENTITY_MANAGER_IMAGE
-      image: icr.io/cpopen/cpfs/icp-identity-manager@sha256:191c45c6e69849123c8d5f0f7a789cb522b2fb5c2aab75563f43af78150e030a
+      image: icr.io/cpopen/cpfs/icp-identity-manager:4.1.0
+    - name: IM_INITCONTAINER_IMAGE
+      image: icr.io/cpopen/cpfs/im-initcontainer:4.1.0
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
@@ -389,6 +391,7 @@ spec:
 
     ## Operator versions
      - 4.1.0
+     - 4.0.0
      - 3.10.0
      - 3.9.1
      - 3.9.0
@@ -504,6 +507,8 @@ spec:
                   value: icr.io/cpopen/cpfs/icp-identity-provider:4.1.0
                 - name: ICP_IDENTITY_MANAGER_IMAGE
                   value: icr.io/cpopen/cpfs/icp-identity-manager:4.1.0
+                - name: IM_INITCONTAINER_IMAGE
+                  value: icr.io/cpopen/cpfs/im-initcontainer:4.1.0
                 - name: WATCH_NAMESPACE
                   valueFrom:
                     configMapKeyRef:

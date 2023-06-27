@@ -90,7 +90,7 @@ metadata:
             "identityManager": {
               "imageName": "icp-identity-manager",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4.0.1",
+              "imageTag": "4.0.0",
               "masterNodesList": "10.0.0.1",
               "resources": {
                 "limits": {
@@ -389,6 +389,7 @@ spec:
 
     ## Operator versions
      - 4.0.1
+     - 4.0.0
      - 3.10.0
      - 3.9.1
      - 3.9.0
@@ -499,11 +500,11 @@ spec:
                 - ibm-iam-operator
                 env:
                 - name: ICP_PLATFORM_AUTH_IMAGE
-                  value: icr.io/cpopen/cpfs/icp-platform-auth:4.0.1
+                  value: icr.io/cpopen/cpfs/icp-platform-auth:4.0.0
                 - name: ICP_IDENTITY_PROVIDER_IMAGE
                   value: icr.io/cpopen/cpfs/icp-identity-provider:4.0.1
                 - name: ICP_IDENTITY_MANAGER_IMAGE
-                  value: icr.io/cpopen/cpfs/icp-identity-manager:4.0.1
+                  value: icr.io/cpopen/cpfs/icp-identity-manager:4.0.0
                 - name: WATCH_NAMESPACE
                   valueFrom:
                     configMapKeyRef:

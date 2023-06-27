@@ -24,7 +24,7 @@ metadata:
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.10.0",
+              "imageTag": "4.0.0",
               "ldapsCACert": "platform-auth-ldaps-ca-cert",
               "resources": {
                 "limits": {
@@ -41,7 +41,7 @@ metadata:
             "clientRegistration": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.10.0",
+              "imageTag": "4.0.0",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -121,7 +121,7 @@ metadata:
             "initMongodb": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "3.10.0",
+              "imageTag": "4.0.0",
               "resources": {
                 "limits": {
                   "cpu": "100m",

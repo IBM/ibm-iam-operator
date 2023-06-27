@@ -90,7 +90,7 @@ metadata:
             "identityManager": {
               "imageName": "icp-identity-manager",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4.0.0",
+              "imageTag": "4.0.1",
               "masterNodesList": "10.0.0.1",
               "resources": {
                 "limits": {
@@ -504,7 +504,7 @@ spec:
                 - name: ICP_IDENTITY_PROVIDER_IMAGE
                   value: icr.io/cpopen/cpfs/icp-identity-provider:4.0.1
                 - name: ICP_IDENTITY_MANAGER_IMAGE
-                  value: icr.io/cpopen/cpfs/icp-identity-manager:4.0.0
+                  value: icr.io/cpopen/cpfs/icp-identity-manager:4.0.1
                 - name: WATCH_NAMESPACE
                   valueFrom:
                     configMapKeyRef:

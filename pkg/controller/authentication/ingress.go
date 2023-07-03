@@ -413,6 +413,8 @@ func platformIdAuthIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends": "true",
 				"icp.management.ibm.com/rewrite-target":  "/",
+				"icp.management.ibm.com/configuration-snippet": `
+					add_header 'X-Frame-Options' 'SAMEORIGIN' always;`,
 			},
 		},
 		Spec: netv1.IngressSpec{

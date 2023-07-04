@@ -38,6 +38,7 @@ require (
 	github.com/coreos/prometheus-operator v0.38.1-0.20200424145508-7e176fda06cc // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
+	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
@@ -92,6 +93,7 @@ require (
 // Pinned to kubernetes-1.16.2
 replace (
 	github.com/dgrijalva/jwt-go => github.com/dgrijalva/jwt-go/v4 v4.0.0-preview1
+	github.com/emicklei/go-restful => github.com/emicklei/go-restful/v3 v3.8.0
 	github.com/golang/protobuf => github.com/golang/protobuf v1.5.2
 	//github.com/go-logr/logr => github.com/go-logr/logr v0.4.0 // indirect
 	//github.com/go-logr/zapr v0.4.0 => github.com/go-logr/zapr v0.4.0 // indirect

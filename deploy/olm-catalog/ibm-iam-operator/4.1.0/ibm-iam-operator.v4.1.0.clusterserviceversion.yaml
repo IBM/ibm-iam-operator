@@ -148,7 +148,7 @@ metadata:
               {
                 "operands": [
                   {
-                    "name": "ibm-mongodb-operator"
+                    "name": "ibm-im-mongodb-operator"
                   },
                   {
                     "name": "ibm-idp-config-ui-operator"

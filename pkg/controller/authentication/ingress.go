@@ -414,7 +414,9 @@ func platformIdAuthIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 				"icp.management.ibm.com/secure-backends": "true",
 				"icp.management.ibm.com/rewrite-target":  "/",
 				"icp.management.ibm.com/configuration-snippet": `
-					add_header 'X-Frame-Options' 'SAMEORIGIN' always;`,
+					add_header 'X-Frame-Options' 'SAMEORIGIN' always;
+					add_header 'X-Content-Type-Options' 'nosniff';
+					`,
 			},
 		},
 		Spec: netv1.IngressSpec{
@@ -575,6 +577,7 @@ func platformOidcBlockIngress(instance *operatorv1alpha1.Authentication, scheme 
 				"icp.management.ibm.com/location-modifier": "=",
 				"icp.management.ibm.com/configuration-snippet": `
 										add_header 'X-XSS-Protection' '1' always;
+										add_header 'X-Content-Type-Options' 'nosniff';
 									`,
 			},
 		},

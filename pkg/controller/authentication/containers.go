@@ -30,7 +30,7 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 		{
 			Name:            "init-mongodb",
 			Image:           mongoDBImage,
-			ImagePullPolicy: corev1.PullAlways,
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"bash",
 				"-c",
@@ -383,10 +383,10 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 					Scheme: "HTTPS",
 				},
 			},
-			InitialDelaySeconds: 60,
+			InitialDelaySeconds: 40,
 			TimeoutSeconds:      10,
-			PeriodSeconds:       30,
-			FailureThreshold:    6,
+			PeriodSeconds:       10,
+			FailureThreshold:    15,
 		},
 		LivenessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
@@ -398,10 +398,10 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 					Scheme: "HTTPS",
 				},
 			},
-			InitialDelaySeconds: 180,
+			InitialDelaySeconds: 50,
 			TimeoutSeconds:      10,
-			PeriodSeconds:       30,
-			FailureThreshold:    6,
+			PeriodSeconds:       10,
+			FailureThreshold:    15,
 		},
 		Env: envVars,
 	}

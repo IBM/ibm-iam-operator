@@ -300,7 +300,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	authServiceImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
-	mongoDBImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
+	mongoDBImage := shatag.GetImageRef("IM_INITCONTAINER_IMAGE")
 	replicas := instance.Spec.Replicas
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
@@ -431,7 +431,7 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	identityProviderImage := shatag.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
-	mongoDBImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
+	mongoDBImage := shatag.GetImageRef("IM_INITCONTAINER_IMAGE")
 	replicas := instance.Spec.Replicas
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
@@ -562,7 +562,7 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	identityManagerImage := shatag.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
-	mongoDBImage := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
+	mongoDBImage := shatag.GetImageRef("IM_INITCONTAINER_IMAGE")
 	replicas := instance.Spec.Replicas
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret

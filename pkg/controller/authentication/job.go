@@ -89,7 +89,7 @@ func (r *ReconcileAuthentication) handleJob(instance *operatorv1alpha1.Authentic
 
 func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, jobName string) *batchv1.Job {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	image := shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
+	image := shatag.GetImageRef("IM_INITCONTAINER_IMAGE")
 	resources := instance.Spec.ClientRegistration.Resources
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
@@ -211,7 +211,7 @@ func buildContainer(jobName string, image string, resources *corev1.ResourceRequ
 		{
 			Name:            jobName,
 			Image:           image,
-			ImagePullPolicy: corev1.PullAlways,
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
 				RunAsNonRoot:             &trueVar,

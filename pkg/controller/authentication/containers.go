@@ -299,6 +299,42 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 				},
 			},
 		},
+		{
+			Name: "HTTP_PROXY",
+			ValueFrom: &corev1.EnvVarSource{
+				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp",
+					},
+					Key: "HTTP_PROXY",
+				},
+			},
+			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
+		},
+		{
+			Name: "HTTPS_PROXY",
+			ValueFrom: &corev1.EnvVarSource{
+				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp",
+					},
+					Key: "HTTPS_PROXY",
+				},
+			},
+			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
+		},
+		{
+			Name: "NO_PROXY",
+			ValueFrom: &corev1.EnvVarSource{
+				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp",
+					},
+					Key: "NO_PROXY",
+				},
+			},
+			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
+		},
 	}
 
 	idpEnvVarList := []string{"NODE_ENV", "MASTER_HOST", "IDENTITY_PROVIDER_URL", "HTTP_ONLY", "SESSION_TIMEOUT", "LDAP_RECURSIVE_SEARCH", "LDAP_ATTR_CACHE_SIZE", "LDAP_ATTR_CACHE_TIMEOUT", "LDAP_ATTR_CACHE_ENABLED", "LDAP_ATTR_CACHE_SIZELIMIT",
@@ -570,6 +606,42 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 						Name: "platform-auth-idp",
 					},
 					Key: "IS_OPENSHIFT_ENV",
+				},
+			},
+			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
+		},
+		{
+			Name: "HTTP_PROXY",
+			ValueFrom: &corev1.EnvVarSource{
+				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp",
+					},
+					Key: "HTTP_PROXY",
+				},
+			},
+			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
+		},
+		{
+			Name: "HTTPS_PROXY",
+			ValueFrom: &corev1.EnvVarSource{
+				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp",
+					},
+					Key: "HTTPS_PROXY",
+				},
+			},
+			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
+		},
+		{
+			Name: "NO_PROXY",
+			ValueFrom: &corev1.EnvVarSource{
+				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp",
+					},
+					Key: "NO_PROXY",
 				},
 			},
 			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
@@ -894,6 +966,42 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 						Name: "platform-auth-idp",
 					},
 					Key: "IS_OPENSHIFT_ENV",
+				},
+			},
+			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
+		},
+		{
+			Name: "HTTP_PROXY",
+			ValueFrom: &corev1.EnvVarSource{
+				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp",
+					},
+					Key: "HTTP_PROXY",
+				},
+			},
+			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
+		},
+		{
+			Name: "HTTPS_PROXY",
+			ValueFrom: &corev1.EnvVarSource{
+				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp",
+					},
+					Key: "HTTPS_PROXY",
+				},
+			},
+			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),
+		},
+		{
+			Name: "NO_PROXY",
+			ValueFrom: &corev1.EnvVarSource{
+				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp",
+					},
+					Key: "NO_PROXY",
 				},
 			},
 			//Value: strconv.FormatBool(instance.Spec.Config.IsOpenshiftEnv),

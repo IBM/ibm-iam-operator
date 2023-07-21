@@ -362,6 +362,24 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					cmUpdateRequired = true
 				}
 
+				if _, keyExists := currentConfigMap.Data["HTTP_PROXY"]; !keyExists {
+					reqLogger.Info("HTTP_PROXY key doesn't exist ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					currentConfigMap.Data["HTTP_PROXY"] = newConfigMap.Data["HTTP_PROXY"]
+					cmUpdateRequired = true
+				}
+
+				if _, keyExists := currentConfigMap.Data["HTTPS_PROXY"]; !keyExists {
+					reqLogger.Info("HTTPS_PROXY key doesn't exist ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					currentConfigMap.Data["HTTPS_PROXY"] = newConfigMap.Data["HTTPS_PROXY"]
+					cmUpdateRequired = true
+				}
+
+				if _, keyExists := currentConfigMap.Data["NO_PROXY"]; !keyExists {
+					reqLogger.Info("NO_PROXY key doesn't exist ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					currentConfigMap.Data["NO_PROXY"] = newConfigMap.Data["NO_PROXY"]
+					cmUpdateRequired = true
+				}
+
 				cmUpdateRequired = true
 
 				if cmUpdateRequired {
@@ -567,6 +585,9 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"SCIM_AUTH_CACHE_MAX_SIZE":           "1000",
 			"SCIM_AUTH_CACHE_TTL_VALUE":          "60",
 			"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
+			"HTTP_PROXY":                         nil,
+			"HTTPS_PROXY":                        nil,
+			"NO_PROXY":                           nil,
 		},
 	}
 

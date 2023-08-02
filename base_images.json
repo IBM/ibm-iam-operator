@@ -20,6 +20,7 @@
     "destImage": "ubi8-minimal",
     "tag": "8.8-1014",
     "updatePackages": []
+    
   },
   {
     "imageType": "external",

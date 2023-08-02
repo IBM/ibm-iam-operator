@@ -535,6 +535,7 @@ func platformIdAuthBlockIngress(instance *operatorv1alpha1.Authentication, schem
 				"icp.management.ibm.com/location-modifier": "=",
 				"icp.management.ibm.com/configuration-snippet": `
 					add_header 'X-XSS-Protection' '1' always;
+					add_header 'X-Content-Type-Options' 'nosniff';
 					`,
 			},
 		},

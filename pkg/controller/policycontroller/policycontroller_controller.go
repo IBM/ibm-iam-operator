@@ -576,7 +576,7 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 							},
 							Args: []string{"--v=0", "--update-frequency=60"},
 							LivenessProbe: &corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{"sh", "-c", "pgrep iam-policy -l"},
 									},
@@ -585,7 +585,7 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 								TimeoutSeconds:      5,
 							},
 							ReadinessProbe: &corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{"sh", "-c", "exec echo start iam-policy-controller"},
 									},

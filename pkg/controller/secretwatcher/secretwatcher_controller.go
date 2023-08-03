@@ -454,7 +454,7 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 								},
 							},
 							LivenessProbe: &corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{"ls"},
 									},
@@ -463,7 +463,7 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 								PeriodSeconds:       15,
 							},
 							ReadinessProbe: &corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{"ls"},
 									},

@@ -177,7 +177,7 @@ func buildPdpContainer(pdpImage string, resources *corev1.ResourceRequirements) 
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/v1/health",
 					Port: intstr.IntOrString{
@@ -189,7 +189,7 @@ func buildPdpContainer(pdpImage string, resources *corev1.ResourceRequirements) 
 			InitialDelaySeconds: 30,
 		},
 		LivenessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/v1/health",
 					Port: intstr.IntOrString{

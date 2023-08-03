@@ -172,7 +172,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		source.Kind(mgr.GetCache(), &corev1.Service{}), 
 		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Pap{}, handler.OnlyControllerOwner()),
-		OwnerType:    &operatorv1alpha1.Pap{},
 	)
 	if err != nil {
 		return err

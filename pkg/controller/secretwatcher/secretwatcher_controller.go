@@ -87,10 +87,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Pods and requeue the owner SecretWatcher
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.Deployment{}), &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &operatorv1alpha1.SecretWatcher{},
-	})
+	err = c.Watch(
+		source.Kind(mgr.GetCache(), &appsv1.Deployment{}),
+		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.SecretWatcher{}, handler.OnlyControllerOwner()),
+	)
 	if err != nil {
 		return err
 	}
@@ -497,7 +497,7 @@ func (r *ReconcileSecretWatcher) deploymentForSecretWatcher(instance *operatorv1
 
 // labelsForSecretWatcher returns the labels for selecting the resources
 // belonging to the given secret watcher CR name.
-//CS??? need separate func for each image to set "instanceName"???
+// CS??? need separate func for each image to set "instanceName"???
 func labelsForSecretWatcherPod(instanceName string, deploymentName string) map[string]string {
 	return map[string]string{"app": deploymentName, "component": "secret-watcher", "secretwatcher_cr": instanceName,
 		"app.kubernetes.io/name": deploymentName, "app.kubernetes.io/component": "secret-watcher",
@@ -505,12 +505,12 @@ func labelsForSecretWatcherPod(instanceName string, deploymentName string) map[s
 		"intent": "projected"}
 }
 
-//CS??? need separate func for each image to set "app"???
+// CS??? need separate func for each image to set "app"???
 func labelsForSecretWatcherSelect(instanceName string, deploymentName string) map[string]string {
 	return map[string]string{"app": deploymentName, "component": "secret-watcher", "secretwatcher_cr": instanceName}
 }
 
-//CS???
+// CS???
 func labelsForSecretWatcherMeta(deploymentName string) map[string]string {
 	return map[string]string{"app.kubernetes.io/name": deploymentName, "app.kubernetes.io/component": "secret-watcher", "release": "secret-watcher"}
 }

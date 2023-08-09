@@ -18,12 +18,13 @@ package v1alpha1
 
 import (
 	"context"
+	"reflect"
+	"sync"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sync"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -40,6 +41,7 @@ type AuthenticationSpec struct {
 	AuthService        AuthServiceSpec        `json:"authService"`
 	IdentityProvider   IdentityProviderSpec   `json:"identityProvider"`
 	IdentityManager    IdentityManagerSpec    `json:"identityManager"`
+	PgsqlService       PgsqlServiceSpec       `json:"pqsqlService"`
 	InitMongodb        InitMongodbSpec        `json:"initMongodb"`
 	ClientRegistration ClientRegistrationSpec `json:"clientRegistration"`
 	Config             ConfigSpec             `json:"config"`
@@ -89,6 +91,15 @@ type IdentityProviderSpec struct {
 
 type IdentityManagerSpec struct {
 	ImageRegistry   string                       `json:"imageRegistry"`
+	ImageName       string                       `json:"imageName"`
+	ImageTag        string                       `json:"imageTag"`
+	MasterNodesList string                       `json:"masterNodesList"`
+	Resources       *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type PgsqlServiceSpec struct {
+	LogLevel        string                       `json:"logLevel"`
+	StorageClass    string                       `json:"storageClass"`
 	ImageName       string                       `json:"imageName"`
 	ImageTag        string                       `json:"imageTag"`
 	MasterNodesList string                       `json:"masterNodesList"`

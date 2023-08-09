@@ -38,7 +38,7 @@ spec:
       containers:
         - name: ibm-iam-operator
           # Replace this with the built image name
-          image: icr.io/cpopen/ibm-iam-operator:4.1.0
+          image: quay.io/tirumalamannaru/ibm-iam-operator:cp3.0
           command:
           - ibm-iam-operator
           imagePullPolicy: Always

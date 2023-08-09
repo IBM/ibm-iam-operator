@@ -345,6 +345,10 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 		}
 	}()
 
+	reqLogger.Info("Creating postgresql cluster")
+	if err := r.createUpdateFromYaml(instance, r.scheme, []byte(pgsqlCluster)); err != nil {
+		return reconcile.Result{}, err
+	}
 	// Check if this Certificate already exists and create it if it doesn't
 	reqLogger.Info("Creating ibm-iam-operand-restricted serviceaccount")
 	currentSA := &corev1.ServiceAccount{}

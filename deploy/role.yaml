@@ -211,6 +211,24 @@ rules:
   - rolebindings
   verbs:
   - create
+- apiGroups:
+  - postgresql.k8s.enterprisedb.io
+  resources:
+  - clusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - postgresql.k8s.enterprisedb.io
+  resources:
+  - clusters/finalizers
+  verbs:
+  - update
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1

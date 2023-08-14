@@ -58,6 +58,7 @@ var iamPostgresClientCertificateValues = IamPgsqlClientCACertificateValues{
 	CommonName: "streaming_replica",
 }
 
+// create required certificates for postgresql cluster
 func (r *ReconcileAuthentication) handlePgsqlCerts(instance *operatorv1alpha1.Authentication, currentCertificate *certmgrv1.Certificate, needToRequeue *bool) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", namespace, "Instance.Name", instance.Name)

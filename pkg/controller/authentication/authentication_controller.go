@@ -356,24 +356,13 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 		return
 	}
 
-	reqLogger.Info("TML:: New pgsqlServiceSpec")
 	cluster := r.newPgsqlServiceSpec(instance)
-	reqLogger.Info("TML:: New pgsqlServiceSpec -- DONE")
 	var pgsqlClusterYaml bytes.Buffer
-	reqLogger.Info("TML:: New template")
 	t := template.Must(template.New("cluster").Parse(pgsqlCluster))
-	reqLogger.Info("TML:: New template --DONE")
-	reqLogger.Info("TML:: template Execute")
 	if err := t.Execute(&pgsqlClusterYaml, cluster); err != nil {
-		reqLogger.Info("TML:: template Execute ERROR")
-		reqLogger.Info(err.Error())
-		fmt.Errorf("could not execure yaml: %v", err)
 		return reconcile.Result{}, err
 	}
-	reqLogger.Info("TML:: template Execute -- DONE")
-	reqLogger.Info("Creating postgresql cluster")
-	reqLogger.Info("Print postgresql cluster YAmL below")
-	reqLogger.Info(pgsqlClusterYaml.String())
+	// Create Postgresql Cluster CR
 	if err := r.createUpdateFromYaml(instance, r.scheme, pgsqlClusterYaml.Bytes()); err != nil {
 		return reconcile.Result{}, err
 	}

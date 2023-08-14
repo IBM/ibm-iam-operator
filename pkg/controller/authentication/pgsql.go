@@ -59,10 +59,9 @@ spec:
       memory: {{ .MemReq }}
 `
 
+// Create Postgresql Cluster CR
 func (r *ReconcileAuthentication) createUpdateFromYaml(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, yamlContent []byte) error {
 	obj := &unstructured.Unstructured{}
-	yamlc := string(yamlContent[:])
-	fmt.Println("TML:: Printing the yaml " + yamlc)
 	jsonSpec, err := yaml.YAMLToJSON(yamlContent)
 	if err != nil {
 		return fmt.Errorf("could not convert yaml to json: %v", err)
@@ -78,8 +77,6 @@ func (r *ReconcileAuthentication) createUpdateFromYaml(instance *operatorv1alpha
 	if err := controllerutil.SetControllerReference(instance, obj, scheme); err != nil {
 		return err
 	}
-	jsonc := string(jsonSpec[:])
-	fmt.Println("TML:: Printing the json " + jsonc)
 	err = r.client.Create(context.TODO(), obj)
 	if err != nil {
 		if errors.IsAlreadyExists(err) {
@@ -100,7 +97,6 @@ func (r *ReconcileAuthentication) newPgsqlServiceSpec(instance *operatorv1alpha1
 	if storageClass == "" {
 		storageclass, err := r.getstorageclass()
 		if err != nil {
-			fmt.Errorf("could not Update resource: %v", err)
 			return nil
 		} else {
 			instance.Spec.PgsqlService.StorageClass = storageclass
@@ -111,7 +107,6 @@ func (r *ReconcileAuthentication) newPgsqlServiceSpec(instance *operatorv1alpha1
 		if !scExist {
 			storageclass, err := r.getstorageclass()
 			if err != nil {
-				fmt.Errorf("could not Update resource: %v", err)
 				return nil
 			} else {
 				instance.Spec.PgsqlService.StorageClass = storageclass
@@ -125,17 +120,11 @@ func (r *ReconcileAuthentication) newPgsqlServiceSpec(instance *operatorv1alpha1
 		instance.Spec.PgsqlService.LogLevel = "info"
 	}
 	cpuReq := instance.Spec.PgsqlService.Resources.Requests.Cpu().String()
-	fmt.Println("cpuReq::" + cpuReq)
 	memReq := instance.Spec.PgsqlService.Resources.Requests.Memory().String()
-	fmt.Println("memReq::" + memReq)
 	esReq := instance.Spec.PgsqlService.Resources.Requests.StorageEphemeral().String()
-	fmt.Println("esReq::" + esReq)
 	cpuLim := instance.Spec.PgsqlService.Resources.Limits.Cpu().String()
-	fmt.Println("cpuLim::" + cpuLim)
 	memLim := instance.Spec.PgsqlService.Resources.Limits.Memory().String()
-	fmt.Println("memLim::" + memLim)
 	esLim := instance.Spec.PgsqlService.Resources.Limits.StorageEphemeral().String()
-	fmt.Println("esLim::" + esLim)
 	return &operatorv1alpha1.PgsqlServiceSpec{LogLevel: instance.Spec.PgsqlService.LogLevel, StorageClass: instance.Spec.PgsqlService.StorageClass, ImageName: shatag.GetImageRef("POSTGRESQL_IMAGE"), CpuReq: cpuReq, MemReq: memReq, ESReq: esReq, CpuLim: cpuLim, MemLim: memLim, ESLim: esLim}
 }
 
@@ -153,8 +142,6 @@ func (r *ReconcileAuthentication) getstorageclass() (string, error) {
 	var nonDefaultSC []string
 
 	for _, sc := range scList.Items {
-		fmt.Println("sc.Name is " + sc.Name)
-		fmt.Println("sc.ObjectMeta.Name " + sc.ObjectMeta.Name)
 		if sc.ObjectMeta.GetAnnotations()["storageclass.kubernetes.io/is-default-class"] == "true" || sc.ObjectMeta.GetAnnotations()["storageclass.beta.kubernetes.io/is-default-class"] == "true" {
 			defaultSC = append(defaultSC, sc.GetName())
 			continue
@@ -188,8 +175,6 @@ func (r *ReconcileAuthentication) storageclassAvailabe(storageClass string) bool
 	}
 
 	for _, sc := range scList.Items {
-		fmt.Println("sc.Name is " + sc.Name)
-		fmt.Println("sc.ObjectMeta.Name " + sc.ObjectMeta.Name)
 		if sc.ObjectMeta.Name == storageClass {
 			scExist = true
 			break

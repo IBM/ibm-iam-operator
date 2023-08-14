@@ -17,10 +17,12 @@
 package authentication
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"reflect"
 	"sync"
+	"text/template"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	pkgCommon "github.com/IBM/ibm-iam-operator/pkg/common"
@@ -82,7 +84,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileAuthentication{client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileAuthentication{client: mgr.GetClient(), Reader: mgr.GetAPIReader(), scheme: mgr.GetScheme()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -191,6 +193,7 @@ var _ reconcile.Reconciler = &ReconcileAuthentication{}
 type ReconcileAuthentication struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
+	Reader      client.Reader
 	client      client.Client
 	scheme      *runtime.Scheme
 	Mutex       sync.Mutex
@@ -345,8 +348,33 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 		}
 	}()
 
+	// create required certificates for postgresql cluster
+	reqLogger.Info("Creating certificates for postgresql")
+	pgsqlServerCACert := &certmgr.Certificate{}
+	err = r.handlePgsqlCerts(instance, pgsqlServerCACert, &needToRequeue)
+	if err != nil {
+		return
+	}
+
+	reqLogger.Info("TML:: New pgsqlServiceSpec")
+	cluster := r.newPgsqlServiceSpec(instance)
+	reqLogger.Info("TML:: New pgsqlServiceSpec -- DONE")
+	var pgsqlClusterYaml bytes.Buffer
+	reqLogger.Info("TML:: New template")
+	t := template.Must(template.New("cluster").Parse(pgsqlCluster))
+	reqLogger.Info("TML:: New template --DONE")
+	reqLogger.Info("TML:: template Execute")
+	if err := t.Execute(&pgsqlClusterYaml, cluster); err != nil {
+		reqLogger.Info("TML:: template Execute ERROR")
+		reqLogger.Info(err.Error())
+		fmt.Errorf("could not execure yaml: %v", err)
+		return reconcile.Result{}, err
+	}
+	reqLogger.Info("TML:: template Execute -- DONE")
 	reqLogger.Info("Creating postgresql cluster")
-	if err := r.createUpdateFromYaml(instance, r.scheme, []byte(pgsqlCluster)); err != nil {
+	reqLogger.Info("Print postgresql cluster YAmL below")
+	reqLogger.Info(pgsqlClusterYaml.String())
+	if err := r.createUpdateFromYaml(instance, r.scheme, pgsqlClusterYaml.Bytes()); err != nil {
 		return reconcile.Result{}, err
 	}
 	// Check if this Certificate already exists and create it if it doesn't

@@ -26,6 +26,20 @@ spec:
       requests:
         cpu: 100m
         memory: 350Mi
+  pgsqlService:
+    imageRegistry: "quay.io/opencloudio"
+    imageName: "postgresql"
+    imageTag: "15.3"
+    storageClass: "rook-cephfs"
+    resources:
+      limits:
+        cpu: 200m
+        ephemeral-storage: 512Mi
+        memory: 768Mi
+      requests:
+        cpu: 75m
+        ephemeral-storage: 128Mi
+        memory: 256Mi
   clientRegistration:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"

@@ -133,6 +133,7 @@ func (in *AuthenticationList) DeepCopyObject() runtime.Object {
 func (in *AuthenticationSpec) DeepCopyInto(out *AuthenticationSpec) {
 	*out = *in
 	in.AuthService.DeepCopyInto(&out.AuthService)
+	in.PgsqlService.DeepCopyInto(&out.PgsqlService)
 	in.IdentityProvider.DeepCopyInto(&out.IdentityProvider)
 	in.IdentityManager.DeepCopyInto(&out.IdentityManager)
 	in.InitMongodb.DeepCopyInto(&out.InitMongodb)

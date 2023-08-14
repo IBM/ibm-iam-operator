@@ -51,6 +51,8 @@ spec:
               value: icr.io/cpopen/cpfs/icp-identity-manager:4.1.0
             - name: IM_INITCONTAINER_IMAGE
               value: icr.io/cpopen/cpfs/im-initcontainer:4.1.0
+            - name: POSTGRESQL_IMAGE
+              value: quay.io/enterprisedb/postgresql:15.3
             - name: WATCH_NAMESPACE
               valueFrom:
                 fieldRef:

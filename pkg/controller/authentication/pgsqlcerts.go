@@ -18,10 +18,10 @@ package authentication
 
 import (
 	"context"
-	"reflect"
 
-	certmgr "github.com/IBM/ibm-iam-operator/pkg/apis/certmanager/v1alpha1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	certmgrv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	cmmeta1 "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,42 +31,38 @@ import (
 var EDBCRName string = "im-store-edb"
 var namespace string
 
-// IamPsqlServerCertificateValues defines the values of iam-postgres certificate
-type IamPsqlServerCertificateValues struct {
+// IamPgsqlServerCertificateValues defines the values of iam-postgres certificate
+type IamPgsqlServerCertificateValues struct {
 	Name       string
 	SecretName string
 	CN         []string
 }
-type IamPsqlServerCACertificateValues struct {
-	Name       string
-	SecretName string
-	CommonName string
-}
-type IamPsqlClientCACertificateValues struct {
+
+type IamPgsqlClientCACertificateValues struct {
 	Name       string
 	SecretName string
 	CommonName string
 }
 
-var iamPsqlServerCertificateValues = IamPsqlServerCertificateValues{
-	Name:       "im-psql-server-cert",
-	SecretName: "iam-postgres-server-cert",
+var iamPgsqlServerCertificateValues = IamPgsqlServerCertificateValues{
+	Name:       "im-pgsql-server-cert",
+	SecretName: "im-pgsql-server-cert",
 	CN: []string{EDBCRName + "-rw", EDBCRName + "-rw" + "." + namespace, EDBCRName + "-rw" + "." + namespace + "." + "svc",
 		EDBCRName + "-ro", EDBCRName + "-ro" + "." + namespace, EDBCRName + "-ro" + "." + namespace + "." + "svc",
 		EDBCRName + "-r", EDBCRName + "-r" + "." + namespace, EDBCRName + "-r" + "." + namespace + "." + "svc"},
 }
 
-var iamPostgresClientCertificateValues = IamPsqlServerCACertificateValues{
-	Name:       "iam-postgres-client-cert",
-	SecretName: "iam-postgres-client-cert",
+var iamPostgresClientCertificateValues = IamPgsqlClientCACertificateValues{
+	Name:       "im-pgsql-client-cert",
+	SecretName: "im-pgsql-client-cert",
 	CommonName: "streaming_replica",
 }
 
-func (r *ReconcileAuthentication) handlePsqlServerCert(instance *operatorv1alpha1.Authentication, currentCertificate *certmgr.Certificate, needToRequeue *bool) error {
+func (r *ReconcileAuthentication) handlePgsqlCerts(instance *operatorv1alpha1.Authentication, currentCertificate *certmgrv1.Certificate, needToRequeue *bool) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", namespace, "Instance.Name", instance.Name)
 	namespace = instance.Namespace
-	serverCrt := iamPsqlServerCertificateValues.Name
+	serverCrt := iamPgsqlServerCertificateValues.Name
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: serverCrt, Namespace: namespace}, currentCertificate)
 	if err != nil && k8serrors.IsNotFound(err) {
 		// Define a new Server certificate
@@ -106,23 +102,23 @@ func (r *ReconcileAuthentication) handlePsqlServerCert(instance *operatorv1alpha
 
 }
 
-func (r *ReconcileAuthentication) certificateForEDBCluster(instance *enterprisedbv1.Cluster, cert string) *certmgr.Certificate {
+func (r *ReconcileAuthentication) certificateForEDBCluster(instance *operatorv1alpha1.Authentication, cert string) *certmgrv1.Certificate {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	edbServerCertificate := &certmgr.Certificate{
+	edbServerCertificate := &certmgrv1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cert,
 			Namespace: instance.Namespace,
 			Labels:    map[string]string{"app": "security-iam", "k8s.enterprisedb.io/reload": ""},
 		},
-		Spec: certmgr.CertificateSpec{
-			SecretName: iamPsqlServerCertificateValues.SecretName,
-			IssuerRef: certmgr.ObjectReference{
+		Spec: certmgrv1.CertificateSpec{
+			SecretName: iamPgsqlServerCertificateValues.SecretName,
+			IssuerRef: cmmeta1.ObjectReference{
 				Name: "cs-ca-issuer",
-				Kind: certmgr.IssuerKind,
+				Kind: certmgrv1.IssuerKind,
 			},
-			DNSNames: iamPsqlServerCertificateValues.CN,
-			Usages:   []certmgr.KeyUsage{"server auth"},
+			DNSNames: iamPgsqlServerCertificateValues.CN,
+			Usages:   []certmgrv1.KeyUsage{"server auth"},
 		},
 	}
 
@@ -135,23 +131,23 @@ func (r *ReconcileAuthentication) certificateForEDBCluster(instance *enterprised
 	return edbServerCertificate
 }
 
-func (r *ReconcileAuthentication) certificateForEDBClient(instance *enterprisedbv1.Cluster, cert string) *certmgr.Certificate {
+func (r *ReconcileAuthentication) certificateForEDBClient(instance *operatorv1alpha1.Authentication, cert string) *certmgrv1.Certificate {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	edbClientCertificate := &certmgr.Certificate{
+	edbClientCertificate := &certmgrv1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cert,
 			Namespace: instance.Namespace,
 			Labels:    map[string]string{"app": "security-iam", "k8s.enterprisedb.io/reload": ""},
 		},
-		Spec: certmgr.CertificateSpec{
+		Spec: certmgrv1.CertificateSpec{
 			SecretName: iamPostgresClientCertificateValues.SecretName,
-			IssuerRef: certmgr.ObjectReference{
+			IssuerRef: cmmeta1.ObjectReference{
 				Name: "cs-ca-issuer",
-				Kind: certmgr.IssuerKind,
+				Kind: certmgrv1.IssuerKind,
 			},
 			CommonName: iamPostgresClientCertificateValues.CommonName,
-			Usages:     []certmgr.KeyUsage{"client auth"},
+			Usages:     []certmgrv1.KeyUsage{"client auth"},
 		},
 	}
 
@@ -163,11 +159,4 @@ func (r *ReconcileAuthentication) certificateForEDBClient(instance *enterprisedb
 	}
 	return edbClientCertificate
 
-}
-
-// EqualCerts returns a Boolean
-func compareClusterCerts(expected *enterprisedbv1.Cluster, found *enterprisedbv1.Cluster) bool {
-	// Check only certificate data
-	// We can probably allow spec.Instances, spec.Resources change
-	return !reflect.DeepEqual(expected.Spec.Certificates, found.Spec.Certificates)
 }

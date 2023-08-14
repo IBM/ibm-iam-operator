@@ -21,6 +21,8 @@ import (
 	"fmt"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,20 +36,33 @@ kind: Cluster
 metadata:
   name: im-store-edb
 spec:
+  imageName: {{ .ImageName }}
   instances: 2
   logLevel: info
   primaryUpdateStrategy: unsupervised
   storage:
     size: 20Gi
+    storageClass: {{ .StorageClass }}
   certificates:
-    serverCASecret: im-ca-cert-secret
-    serverTLSSecret: im-store-edb-server
-    clientCASecret: im-ca-cert-secret
-    replicationTLSSecret: im-store-edb-replica-client
+    serverCASecret: im-pgsql-server-cert
+    serverTLSSecret: im-pgsql-server-cert
+    clientCASecret: im-pgsql-client-cert
+    replicationTLSSecret: im-pgsql-client-cert
+  resources:
+    limits:
+      cpu: {{ .CpuLim }}
+      ephemeral-storage: {{ .ESLim }}
+      memory: {{ .MemLim }}
+    requests:
+      cpu: {{ .CpuReq }}
+      ephemeral-storage: {{ .ESReq }}
+      memory: {{ .MemReq }}
 `
 
 func (r *ReconcileAuthentication) createUpdateFromYaml(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, yamlContent []byte) error {
 	obj := &unstructured.Unstructured{}
+	yamlc := string(yamlContent[:])
+	fmt.Println("TML:: Printing the yaml " + yamlc)
 	jsonSpec, err := yaml.YAMLToJSON(yamlContent)
 	if err != nil {
 		return fmt.Errorf("could not convert yaml to json: %v", err)
@@ -63,7 +78,8 @@ func (r *ReconcileAuthentication) createUpdateFromYaml(instance *operatorv1alpha
 	if err := controllerutil.SetControllerReference(instance, obj, scheme); err != nil {
 		return err
 	}
-
+	jsonc := string(jsonSpec[:])
+	fmt.Println("TML:: Printing the json " + jsonc)
 	err = r.client.Create(context.TODO(), obj)
 	if err != nil {
 		if errors.IsAlreadyExists(err) {
@@ -76,4 +92,109 @@ func (r *ReconcileAuthentication) createUpdateFromYaml(instance *operatorv1alpha
 	}
 
 	return nil
+}
+
+func (r *ReconcileAuthentication) newPgsqlServiceSpec(instance *operatorv1alpha1.Authentication) *operatorv1alpha1.PgsqlServiceSpec {
+	storageClass := instance.Spec.PgsqlService.StorageClass
+
+	if storageClass == "" {
+		storageclass, err := r.getstorageclass()
+		if err != nil {
+			fmt.Errorf("could not Update resource: %v", err)
+			return nil
+		} else {
+			instance.Spec.PgsqlService.StorageClass = storageclass
+
+		}
+	} else {
+		scExist := r.storageclassAvailabe(storageClass)
+		if !scExist {
+			storageclass, err := r.getstorageclass()
+			if err != nil {
+				fmt.Errorf("could not Update resource: %v", err)
+				return nil
+			} else {
+				instance.Spec.PgsqlService.StorageClass = storageclass
+
+			}
+		} else {
+			// provided storageclass is present in the cluster.
+		}
+	}
+	if instance.Spec.PgsqlService.LogLevel == "" {
+		instance.Spec.PgsqlService.LogLevel = "info"
+	}
+	cpuReq := instance.Spec.PgsqlService.Resources.Requests.Cpu().String()
+	fmt.Println("cpuReq::" + cpuReq)
+	memReq := instance.Spec.PgsqlService.Resources.Requests.Memory().String()
+	fmt.Println("memReq::" + memReq)
+	esReq := instance.Spec.PgsqlService.Resources.Requests.StorageEphemeral().String()
+	fmt.Println("esReq::" + esReq)
+	cpuLim := instance.Spec.PgsqlService.Resources.Limits.Cpu().String()
+	fmt.Println("cpuLim::" + cpuLim)
+	memLim := instance.Spec.PgsqlService.Resources.Limits.Memory().String()
+	fmt.Println("memLim::" + memLim)
+	esLim := instance.Spec.PgsqlService.Resources.Limits.StorageEphemeral().String()
+	fmt.Println("esLim::" + esLim)
+	return &operatorv1alpha1.PgsqlServiceSpec{LogLevel: instance.Spec.PgsqlService.LogLevel, StorageClass: instance.Spec.PgsqlService.StorageClass, ImageName: shatag.GetImageRef("POSTGRESQL_IMAGE"), CpuReq: cpuReq, MemReq: memReq, ESReq: esReq, CpuLim: cpuLim, MemLim: memLim, ESLim: esLim}
+}
+
+func (r *ReconcileAuthentication) getstorageclass() (string, error) {
+	scList := &storagev1.StorageClassList{}
+	err := r.Reader.List(context.TODO(), scList)
+	if err != nil {
+		return "", err
+	}
+	if len(scList.Items) == 0 {
+		return "", fmt.Errorf("could not find storage class in the cluster")
+	}
+
+	var defaultSC []string
+	var nonDefaultSC []string
+
+	for _, sc := range scList.Items {
+		fmt.Println("sc.Name is " + sc.Name)
+		fmt.Println("sc.ObjectMeta.Name " + sc.ObjectMeta.Name)
+		if sc.ObjectMeta.GetAnnotations()["storageclass.kubernetes.io/is-default-class"] == "true" || sc.ObjectMeta.GetAnnotations()["storageclass.beta.kubernetes.io/is-default-class"] == "true" {
+			defaultSC = append(defaultSC, sc.GetName())
+			continue
+		}
+		if sc.Provisioner == "kubernetes.io/no-provisioner" {
+			continue
+		}
+		nonDefaultSC = append(nonDefaultSC, sc.GetName())
+	}
+
+	if len(defaultSC) != 0 {
+		return defaultSC[0], nil
+	}
+
+	if len(nonDefaultSC) != 0 {
+		return nonDefaultSC[0], nil
+	}
+
+	return "", fmt.Errorf("could not find dynamic provisioner storage class in the cluster nor is there a default storage class")
+}
+
+func (r *ReconcileAuthentication) storageclassAvailabe(storageClass string) bool {
+	var scExist bool
+	scList := &storagev1.StorageClassList{}
+	err := r.Reader.List(context.TODO(), scList)
+	if err != nil {
+		return false
+	}
+	if len(scList.Items) == 0 {
+		return false
+	}
+
+	for _, sc := range scList.Items {
+		fmt.Println("sc.Name is " + sc.Name)
+		fmt.Println("sc.ObjectMeta.Name " + sc.ObjectMeta.Name)
+		if sc.ObjectMeta.Name == storageClass {
+			scExist = true
+			break
+		}
+	}
+
+	return scExist
 }

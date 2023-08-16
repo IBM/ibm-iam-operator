@@ -596,7 +596,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		},
 		{
 			Name:  "OPENSHIFT_URL",
-			Value: "https://kubernetes.default:443",
+			Value: "https://kubernetes.default.svc.cluster.local:443",
 		},
 		{
 			Name: "IS_OPENSHIFT_ENV",
@@ -956,7 +956,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		},
 		{
 			Name:  "OPENSHIFT_URL",
-			Value: "https://kubernetes.default:443",
+			Value: "https://kubernetes.default.svc.cluster.local:443",
 		},
 		{
 			Name: "IS_OPENSHIFT_ENV",

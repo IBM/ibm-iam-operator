@@ -120,11 +120,30 @@ func (r *ReconcileAuthentication) newPgsqlServiceSpec(instance *operatorv1alpha1
 		instance.Spec.PgsqlService.LogLevel = "info"
 	}
 	cpuReq := instance.Spec.PgsqlService.Resources.Requests.Cpu().String()
+	if cpuReq == "" {
+		cpuReq = "75m"
+	}
 	memReq := instance.Spec.PgsqlService.Resources.Requests.Memory().String()
+	if memReq == "" {
+		memReq = "256Mi"
+	}
 	esReq := instance.Spec.PgsqlService.Resources.Requests.StorageEphemeral().String()
+	if esReq == "" {
+		esReq = "128Mi"
+	}
 	cpuLim := instance.Spec.PgsqlService.Resources.Limits.Cpu().String()
+	if cpuLim == "" {
+		cpuLim = "200m"
+	}
 	memLim := instance.Spec.PgsqlService.Resources.Limits.Memory().String()
+	if memLim == "" {
+		memLim = "768Mi"
+	}
 	esLim := instance.Spec.PgsqlService.Resources.Limits.StorageEphemeral().String()
+	if esLim == "" {
+		esLim = "512Mi"
+
+	}
 	return &operatorv1alpha1.PgsqlServiceSpec{LogLevel: instance.Spec.PgsqlService.LogLevel, StorageClass: instance.Spec.PgsqlService.StorageClass, ImageName: shatag.GetImageRef("POSTGRESQL_IMAGE"), CpuReq: cpuReq, MemReq: memReq, ESReq: esReq, CpuLim: cpuLim, MemLim: memLim, ESLim: esLim}
 }
 

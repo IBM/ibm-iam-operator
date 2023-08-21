@@ -82,17 +82,17 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to primary resource PolicyController
-	err = c.Watch(&source.Kind{Type: &operatorv1alpha1.PolicyController{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &operatorv1alpha1.PolicyController{}), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Pods and requeue the owner PolicyController
-	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &operatorv1alpha1.PolicyController{},
-	})
+	err = c.Watch(
+		source.Kind(mgr.GetCache(), &appsv1.Deployment{}),
+		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.PolicyController{}, handler.OnlyControllerOwner()),
+	)
 	if err != nil {
 		return err
 	}
@@ -576,7 +576,7 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 							},
 							Args: []string{"--v=0", "--update-frequency=60"},
 							LivenessProbe: &corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{"sh", "-c", "pgrep iam-policy -l"},
 									},
@@ -585,7 +585,7 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 								TimeoutSeconds:      5,
 							},
 							ReadinessProbe: &corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{"sh", "-c", "exec echo start iam-policy-controller"},
 									},

@@ -84,17 +84,17 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to primary resource OIDCClientWatcher
-	err = c.Watch(&source.Kind{Type: &operatorv1alpha1.OIDCClientWatcher{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &operatorv1alpha1.OIDCClientWatcher{}), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Pods and requeue the owner OIDCClientWatcher
-	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &operatorv1alpha1.OIDCClientWatcher{},
-	})
+	err = c.Watch(
+		source.Kind(mgr.GetCache(), &appsv1.Deployment{}),
+		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.OIDCClientWatcher{}, handler.OnlyControllerOwner()),
+	)
 	if err != nil {
 		return err
 	}
@@ -803,7 +803,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 								},
 							},
 							LivenessProbe: &corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{"ls"},
 									},
@@ -812,7 +812,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 								PeriodSeconds:       15,
 							},
 							ReadinessProbe: &corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{"ls"},
 									},

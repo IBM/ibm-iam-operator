@@ -81,35 +81,35 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to primary resource SecurityOnboarding
-	err = c.Watch(&source.Kind{Type: &operatorv1alpha1.SecurityOnboarding{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &operatorv1alpha1.SecurityOnboarding{}), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Pods and requeue the owner SecurityOnboarding
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &operatorv1alpha1.SecurityOnboarding{},
-	})
+	err = c.Watch(
+		source.Kind(mgr.GetCache(), &corev1.Pod{}),
+		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.SecurityOnboarding{}, handler.OnlyControllerOwner()),
+	)
 	if err != nil {
 		return err
 	}
 
 	//watch for configMap creation.
-	err = c.Watch(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &operatorv1alpha1.SecurityOnboarding{},
-	})
+	err = c.Watch(
+		source.Kind(mgr.GetCache(), &corev1.ConfigMap{}),
+		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.SecurityOnboarding{}, handler.OnlyControllerOwner()),
+	)
 	if err != nil {
 		return err
 	}
 
 	//watch for JobCreation creation.
-	err = c.Watch(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &operatorv1alpha1.SecurityOnboarding{},
-	})
+	err = c.Watch(
+		source.Kind(mgr.GetCache(), &batchv1.Job{}),
+		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.SecurityOnboarding{}, handler.OnlyControllerOwner()),
+	)
 	if err != nil {
 		return err
 	}

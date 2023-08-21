@@ -46,7 +46,7 @@ func buildAuditContainer(auditImage string, syslogTlsPath string, resources *cor
 	if len(syslogTlsPath) == 0 {
 		syslogTlsPath = "/etc/audit-tls"
 	}
-	
+
 	return corev1.Container{
 		Name:            "icp-audit-service",
 		Image:           auditImage,
@@ -145,7 +145,7 @@ func buildPapContainer(papImage string, resources *corev1.ResourceRequirements) 
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/v1/health",
 					Port: intstr.IntOrString{
@@ -158,7 +158,7 @@ func buildPapContainer(papImage string, resources *corev1.ResourceRequirements) 
 			PeriodSeconds:       30,
 		},
 		LivenessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/v1/health",
 					Port: intstr.IntOrString{

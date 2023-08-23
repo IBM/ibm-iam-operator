@@ -24,7 +24,7 @@ metadata:
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4.1.0",
+              "imageTag": "4.2.0",
               "ldapsCACert": "platform-auth-ldaps-ca-cert",
               "resources": {
                 "limits": {
@@ -41,7 +41,7 @@ metadata:
             "clientRegistration": {
               "imageName": "im-initcontainer",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4.1.0",
+              "imageTag": "4.2.0",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -90,7 +90,7 @@ metadata:
             "identityManager": {
               "imageName": "icp-identity-manager",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4.1.0",
+              "imageTag": "4.2.0",
               "masterNodesList": "10.0.0.1",
               "resources": {
                 "limits": {
@@ -106,7 +106,7 @@ metadata:
             "identityProvider": {
               "imageName": "icp-identity-provider",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4.1.0",
+              "imageTag": "4.2.0",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -121,7 +121,7 @@ metadata:
             "initMongodb": {
               "imageName": "im-initcontainer",
               "imageRegistry": "quay.io/opencloudio",
-              "imageTag": "4.1.0",
+              "imageTag": "4.2.0",
               "resources": {
                 "limits": {
                   "cpu": "100m",
@@ -208,7 +208,7 @@ metadata:
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
       the lifecycle of IAM services. With this operator, you can simply deploy and
       upgrade the IAM services
-    olm.skipRange: '<4.1.0'
+    olm.skipRange: '<4.2.0'
     repository: https://github.com/IBM/ibm-iam-operator
     support: IBM
   labels:
@@ -216,20 +216,20 @@ metadata:
     operatorframework.io/os.linux: supported
     operatorframework.io/arch.amd64: supported
     operatorframework.io/arch.ppc64le: supported
-  name: ibm-iam-operator.v4.1.0
+  name: ibm-iam-operator.v4.2.0
   namespace: placeholder
 spec:
   relatedImages:
     - name: IBM_IAM_OPERATOR_IMAGE
-      image: icr.io/cpopen/ibm-iam-operator:4.1.0
+      image: icr.io/cpopen/ibm-iam-operator:4.2.0
     - name: ICP_PLATFORM_AUTH_IMAGE
-      image: icr.io/cpopen/cpfs/icp-platform-auth:4.1.0
+      image: icr.io/cpopen/cpfs/icp-platform-auth:4.2.0
     - name: ICP_IDENTITY_PROVIDER_IMAGE
-      image: icr.io/cpopen/cpfs/icp-identity-provider:4.1.0
+      image: icr.io/cpopen/cpfs/icp-identity-provider:4.2.0
     - name: ICP_IDENTITY_MANAGER_IMAGE
-      image: icr.io/cpopen/cpfs/icp-identity-manager:4.1.0
+      image: icr.io/cpopen/cpfs/icp-identity-manager:4.2.0
     - name: IM_INITCONTAINER_IMAGE
-      image: icr.io/cpopen/cpfs/im-initcontainer:4.1.0
+      image: icr.io/cpopen/cpfs/im-initcontainer:4.2.0
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
@@ -390,6 +390,7 @@ spec:
         - Linux on IBM Z and LinuxONE
 
     ## Operator versions
+     - 4.2.0
      - 4.1.0
      - 4.0.0
      - 3.10.0
@@ -502,13 +503,13 @@ spec:
                 - ibm-iam-operator
                 env:
                 - name: ICP_PLATFORM_AUTH_IMAGE
-                  value: icr.io/cpopen/cpfs/icp-platform-auth:4.1.0
+                  value: icr.io/cpopen/cpfs/icp-platform-auth:4.2.0
                 - name: ICP_IDENTITY_PROVIDER_IMAGE
-                  value: icr.io/cpopen/cpfs/icp-identity-provider:4.1.0
+                  value: icr.io/cpopen/cpfs/icp-identity-provider:4.2.0
                 - name: ICP_IDENTITY_MANAGER_IMAGE
-                  value: icr.io/cpopen/cpfs/icp-identity-manager:4.1.0
+                  value: icr.io/cpopen/cpfs/icp-identity-manager:4.2.0
                 - name: IM_INITCONTAINER_IMAGE
-                  value: icr.io/cpopen/cpfs/im-initcontainer:4.1.0
+                  value: icr.io/cpopen/cpfs/im-initcontainer:4.2.0
                 - name: WATCH_NAMESPACE
                   valueFrom:
                     configMapKeyRef:
@@ -526,7 +527,7 @@ spec:
                   value: ""
                 - name: cluster_name
                   value: ""
-                image: icr.io/cpopen/ibm-iam-operator:4.1.0
+                image: icr.io/cpopen/ibm-iam-operator:4.2.0
                 imagePullPolicy: IfNotPresent
                 name: ibm-iam-operator
                 resources:
@@ -769,4 +770,4 @@ spec:
   maturity: stable
   provider:
     name: IBM
-  version: 4.1.0
+  version: 4.2.0

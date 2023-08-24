@@ -93,7 +93,7 @@ require (
 // Pinned to kubernetes-1.16.2
 replace (
 	github.com/dgrijalva/jwt-go => github.com/dgrijalva/jwt-go/v4 v4.0.0-preview1
-	github.com/emicklei/go-restful => github.com/emicklei/go-restful/v3 v3.8.0
+	github.com/emicklei/go-restful => github.com/emicklei/go-restful/v3 v3.10.0
 	github.com/golang/protobuf => github.com/golang/protobuf v1.5.2
 	//github.com/go-logr/logr => github.com/go-logr/logr v0.4.0 // indirect
 	//github.com/go-logr/zapr v0.4.0 => github.com/go-logr/zapr v0.4.0 // indirect

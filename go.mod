@@ -90,6 +90,7 @@ replace (
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.27.2
 	//k8s.io/client-go => k8s.io/client-go v0.20.0
 	k8s.io/client-go => github.com/kubernetes/client-go v0.27.2
+	k8s.io/client-go/transport => k8s.io/client-go/transport v0.27.2
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.27.2
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.27.2
 	k8s.io/code-generator => k8s.io/code-generator v0.27.2

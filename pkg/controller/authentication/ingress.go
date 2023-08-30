@@ -372,7 +372,7 @@ func platformIdAuthBlockIngress(instance *operatorv1alpha1.Authentication, schem
 						HTTP: &netv1.HTTPIngressRuleValue{
 							Paths: []netv1.HTTPIngressPath{
 								{
-									Path:     "/idauth/oidc/endpoint",
+									Path:     "/oidc/endpoint",
 									PathType: &pathType,
 									Backend: netv1.IngressBackend{
 										Service: &netv1.IngressServiceBackend{

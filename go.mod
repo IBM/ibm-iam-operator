@@ -133,4 +133,6 @@ replace (
 	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.11.0
 )
 
+replace github.com/emicklei/go-restful/v3 => github.com/emicklei/go-restful/v3 v3.11.0
+
 replace github.com/docker/docker => github.com/moby/moby v0.7.3-0.20190826074503-38ab9da00309 // Required by Helm

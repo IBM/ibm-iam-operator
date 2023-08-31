@@ -218,6 +218,9 @@ func iamTokenIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/secure-backends": "true",
 				"icp.management.ibm.com/rewrite-target":  "/",
+				"icp.management.ibm.com/configuration-snippet": `
+				add_header 'Content-Security-Policy' 'default-src' self;
+				`,
 			},
 		},
 		Spec: net.IngressSpec{
@@ -322,6 +325,7 @@ func idMgmtIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Sc
 					if ($request_uri ~* "/idmgmt/(.*)") {
 						proxy_pass https://$proxy_upstream_name/$1;
 					}
+					add_header 'Content-Security-Policy' 'default-src' self;
 					`,
 			},
 		},
@@ -590,6 +594,7 @@ func platformIdAuthIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 				"icp.management.ibm.com/configuration-snippet": `
 					add_header 'X-Frame-Options' 'SAMEORIGIN' always;
 					add_header 'X-Content-Type-Options' 'nosniff';
+					add_header 'Content-Security-Policy' 'default-src' self;
 					`,
 			},
 		},
@@ -642,7 +647,9 @@ func platformIdProviderIngress(instance *operatorv1alpha1.Authentication, scheme
 				"icp.management.ibm.com/secure-backends":       "true",
 				"icp.management.ibm.com/rewrite-target":        "/",
 				"icp.management.ibm.com/authz-type":            "rbac",
-				"icp.management.ibm.com/configuration-snippet": "\n            limit_req zone=management-ingress-rps-100 burst=20 nodelay;",
+				"icp.management.ibm.com/configuration-snippet": `"\n            limit_req zone=management-ingress-rps-100 burst=20 nodelay;",
+				add_header 'Content-Security-Policy' 'default-src' self;
+				`,
 			},
 		},
 		Spec: net.IngressSpec{

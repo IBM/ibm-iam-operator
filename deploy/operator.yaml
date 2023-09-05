@@ -41,7 +41,7 @@ spec:
           image: icr.io/cpopen/ibm-iam-operator:3.23.7
           command:
           - ibm-iam-operator
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           env:
             - name: ICP_PLATFORM_AUTH_IMAGE
               value: icr.io/cpopen/cpfs/icp-platform-auth:3.11.7

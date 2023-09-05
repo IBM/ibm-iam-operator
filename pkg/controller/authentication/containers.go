@@ -30,7 +30,7 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 		{
 			Name:            "init-mongodb",
 			Image:           mongoDBImage,
-			ImagePullPolicy: corev1.PullAlways,
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"bash",
 				"-c",
@@ -78,7 +78,7 @@ func buildAuditContainer(auditImage string, syslogTlsPath string, resources *cor
 	return corev1.Container{
 		Name:            "icp-audit-service",
 		Image:           auditImage,
-		ImagePullPolicy: corev1.PullAlways,
+		ImagePullPolicy: corev1.PullIfNotPresent,
 		Env: []corev1.EnvVar{
 			{
 				Name:  "AUDIT_DIR",
@@ -366,7 +366,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 	return corev1.Container{
 		Name:            "platform-auth-service",
 		Image:           authServiceImage,
-		ImagePullPolicy: corev1.PullAlways,
+		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: &corev1.SecurityContext{
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
@@ -733,7 +733,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 	return corev1.Container{
 		Name:            "platform-identity-provider",
 		Image:           identityProviderImage,
-		ImagePullPolicy: corev1.PullAlways,
+		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: &corev1.SecurityContext{
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
@@ -1108,7 +1108,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 	return corev1.Container{
 		Name:            "platform-identity-manager",
 		Image:           identityManagerImage,
-		ImagePullPolicy: corev1.PullAlways,
+		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: &corev1.SecurityContext{
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,

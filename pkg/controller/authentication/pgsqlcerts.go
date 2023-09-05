@@ -29,7 +29,6 @@ import (
 )
 
 var EDBCRName string = "im-store-edb"
-var namespace string
 
 // IamPgsqlServerCertificateValues defines the values of iam-postgres certificate
 type IamPgsqlServerCertificateValues struct {
@@ -47,9 +46,6 @@ type IamPgsqlClientCACertificateValues struct {
 var iamPgsqlServerCertificateValues = IamPgsqlServerCertificateValues{
 	Name:       "im-pgsql-server-cert",
 	SecretName: "im-pgsql-server-cert",
-	CN: []string{EDBCRName + "-rw", EDBCRName + "-rw" + "." + namespace, EDBCRName + "-rw" + "." + namespace + "." + "svc",
-		EDBCRName + "-ro", EDBCRName + "-ro" + "." + namespace, EDBCRName + "-ro" + "." + namespace + "." + "svc",
-		EDBCRName + "-r", EDBCRName + "-r" + "." + namespace, EDBCRName + "-r" + "." + namespace + "." + "svc"},
 }
 
 var iamPostgresClientCertificateValues = IamPgsqlClientCACertificateValues{
@@ -61,8 +57,8 @@ var iamPostgresClientCertificateValues = IamPgsqlClientCACertificateValues{
 // create required certificates for postgresql cluster
 func (r *ReconcileAuthentication) handlePgsqlCerts(instance *operatorv1alpha1.Authentication, currentCertificate *certmgrv1.Certificate, needToRequeue *bool) error {
 
+	namespace := instance.Namespace
 	reqLogger := log.WithValues("Instance.Namespace", namespace, "Instance.Name", instance.Name)
-	namespace = instance.Namespace
 	serverCrt := iamPgsqlServerCertificateValues.Name
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: serverCrt, Namespace: namespace}, currentCertificate)
 	if err != nil && k8serrors.IsNotFound(err) {
@@ -106,6 +102,10 @@ func (r *ReconcileAuthentication) handlePgsqlCerts(instance *operatorv1alpha1.Au
 func (r *ReconcileAuthentication) certificateForEDBCluster(instance *operatorv1alpha1.Authentication, cert string) *certmgrv1.Certificate {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	namespace := instance.Namespace
+	iamPgsqlServerCertificateValues.CN = []string{EDBCRName + "-rw", EDBCRName + "-rw" + "." + namespace, EDBCRName + "-rw" + "." + namespace + "." + "svc",
+		EDBCRName + "-ro", EDBCRName + "-ro" + "." + namespace, EDBCRName + "-ro" + "." + namespace + "." + "svc",
+		EDBCRName + "-r", EDBCRName + "-r" + "." + namespace, EDBCRName + "-r" + "." + namespace + "." + "svc"}
 	edbServerCertificate := &certmgrv1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cert,

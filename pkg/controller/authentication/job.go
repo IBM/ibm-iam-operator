@@ -182,7 +182,7 @@ func buildContainer(jobName string, image string, resources *corev1.ResourceRequ
 		{
 			Name:            jobName,
 			Image:           image,
-			ImagePullPolicy: corev1.PullAlways,
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
 				RunAsNonRoot:             &trueVar,

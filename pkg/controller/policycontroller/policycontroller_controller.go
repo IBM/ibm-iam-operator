@@ -567,7 +567,7 @@ func (r *ReconcilePolicyController) deploymentForPolicyController(instance *oper
 						{
 							Name:            iamPolicyControllerDepName,
 							Image:           image,
-							ImagePullPolicy: corev1.PullAlways,
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "tmp",

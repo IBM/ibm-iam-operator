@@ -50,7 +50,7 @@ func buildAuditContainer(auditImage string, syslogTlsPath string, resources *cor
 	return corev1.Container{
 		Name:            "icp-audit-service",
 		Image:           auditImage,
-		ImagePullPolicy: corev1.PullAlways,
+		ImagePullPolicy: corev1.PullIfNotPresent,
 		Env: []corev1.EnvVar{
 			{
 				Name:  "AUDIT_DIR",
@@ -111,7 +111,7 @@ func buildPapContainer(papImage string, resources *corev1.ResourceRequirements) 
 	return corev1.Container{
 		Name:            "auth-pap",
 		Image:           papImage,
-		ImagePullPolicy: corev1.PullAlways,
+		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: &corev1.SecurityContext{
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,

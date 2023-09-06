@@ -613,7 +613,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 							Name:            "init-auth-service",
 							Command:         []string{"sh", "-c", "sleep 75; until curl -k -i -fsS https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration | grep '200 OK'; do sleep 3; done;"},
 							Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
-							ImagePullPolicy: corev1.PullPolicy("Always"),
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: &corev1.SecurityContext{
 								Privileged:               &falseVar,
 								RunAsNonRoot:             &trueVar,
@@ -629,7 +629,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 							Name:            "init-identity-provider",
 							Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-provider:4300 | grep '200 OK'; do sleep 3; done;"},
 							Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
-							ImagePullPolicy: corev1.PullPolicy("Always"),
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: &corev1.SecurityContext{
 								Privileged:               &falseVar,
 								RunAsNonRoot:             &trueVar,
@@ -645,7 +645,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 							Name:            "init-identity-manager",
 							Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-management:4500 | grep '200 OK'; do sleep 3; done;"},
 							Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
-							ImagePullPolicy: corev1.PullPolicy("Always"),
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: &corev1.SecurityContext{
 								Privileged:               &falseVar,
 								RunAsNonRoot:             &trueVar,
@@ -662,7 +662,7 @@ func (r *ReconcileOIDCClientWatcher) deploymentForOIDCClientWatcher(instance *op
 						{
 							Name:            "oidcclient-watcher",
 							Image:           image,
-							ImagePullPolicy: corev1.PullAlways,
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							Resources:       *resources,
 							Env: []corev1.EnvVar{
 								{

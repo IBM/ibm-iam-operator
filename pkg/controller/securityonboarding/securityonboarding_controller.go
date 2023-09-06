@@ -409,7 +409,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 			Name:            "init-auth-service",
 			Command:         []string{"sh", "-c", "sleep 75; until curl -k -i -fsS https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration | grep '200 OK'; do sleep 3; done;"},
 			Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
-			ImagePullPolicy: corev1.PullPolicy("Always"),
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
 				RunAsNonRoot:             &trueVar,
@@ -530,7 +530,7 @@ func getSecurityOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Rec
 			{
 				Name:            "security-onboarding",
 				Image:           shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE"),
-				ImagePullPolicy: corev1.PullPolicy("Always"),
+				ImagePullPolicy: corev1.PullIfNotPresent,
 				//				Command:         []string{"python", "/app/scripts/onboard-script.py"},
 				Command: []string{"python", "/app/scripts/onboard-py3-script.py"},
 				SecurityContext: &corev1.SecurityContext{
@@ -788,7 +788,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			Name:            "init-auth-service",
 			Command:         []string{"sh", "-c", "sleep 75; until curl -k -i -fsS https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration | grep '200 OK'; do sleep 3; done;"},
 			Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
-			ImagePullPolicy: corev1.PullPolicy("Always"),
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
 				RunAsNonRoot:             &trueVar,
@@ -811,7 +811,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			Name:            "init-identity-provider",
 			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-provider:4300 | grep '200 OK'; do sleep 3; done;"},
 			Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
-			ImagePullPolicy: corev1.PullPolicy("Always"),
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			VolumeMounts: []corev1.VolumeMount{
 				{
 					Name:      "cluster-ca",
@@ -840,7 +840,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			Name:            "init-identity-manager",
 			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-identity-management:4500 | grep '200 OK'; do sleep 3; done;"},
 			Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
-			ImagePullPolicy: corev1.PullPolicy("Always"),
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			VolumeMounts: []corev1.VolumeMount{
 				{
 					Name:      "cluster-ca",
@@ -869,7 +869,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			Name:            "init-token-service",
 			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://platform-auth-service:9443/iam/oidc/keys | grep '200 OK'; do sleep 3; done;"},
 			Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
-			ImagePullPolicy: corev1.PullPolicy("Always"),
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
 				RunAsNonRoot:             &trueVar,
@@ -892,7 +892,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			Name:            "init-pap",
 			Command:         []string{"sh", "-c", "until curl -k -i -fsS https://iam-pap:39001/v1/health | grep '200 OK'; do sleep 3; done;"},
 			Image:           shatag.GetImageRef("ICP_PLATFORM_AUTH_IMAGE"),
-			ImagePullPolicy: corev1.PullPolicy("Always"),
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			VolumeMounts: []corev1.VolumeMount{
 				{
 					Name:      "cluster-ca",
@@ -921,7 +921,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 			Name:            "init-token-validation",
 			Command:         []string{"python", "/app/acs_utils/build/init_token_validation.py"},
 			Image:           shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE"),
-			ImagePullPolicy: corev1.PullPolicy("Always"),
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
 				RunAsNonRoot:             &trueVar,
@@ -1115,7 +1115,7 @@ func getIAMOnboardJob(instance *operatorv1alpha1.SecurityOnboarding, r *Reconcil
 				Name:            "iam-onboarding",
 				Command:         []string{"python", "/app/acs_utils/build/icp_iam_am_bootstrap.py"},
 				Image:           shatag.GetImageRef("ICP_IAM_ONBOARDING_IMAGE"),
-				ImagePullPolicy: corev1.PullPolicy("Always"),
+				ImagePullPolicy: corev1.PullIfNotPresent,
 				SecurityContext: &corev1.SecurityContext{
 					Privileged:               &falseVar,
 					RunAsNonRoot:             &trueVar,

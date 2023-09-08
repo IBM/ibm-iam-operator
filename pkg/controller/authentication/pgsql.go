@@ -40,9 +40,26 @@ spec:
   instances: 2
   logLevel: info
   primaryUpdateStrategy: unsupervised
+  startDelay: 120
+  stopDelay: 90
   storage:
+    resizeInUseVolumes: true
     size: 20Gi
     storageClass: {{ .StorageClass }}
+  bootstrap:
+    initdb:
+      database: iam
+      owner: iam_user
+      dataChecksums: true
+      postInitApplicationSQL:
+        - GRANT CONNECT ON DATABASE iam TO public
+        - GRANT ALL PRIVILEGES ON DATABASE iam TO iam_user
+        - CREATE SCHEMA platformdb
+        - ALTER SCHEMA platformdb OWNER TO iam_user
+        - GRANT ALL ON SCHEMA platformdb TO iam_user
+  postgresql:
+    parameters:
+      max_connections: '500'
   certificates:
     serverCASecret: im-pgsql-server-cert
     serverTLSSecret: im-pgsql-server-cert

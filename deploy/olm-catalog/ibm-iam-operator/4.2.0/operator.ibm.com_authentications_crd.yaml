@@ -18,7 +18,7 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Authentication is the Schema for the authentications API
+        description: The Authentication custom resource is used to create an instance of Identity Management service
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation

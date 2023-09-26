@@ -220,6 +220,7 @@ func iamTokenIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.
 				"icp.management.ibm.com/rewrite-target":  "/",
 				"icp.management.ibm.com/configuration-snippet": `
 				add_header 'Content-Security-Policy' "default-src 'self';";
+				add_header 'X-Content-Type-Options' 'nosniff';
 				`,
 			},
 		},

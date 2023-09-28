@@ -485,7 +485,7 @@ spec:
                 app.kubernetes.io/instance: ibm-iam-operator
                 app.kubernetes.io/managed-by: ibm-iam-operator
                 app.kubernetes.io/name: ibm-iam-operator
-                productName: IBM Cloud Platform Common Services
+                productName: IBM_Cloud_Platform_Common_Services
                 intent: projected
                 name: ibm-iam-operator
             spec:

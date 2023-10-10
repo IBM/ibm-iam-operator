@@ -29,11 +29,13 @@ metadata:
               "resources": {
                 "limits": {
                   "cpu": "1000m",
-                  "memory": "1Gi"
+                  "memory": "1Gi",
+                  "ephemeral-storage": "650Mi"
                 },
                 "requests": {
                   "cpu": "100m",
-                  "memory": "350Mi"
+                  "memory": "350Mi",
+                  "ephemeral-storage": "400Mi"
                 }
               },
               "routerCertSecret": "saml-auth-secret"
@@ -49,7 +51,8 @@ metadata:
                 },
                 "requests": {
                   "cpu": "100m",
-                  "memory": "128Mi"
+                  "memory": "128Mi",
+                  "ephemeral-storage": "158Mi"
                 }
               }
             },
@@ -95,11 +98,13 @@ metadata:
               "resources": {
                 "limits": {
                   "cpu": "1000m",
-                  "memory": "1Gi"
+                  "memory": "1Gi",
+                  "ephemeral-storage": "550Mi"
                 },
                 "requests": {
                   "cpu": "50m",
-                  "memory": "150Mi"
+                  "memory": "150Mi",
+                  "ephemeral-storage": "300Mi"
                 }
               }
             },
@@ -110,11 +115,13 @@ metadata:
               "resources": {
                 "limits": {
                   "cpu": "1000m",
-                  "memory": "1Gi"
+                  "memory": "1Gi",
+                  "ephemeral-storage": "550Mi"
                 },
                 "requests": {
                   "cpu": "50m",
-                  "memory": "150Mi"
+                  "memory": "150Mi",
+                  "ephemeral-storage": "300Mi"
                 }
               }
             },
@@ -129,7 +136,8 @@ metadata:
                 },
                 "requests": {
                   "cpu": "100m",
-                  "memory": "128Mi"
+                  "memory": "128Mi",
+                  "ephemeral-storage": "178Mi"
                 }
               }
             },

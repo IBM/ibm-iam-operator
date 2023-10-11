@@ -546,6 +546,7 @@ spec:
                   requests:
                     cpu: 10m
                     memory: 80Mi
+                    ephemeral-storage: 256Mi
                 securityContext:
                   allowPrivilegeEscalation: false
                   capabilities:

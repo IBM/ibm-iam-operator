@@ -32,7 +32,7 @@ IMAGE_BUILD_OPTS=--build-arg "VCS_REF=$(GIT_COMMIT_ID)" --build-arg "VCS_URL=$(G
 # Use your own docker registry and image name for dev/test by overridding the IMG and REGISTRY environment variable.
 IMG ?= ibm-iam-operator
 REGISTRY ?= "docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-integration-docker-local/ibmcom"
-CSV_VERSION ?= 3.23.8
+CSV_VERSION ?= 3.23.9
 
 QUAY_USERNAME ?=
 QUAY_PASSWORD ?=

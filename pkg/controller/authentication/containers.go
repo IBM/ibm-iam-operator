@@ -50,8 +50,10 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 					corev1.ResourceCPU:    *cpu100,
 					corev1.ResourceMemory: *memory128},
 				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
+					corev1.ResourceCPU:              *cpu100,
+					corev1.ResourceMemory:           *memory128,
+					corev1.ResourceEphemeralStorage: *memory178,
+				},
 			},
 		},
 	}
@@ -82,8 +84,10 @@ func buildInitForMngrAndProvider(mongoDBImage string) []corev1.Container {
 					corev1.ResourceCPU:    *cpu100,
 					corev1.ResourceMemory: *memory128},
 				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
+					corev1.ResourceCPU:              *cpu100,
+					corev1.ResourceMemory:           *memory128,
+					corev1.ResourceEphemeralStorage: *memory178,
+				},
 			},
 		},
 	}
@@ -122,11 +126,13 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
 			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu1000,
-				corev1.ResourceMemory: *memory1024},
+				corev1.ResourceCPU:              *cpu1000,
+				corev1.ResourceMemory:           *memory1024,
+				corev1.ResourceEphemeralStorage: *memory650},
 			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu100,
-				corev1.ResourceMemory: *memory350},
+				corev1.ResourceCPU:              *cpu100,
+				corev1.ResourceMemory:           *memory350,
+				corev1.ResourceEphemeralStorage: *memory400},
 		}
 	}
 
@@ -414,11 +420,15 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
 			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu1000,
-				corev1.ResourceMemory: *memory1024},
+				corev1.ResourceCPU:              *cpu1000,
+				corev1.ResourceMemory:           *memory1024,
+				corev1.ResourceEphemeralStorage: *memory550,
+			},
 			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu50,
-				corev1.ResourceMemory: *memory150},
+				corev1.ResourceCPU:              *cpu50,
+				corev1.ResourceMemory:           *memory150,
+				corev1.ResourceEphemeralStorage: *memory300,
+			},
 		}
 	}
 	envVars := []corev1.EnvVar{
@@ -762,11 +772,15 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
 			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu1000,
-				corev1.ResourceMemory: *memory1024},
+				corev1.ResourceCPU:              *cpu1000,
+				corev1.ResourceMemory:           *memory1024,
+				corev1.ResourceEphemeralStorage: *memory550,
+			},
 			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu50,
-				corev1.ResourceMemory: *memory150},
+				corev1.ResourceCPU:              *cpu50,
+				corev1.ResourceMemory:           *memory150,
+				corev1.ResourceEphemeralStorage: *memory300,
+			},
 		}
 	}
 	masterNodesList := ""

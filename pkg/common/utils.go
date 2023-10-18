@@ -174,14 +174,15 @@ func GetSharedServicesNamespace(ctx context.Context, name string) (namespace str
 }
 
 func MergeMap(in map[string]string, mergeMap map[string]string) map[string]string {
+	//in map is always Not NIL -- from the function calls, we ensure in map always has some data in it
 	if in == nil {
 		in = make(map[string]string)
 	}
 	if mergeMap == nil {
 		mergeMap = make(map[string]string)
 	}
-	for k, v := range mergeMap {
-		in[k] = v
+	for k, v := range in {
+		mergeMap[k] = v
 	}
-	return in
+	return mergeMap
 }

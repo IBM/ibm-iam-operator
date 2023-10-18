@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	pkgCommon "github.com/IBM/ibm-iam-operator/pkg/common"
 )
 
 const ClusterInfoConfigmapName = "ibmcloud-cluster-info"
@@ -458,6 +459,9 @@ func (r *ReconcileAuthentication) newRoute(instance *operatorv1alpha1.Authentica
 
 	weight := int32(100)
 
+	commonLabel := map[string]string{"app": "im"}
+	routeLabels := pkgCommon.MergeMap(commonLabel, instance.Spec.Labels)
+
 	route := &routev1.Route{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Route",
@@ -467,6 +471,7 @@ func (r *ReconcileAuthentication) newRoute(instance *operatorv1alpha1.Authentica
 			Name:        fields.Name,
 			Namespace:   namespace,
 			Annotations: fields.Annotations,
+			Labels:      routeLabels,
 		},
 		Spec: routev1.RouteSpec{
 			Host: fields.RouteHost,

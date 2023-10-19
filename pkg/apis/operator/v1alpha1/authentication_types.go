@@ -18,12 +18,13 @@ package v1alpha1
 
 import (
 	"context"
+	"reflect"
+	"sync"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sync"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -36,6 +37,7 @@ type AuthenticationSpec struct {
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
 	OperatorVersion    string                 `json:"operatorVersion"`
 	Replicas           int32                  `json:"replicas"`
+	Labels             map[string]string      `json:"labels,omitempty"`
 	AuditService       AuditServiceSpec       `json:"auditService"`
 	AuthService        AuthServiceSpec        `json:"authService"`
 	IdentityProvider   IdentityProviderSpec   `json:"identityProvider"`

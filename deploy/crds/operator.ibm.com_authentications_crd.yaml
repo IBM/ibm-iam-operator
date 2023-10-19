@@ -346,6 +346,10 @@ spec:
                   modifying this file Add custom validation using kubebuilder tags:
                   https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html'
                 type: string
+              labels:
+                additionalProperties:
+                  type: string
+                type: object
               replicas:
                 format: int32
                 type: integer

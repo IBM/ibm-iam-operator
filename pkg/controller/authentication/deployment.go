@@ -19,7 +19,6 @@ package authentication
 import (
 	"context"
 	"reflect"
-	gorun "runtime"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
 	pkgCommon "github.com/IBM/ibm-iam-operator/pkg/common"
@@ -378,7 +377,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 											{
 												Key:      "kubernetes.io/arch",
 												Operator: corev1.NodeSelectorOpIn,
-												Values:   []string{gorun.GOARCH},
+												Values:   ArchList,
 											},
 										},
 									},
@@ -513,7 +512,7 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 											{
 												Key:      "kubernetes.io/arch",
 												Operator: corev1.NodeSelectorOpIn,
-												Values:   []string{gorun.GOARCH},
+												Values:   ArchList,
 											},
 										},
 									},
@@ -648,7 +647,7 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 											{
 												Key:      "kubernetes.io/arch",
 												Operator: corev1.NodeSelectorOpIn,
-												Values:   []string{gorun.GOARCH},
+												Values:   ArchList,
 											},
 										},
 									},

@@ -261,10 +261,9 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"] = newConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"]
 					cmUpdateRequired = true
 				}
-				if _, keyExists := currentConfigMap.Data["LDAP_CTX_POOL_ENABLED"]; !keyExists {
+				if _, keyExists := currentConfigMap.Data["LDAP_CTX_POOL_INITSIZE"]; !keyExists {
 					reqLogger.Info("Updating an existing Configmap to add context pool for ldap configuration", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.scheme)
-					currentConfigMap.Data["LDAP_CTX_POOL_ENABLED"] = newConfigMap.Data["LDAP_CTX_POOL_ENABLED"]
 					currentConfigMap.Data["LDAP_CTX_POOL_INITSIZE"] = newConfigMap.Data["LDAP_CTX_POOL_INITSIZE"]
 					currentConfigMap.Data["LDAP_CTX_POOL_MAXSIZE"] = newConfigMap.Data["LDAP_CTX_POOL_MAXSIZE"]
 					currentConfigMap.Data["LDAP_CTX_POOL_TIMEOUT"] = newConfigMap.Data["LDAP_CTX_POOL_TIMEOUT"]
@@ -380,7 +379,6 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"LDAP_SEARCH_TIME_LIMIT":             "5",
 			"LDAP_SEARCH_CN_ATTR_ONLY":           "false",
 			"LDAP_SEARCH_ID_ATTR_ONLY":           "false",
-			"LDAP_CTX_POOL_ENABLED":              "true",
 			"LDAP_CTX_POOL_INITSIZE":             "10",
 			"LDAP_CTX_POOL_MAXSIZE":              "50",
 			"LDAP_CTX_POOL_TIMEOUT":              "30s",

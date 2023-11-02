@@ -117,6 +117,13 @@ func (in *AuthenticationSpec) DeepCopyInto(out *AuthenticationSpec) {
 	in.InitMongodb.DeepCopyInto(&out.InitMongodb)
 	in.ClientRegistration.DeepCopyInto(&out.ClientRegistration)
 	out.Config = in.Config
+	if in.Labels != nil {
+		in, out := &in.Labels, &out.Labels
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 

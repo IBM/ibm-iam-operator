@@ -37,6 +37,7 @@ type AuthenticationSpec struct {
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
 	OperatorVersion    string                 `json:"operatorVersion"`
 	Replicas           int32                  `json:"replicas"`
+	Labels             map[string]string      `json:"labels,omitempty"`
 	AuditService       AuditServiceSpec       `json:"auditService"`
 	AuthService        AuthServiceSpec        `json:"authService"`
 	IdentityProvider   IdentityProviderSpec   `json:"identityProvider"`

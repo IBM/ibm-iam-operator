@@ -23,9 +23,11 @@ spec:
       limits:
         cpu: 1000m
         memory: 1Gi
+        ephemeral-storage: 650Mi
       requests:
         cpu: 100m
         memory: 350Mi
+        ephemeral-storage: 400Mi
   pgsqlService:
     imageRegistry: "quay.io/opencloudio"
     imageName: "postgresql"
@@ -51,6 +53,7 @@ spec:
       requests:
         cpu: 100m
         memory: 128Mi
+        ephemeral-storage: 158Mi
   identityManager:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-identity-manager"
@@ -60,9 +63,11 @@ spec:
       limits:
         cpu: 1000m
         memory: 1Gi
+        ephemeral-storage: 550Mi
       requests:
         cpu: 50m
         memory: 150Mi
+        ephemeral-storage: 300Mi
   identityProvider:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-identity-provider"
@@ -71,9 +76,11 @@ spec:
       limits:
         cpu: 1000m
         memory: 1Gi
+        ephemeral-storage: 550Mi
       requests:
         cpu: 50m
         memory: 150Mi
+        ephemeral-storage: 300Mi
   initMongodb:
     imageRegistry: "quay.io/opencloudio"
     imageName: "icp-platform-auth"
@@ -85,6 +92,7 @@ spec:
       requests:
         cpu: 100m
         memory: 128Mi
+        ephemeral-storage: 178Mi
   config:
     oidcIssuerURL: "https://127.0.0.1:443/idauth/oidc/endpoint/OP"
     authUniqueHosts: "internal-ip1 internal-ip2 mycluster.icp"

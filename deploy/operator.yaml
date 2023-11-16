@@ -38,19 +38,19 @@ spec:
       containers:
         - name: ibm-iam-operator
           # Replace this with the built image name
-          image: icr.io/cpopen/ibm-iam-operator:4.2.0
+          image: icr.io/cpopen/ibm-iam-operator:4.3.0
           command:
           - ibm-iam-operator
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           env:
             - name: ICP_PLATFORM_AUTH_IMAGE
-              value: icr.io/cpopen/cpfs/icp-platform-auth:4.2.0
+              value: icr.io/cpopen/cpfs/icp-platform-auth:4.3.0
             - name: ICP_IDENTITY_PROVIDER_IMAGE
-              value: icr.io/cpopen/cpfs/icp-identity-provider:4.2.0
+              value: icr.io/cpopen/cpfs/icp-identity-provider:4.3.0
             - name: ICP_IDENTITY_MANAGER_IMAGE
-              value: icr.io/cpopen/cpfs/icp-identity-manager:4.2.0
+              value: icr.io/cpopen/cpfs/icp-identity-manager:4.3.0
             - name: IM_INITCONTAINER_IMAGE
-              value: icr.io/cpopen/cpfs/im-initcontainer:4.2.0
+              value: icr.io/cpopen/cpfs/im-initcontainer:4.3.0
             - name: POSTGRESQL_IMAGE
               value: quay.io/enterprisedb/postgresql:15.3
             - name: WATCH_NAMESPACE
@@ -76,6 +76,7 @@ spec:
             requests:
               cpu: 20m
               memory: 80Mi
+              ephemeral-storage: 256Mi
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

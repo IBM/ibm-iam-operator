@@ -322,7 +322,16 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"] = newConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"]
 					cmUpdateRequired = true
 				}
-
+				if _, keyExists := currentConfigMap.Data["LDAP_CTX_POOL_INITSIZE"]; !keyExists {
+					reqLogger.Info("Updating an existing Configmap to add context pool for ldap configuration", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					newConfigMap = functionList[index](instance, r.scheme)
+					currentConfigMap.Data["LDAP_CTX_POOL_INITSIZE"] = newConfigMap.Data["LDAP_CTX_POOL_INITSIZE"]
+					currentConfigMap.Data["LDAP_CTX_POOL_MAXSIZE"] = newConfigMap.Data["LDAP_CTX_POOL_MAXSIZE"]
+					currentConfigMap.Data["LDAP_CTX_POOL_TIMEOUT"] = newConfigMap.Data["LDAP_CTX_POOL_TIMEOUT"]
+					currentConfigMap.Data["LDAP_CTX_POOL_WAITTIME"] = newConfigMap.Data["LDAP_CTX_POOL_WAITTIME"]
+					currentConfigMap.Data["LDAP_CTX_POOL_PREFERREDSIZE"] = newConfigMap.Data["LDAP_CTX_POOL_PREFERREDSIZE"]
+					cmUpdateRequired = true
+				}
 				_, keyExists := currentConfigMap.Data["IS_OPENSHIFT_ENV"]
 				if keyExists {
 					reqLogger.Info("Current configmap", "Current Value", currentConfigMap.Data["IS_OPENSHIFT_ENV"])
@@ -546,6 +555,11 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"LDAP_SEARCH_TIME_LIMIT":             "5",
 			"LDAP_SEARCH_CN_ATTR_ONLY":           "false",
 			"LDAP_SEARCH_ID_ATTR_ONLY":           "false",
+			"LDAP_CTX_POOL_INITSIZE":             "10",
+			"LDAP_CTX_POOL_MAXSIZE":              "50",
+			"LDAP_CTX_POOL_TIMEOUT":              "30s",
+			"LDAP_CTX_POOL_WAITTIME":             "60s",
+			"LDAP_CTX_POOL_PREFERREDSIZE":        "10",
 			"IBMID_CLIENT_ID":                    "d3c8d1cf59a77cf73df35b073dfc1dc8",
 			"IBMID_CLIENT_ISSUER":                "idaas.iam.ibm.com",
 			"IBMID_PROFILE_URL":                  "https://w3-dev.api.ibm.com/profilemgmt/test/ibmidprofileait/v2/users",

@@ -14,7 +14,7 @@ spec:
   - name: v1
     schema:
       openAPIV3Schema:
-        description: Client is the Schema for the clients API
+        description: The Client custom resource is used for registering clients with Identity Management service
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation

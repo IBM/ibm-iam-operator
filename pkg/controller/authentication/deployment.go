@@ -19,9 +19,9 @@ package authentication
 import (
 	"context"
 	"reflect"
-	gorun "runtime"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	pkgCommon "github.com/IBM/ibm-iam-operator/pkg/common"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -305,11 +305,21 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
 
+	metaLabels := pkgCommon.MergeMap(map[string]string{"app": deployment}, instance.Spec.Labels)
+	podMetadataLabels := map[string]string{
+		"app":                        deployment,
+		"k8s-app":                    deployment,
+		"component":                  deployment,
+		"app.kubernetes.io/instance": "platform-auth-service",
+		"intent":                     "projected",
+	}
+	podLabels := pkgCommon.MergeMap(podMetadataLabels, instance.Spec.Labels)
+
 	idpDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      deployment,
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": deployment},
+			Labels:    metaLabels,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -322,13 +332,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app":                        deployment,
-						"k8s-app":                    deployment,
-						"component":                  deployment,
-						"app.kubernetes.io/instance": "platform-auth-service",
-						"intent":                     "projected",
-					},
+					Labels: podLabels,
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
 						"productName":                        "IBM Cloud Platform Common Services",
@@ -373,7 +377,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 											{
 												Key:      "kubernetes.io/arch",
 												Operator: corev1.NodeSelectorOpIn,
-												Values:   []string{gorun.GOARCH},
+												Values:   ArchList,
 											},
 										},
 									},
@@ -436,11 +440,21 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
 
+	metaLabels := pkgCommon.MergeMap(map[string]string{"app": deployment}, instance.Spec.Labels)
+	podMetadataLabels := map[string]string{
+		"app":                        deployment,
+		"k8s-app":                    deployment,
+		"component":                  deployment,
+		"app.kubernetes.io/instance": "platform-identity-provider",
+		"intent":                     "projected",
+	}
+	podLabels := pkgCommon.MergeMap(podMetadataLabels, instance.Spec.Labels)
+
 	idpDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      deployment,
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": deployment},
+			Labels:    metaLabels,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -453,13 +467,7 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app":                        deployment,
-						"k8s-app":                    deployment,
-						"component":                  deployment,
-						"app.kubernetes.io/instance": "platform-identity-provider",
-						"intent":                     "projected",
-					},
+					Labels: podLabels,
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
 						"productName":                        "IBM Cloud Platform Common Services",
@@ -504,7 +512,7 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 											{
 												Key:      "kubernetes.io/arch",
 												Operator: corev1.NodeSelectorOpIn,
-												Values:   []string{gorun.GOARCH},
+												Values:   ArchList,
 											},
 										},
 									},
@@ -567,11 +575,21 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
 
+	metaLabels := pkgCommon.MergeMap(map[string]string{"app": deployment}, instance.Spec.Labels)
+	podMetadataLabels := map[string]string{
+		"app":                        deployment,
+		"k8s-app":                    deployment,
+		"component":                  deployment,
+		"app.kubernetes.io/instance": "platform-identity-management",
+		"intent":                     "projected",
+	}
+	podLabels := pkgCommon.MergeMap(podMetadataLabels, instance.Spec.Labels)
+
 	idpDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      deployment,
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": deployment},
+			Labels:    metaLabels,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -584,13 +602,7 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app":                        deployment,
-						"k8s-app":                    deployment,
-						"component":                  deployment,
-						"app.kubernetes.io/instance": "platform-identity-management",
-						"intent":                     "projected",
-					},
+					Labels: podLabels,
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
 						"productName":                        "IBM Cloud Platform Common Services",
@@ -635,7 +647,7 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 											{
 												Key:      "kubernetes.io/arch",
 												Operator: corev1.NodeSelectorOpIn,
-												Values:   []string{gorun.GOARCH},
+												Values:   ArchList,
 											},
 										},
 									},

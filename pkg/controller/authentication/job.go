@@ -20,6 +20,7 @@ import (
 	"context"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/pkg/apis/operator/v1alpha1"
+	pkgCommon "github.com/IBM/ibm-iam-operator/pkg/common"
 	"github.com/IBM/ibm-iam-operator/pkg/controller/shatag"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -91,6 +92,13 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	image := shatag.GetImageRef("IM_INITCONTAINER_IMAGE")
 	resources := instance.Spec.ClientRegistration.Resources
+
+	metaLabels := pkgCommon.MergeMap(map[string]string{"app": jobName}, instance.Spec.Labels)
+	podMetaLabels := map[string]string{
+		"app":                        jobName,
+		"app.kubernetes.io/instance": "oidc-client-registration",
+	}
+	podLabels := pkgCommon.MergeMap(podMetaLabels, instance.Spec.Labels)
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
 			Limits: map[corev1.ResourceName]resource.Quantity{
@@ -106,16 +114,13 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
 			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": jobName},
+			Labels:    metaLabels,
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: jobName,
-					Labels: map[string]string{
-						"app":                        jobName,
-						"app.kubernetes.io/instance": "oidc-client-registration",
-					},
+					Name:   jobName,
+					Labels: podLabels,
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
 						"productName":                        "IBM Cloud Platform Common Services",
@@ -145,6 +150,42 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
 									"app": jobName,
+								},
+							},
+						},
+					},
+					Affinity: &corev1.Affinity{
+						NodeAffinity: &corev1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+								NodeSelectorTerms: []corev1.NodeSelectorTerm{
+									{
+										MatchExpressions: []corev1.NodeSelectorRequirement{
+											{
+												Key:      "kubernetes.io/arch",
+												Operator: corev1.NodeSelectorOpIn,
+												Values:   ArchList,
+											},
+										},
+									},
+								},
+							},
+						},
+						PodAntiAffinity: &corev1.PodAntiAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+								{
+									Weight: 100,
+									PodAffinityTerm: corev1.PodAffinityTerm{
+										TopologyKey: "kubernetes.io/hostname",
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "app",
+													Operator: metav1.LabelSelectorOpIn,
+													Values:   []string{"oidc-client-registration"},
+												},
+											},
+										},
+									},
 								},
 							},
 						},

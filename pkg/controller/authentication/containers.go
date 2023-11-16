@@ -50,8 +50,10 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 					corev1.ResourceCPU:    *cpu100,
 					corev1.ResourceMemory: *memory128},
 				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
+					corev1.ResourceCPU:              *cpu100,
+					corev1.ResourceMemory:           *memory128,
+					corev1.ResourceEphemeralStorage: *memory178,
+				},
 			},
 		},
 	}
@@ -62,7 +64,7 @@ func buildInitForMngrAndProvider(mongoDBImage string) []corev1.Container {
 		{
 			Name:            "init-mongodb",
 			Image:           mongoDBImage,
-			ImagePullPolicy: corev1.PullAlways,
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"bash",
 				"-c",
@@ -82,8 +84,10 @@ func buildInitForMngrAndProvider(mongoDBImage string) []corev1.Container {
 					corev1.ResourceCPU:    *cpu100,
 					corev1.ResourceMemory: *memory128},
 				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    *cpu100,
-					corev1.ResourceMemory: *memory128},
+					corev1.ResourceCPU:              *cpu100,
+					corev1.ResourceMemory:           *memory128,
+					corev1.ResourceEphemeralStorage: *memory178,
+				},
 			},
 		},
 	}
@@ -122,11 +126,13 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
 			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu1000,
-				corev1.ResourceMemory: *memory1024},
+				corev1.ResourceCPU:              *cpu1000,
+				corev1.ResourceMemory:           *memory1024,
+				corev1.ResourceEphemeralStorage: *memory650},
 			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu100,
-				corev1.ResourceMemory: *memory350},
+				corev1.ResourceCPU:              *cpu100,
+				corev1.ResourceMemory:           *memory350,
+				corev1.ResourceEphemeralStorage: *memory400},
 		}
 	}
 
@@ -302,7 +308,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 	}
 
 	idpEnvVarList := []string{"NODE_ENV", "MASTER_HOST", "IDENTITY_PROVIDER_URL", "HTTP_ONLY", "SESSION_TIMEOUT", "LDAP_RECURSIVE_SEARCH", "LDAP_ATTR_CACHE_SIZE", "LDAP_ATTR_CACHE_TIMEOUT", "LDAP_ATTR_CACHE_ENABLED", "LDAP_ATTR_CACHE_SIZELIMIT",
-		"LDAP_SEARCH_CACHE_SIZE", "LDAP_SEARCH_CACHE_TIMEOUT", "IDENTITY_PROVIDER_URL", "IDENTITY_MGMT_URL", "LDAP_SEARCH_CACHE_ENABLED", "LDAP_SEARCH_CACHE_SIZELIMIT", "IDTOKEN_LIFETIME", "IBMID_CLIENT_ID", "IBMID_CLIENT_ISSUER",
+		"LDAP_SEARCH_CACHE_SIZE", "LDAP_SEARCH_CACHE_TIMEOUT", "LDAP_CTX_POOL_INITSIZE", "LDAP_CTX_POOL_MAXSIZE", "LDAP_CTX_POOL_TIMEOUT", "LDAP_CTX_POOL_WAITTIME", "LDAP_CTX_POOL_PREFERREDSIZE", "IDENTITY_PROVIDER_URL", "IDENTITY_MGMT_URL", "LDAP_SEARCH_CACHE_ENABLED", "LDAP_SEARCH_CACHE_SIZELIMIT", "IDTOKEN_LIFETIME", "IBMID_CLIENT_ID", "IBMID_CLIENT_ISSUER",
 		"SAML_NAMEID_FORMAT", "FIPS_ENABLED", "LOGJAM_DHKEYSIZE_2048_BITS_ENABLED", "LOG_LEVEL_AUTHSVC", "LIBERTY_DEBUG_ENABLED", "NONCE_ENABLED", "CLAIMS_SUPPORTED", "CLAIMS_MAP", "SCOPE_CLAIM", "OIDC_ISSUER_URL",
 		"MONGO_READ_TIMEOUT", "MONGO_MAX_STALENESS", "MONGO_READ_PREFERENCE", "MONGO_CONNECT_TIMEOUT", "MONGO_SELECTION_TIMEOUT", "MONGO_WAIT_TIME", "MONGO_POOL_MIN_SIZE", "MONGO_POOL_MAX_SIZE"}
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
@@ -332,7 +338,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 	return corev1.Container{
 		Name:            "platform-auth-service",
 		Image:           authServiceImage,
-		ImagePullPolicy: corev1.PullAlways,
+		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: &corev1.SecurityContext{
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
@@ -422,11 +428,15 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
 			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu1000,
-				corev1.ResourceMemory: *memory1024},
+				corev1.ResourceCPU:              *cpu1000,
+				corev1.ResourceMemory:           *memory1024,
+				corev1.ResourceEphemeralStorage: *memory550,
+			},
 			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu50,
-				corev1.ResourceMemory: *memory150},
+				corev1.ResourceCPU:              *cpu50,
+				corev1.ResourceMemory:           *memory150,
+				corev1.ResourceEphemeralStorage: *memory300,
+			},
 		}
 	}
 	envVars := []corev1.EnvVar{
@@ -671,7 +681,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 	}
 
 	idpEnvVarList := []string{"NODE_ENV", "LOG_LEVEL_IDPROVIDER", "LOG_LEVEL_MW", "PROVIDER_ISSUER_URL", "PREFERRED_LOGIN", "IDTOKEN_LIFETIME", "SAAS_CLIENT_REDIRECT_URL", "IBM_CLOUD_SAAS", "ROKS_ENABLED", "ROKS_URL", "ROKS_USER_PREFIX", "OS_TOKEN_LENGTH", "LIBERTY_TOKEN_LENGTH",
-		"IDENTITY_PROVIDER_URL", "BASE_AUTH_URL", "BASE_OIDC_URL", "SCOPE_CLAIM", "OIDC_ISSUER_URL", "HTTP_ONLY", "IGNORE_LDAP_FILTERS_VALIDATION", "LDAP_ATTR_CACHE_SIZE", "LDAP_ATTR_CACHE_TIMEOUT", "LDAP_ATTR_CACHE_ENABLED", "LDAP_ATTR_CACHE_SIZELIMIT", "LDAP_SEARCH_CACHE_SIZE", "LDAP_SEARCH_CACHE_TIMEOUT", "LDAP_SEARCH_CACHE_ENABLED", "LDAP_SEARCH_CACHE_SIZELIMIT", "LDAP_SEARCH_EXCLUDE_WILDCARD_CHARS", "LDAP_SEARCH_SIZE_LIMIT", "LDAP_SEARCH_TIME_LIMIT", "LDAP_SEARCH_CN_ATTR_ONLY", "LDAP_SEARCH_ID_ATTR_ONLY"}
+		"IDENTITY_PROVIDER_URL", "BASE_AUTH_URL", "BASE_OIDC_URL", "SCOPE_CLAIM", "OIDC_ISSUER_URL", "HTTP_ONLY", "IGNORE_LDAP_FILTERS_VALIDATION", "LDAP_ATTR_CACHE_SIZE", "LDAP_ATTR_CACHE_TIMEOUT", "LDAP_ATTR_CACHE_ENABLED", "LDAP_ATTR_CACHE_SIZELIMIT", "LDAP_SEARCH_CACHE_SIZE", "LDAP_SEARCH_CACHE_TIMEOUT", "LDAP_CTX_POOL_INITSIZE", "LDAP_CTX_POOL_MAXSIZE", "LDAP_CTX_POOL_TIMEOUT", "LDAP_CTX_POOL_WAITTIME", "LDAP_CTX_POOL_PREFERREDSIZE", "LDAP_SEARCH_CACHE_ENABLED", "LDAP_SEARCH_CACHE_SIZELIMIT", "LDAP_SEARCH_EXCLUDE_WILDCARD_CHARS", "LDAP_SEARCH_SIZE_LIMIT", "LDAP_SEARCH_TIME_LIMIT", "LDAP_SEARCH_CN_ATTR_ONLY", "LDAP_SEARCH_ID_ATTR_ONLY"}
 
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
 
@@ -700,7 +710,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 	return corev1.Container{
 		Name:            "platform-identity-provider",
 		Image:           identityProviderImage,
-		ImagePullPolicy: corev1.PullAlways,
+		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: &corev1.SecurityContext{
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
@@ -778,11 +788,15 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
 			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu1000,
-				corev1.ResourceMemory: *memory1024},
+				corev1.ResourceCPU:              *cpu1000,
+				corev1.ResourceMemory:           *memory1024,
+				corev1.ResourceEphemeralStorage: *memory550,
+			},
 			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    *cpu50,
-				corev1.ResourceMemory: *memory150},
+				corev1.ResourceCPU:              *cpu50,
+				corev1.ResourceMemory:           *memory150,
+				corev1.ResourceEphemeralStorage: *memory300,
+			},
 		}
 	}
 	masterNodesList := ""
@@ -1080,7 +1094,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 	return corev1.Container{
 		Name:            "platform-identity-management",
 		Image:           identityManagerImage,
-		ImagePullPolicy: corev1.PullAlways,
+		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: &corev1.SecurityContext{
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,

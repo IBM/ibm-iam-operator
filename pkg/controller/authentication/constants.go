@@ -34,6 +34,12 @@ const (
 	IDMgmtSVC            string = "im_idmgmt_endpoint"
 )
 
+var ArchList = []string{
+	"amd64",
+	"ppc64le",
+	"s390x",
+}
+
 const registerClientScript = `#!/bin/sh
 HTTP_CODE=""
 while true

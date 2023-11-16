@@ -19,7 +19,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -27,8 +26,9 @@ import (
 
 	oidcv1 "github.com/IBM/ibm-iam-operator/pkg/apis/oidc/v1"
 	pkgCommon "github.com/IBM/ibm-iam-operator/pkg/common"
+	ctrlCommon "github.com/IBM/ibm-iam-operator/pkg/controller/common"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -181,7 +181,7 @@ func (r *ReconcileClient) Reconcile(ctx context.Context, request reconcile.Reque
 	instance := &oidcv1.Client{}
 	err = r.Reader.Get(ctx, request.NamespacedName, instance)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8sErrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
@@ -192,18 +192,18 @@ func (r *ReconcileClient) Reconcile(ctx context.Context, request reconcile.Reque
 	}
 
 	processOidcRegistrationCtx := logf.IntoContext(ctx, reqLogger)
-	errorRg := r.processOidcRegistration(processOidcRegistrationCtx, instance)
-	if errorRg != nil {
+	err = r.processOidcRegistration(processOidcRegistrationCtx, instance)
+	if err != nil {
 		//Occassionally we will receive an error message stating the object had been modified and needs to
 		//be reloaded.  k8s says these are benign - we will eat the error and requeue
 		//https://github.com/kubernetes/kubernetes/issues/28149
-		if strings.Contains(errorRg.Error(), OptimisticLockErrorMsg) {
+		if strings.Contains(err.Error(), OptimisticLockErrorMsg) {
 			reqLogger.Info("Client modified during reconcile - requeueing")
 			// do manaul retry without error
 			return reconcile.Result{RequeueAfter: time.Second * 1}, nil
 		}
 
-		return reconcile.Result{}, errorRg
+		return reconcile.Result{}, err
 	} else {
 		reqLogger.Info("Reconciling OIDC Client complete")
 		return reconcile.Result{}, nil
@@ -213,41 +213,11 @@ func (r *ReconcileClient) Reconcile(ctx context.Context, request reconcile.Reque
 // createClient handles all aspects of tying out the creation of a new OIDC client, including registering the client in
 // the OP, updates the ibm-iam-operand-restricted ServiceAccount with new redirect uris from client CR  and registers the Zen instance in IAM if the required fields are supplied.
 func (r *ReconcileClient) createClient(ctx context.Context, client *oidcv1.Client) (err error) {
-	reqLogger := logf.FromContext(ctx).WithName("createClient")
-	clientCreds := r.generateClientCredentials("")
-	reqLogger.Info("generated new client ID/secret pair", "clientId", clientCreds.ClientID)
-	_, err = r.CreateClientRegistration(ctx, client, clientCreds)
-	if err != nil {
-		r.handleOIDCClientError(ctx, client, err, PostType)
-		err = fmt.Errorf("error occurred during client registration: %w", err)
-		return
-	}
-
-	// Now that the Client has been registered in the provider, set the Client ID on the Client
-	client.Spec.ClientId = clientCreds.ClientID
-	reqLogger = reqLogger.WithValues("clientId", client.Spec.ClientId)
-	_, err = r.createNewSecretForClient(ctx, client, clientCreds)
+	//reqLogger := logf.FromContext(ctx).WithName("createClient")
+	//var response *http.Response
+	_, err = r.CreateClientRegistration(ctx, client)
 	if err != nil {
 		return
-	}
-
-	reqLogger.Info("adding annotations to ibm-iam-operand-restricted ServiceAccount")
-	reqLogger.Info("SharedServicesNamespace is", "iamoperandnamespace", r.sharedServicesNamespace)
-
-	r.handleServiceAccount(ctx, client, r.sharedServicesNamespace)
-	if client.Spec.ZenInstanceId == "" {
-		err = r.processZenRegistration(ctx, client, clientCreds)
-		if err != nil {
-			reqLogger.Error(err, "An error occurred during Zen registration", "clientId", client.Spec.ClientId)
-		}
-	}
-	if err == nil {
-		SetClientCondition(client,
-			oidcv1.ClientConditionReady,
-			oidcv1.ConditionTrue,
-			ReasonCreateClientSuccessful,
-			MessageClientSuccessful)
-		r.recorder.Event(client, corev1.EventTypeNormal, ReasonCreateClientSuccessful, MessageCreateClientSuccessful)
 	}
 	return
 }
@@ -255,62 +225,63 @@ func (r *ReconcileClient) createClient(ctx context.Context, client *oidcv1.Clien
 // updateClient handles all aspects of tying out the update of an OIDC client, including any updates that may be needed
 // for the Client's OpenShift OAuthClient resource and matching Zen instance, if applicable.
 func (r *ReconcileClient) updateClient(ctx context.Context, client *oidcv1.Client) (err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("clientId", client.Spec.ClientId)
-	var secret *corev1.Secret
-	var clientCreds *ClientCredentials
-
+	//reqLogger := logf.FromContext(ctx).WithValues("clientId", client.Spec.ClientId)
 	r.cp3RoleFinalizerUpdate(ctx, client)
-
-	secret, err = r.getSecretFromClient(ctx, client)
-	//secretCreated := false
+	_, err = r.UpdateClientRegistration(ctx, client)
 	if err != nil {
-		reqLogger.Error(err, "Secret could not be retrieved for Client; creating a replacement Secret", "secretName", client.Spec.Secret)
-		clientCreds = r.generateClientCredentials(client.Spec.ClientId)
-		secret, err = r.createNewSecretForClient(ctx, client, clientCreds)
-		if err != nil {
-			return fmt.Errorf("failed to create a new Secret: %w", err)
-		}
-		reqLogger.Info("Created Secret", "secretName", client.Spec.Secret)
-		//secretCreated = true
-		err = nil
-	} else {
-		clientCreds, err = getClientCredsFromSecret(secret)
-		if err != nil {
-			return fmt.Errorf("could not create new ClientCredentials struct: %w", err)
-		}
-	}
-	var response *http.Response
-	response, err = r.UpdateClientRegistration(ctx, client, clientCreds)
-	if err != nil {
-		r.handleOIDCClientError(ctx, client, err, PutType)
-		err = fmt.Errorf("error occurred during update oidc client registration: %w", err)
 		return
 	}
-	_, err = ioutil.ReadAll(response.Body)
-	if err != nil {
-		log.Error(err, "Failed to read response body")
-		err = nil
-	}
-	reqLogger.Info("Received non-empty response")
+	return
+}
 
-	// secret is nil if getSecretFromClient produces an error, which we assume to mean that the Secret sought after didn't
-	// turn up. If this happens, try to create a new secret using the clientCreds that were freshly generated and used for
-	// the successful registration update.
-	if secret == nil {
-		_, err = r.createNewSecretForClient(ctx, client, clientCreds)
-		if err != nil {
-			return fmt.Errorf("failed to create a new Secret: %w", err)
+// isBeingDeleted returns true if the Client is in the process of being deleted
+func isBeingDeleted(client *oidcv1.Client) bool {
+	return client.GetDeletionTimestamp() != nil
+}
+
+// createPostfixedName creates a new name that stays below the Kubernetes max length for a name with a postfix.
+func createPostfixedName(original, postfix string) (newName string) {
+	const k8sMaxNameLength int = 253
+	const separator = "-"
+	if len(original)+len(postfix)+1 > k8sMaxNameLength {
+		// Max length minus postfix length with separator
+		truncLen := k8sMaxNameLength - len(postfix) - 1
+		return strings.Join([]string{original[:truncLen], postfix}, separator)
+	}
+	return strings.Join([]string{original, postfix}, separator)
+}
+
+// ensureSecretAndClientIdSet checks a Client CR to be sure that its corresponding Secret containing the client ID and
+// client secret has been created and that the ID on the CR itself has been set to match the value in the Secret.
+func (r *ReconcileClient) ensureSecretAndClientIdSet(ctx context.Context, client *oidcv1.Client) (err error) {
+	var secret *corev1.Secret
+
+	// If a Secret name isn't set on the Client, create a new Secret name based upon the Client's name
+	if client.Spec.Secret == "" {
+		rule := `^([a-z0-9]){8,}$`
+		postfix := strings.Join([]string{ctrlCommon.GenerateRandomString(rule), "secret"}, "-")
+		client.Spec.Secret = createPostfixedName(client.Name, postfix)
+	} else {
+		secret, err = r.getSecretFromClient(ctx, client)
+		if err != nil && !k8sErrors.IsNotFound(err) {
+			return
 		}
 	}
 
-	reqLogger.Info("Updating annotations to ibm-iam-operand-restricted ServiceAccount")
-	reqLogger.Info("SharedServicesNamespace is", "iamoperandnamespace", r.sharedServicesNamespace)
-	r.handleServiceAccount(ctx, client, r.sharedServicesNamespace)
-
-	err = r.processZenRegistration(ctx, client, clientCreds)
-	if err != nil {
-		reqLogger.Error(err, "An error occurred during zen registration")
+	// If there isn't a Secret found, then a Secret needs to be created
+	if secret == nil {
+		secret, err = r.createNewSecretForClient(ctx, client)
 	}
+
+	if err != nil {
+		return
+	}
+
+	secretClientId := string(secret.Data["CLIENT_ID"])
+	if client.Spec.ClientId != secretClientId {
+		client.Spec.ClientId = string(secret.Data["CLIENT_ID"])
+	}
+
 	return
 }
 
@@ -318,12 +289,26 @@ func (r *ReconcileClient) processOidcRegistration(ctx context.Context, client *o
 	reqLogger := logf.FromContext(ctx).WithName("processOidcRegistration")
 	reqLogger.Info("Processing OIDC client Registration")
 
+	var requestMethod string
+
+	// For all of the following outcomes, be sure to write out any condition changes or events
+	defer func() {
+		reqLogger.Info("Updating status")
+		r.writeConditionsAndEvents(ctx, client, err, requestMethod)
+	}()
+
 	// If the Client is marked for deletion, process that action
-	if client.GetDeletionTimestamp() != nil {
+	if isBeingDeleted(client) {
+		requestMethod = http.MethodDelete
 		err = r.deleteClient(ctx, client)
 		if err != nil {
 			reqLogger.Error(err, "Error occurred while deleting oidc registration")
 		}
+		return
+	}
+
+	err = r.ensureSecretAndClientIdSet(ctx, client)
+	if err != nil {
 		return
 	}
 
@@ -333,10 +318,12 @@ func (r *ReconcileClient) processOidcRegistration(ctx context.Context, client *o
 	if err != nil {
 		reqLogger.Info("Client not found, create new Client")
 		verb = "create"
+		requestMethod = http.MethodPost
 		err = r.createClient(ctx, client)
 	} else {
 		reqLogger.Info("Client found, update Client")
 		verb = "update"
+		requestMethod = http.MethodPut
 		err = r.updateClient(ctx, client)
 	}
 
@@ -345,32 +332,28 @@ func (r *ReconcileClient) processOidcRegistration(ctx context.Context, client *o
 		return
 	}
 
+	reqLogger.Info("adding annotations to ibm-iam-operand-restricted ServiceAccount")
+	r.handleServiceAccount(ctx, client, r.sharedServicesNamespace)
+	err = r.processZenRegistration(ctx, client)
+	if err != nil {
+		reqLogger.Error(err, "Zen client registration failed")
+		return
+	}
 	// add finalizer if not already present
 	addFinalizer(client)
 
-	//Hit a strange issue ... the code above possibly updates both the spec fields and the status, however when
-	//client.Update is called, this is reloading the client object from the server which is over-writing the changed
-	//status so status changes are never saved in the status update below when they have changed.
-	//To work around this, we will keep a copy of the status before update and apply after the update is complete
-
-	savedStatus := client.DeepCopy().Status
-
 	// Update the client
-	reqLogger.Info("Updating Client CR")
-	errUpdate := r.client.Update(ctx, client)
-	if errUpdate != nil {
-		return errUpdate
+	reqLogger.Info("Updating Client CR spec")
+	err = r.client.Update(ctx, client)
+	if err != nil {
+		reqLogger.Error(err, "Client CR spec update failed")
+		return
 	}
 
-	//apply saved status
-	client.Status = savedStatus
-
-	reqLogger.Info("Updating status")
-	err = r.client.Status().Update(ctx, client)
 	return
 }
 
-func (r *ReconcileClient) processZenRegistration(ctx context.Context, client *oidcv1.Client, clientCreds *ClientCredentials) (err error) {
+func (r *ReconcileClient) processZenRegistration(ctx context.Context, client *oidcv1.Client) (err error) {
 	reqLogger := logf.FromContext(ctx)
 	if client.Spec.ZenInstanceId == "" {
 		reqLogger.Info("Zen instance ID not specified, skipping zen registration")
@@ -379,10 +362,6 @@ func (r *ReconcileClient) processZenRegistration(ctx context.Context, client *oi
 	var zenReg *ZenInstance
 	zenReg, err = r.GetZenInstance(ctx, client)
 	if err != nil {
-		//Set the status to false since zen registration cannot be completed
-		SetClientCondition(client, oidcv1.ClientConditionReady, oidcv1.ConditionFalse, ReasonCreateZenRegistrationFailed,
-			MessageCreateZenRegistrationFailed)
-		r.recorder.Event(client, corev1.EventTypeWarning, ReasonCreateZenRegistrationFailed, err.Error())
 		return
 	}
 	if zenReg != nil {
@@ -391,15 +370,14 @@ func (r *ReconcileClient) processZenRegistration(ctx context.Context, client *oi
 		return
 	}
 
+	clientCreds, err := r.GetClientCreds(ctx, client)
+	if err != nil {
+		reqLogger.Error(err, "Retrieved Secret did not have correct Client ID and Secret keys", "secretName", client.Spec.Secret)
+		return fmt.Errorf("could not create new ClientCredentials struct: %w", err)
+	}
 	//Zen registration does not exist, create
 	reqLogger.Info("Creating zen registration for client")
 	err = r.CreateZenInstance(ctx, client, clientCreds)
-	if err != nil {
-		//Set the status to false since zen registration cannot be completed
-		SetClientCondition(client, oidcv1.ClientConditionReady, oidcv1.ConditionFalse, ReasonCreateZenRegistrationFailed,
-			MessageCreateZenRegistrationFailed)
-		r.recorder.Event(client, corev1.EventTypeWarning, ReasonCreateZenRegistrationFailed, err.Error())
-	}
 
 	return
 }
@@ -479,17 +457,7 @@ func (r *ReconcileClient) deleteClient(ctx context.Context, client *oidcv1.Clien
 		}
 		return
 	}
-	_, err = r.DeleteClientRegistration(ctx, client)
-	if err != nil {
-		r.handleOIDCClientError(ctx, client, err, DeleteType)
-		err = fmt.Errorf("error occurred during delete oidc client registration: %w", err)
-		return
-	}
-	reqLogger.Info("Client registration successfully deleted")
 
-	reqLogger.Info("Deleting annotations from ibm-iam-operand-restricted ServiceAccount")
-	reqLogger.Info("SharedServicesNamespace is", "iamoperandnamespace", r.sharedServicesNamespace)
-	r.RemoveAnnotationFromSA(ctx, client, r.sharedServicesNamespace)
 	// Delete the zeninstance if it has been specified
 	if client.Spec.ZenInstanceId != "" {
 		reqLogger.Info("Client has a zenInstanceId, attempt to delete the matching Zen instance")
@@ -500,6 +468,16 @@ func (r *ReconcileClient) deleteClient(ctx context.Context, client *oidcv1.Clien
 		}
 		reqLogger.Info("Zen instance deletion succeeded", "ZenInstanceId", client.Spec.ZenInstanceId)
 	}
+
+	_, err = r.DeleteClientRegistration(ctx, client)
+	if err != nil {
+		return
+	}
+	reqLogger.Info("Client registration successfully deleted")
+
+	reqLogger.Info("Deleting annotations from ibm-iam-operand-restricted ServiceAccount")
+	r.RemoveAnnotationFromSA(ctx, client, r.sharedServicesNamespace)
+
 	// Remove the finalizers
 	reqLogger.Info("Removing finalizer from Client", "clientId", client.Spec.ClientId)
 
@@ -521,6 +499,9 @@ func (r *ReconcileClient) deleteClient(ctx context.Context, client *oidcv1.Clien
 // getSecretFromClient attempts to read the secret named in the provided Client resource and returns its contents if
 // found. Returns an error if the attempt to read the Secret off of the cluster fails for any reason.
 func (r *ReconcileClient) getSecretFromClient(ctx context.Context, client *oidcv1.Client) (secret *corev1.Secret, err error) {
+	if client == nil || client.Spec.Secret == "" {
+		return
+	}
 	secret = &corev1.Secret{}
 	err = r.Reader.Get(ctx, types.NamespacedName{Name: client.Spec.Secret, Namespace: client.Namespace}, secret)
 	if err == nil {
@@ -551,7 +532,7 @@ func getClientCredsFromSecret(secret *corev1.Secret) (clientCreds *ClientCredent
 	}, nil
 }
 
-func (r *ReconcileClient) createNewSecretForClient(ctx context.Context, client *oidcv1.Client, clientCreds *ClientCredentials) (*corev1.Secret, error) {
+func (r *ReconcileClient) createNewSecretForClient(ctx context.Context, client *oidcv1.Client) (*corev1.Secret, error) {
 	reqLogger := logf.FromContext(ctx, "Request.Namespace", client.Namespace, "client.Name", client.Name)
 	labels := map[string]string{
 		"app.kubernetes.io/managed-by":          "OIDCClientRegistration.oidc.security.ibm.com",
@@ -571,22 +552,22 @@ func (r *ReconcileClient) createNewSecretForClient(ctx context.Context, client *
 		return nil, err
 	}
 
-	if clientCreds != new(ClientCredentials) && clientCreds != nil {
-		if secret.Data == nil {
-			secret.Data = map[string][]byte{}
-		}
-		clientId := clientCreds.ClientID
-		clientSecret := clientCreds.ClientSecret
-		secret.Data["CLIENT_ID"] = []byte(clientId)
-		secret.Data["CLIENT_SECRET"] = []byte(clientSecret)
-	} else {
-		return secret, nil
+	reqLogger.Info("Generating client credentials for new Secret")
+	clientCreds := r.generateClientCredentials(client.Spec.ClientId)
+	if secret.Data == nil {
+		secret.Data = map[string][]byte{}
 	}
+	clientId := clientCreds.ClientID
+	clientSecret := clientCreds.ClientSecret
+	secret.Data["CLIENT_ID"] = []byte(clientId)
+	secret.Data["CLIENT_SECRET"] = []byte(clientSecret)
+
 	err := r.client.Create(ctx, secret)
 	if err != nil {
 		reqLogger.Error(err, "Error occurred during secret creation")
 		return nil, err
 	}
+	reqLogger.Info("Created Secret", "secretName", secret.Name)
 	return secret, nil
 }
 

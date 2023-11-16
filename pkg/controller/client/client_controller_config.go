@@ -45,6 +45,51 @@ const (
 	oAuthAdminPasswordKey string = "OAUTH2_CLIENT_REGISTRATION_SECRET"
 )
 
+// ConfigValueNotFoundError is returned when a specific key is not available in the ClientControllerConfig
+type ConfigValueNotFoundError struct {
+	Key string
+}
+
+func (e *ConfigValueNotFoundError) Error() string {
+	return fmt.Sprintf("unable to retrieve value for key %q from config", e.Key)
+}
+
+func NewConfigValueNotFoundError(key string) (err error) {
+	return &ConfigValueNotFoundError{Key: key}
+}
+
+var ConfigNotSetError error = fmt.Errorf("config is not set")
+
+type InvalidResourceError struct {
+	Kind      string
+	Name      string
+	Namespace string
+	Reason    string
+}
+
+func (e *InvalidResourceError) Error() string {
+	return fmt.Sprintf("%s %s in namespace %s is invalid: %s", e.Kind, e.Name, e.Namespace, e.Reason)
+}
+
+func NewInvalidResourceError(kind, name, namespace, reason string) (err error) {
+	return &InvalidResourceError{
+		Kind:      kind,
+		Name:      name,
+		Namespace: namespace,
+		Reason:    reason,
+	}
+}
+
+type CP2ServiceURLFormatError struct{}
+
+func (e *CP2ServiceURLFormatError) Error() string {
+	return "found ConfigMap service data with cp2 format : 127.0.0.1"
+}
+
+func NewCP2ServiceURLFormatError() (err error) {
+	return &CP2ServiceURLFormatError{}
+}
+
 // getClusterDomainNameForServiceURL converts the provided URL string from just a Service name to "<service
 // name>.<namespace>.svc"
 func getClusterDomainNameForServiceURL(url string, namespace string) string {
@@ -66,7 +111,7 @@ func (c ClientControllerConfig) ApplyConfigMap(configMap *corev1.ConfigMap, keys
 				} else if !strings.Contains(configMap.Data[k], "127.0.0.1") {
 					c[k] = configMap.Data[k]
 				} else {
-					return fmt.Errorf("found ConfigMap service data with cp2 format : 127.0.0.1")
+					return NewCP2ServiceURLFormatError()
 				}
 			}
 		} else {
@@ -76,13 +121,13 @@ func (c ClientControllerConfig) ApplyConfigMap(configMap *corev1.ConfigMap, keys
 				} else if !strings.Contains(configMap.Data[k], "127.0.0.1") {
 					c[k] = v
 				} else {
-					return fmt.Errorf("found ConfigMap service data with cp2 format : 127.0.0.1")
+					return NewCP2ServiceURLFormatError()
 				}
 			}
 		}
 		return
 	}
-	return fmt.Errorf("found ConfigMap had no \"Data\" field")
+	return NewInvalidResourceError("ConfigMap", configMap.Name, configMap.Namespace, "missing valid \"Data\" field")
 }
 
 // ApplySecret takes the key value pairs found in a Secret's Data field and sets the same keys and values in the
@@ -101,18 +146,18 @@ func (c ClientControllerConfig) ApplySecret(secret *corev1.Secret, keysList ...s
 		}
 		return
 	}
-	return fmt.Errorf("found Secret had no \"Data\" field")
+	return NewInvalidResourceError("Secret", secret.Name, secret.Namespace, "missing valid \"Data\" field")
 }
 
 // getConfigValue retrieves the value stored at the provided key from the ClientControllerConfig. Produces an error if
 // the ClientControllerConfig is empty or if the key is not present.
 func (c ClientControllerConfig) getConfigValue(key string) (value string, err error) {
 	if len(c) == 0 {
-		return "", fmt.Errorf("config is not set")
+		return "", ConfigNotSetError
 	}
 	value, ok := c[key]
 	if !ok {
-		err = fmt.Errorf("unable to retrieve value for key %q from config", key)
+		err = NewConfigValueNotFoundError(key)
 	}
 	return
 }

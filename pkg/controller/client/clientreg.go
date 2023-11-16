@@ -72,21 +72,8 @@ type ZenInstance struct {
 	ZenAuditUrl    string `json:"zenAuditUrl"`
 }
 
-const (
-	GetType    = "GET"
-	PostType   = "POST"
-	PutType    = "PUT"
-	DeleteType = "DELETE"
-)
-
-const (
-	letterBytes   = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" // 52 possibilities
-	letterIdxBits = 6                                                                // 6 bits to represent 64 possibilities / indexes
-	letterIdxMask = 1<<letterIdxBits - 1                                             // All 1-bits, as many as letterIdxBits
-)
-
 // CreateClientRegistration registers a new OIDC Client on the OP using information provided in the provided Client CR.
-func (r *ReconcileClient) CreateClientRegistration(ctx context.Context, client *oidcv1.Client, clientCreds *ClientCredentials) (response *http.Response, err error) {
+func (r *ReconcileClient) CreateClientRegistration(ctx context.Context, client *oidcv1.Client) (response *http.Response, err error) {
 	reqLogger := logf.FromContext(ctx).WithName("CreateClientRegistration")
 	var url, identityProviderURL string
 	identityProviderURL, err = r.GetIdentityProviderURL()
@@ -95,30 +82,55 @@ func (r *ReconcileClient) CreateClientRegistration(ctx context.Context, client *
 		return
 	}
 	url = strings.Join([]string{identityProviderURL, "v1", "auth", "registration"}, "/")
+	clientCreds, err := r.GetClientCreds(ctx, client)
+	if err != nil {
+		return
+	}
 	payload := r.generateClientRegistrationPayload(client, clientCreds)
-	response, err = r.invokeClientRegistrationAPI(ctx, client, PostType, url, payload)
+	response, err = r.invokeClientRegistrationAPI(ctx, client, http.MethodPost, url, payload)
 	if err == nil && response.Status != "201 Created" {
-		err = NewOIDCClientError(response)
-		return nil, err
+		return nil, NewOIDCClientRegistrationError(
+			client.Spec.ClientId,
+			http.MethodPost,
+			fmt.Sprintf("got status %s", response.Status),
+			response,
+		)
+	} else if err != nil {
+		return nil, NewOIDCClientRegistrationError(client.Spec.ClientId, http.MethodPost, err.Error(), response)
 	}
 	return
 }
 
 // UpdateClientRegistration updates the OIDC Client registration represented by the Client CR to use the credentials
 // stored in the provided Secret.
-func (r *ReconcileClient) UpdateClientRegistration(ctx context.Context, client *oidcv1.Client, clientCreds *ClientCredentials) (response *http.Response, err error) {
+func (r *ReconcileClient) UpdateClientRegistration(ctx context.Context, client *oidcv1.Client) (response *http.Response, err error) {
 	logger := logf.FromContext(ctx).WithName("UpdateClientRegistration")
 	var url, identityProviderURL string
+	clientCreds, err := r.GetClientCreds(ctx, client)
+	if err != nil {
+		return
+	}
 	payload := r.generateClientRegistrationPayload(client, clientCreds)
 	identityProviderURL, err = r.GetIdentityProviderURL()
 	if err != nil {
 		return
 	}
 	url = strings.Join([]string{identityProviderURL, "v1", "auth", "registration", clientCreds.ClientID}, "/")
-	response, err = r.invokeClientRegistrationAPI(ctx, client, PutType, url, payload)
+	response, err = r.invokeClientRegistrationAPI(ctx, client, http.MethodPut, url, payload)
 	if err == nil && response.Status != "200 OK" {
-		logger.Error(err, "Client registration update failed")
-		return nil, NewOIDCClientError(response)
+		return nil, NewOIDCClientRegistrationError(
+			client.Spec.ClientId,
+			http.MethodPut,
+			fmt.Sprintf("got status %s", response.Status),
+			response,
+		)
+	} else if err != nil {
+		return nil, NewOIDCClientRegistrationError(
+			client.Spec.ClientId,
+			http.MethodPut,
+			err.Error(),
+			response,
+		)
 	}
 	logger.Info("Client registration update successful")
 	return
@@ -137,9 +149,17 @@ func (r *ReconcileClient) DeleteClientRegistration(ctx context.Context, client *
 		return
 	}
 	url = strings.Join([]string{identityProviderURL, "v1", "auth", "registration", clientId}, "/")
-	response, err = r.invokeClientRegistrationAPI(ctx, client, DeleteType, url, "")
+	response, err = r.invokeClientRegistrationAPI(ctx, client, http.MethodDelete, url, "")
+	if err != nil {
+		return nil, NewOIDCClientRegistrationError(client.Spec.ClientId, http.MethodDelete, err.Error(), response)
+	}
 	if err == nil && response.Status != "204 No Content" && response.Status != "404 Not Found" {
-		return nil, NewOIDCClientError(response)
+		return nil, NewOIDCClientRegistrationError(
+			client.Spec.ClientId,
+			http.MethodDelete,
+			fmt.Sprintf("got status %s", response.Status),
+			response,
+		)
 	}
 	return
 }
@@ -173,24 +193,32 @@ func (r *ReconcileClient) invokeClientRegistrationAPI(ctx context.Context, clien
 		reqLogger.Error(err, "Request failed")
 		return
 	}
-	reqLogger.Info("Request complete")
+	reqLogger.Info("Request complete", "headers", response.Request.Header)
 	return
 }
 
-// GetClientRegistration gets the registered Client from the OP, if it is there.
+// GetClientRegistration gets the registered Client from the OP via the IdP, if that Client is there.
 func (r *ReconcileClient) GetClientRegistration(ctx context.Context, client *oidcv1.Client) (response *http.Response, err error) {
-	authServiceURL, err := r.GetIdentityProviderURL()
+	identityProviderURL, err := r.GetIdentityProviderURL()
 	if err != nil {
 		return
 	}
-	url := strings.Join([]string{authServiceURL, "v1", "auth", "registration", client.Spec.ClientId}, "/")
-	response, err = r.invokeClientRegistrationAPI(ctx, client, GetType, url, "")
-	if response == nil {
-		err = fmt.Errorf("did not receive response from identity provider")
-	} else if response.StatusCode >= 400 {
-		err = NewOIDCClientError(response)
+	url := strings.Join([]string{identityProviderURL, "v1", "auth", "registration", client.Spec.ClientId}, "/")
+	response, err = r.invokeClientRegistrationAPI(ctx, client, http.MethodGet, url, "")
+	if err != nil {
+		err = NewOIDCClientRegistrationError(
+			client.Spec.ClientId,
+			http.MethodGet,
+			err.Error(),
+			response,
+		)
 	} else if response.Status != "200 OK" {
-		err = fmt.Errorf("did not get client successfully; received status %q", response.Status)
+		err = NewOIDCClientRegistrationError(
+			client.Spec.ClientId,
+			http.MethodGet,
+			fmt.Sprintf("did not get client successfully; received status %q", response.Status),
+			response,
+		)
 	}
 	return
 }
@@ -217,26 +245,17 @@ func (r *ReconcileClient) getCSCACertificateSecret(ctx context.Context) (secret 
 func (r *ReconcileClient) GetClientCreds(ctx context.Context, client *oidcv1.Client) (clientCreds *ClientCredentials, err error) {
 	if client == nil {
 		return nil, fmt.Errorf("provided nil client")
-	} else if client.Spec.ClientId == "" {
-		return nil, fmt.Errorf("clientId was not set on Client")
 	}
-	reqLogger := logf.FromContext(ctx).WithName("GetClientCreds").WithValues("clientId", client.Spec.ClientId)
-	if client.Spec.Secret == "" {
-		return nil, fmt.Errorf("secret was not set on Client")
-	}
-	secret := &corev1.Secret{}
-	err = r.client.Get(ctx, types.NamespacedName{Name: client.Spec.Secret, Namespace: client.GetNamespace()}, secret)
+	secret, err := r.getSecretFromClient(ctx, client)
+	reqLogger := logf.FromContext(ctx)
 	if err != nil {
+		reqLogger.Error(err, "Secret could not be retrieved for Client", "secretName", client.Spec.Secret)
 		return
 	}
-	reqLogger.Info("successfully retrieved secret for Client", "secret", client.Spec.Secret)
-	clientId := string(secret.Data["CLIENT_ID"][:])
-	if clientId != client.Spec.ClientId {
-		return nil, fmt.Errorf("secret %q with CLIENT_ID %q did not match .spec.clientId %q", client.Spec.Secret, clientId, client.Spec.ClientId)
-	}
-	clientCreds = &ClientCredentials{
-		ClientID:     clientId,
-		ClientSecret: string(secret.Data["CLIENT_SECRET"][:]),
+	clientCreds, err = getClientCredsFromSecret(secret)
+	if err != nil {
+		reqLogger.Error(err, "Retrieved Secret did not have correct Client ID and Secret keys", "secretName", client.Spec.Secret)
+		return nil, fmt.Errorf("could not create new ClientCredentials struct: %w", err)
 	}
 	return
 }
@@ -254,7 +273,6 @@ func (r *ReconcileClient) unmarshalClientCreds(response *http.Response) (clientC
 }
 
 func (r *ReconcileClient) generateClientCredentials(clientID string) *ClientCredentials {
-	log.Info("OidcClient-Watcher, Generate ClientID & Secret")
 	rule := `^([a-z0-9]){32,}$`
 	// If clientID is empty, generate a new Client ID
 	if len(clientID) == 0 {
@@ -312,6 +330,7 @@ marshal:
 // GetZenInstance returns the zen instance or nil if it does not exist
 func (r *ReconcileClient) GetZenInstance(ctx context.Context, client *oidcv1.Client) (zenInstance *ZenInstance, err error) {
 
+	var response *http.Response
 	if client.Spec.ZenInstanceId == "" {
 		return nil, fmt.Errorf("Zen instance id is required to query a zen instance")
 	}
@@ -324,10 +343,16 @@ func (r *ReconcileClient) GetZenInstance(ctx context.Context, client *oidcv1.Cli
 	requestURLSplit := []string{identityManagementURL, "identity", "api", "v1", "zeninstance", client.Spec.ZenInstanceId}
 	requestURL := strings.Join(requestURLSplit, "/")
 
-	response, err := r.invokeIamApi(ctx, client, GetType, requestURL, "")
+	response, err = r.invokeIamApi(ctx, client, http.MethodGet, requestURL, "")
 
 	if err != nil {
-		return
+		return nil, NewZenClientRegistrationError(
+			client.Spec.ClientId,
+			http.MethodGet,
+			client.Spec.ZenInstanceId,
+			err.Error(),
+			response,
+		)
 	}
 	if response != nil {
 		if response.StatusCode == 404 {
@@ -342,14 +367,32 @@ func (r *ReconcileClient) GetZenInstance(ctx context.Context, client *oidcv1.Cli
 			zenInstance := &ZenInstance{}
 			err := json.Unmarshal(buf.Bytes(), zenInstance)
 			if err != nil {
-				return nil, err
+				return nil, NewZenClientRegistrationError(
+					client.Spec.ClientId,
+					http.MethodGet,
+					client.Spec.ZenInstanceId,
+					err.Error(),
+					response,
+				)
 			}
 			return zenInstance, nil
 		}
-		return nil, fmt.Errorf("An error occurred while querying the zen instance: Status:%s Msg:%s", response.Status, buf.String())
+		return nil, NewZenClientRegistrationError(
+			client.Spec.ClientId,
+			http.MethodGet,
+			client.Spec.ZenInstanceId,
+			fmt.Sprintf("An error occurred while querying the zen instance: Status:%s Msg:%s", response.Status, buf.String()),
+			response,
+		)
 	}
 
-	return nil, fmt.Errorf("No response was recieved from query of zen instance %s", client.Spec.ZenInstanceId)
+	return nil, NewZenClientRegistrationError(
+		client.Spec.ClientId,
+		http.MethodGet,
+		client.Spec.ZenInstanceId,
+		fmt.Sprintf("no response was recieved from query of zen instance %s", client.Spec.ZenInstanceId),
+		response,
+	)
 }
 
 // DeleteZenInstance deletes the requested zen instance
@@ -361,15 +404,11 @@ func (r *ReconcileClient) DeleteZenInstance(ctx context.Context, client *oidcv1.
 	// Get the platform-auth-idp ConfigMap to obtain constant values
 	identityManagementURL, err := r.GetIdentityManagementURL()
 	if err != nil {
-		return err
+		return
 	}
 	requestURLSplit := []string{identityManagementURL, "identity", "api", "v1", "zeninstance", client.Spec.ZenInstanceId}
 	requestURL := strings.Join(requestURLSplit, "/")
-	response, err := r.invokeIamApi(ctx, client, DeleteType, requestURL, "")
-	if err != nil {
-		return
-	}
-
+	response, err := r.invokeIamApi(ctx, client, http.MethodDelete, requestURL, "")
 	if err != nil {
 		return
 	}
@@ -385,7 +424,7 @@ func (r *ReconcileClient) DeleteZenInstance(ctx context.Context, client *oidcv1.
 		return fmt.Errorf("An error occurred while deleting the zen instance: Status:%s Msg:%s", response.Status, buf.String())
 	}
 
-	return fmt.Errorf("No response was received from query of zen instance %s", client.Spec.ZenInstanceId)
+	return fmt.Errorf("no response was received from query of zen instance %s", client.Spec.ZenInstanceId)
 }
 
 // CreateZenInstance registers the zen instance with the iam identity mgmt service
@@ -408,7 +447,7 @@ func (r *ReconcileClient) CreateZenInstance(ctx context.Context, client *oidcv1.
 	requestURLSplit := []string{identityManagementURL, "identity", "api", "v1", "zeninstance"}
 	requestURL := strings.Join(requestURLSplit, "/")
 
-	response, err := r.invokeIamApi(ctx, client, PostType, requestURL, payload)
+	response, err := r.invokeIamApi(ctx, client, http.MethodPost, requestURL, payload)
 	if response != nil && response.Status == "200 OK" {
 		return nil
 	}

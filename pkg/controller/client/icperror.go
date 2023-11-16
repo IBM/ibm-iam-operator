@@ -17,21 +17,178 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"fmt"
 	"net/http"
 
 	oidcv1 "github.com/IBM/ibm-iam-operator/pkg/apis/oidc/v1"
 	corev1 "k8s.io/api/core/v1"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type OIDCClientError struct {
-	Description string `json:"error_description"`
+type clientIDed interface {
+	ClientID() string
+}
+type httpTyped interface {
+	RequestMethod() string
+	Response() *http.Response
+}
+type zenInstanced interface {
+	ZenInstanceId() string
 }
 
-func (e *OIDCClientError) Error() string {
-	return e.Description
+// OIDCClientRegistrationError is an error for any issue that occurs while interacting with OIDC Client registrations.
+type OIDCClientRegistrationError struct {
+	Description   string `json:"error_description"`
+	clientID      string
+	requestMethod string
+	response      *http.Response
+}
+
+// NewOIDCClientRegistrationError produces a new OIDCClientError by attempting to unmarshal the response body JSON into an
+// OIDCClientRegistrationError's description field.
+func NewOIDCClientRegistrationError(clientID, requestMethod, origErrMsg string, response *http.Response) (oidcErr *OIDCClientRegistrationError) {
+	oidcErr = &OIDCClientRegistrationError{
+		clientID:      clientID,
+		Description:   MessageUnknown,
+		requestMethod: requestMethod,
+		response:      response,
+	}
+	if origErrMsg != "" {
+		oidcErr.Description = origErrMsg
+		return
+	}
+	if response == nil || response.Body == nil {
+		return
+	}
+	defer response.Body.Close()
+
+	buf := new(bytes.Buffer)
+	_, err := buf.ReadFrom(response.Body)
+	if err != nil {
+		return
+	}
+	bodyBytes := buf.Bytes()
+	err = json.Unmarshal(bodyBytes, oidcErr)
+	// If unmarshal doesn't work, fail over to using the body directly
+	if err != nil {
+		oidcErr.Description = string(bodyBytes)
+		return
+	}
+	return
+}
+
+func (e *OIDCClientRegistrationError) Error() string {
+	var verb string
+	switch e.requestMethod {
+	case http.MethodPost:
+		verb = "create"
+	case http.MethodPut:
+		verb = "update"
+	case http.MethodDelete:
+		verb = "delete"
+	case http.MethodGet:
+		verb = "get"
+	}
+	return fmt.Sprintf("failed to %s OIDC client %s: %s", verb, e.clientID, e.Description)
+}
+
+func (e *OIDCClientRegistrationError) ClientID() string {
+	return e.clientID
+}
+
+func (e *OIDCClientRegistrationError) RequestMethod() string {
+	return e.requestMethod
+}
+
+func (e *OIDCClientRegistrationError) Response() *http.Response {
+	return e.response
+}
+
+// OIDCClientRegistrationError implements the following interfaces
+var _ clientIDed = &OIDCClientRegistrationError{}
+var _ httpTyped = &OIDCClientRegistrationError{}
+
+// ZenClientRegistrationError is an error for any issue that occurs while interacting with a Zen instance.
+type ZenClientRegistrationError struct {
+	clientID      string
+	Description   string
+	requestMethod string // e.g. "GET"
+	response      *http.Response
+	zenInstanceId string
+}
+
+// NewZenClientRegistrationError produces a new ZenClientRegistrationError by attempting to unmarshal the response body
+// JSON into an ZenClientRegistrationError's description field.
+func NewZenClientRegistrationError(clientID, requestMethod, zenInstanceId, origErrMsg string, response *http.Response) (zenErr *ZenClientRegistrationError) {
+	zenErr = &ZenClientRegistrationError{
+		clientID:      clientID,
+		requestMethod: requestMethod,
+		response:      response,
+		Description:   MessageUnknown,
+		zenInstanceId: zenInstanceId,
+	}
+	if origErrMsg != "" {
+		zenErr.Description = origErrMsg
+		return
+	}
+	return
+}
+
+func (e *ZenClientRegistrationError) Error() string {
+	var verb string
+	switch e.requestMethod {
+	case http.MethodPost:
+		verb = "create"
+	case http.MethodPut:
+		verb = "update"
+	case http.MethodDelete:
+		verb = "delete"
+	case http.MethodGet:
+		verb = "get"
+	}
+	return fmt.Sprintf("failed to %s Zen registration for OIDC client %s on instance with ID %s: %s", verb, e.clientID, e.zenInstanceId, e.Description)
+}
+
+func (e *ZenClientRegistrationError) ClientID() string {
+	return e.clientID
+}
+
+func (e *ZenClientRegistrationError) RequestMethod() string {
+	return e.requestMethod
+}
+
+func (e *ZenClientRegistrationError) Response() *http.Response {
+	return e.response
+}
+
+func (e *ZenClientRegistrationError) ZenInstanceId() string {
+	return e.zenInstanceId
+}
+
+// ZenClientRegistrationError implements the following interfaces
+var _ clientIDed = &ZenClientRegistrationError{}
+var _ httpTyped = &ZenClientRegistrationError{}
+var _ zenInstanced = &ZenClientRegistrationError{}
+
+// IsOIDCError returns whether the error is related to an attempt to register OIDC Client or an existing OIDC Client
+func IsOIDCError(err error) bool {
+	oidcErr, ok := err.(clientIDed)
+	return ok && oidcErr.ClientID() != ""
+}
+
+// IsHTTPError returns whether the error is the result of an HTTP connection that has failed in some way
+func IsHTTPError(err error) bool {
+	reqErr, ok := err.(httpTyped)
+	return ok && reqErr.RequestMethod() != ""
+}
+
+// IsZenError returns whether the error relates to a failure received when interacting with Zen
+func IsZenError(err error) bool {
+	zenErr, ok := err.(zenInstanced)
+	return ok && zenErr.ZenInstanceId() != ""
 }
 
 // ConditionStatus represents a condition's status.
@@ -60,51 +217,86 @@ const (
 	ReasonUnknown                     string = "Unknown"
 )
 
-// NewOIDCClientError produces a new OIDCClientError by attempting to unmarshal the response body JSON into an
-// OIDCClientError's Description field.
-func NewOIDCClientError(response *http.Response) (oidcErr *OIDCClientError) {
-	if response == nil || response.Body == nil {
-		return nil
-	}
-	defer response.Body.Close()
-	bodyBuffer, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return &OIDCClientError{
-			Description: MessageUnknown,
+// writeConditionsAndEvents updates a Client CR's `.status.conditions` and writes an event related to the outcome of the
+// reconciliation.
+func (r *ReconcileClient) writeConditionsAndEvents(ctx context.Context, client *oidcv1.Client, err error, requestMethod string) {
+	reqLogger := logf.FromContext(ctx).WithName("writeConditionsAndEvents").WithValues("clientId", client.Spec.ClientId, "namespace", client.Namespace)
+	// If err is nil, then conditions and events are being written for succesful creates or updates. Skip deletions
+	// (there shouldn't be an object on the cluster by the time this operation happens.)
+	if err == nil {
+		if requestMethod == http.MethodDelete {
+			reqLogger.Info("Process successful status", "client", client)
+			return
 		}
-	}
-	err = json.Unmarshal(bodyBuffer, oidcErr)
-	if err != nil {
-		return &OIDCClientError{
-			Description: MessageUnknown,
-		}
-	}
-	return
-}
 
-func (r *ReconcileClient) handleOIDCClientError(ctx context.Context, client *oidcv1.Client, err error, requestType string) {
-	var errorMessage, reason string
-	switch requestType {
-	case PostType:
+		SetClientCondition(client,
+			oidcv1.ClientConditionReady,
+			oidcv1.ConditionTrue,
+			ReasonCreateClientSuccessful,
+			MessageClientSuccessful)
+		if statusUpdateErr := r.client.Status().Update(ctx, client); statusUpdateErr != nil {
+			reqLogger.Error(statusUpdateErr, "Error while trying to update status on client")
+		}
+		switch requestMethod {
+		case http.MethodPost:
+			r.recorder.Event(client, corev1.EventTypeNormal, ReasonCreateClientSuccessful, MessageCreateClientSuccessful)
+		case http.MethodPut:
+			r.recorder.Event(client, corev1.EventTypeNormal, ReasonUpdateClientSuccessful, MessageUpdateClientSuccessful)
+		}
+		return
+	}
+
+	// If the error doesn't relate to a failure of or transmitted by HTTP, this isn't a OIDC or Zen registration
+	// problem
+	httpErr, ok := err.(httpTyped)
+	if !ok {
+		SetClientCondition(client,
+			oidcv1.ClientConditionReady,
+			oidcv1.ConditionFalse,
+			ReasonUnknown,
+			MessageUnknown)
+		if statusUpdateErr := r.client.Status().Update(ctx, client); statusUpdateErr != nil {
+			reqLogger.Error(statusUpdateErr, "Error while trying to update status on client")
+		}
+		r.recorder.Event(client, corev1.EventTypeWarning, ReasonUnknown, err.Error())
+		return
+	}
+
+	// As for Zen, only report Zen client problems as registration creation issues
+	if IsZenError(err) {
+		SetClientCondition(client,
+			oidcv1.ClientConditionReady,
+			oidcv1.ConditionFalse,
+			ReasonCreateZenRegistrationFailed,
+			MessageCreateZenRegistrationFailed)
+		if statusUpdateErr := r.client.Status().Update(ctx, client); statusUpdateErr != nil {
+			reqLogger.Error(statusUpdateErr, "Error while trying to update status on client")
+		}
+		r.recorder.Event(client, corev1.EventTypeWarning, ReasonCreateZenRegistrationFailed, err.Error())
+		return
+	}
+
+	var reason string
+	switch httpErr.RequestMethod() {
+	case http.MethodPost:
 		reason = ReasonCreateClientFailed
-	case PutType:
-		reason = ReasonUpdateClientFailed
-	case GetType:
-		reason = ReasonGetClientFailed
-	case DeleteType:
-		reason = ReasonDeleteClientFailed
-	default:
-		reason = ReasonUnknown
-	}
-
-	errorMessage = err.Error()
-
-	if requestType == PostType {
 		SetClientCondition(client,
 			oidcv1.ClientConditionReady,
 			oidcv1.ConditionFalse,
 			reason,
 			MessageCreateClientFailed)
+		if statusUpdateErr := r.client.Status().Update(ctx, client); statusUpdateErr != nil {
+			reqLogger.Error(statusUpdateErr, "Error while trying to update status on client")
+		}
+	case http.MethodPut:
+		reason = ReasonUpdateClientFailed
+	case http.MethodGet:
+		reason = ReasonGetClientFailed
+	case http.MethodDelete:
+		reason = ReasonDeleteClientFailed
+	default:
+		reason = ReasonUnknown
 	}
-	r.recorder.Event(client, corev1.EventTypeWarning, reason, errorMessage)
+
+	r.recorder.Event(client, corev1.EventTypeWarning, reason, err.Error())
 }

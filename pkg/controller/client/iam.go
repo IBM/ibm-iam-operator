@@ -29,6 +29,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type TokenInfo struct {
@@ -41,19 +42,31 @@ type TokenInfo struct {
 }
 
 func getTokenInfoFromResponse(response *http.Response) (tokenInfo *TokenInfo, err error) {
-	if response.Body != nil {
-		defer response.Body.Close()
-		tokenInfo = &TokenInfo{}
-		buf := new(bytes.Buffer)
-		buf.ReadFrom(response.Body)
-		regResponse := buf.String()
-		err = json.Unmarshal([]byte(regResponse), tokenInfo)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get unmarshal response JSON %q: %w", regResponse, err)
-		}
-		return tokenInfo, nil
+	if response == nil || response.Body == nil {
+		return nil, fmt.Errorf("response body was not set")
 	}
-	return nil, fmt.Errorf("response body was not set")
+	defer response.Body.Close()
+	tokenInfo = &TokenInfo{}
+	buf := new(bytes.Buffer)
+	numBytes, err := buf.ReadFrom(response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read from response body due: %w", err)
+	}
+	if numBytes == 0 {
+		return nil, fmt.Errorf("response body was not set")
+	}
+	bodyBytes := buf.Bytes()
+	r, _ := utf8.DecodeRune(bodyBytes)
+
+	// If the first character is not a '{', we do not have a valid JSON response
+	if r != '{' {
+		return nil, fmt.Errorf("failed to get token info: %s", string(bodyBytes))
+	}
+
+	if err = json.Unmarshal(bodyBytes, tokenInfo); err != nil {
+		return nil, fmt.Errorf("failed to get %q: %w", string(bodyBytes), err)
+	}
+	return tokenInfo, nil
 }
 
 // getAuthnTokens attempts to retrieve authentication tokens from the IAM identity provider. If the Client is configured

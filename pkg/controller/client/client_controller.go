@@ -174,10 +174,6 @@ func (r *ReconcileClient) Reconcile(ctx context.Context, request reconcile.Reque
 	} else {
 		reqLogger.Info("successfully set config for controller")
 	}
-	// If this is a cache update only, return
-	if request.Name == "CACHE_UPDATE" {
-		return reconcile.Result{}, nil
-	}
 
 	reqLogger.Info("Reconciling OIDC Client data")
 
@@ -333,12 +329,20 @@ func (r *ReconcileClient) processOidcRegistration(ctx context.Context, client *o
 
 	// Attempt to get the Client registration; if it isn't there, create a new one, otherwise, update
 	_, err = r.GetClientRegistration(ctx, client)
+	var verb string
 	if err != nil {
 		reqLogger.Info("Client not found, create new Client")
+		verb = "create"
 		err = r.createClient(ctx, client)
 	} else {
 		reqLogger.Info("Client found, update Client")
+		verb = "update"
 		err = r.updateClient(ctx, client)
+	}
+
+	if err != nil {
+		reqLogger.Error(err, fmt.Sprintf("Error occured while attempting to %s Client", verb))
+		return
 	}
 
 	// add finalizer if not already present

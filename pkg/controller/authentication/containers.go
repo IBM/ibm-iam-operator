@@ -386,6 +386,10 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 				Name:      "pgsql-client-cert",
 				MountPath: "/certs/pgsql-client",
 			},
+			{
+				Name:      "pgsql-client-cred",
+				MountPath: "/pgsql/clientinfo",
+			},
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
@@ -749,6 +753,10 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			{
 				Name:      "pgsql-client-cert",
 				MountPath: "/certs/pgsql-client",
+			},
+			{
+				Name:      "pgsql-client-cred",
+				MountPath: "/pgsql/clientinfo",
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
@@ -1133,6 +1141,10 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			{
 				Name:      "pgsql-client-cert",
 				MountPath: "/certs/pgsql-client",
+			},
+			{
+				Name:      "pgsql-client-cred",
+				MountPath: "/pgsql/clientinfo",
 			},
 		},
 		ReadinessProbe: &corev1.Probe{

@@ -1,0 +1,94 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+    categories: Security
+    certified: "false"
+    containerImage: icr.io/cpopen/ibm-iam-operator:4.4.0
+    description: The IAM operator provides a simple Kubernetes CRD-Based API to manage the lifecycle of IAM services. With this operator, you can simply deploy and upgrade the IAM services
+    olm.skipRange: <4.4.0
+    repository: https://github.com/IBM/ibm-iam-operator
+    support: IBM
+  labels:
+    operatorframework.io/arch.amd64: supported
+    operatorframework.io/arch.ppc64le: supported
+    operatorframework.io/arch.s390x: supported
+    operatorframework.io/os.linux: supported
+  name: ibm-iam-operator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+      - description: Authentication is the Schema for the authentications API
+        displayName: Authentication
+        kind: Authentication
+        name: authentications.operator.ibm.com
+        version: v1alpha1
+      - description: Client is the Schema for the clients API
+        displayName: Client
+        kind: Client
+        name: clients.oidc.security.ibm.com
+        version: v1
+  description: |-
+    The `ibm-iam-operator` installs the IBM Cloud Platform Common Services Identity and access management (IAM) service.
+
+    **Important:** Do not install this operator directly. Install this operator only by using the IBM Common Service Operator. For more information about installing this operator and other Common Services operators, see [Installer documentation](http://ibm.biz/cpcs_opinstall). Additionally, you can exit this panel and navigate to the IBM Common Services tile in OperatorHub to learn more about the operator. If you are using the operator as part of an IBM Cloud Pak, see the documentation for that IBM Cloud Pak to learn more about how to install and use the operator service. For more information about IBM Cloud Paks, see [IBM Cloud Paks that use Common Services](http://ibm.biz/cpcs_cloudpaks).
+
+    You can use the `ibm-iam-operator` to install the authentication and authorization services for the IBM Cloud Platform Common Services.
+
+    With these services, you can configure security for IBM Cloud Platform Common Services, IBM Certified Containers (IBM products), or IBM Cloud Paks that are installed.
+
+    For more information about the available IBM Cloud Platform Common Services, see the [IBM Knowledge Center](http://ibm.biz/cpcsdocs).
+
+    ## Supported platforms
+
+     - Red Hat OpenShift Container Platform 4.3 or newer installed on one of the following platforms:
+
+        - Linux x86_64
+        - Linux on Power (ppc64le)
+        - Linux on IBM Z and LinuxONE
+
+    ## Prerequisites
+
+    Before you install this operator, you need to first install the operator dependencies and prerequisites:
+
+    - For the list of operator dependencies, see the IBM Knowledge Center [Common Services dependencies documentation](http://ibm.biz/cpcs_opdependencies).
+
+    - For the list of prerequisites for installing the operator, see the IBM Knowledge Center [Preparing to install services documentation](http://ibm.biz/cpcs_opinstprereq).
+
+    ## Documentation
+
+    To install the operator by using the IBM Common Services Operator, follow the installation and configuration instructions that are in the IBM Knowledge Center.
+
+    - If you are using the operator as part of an IBM Cloud Pak, see the documentation for that IBM Cloud Pak [IBM Cloud Paks that use Common Services](http://ibm.biz/cpcs_cloudpaks).
+    - If you are using the operator with an IBM Containerized Software, see the IBM Cloud Platform Common Services Knowledge Center [Installer documentation](http://ibm.biz/cpcs_opinstall).
+  displayName: IBM IM Operator
+  icon:
+    - base64data: ""
+      mediatype: image/png
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: true
+      type: MultiNamespace
+    - supported: true
+      type: AllNamespaces
+  keywords:
+    - IBM
+    - Cloud
+  maintainers:
+    - email: support@ibm.com
+      name: IBM Support
+  maturity: stable
+  provider:
+    name: IBM
+  version: 0.0.0

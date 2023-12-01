@@ -1,6 +1,4 @@
 #
-# Copyright 2020, 2023 IBM Corporation
-#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -39,12 +37,8 @@ COPY controllers/ controllers/
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager main.go
 
-FROM alpine as qemu-builder
-
-RUN wget -O /qemu-ppc64le-static https://github.com/multiarch/qemu-user-static/releases/download/v5.2.0-2/qemu-ppc64le-static && chmod +x /qemu-ppc64le-static
-
 # Swap default image for ubi8-minimal
-FROM docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-edge-docker-local/build-images/ubi8-minimal:latest-ppc64le
+FROM docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-edge-docker-local/build-images/ubi8-minimal:latest-amd64
 
 ARG VCS_REF
 ARG VCS_URL
@@ -67,13 +61,12 @@ ENV OPERATOR=/usr/local/bin/ibm-iam-operator \
 
 WORKDIR /
 COPY --from=builder /workspace/manager ${OPERATOR}
-COPY --from=qemu-builder /qemu-ppc64le-static /usr/bin
+USER 65532:65532
 
 # Copy in licenses
 RUN mkdir /licenses
 COPY LICENSE /licenses
 
-USER ${USER_UID}
-
 ENTRYPOINT ["/usr/local/bin/ibm-iam-operator"]
 
+USER ${USER_UID}

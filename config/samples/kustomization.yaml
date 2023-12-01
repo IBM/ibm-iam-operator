@@ -1,0 +1,6 @@
+## Append samples you want in your CSV to this file as resources ##
+resources:
+- operator_v1alpha1_authentication.yaml
+- operator_v1alpha1_operandrequest.yaml
+- operator_v1alpha1_operandbindinfo.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

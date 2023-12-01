@@ -1,0 +1,198 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "OperandRequest",
+          "metadata": {
+            "name": "ibm-iam-request"
+          },
+          "spec": {
+            "requests": [
+              {
+                "operands": [
+                  {
+                    "name": "ibm-im-mongodb-operator"
+                  },
+                  {
+                    "name": "ibm-idp-config-ui-operator"
+                  }
+                ],
+                "registry": "common-service"
+              }
+            ]
+          }
+        },
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "OperandBindInfo",
+          "metadata": {
+            "name": "ibm-iam-bindinfo"
+          },
+          "spec": {
+            "operand": "ibm-im-operator",
+            "registry": "common-service",
+            "description": "Binding information that should be accessible to iam adopters",
+            "bindings": {
+              "public-oidc-creds": {
+                "secret": "platform-oidc-credentials"
+              },
+              "public-auth-creds": {
+                "secret" : "platform-auth-idp-credentials"
+              },
+              "public-scim-creds": {
+                "secret" : "platform-auth-scim-credentials"
+              },
+              "public-auth-cert": {
+                "secret" : "platform-auth-secret"
+              },
+              "public-cam-secret": {
+                "secret" : "oauth-client-secret"
+              },
+              "public-cam-map": {
+                "configmap" : "oauth-client-map"
+              },
+              "public-auth-config": {
+                "configmap" : "platform-auth-idp"
+              },
+              "public-ibmcloud-config": {
+                "configmap" : "ibmcloud-cluster-info"
+              },
+              "public-ibmcloudca-secret": {
+                "secret" : "ibmcloud-cluster-ca-cert"
+              }
+            }
+          }
+        }
+      ]
+    capabilities: Basic Install
+    categories: Security
+    certified: "false"
+    containerImage: icr.io/cpopen/ibm-iam-operator:latest
+    description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
+      the lifecycle of IAM services. With this operator, you can simply deploy and
+      upgrade the IAM services
+    olm.skipRange: <4.3.0
+    repository: https://github.com/IBM/ibm-iam-operator
+    support: IBM
+  labels:
+    operatorframework.io/arch.amd64: supported
+    operatorframework.io/arch.ppc64le: supported
+    operatorframework.io/arch.s390x: supported
+    operatorframework.io/os.linux: supported
+  name: ibm-iam-operator.v4.3.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: Authentication is the Schema for the authentications API
+      displayName: Authentication
+      kind: Authentication
+      name: authentications.operator.ibm.com
+      version: v1alpha1
+    - description: Client is the Schema for the clients API
+      displayName: Client
+      kind: Client
+      name: clients.oidc.security.ibm.com
+      version: v1
+  description: |-
+    The `ibm-iam-operator` installs the IBM Cloud Platform Common Services Identity and access management (IAM) service.
+
+    **Important:** Do not install this operator directly. Install this operator only by using the IBM Common Service Operator. For more information about installing this operator and other Common Services operators, see [Installer documentation](http://ibm.biz/cpcs_opinstall). Additionally, you can exit this panel and navigate to the IBM Common Services tile in OperatorHub to learn more about the operator. If you are using the operator as part of an IBM Cloud Pak, see the documentation for that IBM Cloud Pak to learn more about how to install and use the operator service. For more information about IBM Cloud Paks, see [IBM Cloud Paks that use Common Services](http://ibm.biz/cpcs_cloudpaks).
+
+    You can use the `ibm-iam-operator` to install the authentication and authorization services for the IBM Cloud Platform Common Services.
+
+    With these services, you can configure security for IBM Cloud Platform Common Services, IBM Certified Containers (IBM products), or IBM Cloud Paks that are installed.
+
+    For more information about the available IBM Cloud Platform Common Services, see the [IBM Knowledge Center](http://ibm.biz/cpcsdocs).
+
+    ## Supported platforms
+
+     - Red Hat OpenShift Container Platform 4.3 or newer installed on one of the following platforms:
+
+        - Linux x86_64
+        - Linux on Power (ppc64le)
+        - Linux on IBM Z and LinuxONE
+
+    ## Operator versions
+     - 4.3.0
+     - 4.2.1
+     - 4.2.0
+     - 4.1.0
+     - 4.0.0
+     - 3.10.0
+     - 3.9.1
+     - 3.9.0
+     - 3.8.2
+     - 3.8.1
+     - 3.8.0
+     - 3.7.5
+     - 3.7.4
+     - 3.7.3
+     - 3.7.2
+     - 3.7.1
+     - 3.7.0
+     - 3.6.5
+     - 3.6.4
+     - 3.6.3
+     - 3.6.2
+     - 3.6.0
+        - With this version, support for OpenShift 4.3 is added.
+     - 3.5.0
+
+    ## Prerequisites
+
+    Before you install this operator, you need to first install the operator dependencies and prerequisites:
+
+    - For the list of operator dependencies, see the IBM Knowledge Center [Common Services dependencies documentation](http://ibm.biz/cpcs_opdependencies).
+
+    - For the list of prerequisites for installing the operator, see the IBM Knowledge Center [Preparing to install services documentation](http://ibm.biz/cpcs_opinstprereq).
+
+    ## Documentation
+
+    To install the operator by using the IBM Common Services Operator, follow the installation and configuration instructions that are in the IBM Knowledge Center.
+
+    - If you are using the operator as part of an IBM Cloud Pak, see the documentation for that IBM Cloud Pak [IBM Cloud Paks that use Common Services](http://ibm.biz/cpcs_cloudpaks).
+    - If you are using the operator with an IBM Containerized Software, see the IBM Cloud Platform Common Services Knowledge Center [Installer documentation](http://ibm.biz/cpcs_opinstall).
+  displayName: IBM IM Operator
+  icon:
+  - base64data: ""
+    mediatype: image/png
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: true
+    type: OwnNamespace
+  - supported: true
+    type: SingleNamespace
+  - supported: true
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - IBM
+  - Cloud
+  maintainers:
+  - email: support@ibm.com
+    name: IBM Support
+  maturity: stable
+  provider:
+    name: IBM
+  relatedImages:
+  - image: icr.io/cpopen/ibm-iam-operator:4.3.0
+    name: IBM_IAM_OPERATOR_IMAGE
+  - image: icr.io/cpopen/cpfs/icp-platform-auth:4.3.0
+    name: ICP_PLATFORM_AUTH_IMAGE
+  - image: icr.io/cpopen/cpfs/icp-identity-provider:4.3.0
+    name: ICP_IDENTITY_PROVIDER_IMAGE
+  - image: icr.io/cpopen/cpfs/icp-identity-manager:4.3.0
+    name: ICP_IDENTITY_MANAGER_IMAGE
+  - image: icr.io/cpopen/cpfs/im-initcontainer:4.3.0
+    name: IM_INITCONTAINER_IMAGE
+  version: 4.3.0

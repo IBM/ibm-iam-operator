@@ -145,11 +145,11 @@ metadata:
               "imageName": "postgresql",
               "imageRegistry": "quay.io/opencloudio",
               "imageTag": "15.3",
-              "storageClass": "rook-cephfs"
+              "storageClass": "rook-cephfs",
               "resources": {
                 "limits": {
                   "cpu": "200m",
-                  "ephemeral-storage": "512Mi"
+                  "ephemeral-storage": "512Mi",
                   "memory": "768Mi"
                 },
                 "requests": {

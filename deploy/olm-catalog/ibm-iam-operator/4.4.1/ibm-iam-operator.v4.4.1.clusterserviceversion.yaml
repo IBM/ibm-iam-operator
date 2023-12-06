@@ -141,24 +141,21 @@ metadata:
                 }
               }
             },
-            "operatorVersion": "0.14.1",
-            "replicas": 1
-          }
-        },
-        "pgsqlService": {
-            "imageName": "postgresql",
-            "imageRegistry": "quay.io/opencloudio",
-            "imageTag": "15.3",
-            "storageClass": "rook-cephfs",
-            "resources": {
-            "limits": {
-                "cpu": "200m",
-                "memory": "512Mi"
+            "pgsqlService": {
+              "imageName": "postgresql",
+              "imageRegistry": "quay.io/opencloudio",
+              "imageTag": "15.3",
+              "storageClass": "rook-cephfs"
+              "resources": {
+                "limits": {
+                  "cpu": "200m",
+                  "ephemeral-storage": "512Mi"
+                  "memory": "768Mi"
                 },
                 "requests": {
-                  "cpu": "75m",
-                  "memory": "768Mi",
-                  "ephemeral-storage": "512Mi"
+                  "cpu": "100m",
+                  "memory": "256Mi",
+                  "ephemeral-storage": "128Mi"
                 }
               }
             },
@@ -497,6 +494,14 @@ spec:
           verbs:
           - get
           - list
+        - apiGroups:
+          - storage.k8s.io
+          resources:
+          - storageclasses
+          verbs:
+          - get
+          - list
+          - watch
         serviceAccountName: ibm-iam-operator
       deployments:
       - name: ibm-iam-operator
@@ -559,7 +564,7 @@ spec:
                   value: ""
                 - name: cluster_name
                   value: ""
-                image: icr.io/cpopen/ibm-iam-operator:4.4.0
+                image: icr.io/cpopen/ibm-iam-operator:4.4.1
                 imagePullPolicy: IfNotPresent
                 name: ibm-iam-operator
                 resources:
@@ -801,14 +806,6 @@ spec:
           - clusters/finalizers
           verbs:
           - update
-        - apiGroups:
-          - storage.k8s.io
-          resources:
-          - storageclasses
-          verbs:
-          - get
-          - list
-          - watch
         serviceAccountName: ibm-iam-operator
     strategy: deployment
   installModes:

@@ -38,13 +38,13 @@ spec:
       containers:
         - name: ibm-iam-operator
           # Replace this with the built image name
-          image: icr.io/cpopen/ibm-iam-operator:4.3.1
+          image: icr.io/cpopen/ibm-iam-operator:4.3.0
           command:
           - ibm-iam-operator
           imagePullPolicy: IfNotPresent
           env:
             - name: ICP_PLATFORM_AUTH_IMAGE
-              value: icr.io/cpopen/cpfs/icp-platform-auth:4.3.1
+              value: icr.io/cpopen/cpfs/icp-platform-auth:4.3.0
             - name: ICP_IDENTITY_PROVIDER_IMAGE
               value: icr.io/cpopen/cpfs/icp-identity-provider:4.3.0
             - name: ICP_IDENTITY_MANAGER_IMAGE

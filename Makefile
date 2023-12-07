@@ -34,7 +34,7 @@ IMG ?= ibm-iam-operator
 REGISTRY ?= "docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-integration-docker-local/ibmcom"
 CONTAINER_CLI ?= docker
 
-CSV_VERSION ?= 4.3.0
+CSV_VERSION ?= 4.3.1
 
 
 QUAY_USERNAME ?=

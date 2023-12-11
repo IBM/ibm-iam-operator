@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/apis/oidc.security/v1"
-	corev1 "k8s.io/api/core/v1"
 	"net/http"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"strings"
@@ -64,7 +63,7 @@ func getTokenInfoFromResponse(response *http.Response) (tokenInfo *TokenInfo, er
 	}
 
 	if err = json.Unmarshal(bodyBytes, tokenInfo); err != nil {
-		return nil, fmt.Errorf("failed to get %q: %w", string(bodyBytes), err)
+		return nil, fmt.Errorf("%s", string(bodyBytes[:]))
 	}
 	return tokenInfo, nil
 }
@@ -110,7 +109,6 @@ func (r *ClientReconciler) getAuthnTokens(ctx context.Context, client *oidcsecur
 
 	var tResp *http.Response
 	var req *http.Request
-	var caCertSecret *corev1.Secret
 	var httpClient *http.Client
 	oAuthAdminPassword, err := config.GetOAuthAdminPassword()
 	if err != nil {
@@ -129,22 +127,23 @@ func (r *ClientReconciler) getAuthnTokens(ctx context.Context, client *oidcsecur
 			req.SetBasicAuth("oauthadmin", oAuthAdminPassword)
 		}
 
-		caCertSecret, err = r.getCSCACertificateSecret(ctx)
+		var caCert []byte
+		caCert, err = config.GetCSCATLSKey()
 		if err != nil {
 			return
 		}
-		httpClient, err = createHTTPClient(caCertSecret.Data[corev1.TLSCertKey])
+		httpClient, err = createHTTPClient(caCert)
 		if err != nil {
 			return
 		}
 		tResp, err = httpClient.Do(req)
 		if err != nil {
-			reqLogger.Error(err, "failed to request token from id provider")
+			reqLogger.Error(err, "Failed to request token from id provider")
 			goto sleep
 		}
 		tokenInfo, err = getTokenInfoFromResponse(tResp)
 		if err != nil {
-			reqLogger.Error(err, "failed to get token from id provider HTTP response")
+			reqLogger.Error(err, "Failed to get token from id provider HTTP response")
 		} else if tokenInfo != nil {
 			return
 		}
@@ -174,6 +173,12 @@ func createHTTPClient(caCert []byte) (httpClient *http.Client, err error) {
 
 // Invoke an IAM API.  This function will obtain the required token before calling
 func (r *ClientReconciler) invokeIamApi(ctx context.Context, client *oidcsecurityv1.Client, requestType string, requestURL string, payload string, config *AuthenticationConfig) (response *http.Response, err error) {
+	// First, check to see if OIDC client is registered before trying to get a token; if an issue is encountered,
+	// bubble that up.
+	if _, err = r.getClientRegistration(ctx, client, config); err != nil {
+		return
+	}
+
 	tokenInfo, err := r.getAuthnTokens(ctx, client, config)
 	if err != nil {
 		return

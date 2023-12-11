@@ -170,21 +170,27 @@ var _ zenInstanced = &ZenClientRegistrationError{}
 
 // IsOIDCError returns whether the error is related to an attempt to register OIDC Client or an existing OIDC Client
 func IsOIDCError(err error) bool {
+	if err == nil {
+		return false
+	}
 	oidcErr, ok := err.(clientIDed)
 	return ok && oidcErr.ClientID() != ""
 }
 
 // IsHTTPError returns whether the error is the result of an HTTP connection that has failed in some way
 func IsHTTPError(err error) bool {
+	if err == nil {
+		return false
+	}
 	reqErr, ok := err.(httpTyped)
 	return ok && reqErr.RequestMethod() != ""
 }
 
 // IsZenError returns whether the error relates to a failure received when interacting with Zen
 func IsZenError(err error) bool {
+	if err == nil {
+		return false
+	}
 	zenErr, ok := err.(zenInstanced)
 	return ok && zenErr.ZenInstanceId() != ""
 }
-
-// ConditionStatus represents a condition's status.
-//type EventType string

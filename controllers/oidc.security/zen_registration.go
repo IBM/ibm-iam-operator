@@ -43,16 +43,23 @@ func (r *ClientReconciler) getZenInstanceRegistration(ctx context.Context, clien
 	requestURL := strings.Join(requestURLSplit, "/")
 
 	response, err = r.invokeIamApi(ctx, clientCR, http.MethodGet, requestURL, "", config)
-
-	if err != nil {
+	switch v := err.(type) {
+	case *OIDCClientRegistrationError:
+		// Return no response or error if the OIDC client isn't found given a token couldn't be retrieved
+		if v.response.StatusCode == 404 {
+			return nil, nil
+		}
+		return
+	case error:
 		return nil, NewZenClientRegistrationError(
 			clientCR.Spec.ClientId,
 			http.MethodGet,
 			clientCR.Spec.ZenInstanceId,
-			err.Error(),
+			v.Error(),
 			response,
 		)
 	}
+
 	if response != nil {
 		if response.StatusCode == 404 {
 			//zen instance not found
@@ -108,9 +115,23 @@ func (r *ClientReconciler) unregisterZenInstance(ctx context.Context, clientCR *
 	requestURLSplit := []string{identityManagementURL, "identity", "api", "v1", "zeninstance", clientCR.Spec.ZenInstanceId}
 	requestURL := strings.Join(requestURLSplit, "/")
 	response, err := r.invokeIamApi(ctx, clientCR, http.MethodDelete, requestURL, "", config)
-	if err != nil {
+	switch v := err.(type) {
+	case *OIDCClientRegistrationError:
+		// Return no response or error if the OIDC client isn't found given a token couldn't be retrieved
+		if v.response.StatusCode == 404 {
+			return nil
+		}
 		return
+	case error:
+		return NewZenClientRegistrationError(
+			clientCR.Spec.ClientId,
+			http.MethodGet,
+			clientCR.Spec.ZenInstanceId,
+			v.Error(),
+			response,
+		)
 	}
+
 	if response != nil {
 		if response.StatusCode == 200 {
 			//zen instance deleted
@@ -147,6 +168,23 @@ func (r *ClientReconciler) registerZenInstance(ctx context.Context, clientCR *oi
 	requestURL := strings.Join(requestURLSplit, "/")
 
 	response, err := r.invokeIamApi(ctx, clientCR, http.MethodPost, requestURL, payload, config)
+	switch v := err.(type) {
+	case *OIDCClientRegistrationError:
+		// Return no response or error if the OIDC client isn't found given a token couldn't be retrieved
+		if v.response.StatusCode == 404 {
+			return nil
+		}
+		return
+	case error:
+		return NewZenClientRegistrationError(
+			clientCR.Spec.ClientId,
+			http.MethodGet,
+			clientCR.Spec.ZenInstanceId,
+			v.Error(),
+			response,
+		)
+	}
+
 	if response != nil && response.Status == "200 OK" {
 		return nil
 	}

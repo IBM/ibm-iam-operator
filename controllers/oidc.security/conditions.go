@@ -49,29 +49,7 @@ const (
 func (r *ClientReconciler) writeErrorConditionsAndEvents(ctx context.Context, clientCR *oidcsecurityv1.Client, err error, requestMethod string) (statusUpdateErr error) {
 	//reqLogger := logf.FromContext(ctx).WithValues("clientId", clientCR.Spec.ClientId, "namespace", clientCR.Namespace)
 	var condition metav1.Condition
-	// If err is nil, then conditions and events are being written for succesful creates or updates. Skip deletions
-	// (there shouldn't be an object on the cluster by the time this operation happens.)
 	if err == nil {
-		//if requestMethod == http.MethodDelete {
-		//	reqLogger.Info("Process successful status", "client", clientCR)
-		//	return
-		//}
-
-		//condition = metav1.Condition{
-		//	Type:    oidcsecurityv1.ClientConditionReady,
-		//	Status:  metav1.ConditionTrue,
-		//	Reason:  ReasonCreateClientSuccessful,
-		//	Message: MessageClientSuccessful,
-		//}
-		//meta.SetStatusCondition(&clientCR.Status.Conditions, condition)
-
-		//statusUpdateErr = r.Client.Status().Update(ctx, clientCR)
-		//switch requestMethod {
-		//case http.MethodPost:
-		//	r.Recorder.Event(clientCR, corev1.EventTypeNormal, ReasonCreateClientSuccessful, MessageCreateClientSuccessful)
-		//case http.MethodPut:
-		//	r.Recorder.Event(clientCR, corev1.EventTypeNormal, ReasonUpdateClientSuccessful, MessageUpdateClientSuccessful)
-		//}
 		return
 	}
 

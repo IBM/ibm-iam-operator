@@ -137,6 +137,7 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 .PHONY: fmt
 fmt: ## Run go fmt against code.
 	ls -alh $(GOBIN)
+	ls -alh $(GOPATH)/bin
 	env | grep -E '^PATH='
 	which gofmt
 	go fmt ./...

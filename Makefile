@@ -136,6 +136,9 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
+	$(shell ls -alh $(GOBIN))
+	echo ${PATH}
+	which gofmt
 	go fmt ./...
 
 .PHONY: vet
@@ -239,23 +242,7 @@ $(KUSTOMIZE): $(LOCALBIN)
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary. If wrong version is installed, it will be overwritten.
 $(CONTROLLER_GEN): $(LOCALBIN)
 	test -s $(LOCALBIN)/controller-gen && $(LOCALBIN)/controller-gen --version | grep -q $(CONTROLLER_TOOLS_VERSION) || \
-	GOSUMDB=sum.golang.org GOBIN=$(LOCALBIN) go install -v -x sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
-
-#controller-gen: ## Download controller-gen locally if necessary.
-## $(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.8.0)
-#ifeq (, $(shell which controller-gen))
-#	@{ \
-#	set -e ;\
-#	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
-#	cd $$CONTROLLER_GEN_TMP_DIR ;\
-#	go mod init tmp ;\
-#	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.11.1 ;\
-#	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
-#	}
-#CONTROLLER_GEN=$(GOBIN)/controller-gen
-#else
-#CONTROLLER_GEN=$(shell which controller-gen)
-#endif
+	GOSUMDB=sum.golang.org GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.

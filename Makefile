@@ -136,6 +136,7 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
+	go build -o $(GOBIN)/gofmt /usr/local/go/src/cmd/gofmt
 	go fmt ./...
 
 .PHONY: vet

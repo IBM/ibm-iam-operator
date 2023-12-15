@@ -42,6 +42,7 @@ type AuthenticationSpec struct {
 	AuthService        AuthServiceSpec        `json:"authService"`
 	IdentityProvider   IdentityProviderSpec   `json:"identityProvider"`
 	IdentityManager    IdentityManagerSpec    `json:"identityManager"`
+	PgsqlService       PgsqlServiceSpec       `json:"pgsqlService"`
 	InitMongodb        InitMongodbSpec        `json:"initMongodb"`
 	ClientRegistration ClientRegistrationSpec `json:"clientRegistration"`
 	Config             ConfigSpec             `json:"config"`
@@ -95,6 +96,21 @@ type IdentityManagerSpec struct {
 	ImageTag        string                       `json:"imageTag"`
 	MasterNodesList string                       `json:"masterNodesList"`
 	Resources       *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type PgsqlServiceSpec struct {
+	LogLevel      string                       `json:"logLevel"`
+	StorageClass  string                       `json:"storageClass"`
+	ImageRegistry string                       `json:"imageRegistry"`
+	ImageName     string                       `json:"imageName"`
+	ImageTag      string                       `json:"imageTag"`
+	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
+	CpuReq        string
+	MemReq        string
+	ESReq         string
+	CpuLim        string
+	MemLim        string
+	ESLim         string
 }
 
 type InitMongodbSpec struct {

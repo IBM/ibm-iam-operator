@@ -112,7 +112,7 @@ func (r *ReconcileAuthentication) newPgsqlServiceSpec(instance *operatorv1alpha1
 	storageClass := instance.Spec.PgsqlService.StorageClass
 
 	if storageClass == "" {
-		storageclass, err := r.getstorageclass()
+		storageclass, err := r.getStorageClass()
 		if err != nil {
 			return nil
 		} else {
@@ -120,17 +120,14 @@ func (r *ReconcileAuthentication) newPgsqlServiceSpec(instance *operatorv1alpha1
 
 		}
 	} else {
-		scExist := r.storageclassAvailabe(storageClass)
+		scExist := r.storageClassAvailable(storageClass)
 		if !scExist {
-			storageclass, err := r.getstorageclass()
+			storageclass, err := r.getStorageClass()
 			if err != nil {
 				return nil
-			} else {
-				instance.Spec.PgsqlService.StorageClass = storageclass
-
 			}
-		} else {
-			// provided storageclass is present in the cluster.
+			instance.Spec.PgsqlService.StorageClass = storageclass
+
 		}
 	}
 	if instance.Spec.PgsqlService.LogLevel == "" {
@@ -164,7 +161,7 @@ func (r *ReconcileAuthentication) newPgsqlServiceSpec(instance *operatorv1alpha1
 	return &operatorv1alpha1.PgsqlServiceSpec{LogLevel: instance.Spec.PgsqlService.LogLevel, StorageClass: instance.Spec.PgsqlService.StorageClass, ImageName: shatag.GetImageRef("POSTGRESQL_IMAGE"), CpuReq: cpuReq, MemReq: memReq, ESReq: esReq, CpuLim: cpuLim, MemLim: memLim, ESLim: esLim}
 }
 
-func (r *ReconcileAuthentication) getstorageclass() (string, error) {
+func (r *ReconcileAuthentication) getStorageClass() (string, error) {
 	scList := &storagev1.StorageClassList{}
 	err := r.Reader.List(context.TODO(), scList)
 	if err != nil {
@@ -174,32 +171,19 @@ func (r *ReconcileAuthentication) getstorageclass() (string, error) {
 		return "", fmt.Errorf("could not find storage class in the cluster")
 	}
 
-	var defaultSC []string
-	var nonDefaultSC []string
-
 	for _, sc := range scList.Items {
-		if sc.ObjectMeta.GetAnnotations()["storageclass.kubernetes.io/is-default-class"] == "true" || sc.ObjectMeta.GetAnnotations()["storageclass.beta.kubernetes.io/is-default-class"] == "true" {
-			defaultSC = append(defaultSC, sc.GetName())
-			continue
+		if sc.GetAnnotations()["storageclass.kubernetes.io/is-default-class"] == "true" || sc.GetAnnotations()["storageclass.beta.kubernetes.io/is-default-class"] == "true" {
+			return sc.GetName(), nil
 		}
 		if sc.Provisioner == "kubernetes.io/no-provisioner" {
-			continue
+			return sc.GetName(), nil
 		}
-		nonDefaultSC = append(nonDefaultSC, sc.GetName())
-	}
-
-	if len(defaultSC) != 0 {
-		return defaultSC[0], nil
-	}
-
-	if len(nonDefaultSC) != 0 {
-		return nonDefaultSC[0], nil
 	}
 
 	return "", fmt.Errorf("could not find dynamic provisioner storage class in the cluster nor is there a default storage class")
 }
 
-func (r *ReconcileAuthentication) storageclassAvailabe(storageClass string) bool {
+func (r *ReconcileAuthentication) storageClassAvailable(storageClass string) bool {
 	var scExist bool
 	scList := &storagev1.StorageClassList{}
 	err := r.Reader.List(context.TODO(), scList)

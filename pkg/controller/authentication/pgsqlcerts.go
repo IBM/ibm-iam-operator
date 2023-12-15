@@ -1,5 +1,5 @@
 //
-// Copyright 2022 IBM Corporation
+// Copyright 2023 IBM Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -64,37 +64,35 @@ func (r *ReconcileAuthentication) handlePgsqlCerts(instance *operatorv1alpha1.Au
 	if err != nil && k8serrors.IsNotFound(err) {
 		// Define a new Server certificate
 		newCertificate := r.certificateForEDBCluster(instance, serverCrt)
-		reqLogger.Info("EDB:: Creating a new server Certificate", "Certificate.Namespace", namespace, "Certificate.Name", serverCrt)
+		reqLogger.Info("Creating a new server Certificate", "Certificate.Namespace", namespace, "Certificate.Name", serverCrt)
 		err = r.client.Create(context.TODO(), newCertificate)
 		if err != nil {
-			reqLogger.Error(err, "EDB:: Failed to create new Certificate", "Certificate.Namespace", namespace, "Certificate.Name", serverCrt)
+			reqLogger.Error(err, "Failed to create new server Certificate", "Certificate.Namespace", namespace, "Certificate.Name", serverCrt)
 			return err
 		}
 		// Server Certificate created successfully - return and requeue
 		*needToRequeue = true
 	} else if err != nil {
-		reqLogger.Error(err, "EDB:: Failed to get Server Certificate")
+		reqLogger.Error(err, "Failed to get EDB Server Certificate")
 		return err
 	}
-	reqLogger.Info("EDB:: Server cert is ALREADY PRESENT")
 	clientCrt := iamPostgresClientCertificateValues.Name
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: clientCrt, Namespace: namespace}, currentCertificate)
 	if err != nil && k8serrors.IsNotFound(err) {
 		// Define a new Client certificate
 		newCertificate := r.certificateForEDBClient(instance, clientCrt)
-		reqLogger.Info("EDB:: Creating a new client Certificate", "Certificate.Namespace", namespace, "Certificate.Name", clientCrt)
+		reqLogger.Info("Creating a new client Certificate", "Certificate.Namespace", namespace, "Certificate.Name", clientCrt)
 		err = r.client.Create(context.TODO(), newCertificate)
 		if err != nil {
-			reqLogger.Error(err, "EDB:: Failed to create new Certificate", "Certificate.Namespace", namespace, "Certificate.Name", clientCrt)
+			reqLogger.Error(err, "Failed to create new client Certificate", "Certificate.Namespace", namespace, "Certificate.Name", clientCrt)
 			return err
 		}
 		// Client Certificate created successfully - return and requeue
 		*needToRequeue = true
 	} else if err != nil {
-		reqLogger.Error(err, "EDB:: Failed to get Client Certificate")
+		reqLogger.Error(err, "Failed to get EDB Client Certificate")
 		return err
 	}
-	reqLogger.Info("EDB:: Client cert is ALREADY PRESENT")
 	return nil
 
 }
@@ -123,10 +121,10 @@ func (r *ReconcileAuthentication) certificateForEDBCluster(instance *operatorv1a
 		},
 	}
 
-	// Set Pap instance as the owner and controller of the Certificate
+	// Set Authentication instance as the owner and controller of the Certificate
 	err := controllerutil.SetControllerReference(instance, edbServerCertificate, r.scheme)
 	if err != nil {
-		reqLogger.Error(err, "EDB:: Failed to set owner for Certificate")
+		reqLogger.Error(err, "Failed to set owner for EDB server Certificate")
 		return nil
 	}
 	return edbServerCertificate
@@ -155,7 +153,7 @@ func (r *ReconcileAuthentication) certificateForEDBClient(instance *operatorv1al
 	// Set Pap instance as the owner and controller of the Certificate
 	err := controllerutil.SetControllerReference(instance, edbClientCertificate, r.scheme)
 	if err != nil {
-		reqLogger.Error(err, "EDB:: Failed to set owner for Certificate")
+		reqLogger.Error(err, "Failed to set owner for EDB client Certificate")
 		return nil
 	}
 	return edbClientCertificate

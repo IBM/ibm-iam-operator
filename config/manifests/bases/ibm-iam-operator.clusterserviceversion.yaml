@@ -6,9 +6,9 @@ metadata:
     capabilities: Basic Install
     categories: Security
     certified: "false"
-    containerImage: icr.io/cpopen/ibm-iam-operator:4.4.0
-    description: The IAM operator provides a simple Kubernetes CRD-Based API to manage the lifecycle of IAM services. With this operator, you can simply deploy and upgrade the IAM services
-    olm.skipRange: <4.4.0
+    description: The IAM operator provides a simple Kubernetes CRD-Based API to manage
+      the lifecycle of IAM services. With this operator, you can simply deploy and
+      upgrade the IAM services
     repository: https://github.com/IBM/ibm-iam-operator
     support: IBM
   labels:
@@ -22,16 +22,16 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-      - description: Authentication is the Schema for the authentications API
-        displayName: Authentication
-        kind: Authentication
-        name: authentications.operator.ibm.com
-        version: v1alpha1
-      - description: Client is the Schema for the clients API
-        displayName: Client
-        kind: Client
-        name: clients.oidc.security.ibm.com
-        version: v1
+    - description: Authentication is the Schema for the authentications API
+      displayName: Authentication
+      kind: Authentication
+      name: authentications.operator.ibm.com
+      version: v1alpha1
+    - description: Client is the Schema for the clients API
+      displayName: Client
+      kind: Client
+      name: clients.oidc.security.ibm.com
+      version: v1
   description: |-
     The `ibm-iam-operator` installs the IBM Cloud Platform Common Services Identity and access management (IAM) service.
 
@@ -67,27 +67,27 @@ spec:
     - If you are using the operator with an IBM Containerized Software, see the IBM Cloud Platform Common Services Knowledge Center [Installer documentation](http://ibm.biz/cpcs_opinstall).
   displayName: IBM IM Operator
   icon:
-    - base64data: ""
-      mediatype: image/png
+  - base64data: ""
+    mediatype: image/png
   install:
     spec:
       deployments: null
     strategy: ""
   installModes:
-    - supported: true
-      type: OwnNamespace
-    - supported: true
-      type: SingleNamespace
-    - supported: true
-      type: MultiNamespace
-    - supported: true
-      type: AllNamespaces
+  - supported: true
+    type: OwnNamespace
+  - supported: true
+    type: SingleNamespace
+  - supported: true
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
   keywords:
-    - IBM
-    - Cloud
+  - IBM
+  - Cloud
   maintainers:
-    - email: support@ibm.com
-      name: IBM Support
+  - email: support@ibm.com
+    name: IBM Support
   maturity: stable
   provider:
     name: IBM

@@ -1,6 +1,5 @@
 resources:
-- bases/ibm-iam-operator.clusterserviceversion.yaml
+- bases
 - ../default
 - ../samples
 - ../scorecard
-

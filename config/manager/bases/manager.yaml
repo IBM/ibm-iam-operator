@@ -50,14 +50,6 @@ spec:
           - ibm-iam-operator
           imagePullPolicy: IfNotPresent
           env:
-            - name: ICP_PLATFORM_AUTH_IMAGE
-              value: icr.io/cpopen/cpfs/icp-platform-auth:4.4.0
-            - name: ICP_IDENTITY_PROVIDER_IMAGE
-              value: icr.io/cpopen/cpfs/icp-identity-provider:4.4.0
-            - name: ICP_IDENTITY_MANAGER_IMAGE
-              value: icr.io/cpopen/cpfs/icp-identity-manager:4.4.0
-            - name: IM_INITCONTAINER_IMAGE
-              value: icr.io/cpopen/cpfs/im-initcontainer:4.4.0
             - name: WATCH_NAMESPACE
               valueFrom:
                 configMapKeyRef:

@@ -18,12 +18,6 @@ IMG ?= ibm-iam-operator
 REGISTRY ?= "docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-integration-docker-local/ibmcom"
 CONTAINER_CLI ?= docker
 
-CSV_VERSION ?= 4.4.0
-
-
-QUAY_USERNAME ?=
-QUAY_PASSWORD ?=
-
 MARKDOWN_LINT_WHITELIST=https://quay.io/cnr
 
 TESTARGS_DEFAULT := "-v"
@@ -69,7 +63,7 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # This variable is used to construct full image tags for bundle and catalog images.
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# ibm.com/ibm-iam-operator-bundle:$VERSION and ibm.com/ibm-iam-operator-catalog:$VERSION.
+# icr.io/cpopen/ibm-iam-operator-bundle:$VERSION and icr.io/cpopen/ibm-iam-operator-catalog:$VERSION.
 IMAGE_TAG_BASE ?= icr.io/cpopen/ibm-iam-operator
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
@@ -258,28 +252,43 @@ envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
 	test -s $(LOCALBIN)/setup-envtest || GOSUMDB=sum.golang.org GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 
-.PHONY: bundle
-bundle: manifests kustomize yq ## Generate bundle manifests and metadata, then validate generated files.
-	operator-sdk generate kustomize manifests -q
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMAGE_TAG_BASE):$(VERSION)
-	@# Dynamically set olm.skipRange and containerImage annotations based upon environment vars
-	$(LOCALBIN)/yq -i '.metadata.annotations."olm.skipRange" = "<${CSV_VERSION}"' config/manifests/bases/ibm-iam-operator.clusterserviceversion.yaml
-	$(LOCALBIN)/yq -i '.metadata.annotations.containerImage = "${IMAGE_TAG_BASE}:${VERSION}"' config/manifests/bases/ibm-iam-operator.clusterserviceversion.yaml
-	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
-	operator-sdk bundle validate ./bundle
+.PHONY: update-version
+update-version: manifests kustomize yq 
+	./hack/update_operator_version
+
+.PHONY: bundle-hacks
+bundle-hacks: yq bundle/manifests/ibm-iam-operator.clusterserviceversion.yaml hack/external-crs.json
 	@# Hack to add in the OperandRequest/OperandBindInfo after bundle validation; bundle validation will fail if they are
 	@# included in the examples beforehand. alm-examples is a JSON string, which makes it somewhat awkward to deal with in
 	@# kustomize. Instead, use yq to get the Authentication CR example as a JSON file, merge that example with the
 	@# OperandRequest and OperandBindInfo examples, and 
-	$(LOCALBIN)/yq '.metadata.annotations.alm-examples' bundle/manifests/ibm-iam-operator.clusterserviceversion.yaml > internal-crs.json
-	$(LOCALBIN)/yq '. += load("./config/manifests/external-crs.json")' internal-crs.json > combined-crs.json
-	$(LOCALBIN)/yq -i '.metadata.annotations.alm-examples = load_str("combined-crs.json")' bundle/manifests/ibm-iam-operator.clusterserviceversion.yaml
+	$(YQ) '.metadata.annotations.alm-examples' bundle/manifests/ibm-iam-operator.clusterserviceversion.yaml > internal-crs.json
+	$(YQ) '. += load("./hack/external-crs.json")' internal-crs.json > combined-crs.json
+	$(YQ) -i '.metadata.annotations.alm-examples = load_str("combined-crs.json")' bundle/manifests/ibm-iam-operator.clusterserviceversion.yaml
 	@# Also need to replace the WATCH_NAMESPACE value that operator-sdk seems to overwrite with a reference to the
 	@# namespace-scope ConfigMap
-	$(LOCALBIN)/yq -i '.spec.install.spec.deployments[].spec.template.spec.containers[].env |= map(select(.name == "WATCH_NAMESPACE").valueFrom=load("./config/manager/manager_patch.yaml"))' bundle/manifests/ibm-iam-operator.clusterserviceversion.yaml
+	$(YQ) -i '.spec.install.spec.deployments[].spec.template.spec.containers[].env |= map(select(.name == "WATCH_NAMESPACE").valueFrom=load("./hack/manager_patch.yaml"))' bundle/manifests/ibm-iam-operator.clusterserviceversion.yaml
 	@# Trying to include relatedImages in the config base leads to it being clobbered by operator-sdk apparently
-	$(LOCALBIN)/yq -i '.spec.relatedImages = load("./config/manifests/relatedimages.yaml")' bundle/manifests/ibm-iam-operator.clusterserviceversion.yaml
+	$(YQ) -i '.spec.relatedImages = load("./hack/relatedimages.yaml")' bundle/manifests/ibm-iam-operator.clusterserviceversion.yaml
 	rm combined-crs.json internal-crs.json
+
+.PHONY: dev-bundle-base 
+dev-bundle-base: manifests kustomize yq
+	operator-sdk generate kustomize manifests -q
+	cd config/manager/dev && $(KUSTOMIZE) edit set image controller=$(IMAGE_TAG_BASE):$(VERSION)
+	$(KUSTOMIZE) build config/manifests/overlays/dev | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
+
+.PHONY: dev-bundle
+dev-bundle: dev-bundle-base bundle-hacks
+
+.PHONY: bundle-base
+bundle-base: manifests kustomize yq ## Generate bundle manifests and metadata, then validate generated files.
+	operator-sdk generate kustomize manifests -q
+	$(KUSTOMIZE) build config/manifests/overlays/prod | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
+	operator-sdk bundle validate ./bundle
+
+.PHONY: bundle
+bundle: bundle-base bundle-hacks ## Build the bundle manifests
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.

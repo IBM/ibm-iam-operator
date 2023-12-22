@@ -8,4 +8,3 @@
   name: ICP_IDENTITY_MANAGER_IMAGE
 - image: icr.io/cpopen/cpfs/im-initcontainer:4.4.0
   name: IM_INITCONTAINER_IMAGE
-

@@ -1,4 +1,0 @@
-bases:
-- ../../../crd
-- ../../../rbac
-- ../../../manager/overlays/prod

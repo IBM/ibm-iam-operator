@@ -14,32 +14,7 @@
 # limitations under the License.
 #
 
-# Build the manager binary
-FROM docker.io/golang:1.21-bullseye as builder
-ARG TARGETOS
-ARG TARGETARCH
-
-WORKDIR /workspace
-# Copy the Go Modules manifests
-COPY go.mod go.mod
-COPY go.sum go.sum
-# cache deps before building and copying source so that we don't need to re-download as much
-# and so that source changes don't invalidate our downloaded layer
-RUN go mod download
-
-# Copy the go source
-COPY main.go main.go
-COPY apis/ apis/
-COPY controllers/ controllers/
-
-# Build
-# the GOARCH has not a default value to allow the binary be built according to the host where the command
-# was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
-# the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
-# by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager main.go
-
-FROM alpine as qemu-builder
+FROM alpine as builder
 
 RUN wget -O /qemu-s390x-static https://github.com/multiarch/qemu-user-static/releases/download/v5.2.0-2/qemu-s390x-static && chmod +x /qemu-s390x-static
 
@@ -64,18 +39,19 @@ ENV OPERATOR=/usr/local/bin/ibm-iam-operator \
   USER_UID=1001 \
   USER_NAME=ibm-iam-operator
 
-WORKDIR /
-COPY --from=builder /workspace/manager ${OPERATOR}
-COPY --from=qemu-builder /qemu-s390x-static /usr/bin/
+COPY --from=builder /qemu-s390x-static /usr/bin/
 
-# Copy in licenses
-RUN mkdir /licenses
+# install the binary
+COPY build/_output/bin/ibm-iam-operator-s390x ${OPERATOR}
+
+COPY build/bin /usr/local/bin
+RUN  /usr/local/bin/user_setup && mkdir /licenses
+
 COPY LICENSE /licenses
 
+ENTRYPOINT ["/usr/local/bin/entrypoint"]
+
 USER ${USER_UID}
-
-ENTRYPOINT ["/usr/local/bin/ibm-iam-operator"]
-
 
 LABEL version="0.0.1"
 LABEL release="0.0.1"

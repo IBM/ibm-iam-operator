@@ -22,8 +22,7 @@ ENV OPERATOR=/usr/local/bin/ibm-iam-operator \
 # install operator binary
 COPY build/_output/bin/ibm-iam-operator ${OPERATOR}
 
-COPY build/bin /usr/local/bin
-RUN  /usr/local/bin/user_setup && mkdir /licenses
+RUN mkdir /licenses
 
 COPY LICENSE /licenses
 

@@ -1,6 +1,6 @@
 module github.com/IBM/ibm-iam-operator
 
-go 1.19
+go 1.21
 
 require (
 	github.com/cert-manager/cert-manager v1.13.1

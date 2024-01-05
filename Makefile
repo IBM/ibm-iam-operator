@@ -366,7 +366,7 @@ build-image-s390x: $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on s3
 	@\rm -f build/_output/bin/ibm-iam-operator-s390x
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-s390x:$(VERSION); fi
 
-images: build-image build-image-ppc64le build-image-s390x
+images: build-image-amd64 build-image-ppc64le build-image-s390x
 	@curl -L -o /tmp/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.3/manifest-tool-$(TARGET_OS)-amd64
 	@chmod +x /tmp/manifest-tool
 	/tmp/manifest-tool push from-args --platforms linux/amd64,linux/ppc64le,linux/s390x --template $(REGISTRY)/$(IMG)-ARCH:$(VERSION) --target $(REGISTRY)/$(IMG) --ignore-missing

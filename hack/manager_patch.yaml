@@ -1,4 +1,0 @@
-configMapKeyRef:
-  name: namespace-scope
-  key: namespaces
-

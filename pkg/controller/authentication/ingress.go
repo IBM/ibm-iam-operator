@@ -698,6 +698,8 @@ func samlUiCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 				"kubernetes.io/ingress.class":            "ibm-icp-management",
 				"icp.management.ibm.com/upstream-uri":    "/ibm/saml20/defaultSP/acs",
 				"icp.management.ibm.com/secure-backends": "true",
+				"icp.management.ibm.com/configuration-snippet": `
+				add_header "Content-Security-Policy" "default-src 'self'";`,
 			},
 		},
 		Spec: netv1.IngressSpec{

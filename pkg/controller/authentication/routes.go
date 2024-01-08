@@ -262,6 +262,7 @@ func (r *ReconcileAuthentication) handleRoutes(ctx context.Context, instance *op
 		"haproxy.router.openshift.io/rate-limit-connections.rate-tcp":       "200",
 		"haproxy.router.openshift.io/rate-limit-connections.rate-http":      "200",
 		"haproxy.router.openshift.io/hsts_header":                           "max-age=31536000;includeSubDomains",
+		"haproxy.router.openshift.io/csp": 									 "default-src 'self'",
 	}
 
 	for _, routeFields := range allRoutesFields {

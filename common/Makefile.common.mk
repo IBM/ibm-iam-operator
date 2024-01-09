@@ -97,25 +97,5 @@ format-python:
 format-protos:
 	@$(FINDFILES) -name '*.proto' -print0 | $(XARGS) -L 1 prototool format -w
 
-csv-gen:
-	@echo Updating the CSV files with the changes in the CRD
-	operator-sdk generate csv --csv-version ${CSV_VERSION} --update-crds
-
-bundle:
-	@echo --- Updating the bundle directory with latest yamls from olm-catalog ---
-	rm -rf bundle/*
-	cp -r deploy/olm-catalog/ibm-iam-operator/${CSV_VERSION}/* bundle/
-	cp deploy/olm-catalog/ibm-iam-operator/ibm-iam-operator.package.yaml bundle/
-	zip bundle/ibm-iam-metadata bundle/*.yaml
-
-install-operator-courier:
-	@echo --- Installing Operator Courier ---
-	pip3 install operator-courier
-
-verify-bundle:
-	@echo --- Verify Bundle is Redhat Certify ready ---
-	operator-courier --verbose verify --ui_validate_io bundle/
-
-redhat-certify-ready: bundle install-operator-courier verify-bundle
 
 .PHONY: lint-dockerfiles lint-scripts lint-yaml lint-copyright-banner lint-go lint-python lint-helm lint-markdown lint-sass lint-typescript lint-protos lint-all format-go format-python format-protos csv-gen bundle install-operator-courier verify-bundle redhat-certify-ready config-docker

@@ -1,6 +1,7 @@
 ignored:
   - FAKE_DL3003
   - DL3006
+  - DL3007
   
 trustedRegistries:
   - gcr.io

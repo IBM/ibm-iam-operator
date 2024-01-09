@@ -40,7 +40,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -a -o manager main.go
 
 FROM alpine as qemu-builder
 
-RUN wget -O -q /qemu-s390x-static https://github.com/multiarch/qemu-user-static/releases/download/v5.2.0-2/qemu-s390x-static && chmod +x /qemu-s390x-static
+RUN wget -O /qemu-s390x-static https://github.com/multiarch/qemu-user-static/releases/download/v5.2.0-2/qemu-s390x-static && chmod +x /qemu-s390x-static
 
 FROM docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-edge-docker-local/build-images/ubi8-minimal:latest-s390x
 

@@ -552,7 +552,7 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 			"IGNORE_LDAP_FILTERS_VALIDATION":     "false",
 			"LDAP_SEARCH_EXCLUDE_WILDCARD_CHARS": "false",
 			"LDAP_SEARCH_SIZE_LIMIT":             "50",
-			"LDAP_SEARCH_TIME_LIMIT":             "5",
+			"LDAP_SEARCH_TIME_LIMIT":             "10",
 			"LDAP_SEARCH_CN_ATTR_ONLY":           "false",
 			"LDAP_SEARCH_ID_ATTR_ONLY":           "false",
 			"LDAP_CTX_POOL_INITSIZE":             "10",

@@ -19,7 +19,6 @@
 # If set to 1, then you need to also set 'DOCKER_USERNAME' and 'DOCKER_PASSWORD'
 # environment variables before build the repo.
 BUILD_LOCALLY ?= 1
-TARGET_GOARCH=amd64
 
 # The namespace that operator will be deployed in
 NAMESPACE=ibm-common-services
@@ -365,19 +364,19 @@ build-dev-image:
 
 build-image-amd64: $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on amd64
 	$(CONTAINER_CLI) run --rm --privileged docker.io/multiarch/qemu-user-static:register --reset
-	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} --build-arg="TARGET_GOARCH=amd64" -t $(REGISTRY)/$(IMG)-amd64:$(VERSION) -f build/Dockerfile.amd64 .
+	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-amd64:$(VERSION) -f build/Dockerfile.amd64 .
 	@\rm -f build/_output/bin/ibm-iam-operator-amd64
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-amd64:$(VERSION); fi
 
 build-image-ppc64le: $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on ppc64le
 	$(CONTAINER_CLI) run --rm --privileged docker.io/multiarch/qemu-user-static:register --reset
-	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} --build-arg="TARGET_GOARCH=ppc64le"  -t $(REGISTRY)/$(IMG)-ppc64le:$(VERSION) -f build/Dockerfile.ppc64le .
+	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-ppc64le:$(VERSION) -f build/Dockerfile.ppc64le .
 	@\rm -f build/_output/bin/ibm-iam-operator-ppc64le
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-ppc64le:$(VERSION); fi
 
 build-image-s390x: $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on s390x
 	$(CONTAINER_CLI) run --rm --privileged docker.io/multiarch/qemu-user-static:register --reset
-	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} --build-arg="TARGET_GOARCH=s390x" -t $(REGISTRY)/$(IMG)-s390x:$(VERSION) -f build/Dockerfile.s390x .
+	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-s390x:$(VERSION) -f build/Dockerfile.s390x .
 	@\rm -f build/_output/bin/ibm-iam-operator-s390x
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-s390x:$(VERSION); fi
 

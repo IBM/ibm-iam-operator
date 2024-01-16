@@ -150,17 +150,6 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}()
 
-	// Determine the type of cluster that the Operator is installed on
-	//if r.RunningOnUnknownCluster() {
-	//	r.clusterType, err = ctrlCommon.GetClusterType(reconcileCtx, &r.Client, ctrlCommon.GlobalConfigMapName)
-	//	if err != nil {
-	//		reqLogger.Error(err, "Failed to determine cluster platform")
-	//		return
-	//	} else {
-	//		reqLogger.Info("Set cluster type", "clusterType", r.clusterType)
-	//	}
-	//}
-
 	reqLogger.Info("Reconciling Authentication")
 
 	// Fetch the Authentication instance
@@ -212,15 +201,15 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			instance.Status.Service = currentServiceStatus
 			reqLogger.Info("Current status does not reflect current state; updating")
 		}
-		err = r.Client.Status().Update(ctx, instance)
-		if err != nil {
-			reqLogger.Error(err, "Failed to update status; trying again")
+		statusUpdateErr := r.Client.Status().Update(ctx, instance)
+		if statusUpdateErr != nil {
+			reqLogger.Error(statusUpdateErr, "Failed to update status; trying again")
 			currentInstance := &operatorv1alpha1.Authentication{}
 			r.Client.Get(ctx, req.NamespacedName, currentInstance)
 			currentInstance.Status.Service = currentServiceStatus
-			err = r.Client.Status().Update(ctx, currentInstance)
-			if err != nil {
-				reqLogger.Error(err, "Retry failed; returning error")
+			statusUpdateErr = r.Client.Status().Update(ctx, currentInstance)
+			if statusUpdateErr != nil {
+				reqLogger.Error(statusUpdateErr, "Retry failed; returning error")
 				return
 			}
 		} else {

@@ -104,7 +104,7 @@ func (r *ClientReconciler) getAuthnTokens(ctx context.Context, client *oidcsecur
 		}
 		payload = fmt.Sprintf("%s&grant_type=%s&username=%s&password=%s", payload, grantType, defaultAdminUser, defaultAdminPassword)
 	}
-	reqLogger.Info("Payload set", "token_type", tokenType, "grant_type", grantType, "client_id", clientCreds.ClientID, "client_secret_set", clientCreds.ClientSecret != "")
+	// reqLogger.Info("Payload set", "token_type", tokenType, "grant_type", grantType, "client_id", clientCreds.ClientID, "client_secret_set", clientCreds.ClientSecret != "")
 	requestURL = strings.Join(append(requestURLSplit, tokenType), "/")
 
 	var tResp *http.Response

@@ -39,7 +39,6 @@ import (
 	oidcsecuritycontrollers "github.com/IBM/ibm-iam-operator/controllers/oidc.security"
 	operatorcontrollers "github.com/IBM/ibm-iam-operator/controllers/operator"
 	certmgrv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
-	//osconfigv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	//+kubebuilder:scaffold:imports
 )
@@ -58,10 +57,6 @@ func init() {
 	if controllercommon.ClusterHasRouteGroupVersion() {
 		utilruntime.Must(routev1.AddToScheme(scheme))
 	}
-	// Add the OpenShiftConfig scheme if found on the cluster
-	//if controllercommon.ClusterHasOpenShiftConfigGroupVerison() {
-	//	utilruntime.Must(osconfigv1.AddToScheme(scheme))
-	//}
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -86,18 +81,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	defaultNamespaces := make(map[string]cache.Config)
-
-	for _, namespace := range strings.Split(watchNamespace, ",") {
-		defaultNamespaces[namespace] = cache.Config{}
-	}
-
-	cacheOptions := cache.Options{
-		DefaultNamespaces: defaultNamespaces,
-	}
-
 	mgrOptions := ctrl.Options{
-		Cache:                  cacheOptions,
 		Scheme:                 scheme,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
@@ -115,7 +99,24 @@ func main() {
 		// LeaderElectionReleaseOnCancel: true,
 	}
 
-	// TODO add back in equivalent of Port and MetricsBindAddress
+	// If one or more namespaces are to be watched, the cache.Config for each of those namespaces must be
+	// initialized; otherwise, as long as the Cache remains unset, the manager should watch all namespaces:
+	// https://github.com/kubernetes-sigs/controller-runtime/blob/v0.17.0/pkg/cluster/cluster.go#L106-L107
+	if watchNamespace != "" {
+		defaultNamespaces := make(map[string]cache.Config)
+
+		for _, namespace := range strings.Split(watchNamespace, ",") {
+			defaultNamespaces[namespace] = cache.Config{}
+		}
+
+		cacheOptions := cache.Options{
+			DefaultNamespaces: defaultNamespaces,
+		}
+
+		mgrOptions.Cache = cacheOptions
+	}
+
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), mgrOptions)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

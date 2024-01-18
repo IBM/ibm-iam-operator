@@ -238,7 +238,7 @@ func (r *ClientReconciler) finalizeClient(ctx context.Context, req ctrl.Request)
 	reqLogger := logf.FromContext(ctx)
 	clientCR := &oidcsecurityv1.Client{}
 
-	if result, err = r.getLatestClient(ctx, req, clientCR); err != nil {
+	if _, err = r.getLatestClient(ctx, req, clientCR); err != nil {
 		if k8sErrors.IsNotFound(err) {
 			// Assume that the Client was already deleted
 			return subreconciler.DoNotRequeue()
@@ -258,20 +258,20 @@ func (r *ClientReconciler) finalizeClient(ctx context.Context, req ctrl.Request)
 		err = r.unregisterZenInstance(ctx, clientCR, config)
 		if err != nil {
 			reqLogger.Error(err, "Zen instance registration deletion failed", "zenInstanceId", clientCR.Spec.ZenInstanceId)
-			return
+			return subreconciler.RequeueWithError(err)
 		}
 		reqLogger.Info("Zen instance registration deletion succeeded", "ZenInstanceId", clientCR.Spec.ZenInstanceId)
 	}
 
 	reqLogger.Info("Deleting annotations from ibm-iam-operand-restricted ServiceAccount")
 	if result, err = r.removeAnnotationFromSA(ctx, req); subreconciler.ShouldRequeue(result, err) {
-		return
+		return subreconciler.RequeueWithError(err)
 	}
 
 	reqLogger.Info("Attempting deletion of the OIDC client registration")
 	_, err = r.deleteClientRegistration(ctx, clientCR, config)
 	if err != nil {
-		return
+		return subreconciler.RequeueWithError(err)
 	}
 	reqLogger.Info("Client registration successfully deleted")
 
@@ -309,15 +309,16 @@ func (r *ClientReconciler) handleDeletion(ctx context.Context, req ctrl.Request)
 	reqLogger.Info("Client is marked for deletion")
 
 	if result, err = r.finalizeClient(ctx, req); subreconciler.ShouldRequeue(result, err) {
-		if err != nil {
-			reqLogger.Error(err, "Error occurred while finalizing Client")
-			reqLogger.Info("Updating status")
-			if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, requestMethod); err != nil {
-				reqLogger.Error(err, "Failed to update Client status")
-				return subreconciler.RequeueWithError(err)
-			}
+		if err == nil {
+			return subreconciler.Requeue()
 		}
-		return
+		reqLogger.Error(err, "Error occurred while finalizing Client")
+		reqLogger.Info("Updating status")
+		if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, requestMethod); err != nil {
+			reqLogger.Error(err, "Failed to update Client status")
+			return subreconciler.RequeueWithError(err)
+		}
+		return subreconciler.RequeueWithError(err)
 	}
 
 	reqLogger.Info("Updating status")
@@ -384,7 +385,6 @@ func (r *ClientReconciler) processOidcRegistration(ctx context.Context, req ctrl
 		requestMethod = http.MethodPut
 		if _, err = r.updateClientRegistration(ctx, clientCR, config); err != nil {
 			reqLogger.Error(err, "Failed to update OIDC client registration")
-			//r.Recorder.Event(clientCR, corev1.EventTypeWarning, ReasonUpdateClientFailed, err.Error())
 			if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, requestMethod); err != nil {
 				reqLogger.Error(err, "Failed to update Client status")
 				return subreconciler.RequeueWithError(err)
@@ -401,7 +401,7 @@ func (r *ClientReconciler) processOidcRegistration(ctx context.Context, req ctrl
 		return subreconciler.RequeueWithError(err)
 	}
 
-	return
+	return subreconciler.ContinueReconciling()
 }
 
 // migrateCP2Client updates an existing Client that has the finalizer from the icp-oidcclient-watcher Operator and
@@ -637,7 +637,7 @@ func (r *ClientReconciler) removeAnnotationFromSA(ctx context.Context, req ctrl.
 	err = r.Get(ctx, types.NamespacedName{Name: sAccName, Namespace: sAccNamespace}, serviceAccount)
 	if err != nil {
 		reqLogger.Error(err, "failed to GET ServiceAccount ibm-iam-operand-restricted")
-		return
+		return subreconciler.RequeueWithError(err)
 	}
 
 	// If there are no annotations, nothing to do - continue reconciling

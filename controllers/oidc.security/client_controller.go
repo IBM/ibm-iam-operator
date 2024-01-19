@@ -175,12 +175,11 @@ func (r *ClientReconciler) ensureSecretAndClientIdSet(ctx context.Context, req c
 
 	var secret *corev1.Secret
 
-	// If a Secret name isn't set on the Client, create a new Secret name based upon the Client's name
+	// If a Secret name isn't set on the Client, report that the secret must be set; otherwise, try to obtain the
+	// Secret to check for changes
 	if clientCR.Spec.Secret == "" {
-		reqLogger.Info("Generating new Secret name")
-		rule := `^([a-z0-9]){8,}$`
-		postfix := strings.Join([]string{common.GenerateRandomString(rule), "secret"}, "-")
-		clientCR.Spec.Secret = createPostfixedName(clientCR.Name, postfix)
+		reqLogger.Info(".spec.secret is not set; set to a non-empty value to continue reconciling this Client")
+		return subreconciler.DoNotRequeue()
 	} else {
 		secret, err = r.getSecretFromClient(ctx, clientCR)
 		if err != nil && !k8sErrors.IsNotFound(err) {

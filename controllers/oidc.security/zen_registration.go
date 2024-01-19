@@ -118,7 +118,7 @@ func (r *ClientReconciler) unregisterZenInstance(ctx context.Context, clientCR *
 	switch v := err.(type) {
 	case *OIDCClientRegistrationError:
 		// Return no response or error if the OIDC client isn't found given a token couldn't be retrieved
-		if v.response.StatusCode == 404 {
+		if v.response != nil && v.response.StatusCode == 404 {
 			return nil
 		}
 		return

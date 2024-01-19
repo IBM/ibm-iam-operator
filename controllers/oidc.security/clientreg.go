@@ -169,7 +169,7 @@ func (r *ClientReconciler) updateClientRegistration(ctx context.Context, client 
 func (r *ClientReconciler) deleteClientRegistration(ctx context.Context, client *oidcsecurityv1.Client, config *AuthenticationConfig) (response *http.Response, err error) {
 	clientId := client.Spec.ClientId
 	if clientId == "" {
-		return nil, fmt.Errorf("empty client ID")
+		return nil, nil
 	}
 
 	var url, identityProviderURL string

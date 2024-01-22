@@ -1,0 +1,13 @@
+resources:
+- ../../bases
+- ../../../default/overlays/prod
+- ../../../samples/overlays/prod
+- ../../../scorecard
+
+patches:
+- path: annotations_patch.yaml
+  target:
+    group: operators.coreos.com
+    version: v1alpha1
+    kind: ClusterServiceVersion
+    name: ibm-iam-operator.v0.0.0

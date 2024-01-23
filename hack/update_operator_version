@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+#
+# update_operator_version writes the value stored in the VERSION environment variable to all locations where it is
+# needed in order to propagate to the Operator bundle. VERSION must be set to a valid SemVer, and the change is carried
+# across both dev and prod Kustomize overlays as well as other non-Kustomize files used for patching the CSV after
+# operator-sdk validation.
+# 
+
+set -e -u -o pipefail
+
+REPO_ROOT=""
+if command -v realpath &>/dev/null
+then
+  REPO_ROOT="$(realpath $(dirname $0)/..)"
+else
+  REPO_ROOT="$(dirname $0/..)"
+fi
+export LOCALBIN="${REPO_ROOT}/bin"
+
+
+echo "Verify VERSION is SemVer-compliant"
+$REPO_ROOT/hack/is_semver || {
+  >&2 echo "Unexpected error: VERSION=${VERSION} is not a valid SemVer; will not update version values"
+  exit 1
+}
+
+
+export CPOPEN_LOCATION="icr.io/cpopen"
+export PRODUCTION_IMAGE="${CPOPEN_LOCATION}/ibm-iam-operator"
+
+
+echo "Update the version.go"
+current_version="$(grep 'Version =' "${REPO_ROOT}/version/version.go" | cut -f2 -d\")" 
+sed s/$current_version/$VERSION/ $REPO_ROOT/version/version.go > $REPO_ROOT/version/version.go.new
+mv $REPO_ROOT/version/version.go.new $REPO_ROOT/version/version.go
+
+
+echo "Update the containerImage and olm.skipRange annotations in dev and patch"
+$LOCALBIN/yq -i 'with(.[] | select(.path == "/metadata/annotations/containerImage") ; .value |= env(PRODUCTION_IMAGE) + ":" + env(VERSION))' \
+  "${REPO_ROOT}/config/manifests/overlays/prod/annotations_patch.yaml"
+$LOCALBIN/yq -i 'with(.[] | select(.path == "/metadata/annotations/olm.skipRange") ; .value |= "<" + env(VERSION))' \
+  "${REPO_ROOT}/config/manifests/overlays/prod/annotations_patch.yaml"
+cp "${REPO_ROOT}/config/manifests/overlays/prod/annotations_patch.yaml" "${REPO_ROOT}/config/manifests/overlays/dev/annotations_patch.yaml"
+
+
+echo "Update all related images' tags"
+$LOCALBIN/yq -i 'with(.[] | select(.name != "IBM_IAM_OPERATOR_IMAGE"); .image |= sub("([a-zA-Z0-9-./]+)/([a-zA-Z0-9-.]+):([a-zA-Z0-9-.]+)", env(CPOPEN_LOCATION)+"/cpfs/${2}:"+env(VERSION)))' \
+  "${REPO_ROOT}/hack/relatedimages.yaml"
+$LOCALBIN/yq -i 'with(.[] | select(.name == "IBM_IAM_OPERATOR_IMAGE"); .image |= env(PRODUCTION_IMAGE)+":"+env(VERSION))' \
+  "${REPO_ROOT}/hack/relatedimages.yaml"
+
+
+echo "Update all image-related environment variables' tags"
+$LOCALBIN/yq -i 'with(.[].value ; .value |= sub("([a-zA-Z0-9-./]+):([a-zA-Z0-9-.]+)", "${1}:"+env(VERSION)))' \
+  "${REPO_ROOT}/config/manager/overlays/prod/image_env_vars_patch.yaml"
+cp "${REPO_ROOT}/config/manager/overlays/prod/image_env_vars_patch.yaml" "${REPO_ROOT}/config/manager/overlays/dev/image_env_vars_patch.yaml"
+
+
+echo "Update controller image in manager kustomization.yaml"
+$LOCALBIN/yq -i '.images[0].newTag = env(VERSION)' "${REPO_ROOT}/config/manager/overlays/prod/kustomization.yaml"
+cp "${REPO_ROOT}/config/manager/overlays/prod/kustomization.yaml" "${REPO_ROOT}/config/manager/overlays/dev/kustomization.yaml"
+
+echo "Update sample image tags"
+$LOCALBIN/yq -i '.spec.*.imageTag = env(VERSION)' \
+  "${REPO_ROOT}/config/samples/overlays/prod/authentication_image_patch.yaml"
+cp "${REPO_ROOT}/config/samples/overlays/prod/authentication_image_patch.yaml" "${REPO_ROOT}/config/samples/overlays/dev/authentication_image_patch.yaml"
+
+echo "Done"

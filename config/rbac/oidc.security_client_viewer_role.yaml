@@ -1,0 +1,27 @@
+# permissions for end users to view clients.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: client-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: ibm-iam-operator
+    app.kubernetes.io/part-of: ibm-iam-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: client-viewer-role
+rules:
+- apiGroups:
+  - oidc.security.ibm.com
+  resources:
+  - clients
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - oidc.security.ibm.com
+  resources:
+  - clients/status
+  verbs:
+  - get

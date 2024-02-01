@@ -1,4 +1,4 @@
 bases:
-- ../crd
-- ../rbac
+- ../../../crd
+- ../../../rbac
 - ../../../manager/overlays/dev

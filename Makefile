@@ -293,7 +293,7 @@ bundle-hacks: yq bundle/manifests/ibm-iam-operator.clusterserviceversion.yaml ha
 .PHONY: dev-bundle-base 
 dev-bundle-base: manifests kustomize yq
 	operator-sdk generate kustomize manifests -q
-	cd config/manager/dev && $(KUSTOMIZE) edit set image controller=$(IMAGE_TAG_BASE):$(VERSION)
+	cd config/manager/overlays/dev && $(KUSTOMIZE) edit set image controller=$(IMAGE_TAG_BASE):$(VERSION)
 	$(KUSTOMIZE) build config/manifests/overlays/dev | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
 
 .PHONY: dev-bundle

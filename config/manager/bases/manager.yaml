@@ -1,3 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: ibm-iam-operator
+  name: system
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -38,10 +45,10 @@ spec:
                 - s390x
       containers:
         - name: ibm-iam-operator
-          image: icr.io/cpopen/ibm-iam-operator:4.5.0 # replace this image with dev image for testing
+          image: controller:latest
           command:
           - ibm-iam-operator
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           env:
             - name: WATCH_NAMESPACE
               valueFrom:
@@ -60,14 +67,6 @@ spec:
               value: ""
             - name: cluster_name
               value: ""
-            - name: ICP_PLATFORM_AUTH_IMAGE
-              value: icr.io/cpopen/cpfs/icp-platform-auth:4.5.0
-            - name: ICP_IDENTITY_PROVIDER_IMAGE
-              value: icr.io/cpopen/cpfs/icp-identity-provider:4.5.0
-            - name: ICP_IDENTITY_MANAGER_IMAGE
-              value: icr.io/cpopen/cpfs/icp-identity-manager:4.5.0
-            - name: IM_INITCONTAINER_IMAGE
-              value: icr.io/cpopen/cpfs/im-initcontainer:4.5.0
           resources:
             limits:
               cpu: 25m

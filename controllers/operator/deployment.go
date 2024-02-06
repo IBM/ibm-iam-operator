@@ -299,7 +299,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	authServiceImage := common.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
-	mongoDBImage := common.GetImageRef("IM_INITCONTAINER_IMAGE")
+	//mongoDBImage := common.GetImageRef("IM_INITCONTAINER_IMAGE")
 	replicas := instance.Spec.Replicas
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
@@ -429,9 +429,9 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 							Operator: corev1.TolerationOpExists,
 						},
 					},
-					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret),
-					Containers:     buildContainers(instance, authServiceImage),
-					InitContainers: buildInitContainers(mongoDBImage),
+					Volumes:    buildIdpVolumes(ldapCACert, routerCertSecret),
+					Containers: buildContainers(instance, authServiceImage),
+					//InitContainers: buildInitContainers(mongoDBImage),
 				},
 			},
 		},

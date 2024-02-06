@@ -896,6 +896,55 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume
 			},
 		},
 		{
+			Name: "pgsql-ca-cert",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "im-datastore-edb-secret",
+				},
+			},
+		},
+		{
+			Name: "pgsql-client-cert",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "im-datastore-edb-secret",
+				},
+			},
+		},
+		{
+			Name: "pgsql-client-cred",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "im-datastore-edb-cm",
+					},
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "DATABASE_USER",
+							Path: "user",
+						},
+						{
+							Key:  "DATABASE_NAME",
+							Path: "dbname",
+						},
+						{
+							Key:  "DATABASE_RW_ENDPOINT",
+							Path: "host",
+						},
+						{
+							Key:  "DATABASE_R_ENDPOINT",
+							Path: "readhost",
+						},
+						{
+							Key:  "DATABASE_PORT",
+							Path: "port",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		},
+		{
 			Name: "scim-ldap-attributes-mapping",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{

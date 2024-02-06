@@ -380,6 +380,18 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 				Name:      "saml-cert",
 				MountPath: "/certs/saml-certs",
 			},
+			{
+				Name:      "pgsql-ca-cert",
+				MountPath: "/certs/pgsql-ca",
+			},
+			{
+				Name:      "pgsql-client-cert",
+				MountPath: "/certs/pgsql-client",
+			},
+			{
+				Name:      "pgsql-client-cred",
+				MountPath: "/pgsql/clientinfo",
+			},
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
@@ -741,6 +753,18 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			{
 				Name:      "saml-cert",
 				MountPath: "/certs/saml-certs",
+			},
+			{
+				Name:      "pgsql-ca-cert",
+				MountPath: "/certs/pgsql-ca",
+			},
+			{
+				Name:      "pgsql-client-cert",
+				MountPath: "/certs/pgsql-client",
+			},
+			{
+				Name:      "pgsql-client-cred",
+				MountPath: "/pgsql/clientinfo",
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
@@ -1117,6 +1141,18 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			{
 				Name:      "scim-ldap-attributes-mapping",
 				MountPath: "/opt/ibm/identity-mgmt/config/scim-config",
+			},
+			{
+				Name:      "pgsql-ca-cert",
+				MountPath: "/certs/pgsql-ca",
+			},
+			{
+				Name:      "pgsql-client-cert",
+				MountPath: "/certs/pgsql-client",
+			},
+			{
+				Name:      "pgsql-client-cred",
+				MountPath: "/pgsql/clientinfo",
 			},
 		},
 		ReadinessProbe: &corev1.Probe{

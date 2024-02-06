@@ -20,6 +20,9 @@ import (
 	"context"
 
 	"fmt"
+	"reflect"
+	"sync"
+
 	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	certmgr "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	routev1 "github.com/openshift/api/route/v1"
@@ -30,10 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
-	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sync"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -216,6 +217,10 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			reqLogger.Info("Updated status")
 		}
 	}()
+
+	// check for CS EDB, and create operandrequest for EDB operator if embedded
+	reqLogger.Info("Check for Common Services EDB and create ibm-iam-request-csedb if required")
+	r.checkforCSEDB(instance, &needToRequeue)
 
 	// Check if this Certificate already exists and create it if it doesn't
 	reqLogger.Info("Creating ibm-iam-operand-restricted serviceaccount")

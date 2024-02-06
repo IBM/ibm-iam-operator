@@ -532,6 +532,22 @@ spec:
               verbs:
                 - get
                 - list
+                - create
+            - apiGroups:
+                - operator.ibm.com
+              resources:
+                - operandrequests
+              verbs:
+                - get
+                - list
+                - create
+            - apiGroups:
+                - operator.ibm.com
+              resources:
+                - operandrequests/status
+              verbs:
+                - get
+                - list
             - apiGroups:
                 - cert-manager.io
               resources:

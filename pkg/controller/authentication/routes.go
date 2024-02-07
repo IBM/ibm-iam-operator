@@ -183,18 +183,6 @@ func (r *ReconcileAuthentication) handleRoutes(ctx context.Context, instance *op
 			DestinationCAcert: platformIdentityProviderCert,
 			ServiceName:       PlatformIdentityProviderServiceName,
 		},
-		"platform-id-auth": {
-			Annotations: map[string]string{
-				"haproxy.router.openshift.io/balance":        "source",
-				"haproxy.router.openshift.io/rewrite-target": "/",
-			},
-			Name:              "platform-id-auth",
-			RouteHost:         routeHost,
-			RoutePath:         "/idauth",
-			RoutePort:         9443,
-			DestinationCAcert: platformAuthCert,
-			ServiceName:       PlatformAuthServiceName,
-		},
 		"platform-id-provider": {
 			Annotations: map[string]string{
 				"haproxy.router.openshift.io/rewrite-target": "/",

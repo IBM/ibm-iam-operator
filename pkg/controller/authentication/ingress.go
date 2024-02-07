@@ -97,7 +97,6 @@ func (r *ReconcileAuthentication) handleIngress(instance *operatorv1alpha1.Authe
 		idmgmtV2ApiIngress,
 		platformAuthIngress,
 		platformIdAuthBlockIngress,
-		platformIdAuthIngress,
 		platformIdProviderIngress,
 		platformLoginIngress,
 		platformOidcBlockIngress,
@@ -379,60 +378,6 @@ func platformIdAuthBlockIngress(instance *operatorv1alpha1.Authentication, schem
 											Name: "default-http-backend",
 											Port: netv1.ServiceBackendPort{
 												Number: 80,
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// Set Authentication instance as the owner and controller of the Ingress
-	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
-	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Ingress")
-		return nil
-	}
-	return newIngress
-
-}
-
-func platformIdAuthIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *netv1.Ingress {
-	pathType := netv1.PathType("ImplementationSpecific")
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	newIngress := &netv1.Ingress{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "platform-id-auth",
-			Namespace: instance.Namespace,
-			Labels:    map[string]string{"app": "platform-auth-service"},
-			Annotations: map[string]string{
-				"kubernetes.io/ingress.class":            "ibm-icp-management",
-				"icp.management.ibm.com/secure-backends": "true",
-				"icp.management.ibm.com/rewrite-target":  "/",
-				"icp.management.ibm.com/configuration-snippet": `
-					add_header 'X-Frame-Options' 'SAMEORIGIN' always;
-					add_header 'X-Content-Type-Options' 'nosniff';
-					`,
-			},
-		},
-		Spec: netv1.IngressSpec{
-			Rules: []netv1.IngressRule{
-				{
-					IngressRuleValue: netv1.IngressRuleValue{
-						HTTP: &netv1.HTTPIngressRuleValue{
-							Paths: []netv1.HTTPIngressPath{
-								{
-									Path:     "/idauth",
-									PathType: &pathType,
-									Backend: netv1.IngressBackend{
-										Service: &netv1.IngressServiceBackend{
-											Name: "platform-auth-service",
-											Port: netv1.ServiceBackendPort{
-												Number: 9443,
 											},
 										},
 									},

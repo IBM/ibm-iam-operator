@@ -19,16 +19,10 @@ package operator
 import (
 	"context"
 	"fmt"
-	"os"
-	"time"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -36,21 +30,27 @@ import (
 )
 
 func (r *AuthenticationReconciler) checkforCSEDB(instance *operatorv1alpha1.Authentication, needToRequeue *bool) (err error) {
-
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	edbConfiMapName := ctrlCommon.IMDatasourceCMName
 	cfgmap, exists := r.checkIfConfigmapExists(instance, edbConfiMapName)
 
 	if exists {
 		is_embedded := cfgmap.Data["IS_EMBEDDED"]
+		reqLogger.Info("EMBEDDED ??" + is_embedded)
 		if is_embedded == "true" {
 			// create postgresql operandrequest
-			err := createOpendRequest(instance)
+			reqLogger.Info("Embedded edb is TRUE, Creating ibm-iam-request-csedb operandrequest")
+			err := r.createOpendRequest(instance)
 			if err != nil {
 				*needToRequeue = true
 			}
 			// create Commonservice CR
 
+		} else {
+			reqLogger.Info("Embedded edb is FALSE, Creating ibm-iam-request-csedb operandrequest")
 		}
+	} else {
+		reqLogger.Info("ELSE BLOCK EMBEDDED ??")
 	}
 
 	return
@@ -64,154 +64,95 @@ func (r *AuthenticationReconciler) checkIfConfigmapExists(instance *operatorv1al
 	if err != nil {
 		if errors.IsNotFound(err) {
 			reqLogger.Error(err, "The configmap ", edbConfiMapName, " is not created yet")
+			reqLogger.Info("Creating ibm-iam-request-csedb operandrequest")
 			// create postgresql operandrequest
-			createOpendRequest(instance)
+			r.createOpendRequest(instance)
 			return nil, false
+		} else {
+			reqLogger.Info("EDB CONFIGMAP present or what ")
 		}
 		reqLogger.Error(err, "Failed to get ConfigMap", edbConfiMapName)
 		return nil, false
 	} else {
+		reqLogger.Info("configmap " + edbConfiMapName + " is already present")
 		// edbConfiMapName exist, read the data
 		return csEDBConfigmap, true
 	}
 }
 
-func createOpendRequest(instance *operatorv1alpha1.Authentication) (err error) {
+func (r *AuthenticationReconciler) createOpendRequest(instance *operatorv1alpha1.Authentication) (err error) {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	cfg, err := config.GetConfig()
-	if err != nil {
-		// Create a dynamic client
-		dynamicClient, err := dynamic.NewForConfig(cfg)
-		if err != nil {
-			fmt.Printf("Error creating dynamic client: %v\n", err)
-			os.Exit(1)
-		}
-		gvr := schema.GroupVersionResource{
-			Group:    "operator.ibm.com", // Update with the actual API group of your CRD
-			Version:  "v1alpha1",         // Update with the actual API version of your CRD
-			Resource: "OperandRequest",   // Update with the actual resource name of your CRD
-		}
+	reqLogger.Info("EDB:: inside operandrequest creation")
 
-		// Define the YAML content as a map[string]interface{}
-		operandRequestName := "ibm-iam-request-csedb"
-		yamlContent := map[string]interface{}{
-			"kind":       "OperandRequest",
-			"apiVersion": "operator.ibm.com/v1alpha1",
-			"metadata": map[string]interface{}{
-				"name": operandRequestName,
-			},
-			"spec": map[string]interface{}{
-				"requests": []map[string]interface{}{
-					{
-						"operands": []map[string]interface{}{
-							{
-								"name": "common-service-postgresql",
-								"bindings": map[string]interface{}{
-									"protected-cloudpak-db": map[string]interface{}{
-										"secret": "common-service-db-cpadmin",
-									},
-									"private-superuser-db": map[string]interface{}{
-										"secret": "common-service-db-superuser",
-									},
+	// Define the YAML content as a map[string]interface{}
+	operandRequestName := "ibm-iam-request-csedb"
+	yamlContent := map[string]interface{}{
+		"kind":       "OperandRequest",
+		"apiVersion": "operator.ibm.com/v1alpha1",
+		"metadata": map[string]interface{}{
+			"name":      operandRequestName,
+			"namespace": instance.Namespace,
+		},
+		"spec": map[string]interface{}{
+			"requests": []map[string]interface{}{
+				{
+					"operands": []map[string]interface{}{
+						{
+							"name": "common-service-postgresql",
+							"bindings": map[string]interface{}{
+								"protected-im-db": map[string]interface{}{
+									"secret":    "im-datastore-edb-secret",
+									"configmap": "im-datastore-edb-cm",
 								},
 							},
 						},
-						"registry":          "common-service",
-						"registryNamespace": "ibm-common-services",
 					},
+					"registry":          "common-service",
+					"registryNamespace": instance.Namespace,
 				},
 			},
+		},
+	}
+
+	// Create an Unstructured object from the YAML content
+	unstructuredObj := &unstructured.Unstructured{Object: yamlContent}
+
+	err = r.Client.Create(context.TODO(), unstructuredObj)
+	if err != nil {
+		if errors.IsAlreadyExists(err) {
+			// Route already exists from a previous reconcile
+			reqLogger.Info("OperandRequest ibm-iam-request-csedb  already exists")
+		} else {
+			fmt.Printf("Error creating custom resource: %v\n", err)
 		}
-
-		// Create an Unstructured object from the YAML content
-		unstructuredObj := &unstructured.Unstructured{Object: yamlContent}
-
-		// Now you can use unstructuredObj as needed
-		_, err = dynamicClient.Resource(gvr).
-			Namespace(instance.Namespace).
-			Create(context.Background(), unstructuredObj, metav1.CreateOptions{})
-
-		if err != nil {
-			if errors.IsAlreadyExists(err) {
-				// Route already exists from a previous reconcile
-				reqLogger.Info("OperandRequest ibm-iam-request-csedb  already exists")
-			} else {
-				fmt.Printf("Error creating custom resource: %v\n", err)
-			}
-			return err
-		}
-		// Rest of your code...
-
-		// Wait for the resource to become ready (for demonstration purposes, adjust the timeout and polling intervals as needed)
-		for {
-			time.Sleep(5 * time.Second) // Adjust the polling interval
-			customResource, err := dynamicClient.Resource(gvr).
-				Namespace(instance.Namespace).
-				Get(context.Background(), "example-custom-resource", metav1.GetOptions{})
-			if err != nil {
-				panic(err.Error())
-			}
-
-			// Check if the resource is ready (you need to define the specific conditions for readiness)
-			ready := checkCustomResourceReady(customResource)
-			if ready {
-				fmt.Println("Custom resource is ready for use!")
-				break
-			}
-
-			fmt.Println("Custom resource is not yet ready. Waiting...")
-			// Add a timeout check or other condition to exit the loop if needed
-		}
+		return err
 	}
 	return nil
 }
 
-func checkCustomResourceReady(cr *unstructured.Unstructured) bool {
-	cr.GetCreationTimestamp()
-	fmt.Println("Custom resource creation timestamp is ", cr.GetCreationTimestamp())
-	// Implement your own logic to check if the custom resource is ready for use
-	// For demonstration purposes, this function returns true always
-	return true
-}
+// IM operator creates CommonService CR, to claim the usage on shared embedded database
+func (r *AuthenticationReconciler) createCommonService(instance *operatorv1alpha1.Authentication) (err error) {
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	// Define the YAML content as a map[string]interface{}
+	csCRName := "im-common-service"
+	yamlContent := map[string]interface{}{
+		"kind":       "CommonService",
+		"apiVersion": "operator.ibm.com/v3",
+		"metadata": map[string]interface{}{
+			"name": csCRName,
+		},
+		"spec": map[string]interface{}{
+			"sharedDBServices": "IM",
+		},
+	}
 
-func createCommonService(instance *operatorv1alpha1.Authentication) (err error) {
-
-	cfg, err := config.GetConfig()
+	unstructuredObj := &unstructured.Unstructured{Object: yamlContent}
+	err = r.Client.Create(context.TODO(), unstructuredObj)
 	if err != nil {
-		// Create a dynamic client
-		dynamicClient, err := dynamic.NewForConfig(cfg)
-		if err != nil {
-			fmt.Printf("Error creating dynamic client: %v\n", err)
-			os.Exit(1)
-		}
-		gvr := schema.GroupVersionResource{
-			Group:    "operator.ibm.com", // Update with the actual API group of your CRD
-			Version:  "v3",               // Update with the actual API version of your CRD
-			Resource: "CommonService",    // Update with the actual resource name of your CRD
-		}
-
-		// Define the YAML content as a map[string]interface{}
-		csCRName := "im-common-service"
-		yamlContent := map[string]interface{}{
-			"kind":       "CommonService",
-			"apiVersion": "operator.ibm.com/v3",
-			"metadata": map[string]interface{}{
-				"name": csCRName,
-			},
-			"spec": map[string]interface{}{
-				"sharedDBServices": "IM",
-			},
-		}
-
-		// Create an Unstructured object from the YAML content
-		unstructuredObj := &unstructured.Unstructured{Object: yamlContent}
-
-		// Now you can use unstructuredObj as needed
-		_, err = dynamicClient.Resource(gvr).
-			Namespace(instance.Namespace).
-			Create(context.Background(), unstructuredObj, metav1.CreateOptions{})
-
-		if err != nil {
+		if errors.IsAlreadyExists(err) {
+			// Route already exists from a previous reconcile
+			reqLogger.Info("CommonService CR im-common-service already exists")
+		} else {
 			fmt.Printf("Error creating custom resource: %v\n", err)
 			return err
 		}

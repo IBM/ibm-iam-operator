@@ -388,6 +388,37 @@ images: build-image-amd64 build-image-ppc64le build-image-s390x
 
 all: check test coverage build images
 
+##@ Application - Non-OLM way of installation
+
+dpl: ## Install all resources (CR/CRD's, RBAC and Operator)
+	@echo ....... Applying CRDs and Operator .......
+	- oc apply -f bundle/manifests/operator.ibm.com_authentications.yaml
+	- oc apply -f bundle/manifests/oidc.security.ibm.com_clients.yaml
+	@echo ....... Applying RBAC .......
+	- oc apply -f config/rbac/service_account.yaml -n ${NAMESPACE}
+	- oc apply -f config/rbac/role.yaml -n ${NAMESPACE}
+	- oc apply -f config/rbac/role_binding.yaml -n ${NAMESPACE}
+	@echo ....... Applying Operator .......
+	- oc apply -f config/manager/bases/manager.yaml -n ${NAMESPACE}
+	@echo ....... Creating the Instance .......
+	- oc apply -f config/samples/bases/operator_v1alpha1_authentication.yaml -n ${NAMESPACE}
+
+undpl: ## Uninstall all resources
+	@echo ....... Uninstalling .......
+	@echo ....... Deleting CR .......
+	- oc delete -f config/samples/bases/operator_v1alpha1_authentication.yaml -n ${NAMESPACE}
+	@echo ....... Deleting Operator .......
+	- oc delete -f config/manager/bases/manager.yaml -n ${NAMESPACE}
+	@echo ....... Deleting Roles and Service Account .......
+	- oc delete rolebinding ibm-iam-operand-restricted
+	- oc delete clusterrolebinding ibm-iam-operand-restricted
+	- oc delete clusterrole ibm-iam-operand-restricted
+	- oc delete -f config/rbac/role_binding.yaml -n ${NAMESPACE}
+	- oc delete -f config/rbac/role.yaml -n ${NAMESPACE}
+	- oc delete -f config/rbac/service_account.yaml -n ${NAMESPACE}
+	@echo ....... Deleting CRDs.......
+	- oc delete -f bundle/manifests/operator.ibm.com_authentications.yaml
+	- oc delete -f bundle/manifests/oidc.security.ibm.com_clients.yaml
 ##@ Cleanup
 clean: ## Clean build binary
 	rm -f build/_output/bin/$(IMG)

@@ -222,6 +222,10 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	reqLogger.Info("Check for Common Services EDB and create ibm-iam-request-csedb if required")
 	r.checkforCSEDB(instance, &needToRequeue)
 
+	// create CommonService CR to claim the usage on shared embedded database
+
+	r.createCommonService(instance)
+
 	// Check if this Certificate already exists and create it if it doesn't
 	reqLogger.Info("Creating ibm-iam-operand-restricted serviceaccount")
 	currentSA := &corev1.ServiceAccount{}

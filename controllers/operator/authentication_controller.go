@@ -219,12 +219,8 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}()
 
 	// check for CS EDB, and create operandrequest for EDB operator if embedded
-	reqLogger.Info("Check for Common Services EDB and create ibm-iam-request-csedb if required")
+	reqLogger.Info("Check for Common Services EDB CM and create operandrequest and commonservice CR if required")
 	r.checkforCSEDB(instance, &needToRequeue)
-
-	// create CommonService CR to claim the usage on shared embedded database
-
-	r.createCommonService(instance)
 
 	// Check if this Certificate already exists and create it if it doesn't
 	reqLogger.Info("Creating ibm-iam-operand-restricted serviceaccount")

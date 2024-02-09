@@ -18,11 +18,12 @@ package operator
 
 import (
 	"context"
-	"fmt"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
+	"github.com/IBM/ibm-iam-operator/controllers/common"
 	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -35,22 +36,19 @@ func (r *AuthenticationReconciler) checkforCSEDB(instance *operatorv1alpha1.Auth
 	cfgmap, exists := r.checkIfConfigmapExists(instance, edbConfiMapName)
 
 	if exists {
+		// im-datastore-edb-cm exist, check if DB is embedded or not
 		is_embedded := cfgmap.Data["IS_EMBEDDED"]
-		reqLogger.Info("EMBEDDED ??" + is_embedded)
+		reqLogger.Info("EMBEDDED: " + is_embedded)
 		if is_embedded == "true" {
-			// create postgresql operandrequest
-			reqLogger.Info("Embedded edb is TRUE, Creating ibm-iam-request-csedb operandrequest")
-			err := r.createOpendRequest(instance)
-			if err != nil {
-				*needToRequeue = true
-			}
-			// create Commonservice CR
+			// create operandrequst as well as commonservice CRs
+			r.createOprReqAndCS(instance, needToRequeue)
 
 		} else {
-			reqLogger.Info("Embedded edb is FALSE, Creating ibm-iam-request-csedb operandrequest")
+			reqLogger.Info("Embedded edb is FALSE, External Db is being used")
 		}
 	} else {
-		reqLogger.Info("ELSE BLOCK EMBEDDED ??")
+		// create operandrequst as well as commonservice CRs
+		r.createOprReqAndCS(instance, needToRequeue)
 	}
 
 	return
@@ -63,21 +61,14 @@ func (r *AuthenticationReconciler) checkIfConfigmapExists(instance *operatorv1al
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: edbConfiMapName, Namespace: instance.Namespace}, csEDBConfigmap)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			reqLogger.Error(err, "The configmap ", edbConfiMapName, " is not created yet")
-			reqLogger.Info("Creating ibm-iam-request-csedb operandrequest")
-			// create postgresql operandrequest
-			r.createOpendRequest(instance)
+			reqLogger.Info("The configmap " + edbConfiMapName + " is not present")
 			return nil, false
-		} else {
-			reqLogger.Info("EDB CONFIGMAP present or what ")
 		}
-		reqLogger.Error(err, "Failed to get ConfigMap", edbConfiMapName)
+		reqLogger.Info("Failed to get ConfigMap " + edbConfiMapName)
 		return nil, false
-	} else {
-		reqLogger.Info("configmap " + edbConfiMapName + " is already present")
-		// edbConfiMapName exist, read the data
-		return csEDBConfigmap, true
 	}
+	reqLogger.Info("configmap " + edbConfiMapName + " is present")
+	return csEDBConfigmap, true
 }
 
 func (r *AuthenticationReconciler) createOpendRequest(instance *operatorv1alpha1.Authentication) (err error) {
@@ -85,12 +76,11 @@ func (r *AuthenticationReconciler) createOpendRequest(instance *operatorv1alpha1
 	reqLogger.Info("EDB:: inside operandrequest creation")
 
 	// Define the YAML content as a map[string]interface{}
-	operandRequestName := "ibm-iam-request-csedb"
 	yamlContent := map[string]interface{}{
 		"kind":       "OperandRequest",
 		"apiVersion": "operator.ibm.com/v1alpha1",
 		"metadata": map[string]interface{}{
-			"name":      operandRequestName,
+			"name":      ctrlCommon.IMEDBOprName,
 			"namespace": instance.Namespace,
 		},
 		"spec": map[string]interface{}{
@@ -120,10 +110,9 @@ func (r *AuthenticationReconciler) createOpendRequest(instance *operatorv1alpha1
 	err = r.Client.Create(context.TODO(), unstructuredObj)
 	if err != nil {
 		if errors.IsAlreadyExists(err) {
-			// Route already exists from a previous reconcile
-			reqLogger.Info("OperandRequest ibm-iam-request-csedb  already exists")
+			reqLogger.Info("OperandRequest" + ctrlCommon.IMEDBOprName + " already exists")
 		} else {
-			fmt.Printf("Error creating custom resource: %v\n", err)
+			reqLogger.Error(err, "Error creating OperandRequest "+ctrlCommon.IMEDBOprName)
 		}
 		return err
 	}
@@ -134,12 +123,12 @@ func (r *AuthenticationReconciler) createOpendRequest(instance *operatorv1alpha1
 func (r *AuthenticationReconciler) createCommonService(instance *operatorv1alpha1.Authentication) (err error) {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	// Define the YAML content as a map[string]interface{}
-	csCRName := "im-common-service"
 	yamlContent := map[string]interface{}{
 		"kind":       "CommonService",
 		"apiVersion": "operator.ibm.com/v3",
 		"metadata": map[string]interface{}{
-			"name": csCRName,
+			"name":      ctrlCommon.IMEDBCSName,
+			"namespace": instance.Namespace,
 		},
 		"spec": map[string]interface{}{
 			"sharedDBServices": "IM",
@@ -153,9 +142,96 @@ func (r *AuthenticationReconciler) createCommonService(instance *operatorv1alpha
 			// Route already exists from a previous reconcile
 			reqLogger.Info("CommonService CR im-common-service already exists")
 		} else {
-			fmt.Printf("Error creating custom resource: %v\n", err)
+			reqLogger.Error(err, "Error creating commonservice "+ctrlCommon.IMEDBCSName)
 			return err
 		}
 	}
 	return nil
+}
+
+func (r *AuthenticationReconciler) checkOperandRequestExists(instance *operatorv1alpha1.Authentication) (exist bool) {
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger.Info("Query IM EDB OperandRequest", "OperandRequest.Namespace", instance.Namespace, "OperandRequest.Name", common.IMEDBOprName)
+
+	key := types.NamespacedName{Name: ctrlCommon.IMEDBOprName, Namespace: instance.Namespace}
+
+	gvk := schema.GroupVersionKind{
+		Group:   "operator.ibm.com",
+		Version: "v1alpha1",
+		Kind:    "OperandRequest",
+	}
+
+	unstrCert := &unstructured.Unstructured{}
+	unstrCert.SetGroupVersionKind(gvk)
+
+	err := r.Client.Get(context.TODO(), key, unstrCert)
+
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			reqLogger.Info(ctrlCommon.IMEDBOprName + " OperandRequest Not Found")
+			return false
+		}
+		reqLogger.Info("Failed to get OperandRequest " + ctrlCommon.IMEDBOprName)
+		return false
+	}
+	reqLogger.Info("OperandRequest " + ctrlCommon.IMEDBOprName + " is present")
+
+	return true
+}
+
+func (r *AuthenticationReconciler) checkCommonServiceExists(instance *operatorv1alpha1.Authentication) (exist bool) {
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger.Info("Query IM EDB CommonService", "OperandRequest.Namespace", instance.Namespace, "OperandRequest.Name", common.IMEDBOprName)
+
+	key := types.NamespacedName{Name: ctrlCommon.IMEDBCSName, Namespace: instance.Namespace}
+
+	gvk := schema.GroupVersionKind{
+		Group:   "operator.ibm.com",
+		Version: "v3",
+		Kind:    "CommonService",
+	}
+
+	unstrCert := &unstructured.Unstructured{}
+	unstrCert.SetGroupVersionKind(gvk)
+
+	err := r.Client.Get(context.TODO(), key, unstrCert)
+
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			reqLogger.Info(ctrlCommon.IMEDBCSName + " CommonService Not Found")
+			return false
+		}
+		reqLogger.Info("Failed to get CommonService " + ctrlCommon.IMEDBCSName)
+		return false
+	}
+	reqLogger.Info("CommonService " + ctrlCommon.IMEDBCSName + " is present")
+
+	return true
+}
+
+// creates operandrequest and commonservice cr
+func (r *AuthenticationReconciler) createOprReqAndCS(instance *operatorv1alpha1.Authentication, needToRequeue *bool) {
+	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	// check if ibm-iam-request-csedb operandrequest is already present or not
+	oprExist := r.checkOperandRequestExists(instance)
+	// create  ibm-iam-request-csedb operandrequest if not present
+	if !oprExist {
+		// create postgresql operandrequest
+		reqLogger.Info("Creating OperandRequest: " + ctrlCommon.IMEDBOprName)
+		err := r.createOpendRequest(instance)
+		if err != nil {
+			*needToRequeue = true
+		}
+	}
+	// create Commonservice CR
+	csCRExist := r.checkCommonServiceExists(instance)
+	if !csCRExist {
+		// create postgresql commonservice CR
+		reqLogger.Info("Creating CommonService: " + ctrlCommon.IMEDBCSName)
+		err := r.createCommonService(instance)
+		if err != nil {
+			*needToRequeue = true
+		}
+	}
+
 }

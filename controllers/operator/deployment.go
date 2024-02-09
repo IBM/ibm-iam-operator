@@ -918,29 +918,6 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: "im-datastore-edb-cm",
 					},
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "DATABASE_USER",
-							Path: "user",
-						},
-						{
-							Key:  "DATABASE_NAME",
-							Path: "dbname",
-						},
-						{
-							Key:  "DATABASE_RW_ENDPOINT",
-							Path: "host",
-						},
-						{
-							Key:  "DATABASE_R_ENDPOINT",
-							Path: "readhost",
-						},
-						{
-							Key:  "DATABASE_PORT",
-							Path: "port",
-						},
-					},
-					DefaultMode: &partialAccess,
 				},
 			},
 		},

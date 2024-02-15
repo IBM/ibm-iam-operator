@@ -34,7 +34,7 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 			Command: []string{
 				"bash",
 				"-c",
-				"until </dev/tcp/common-service-db-ro/5432 ; do sleep 5; done;",
+				"until </dev/tcp/common-service-db-r/5432 ; do sleep 5; done;",
 			},
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
@@ -68,7 +68,7 @@ func buildInitForMngrAndProvider(mongoDBImage string) []corev1.Container {
 			Command: []string{
 				"bash",
 				"-c",
-				"until curl -k https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration; do sleep 5; done",
+				"until </dev/tcp/common-service-db-r/5432 && curl -k https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration; do sleep 5; done",
 			},
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
@@ -274,7 +274,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 
 	envVars = append(envVars, idpEnvVars...)
 
-	if instance.Spec.Config.EnableImpersonation == true {
+	if instance.Spec.Config.EnableImpersonation {
 		impersonationVars := []corev1.EnvVar{
 			{
 				Name:  "ENABLE_IMPERSONATION",
@@ -604,7 +604,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 
 	envVars = append(envVars, idpEnvVars...)
 
-	if instance.Spec.Config.EnableImpersonation == true {
+	if instance.Spec.Config.EnableImpersonation {
 		impersonationVars := []corev1.EnvVar{
 			{
 				Name:  "ENABLE_IMPERSONATION",
@@ -695,7 +695,6 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 
 func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string, icpConsoleURL string) corev1.Container {
 
-	//@posriniv - find a better solution
 	replicaCount := int(instance.Spec.Replicas)
 	resources := instance.Spec.IdentityManager.Resources
 	if resources == nil {

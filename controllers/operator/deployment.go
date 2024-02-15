@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
+	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	"github.com/IBM/ibm-iam-operator/controllers/common"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -883,7 +884,7 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume
 			Name: "pgsql-ca-cert",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: "im-datastore-edb-secret",
+					SecretName: ctrlCommon.DatastoreEDBSecretName,
 					Items: []corev1.KeyToPath{
 						{
 							Key:  "ca.crt",
@@ -897,7 +898,7 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume
 			Name: "pgsql-client-cert",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: "im-datastore-edb-secret",
+					SecretName: ctrlCommon.DatastoreEDBSecretName,
 					Items: []corev1.KeyToPath{
 						{
 							Key:  "tls.crt",
@@ -916,29 +917,7 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "im-datastore-edb-cm",
-					},
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "DATABASE_USER",
-							Path: "user",
-						},
-						{
-							Key:  "DATABASE_NAME",
-							Path: "dbname",
-						},
-						{
-							Key:  "DATABASE_RW_ENDPOINT",
-							Path: "host",
-						},
-						{
-							Key:  "DATABASE_R_ENDPOINT",
-							Path: "readhost",
-						},
-						{
-							Key:  "DATABASE_PORT",
-							Path: "port",
-						},
+						Name: ctrlCommon.DatastoreEDBCMName,
 					},
 					DefaultMode: &partialAccess,
 				},

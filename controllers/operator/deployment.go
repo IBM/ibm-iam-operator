@@ -21,8 +21,8 @@ import (
 	"reflect"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
-	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	"github.com/IBM/ibm-iam-operator/controllers/common"
+	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -877,6 +877,22 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume
 							Path: "ca.crt",
 						},
 					},
+				},
+			},
+		},
+		{
+			Name: "mongodb-ca-cert",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "mongodb-root-ca-cert",
+				},
+			},
+		},
+		{
+			Name: "mongodb-client-cert",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "icp-mongodb-client-cert",
 				},
 			},
 		},

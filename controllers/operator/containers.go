@@ -144,7 +144,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 
 	envVars := []corev1.EnvVar{
 		{
-			Name: "MONGO_DB_NAME",
+			Name:  "MONGO_DB_NAME",
 			Value: "platform-db",
 		},
 		{
@@ -152,7 +152,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			Value: libertyMemory,
 		},
 		{
-			Name: "MONGO_COLLECTION",
+			Name:  "MONGO_COLLECTION",
 			Value: "iam",
 		},
 		{
@@ -747,7 +747,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 				MountPath: "/certs/mongodb-ca",
 			},
 			{
-				Name: "mongodb-client-cert",
+				Name:      "mongodb-client-cert",
 				MountPath: "/certs/mongodb-client",
 			},
 			{

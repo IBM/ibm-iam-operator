@@ -116,7 +116,6 @@ func main() {
 		mgrOptions.Cache = cacheOptions
 	}
 
-
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), mgrOptions)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

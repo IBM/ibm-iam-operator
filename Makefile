@@ -162,7 +162,7 @@ test: manifests generate fmt vet envtest ## Run tests.
 ##@ Build
 
 .PHONY: build
-build: manifests generate fmt vet ## Build manager binary.
+build: manifests generate fmt vet images ## Build manager binary.
 	@echo "Building the ibm-iam-operator binary"
 	@CGO_ENABLED=0 go build -o build/_output/bin/$(IMG) main.go
 	@strip $(STRIP_FLAGS) build/_output/bin/$(IMG)
@@ -236,8 +236,8 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v3.8.7
-CONTROLLER_TOOLS_VERSION ?= v0.11.1
+KUSTOMIZE_VERSION ?= v3.8.9
+CONTROLLER_TOOLS_VERSION ?= v0.11.4
 YQ_VERSION ?= v4.40.5
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"

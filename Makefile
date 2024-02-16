@@ -237,9 +237,9 @@ bundle-base: manifests kustomize yq
 bundle: bundle-base bundle-hacks ## Build the bundle manifests
 
 .PHONY: fmt
-fmt: ## Run go fmt against code.
-	which gofmt 2>&1 || $(GO) build -o $(GOBIN)/gofmt /usr/local/go/src/cmd/gofmt
-	go fmt ./...
+fmt: go ## Run go fmt against code.
+	test -s $(LOCALBIN)/gofmt 2>&1 || $(GO) build -o $(LOCALBIN)/gofmt ${HOME}/sdk/go1.21.7/src/cmd/gofmt
+	$(GO) fmt ./...
 
 .PHONY: vet
 vet: ## Run go vet against code.

@@ -91,8 +91,25 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		return subreconciler.RequeueWithError(err)
 	}
 
-	// TODO Get datastore CM as well to configure the connection
-	// TODO Create EDB config struct for unmarshaling this CM's data
+	datastoreCertCM := &corev1.ConfigMap{}
+	if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.DatastoreEDBCMName, Namespace: authCR.Namespace}, datastoreCertCM); k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Could not find EDB share ConfigMap", "name", ctrlCommon.DatastoreEDBCMName)
+		return subreconciler.Requeue()
+	} else if err != nil {
+		reqLogger.Error(err, "Could not get EDB share ConfigMap", "name", ctrlCommon.DatastoreEDBCMName)
+		return subreconciler.RequeueWithError(err)
+	}
+
+	datastoreConfig := &migration.DatastoreConfig{
+		Name:       datastoreCertCM.Data["DATABASE_NAME"],
+		Port:       datastoreCertCM.Data["DATABASE_PORT"],
+		User:       datastoreCertCM.Data["DATABASE_USER"],
+		RWEndpoint: datastoreCertCM.Data["DATABASE_RW_ENDPOINT"],
+		REndpoint:  datastoreCertCM.Data["DATABASE_R_ENDPOINT"],
+		CACert:     datastoreCertSecret.Data["ca.crt"],
+		ClientCert: datastoreCertSecret.Data["tls.crt"],
+		ClientKey:  datastoreCertSecret.Data["tls.key"],
+	}
 
 	if dbSetupChan == nil {
 		reqLogger.Info("Starting a migration worker")
@@ -100,9 +117,7 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		// TODO Add EDB config struct as an additional argument
 		go migration.Migrate(context.Background(),
 			dbSetupChan,
-			datastoreCertSecret.Data["ca.crt"],
-			datastoreCertSecret.Data["tls.crt"],
-			datastoreCertSecret.Data["tls.key"])
+			datastoreConfig)
 		return subreconciler.Requeue()
 	}
 

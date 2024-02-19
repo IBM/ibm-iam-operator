@@ -17,46 +17,99 @@ package migration
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	_ "embed"
+	"fmt"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"time"
 )
 
-// TODO Remove this
-var countdown int = 10
+//go:embed v1.sql
+var initDDL string
 
 // TODO Add any helpful properties
-type Result struct{}
+type Result struct {
+	Error error
+}
 
-// TODO Add EDB config struct as an addiitonal argument
-func Migrate(ctx context.Context, c chan *Result, caCert, clientCert, clientKey []byte) {
+type DatastoreConfig struct {
+	Name       string
+	Port       string
+	User       string
+	RWEndpoint string
+	REndpoint  string
+	CACert     []byte
+	ClientCert []byte
+	ClientKey  []byte
+}
+
+// Migrate initializes the EDB database for the IM Operands and performs any additional migrations that may be needed.
+func Migrate(ctx context.Context, c chan *Result, config *DatastoreConfig) {
 	reqLogger := logf.FromContext(ctx).WithName("migration_worker")
 
-	// TODO Replace with migration implementation
-	for countdown > 0 {
-		reqLogger.Info("Countdown", "count", countdown)
-		time.Sleep(1 * time.Second)
-		countdown--
+	result := initEDB(logf.IntoContext(ctx, reqLogger), config)
+	if result.Error != nil {
+		reqLogger.Error(result.Error, "Failed to migrate")
+	} else {
+		reqLogger.Info("Migration completed")
 	}
-
-	reqLogger.Info("Migration completed")
-	c <- &Result{}
+	c <- result
 	close(c)
 }
 
-//import (
-//	"gorm.io/gorm"
-//	"gorm.io/driver/postgres"
-//)
-//
-//func initEDB() {
-//	host := ""
-//	port := ""
-//	user := ""
-//	dbname := ""
-//	sslrootcert := ""
-//	sslkey := ""
-//	sslcert := ""
-//
-//	dsn := ``
-//	postgres.New(postgres.Config{})
-//}
+type IdpConfig struct {
+	UID         string            `db:"uid"`
+	Name        string            `db:"name"`
+	Protocol    string            `db:"protocol"`
+	Type        string            `db:"type"`
+	Description string            `db:"description"`
+	Enabled     string            `db:"enabled"`
+	IDPConfig   map[string]string `db:"idp_config"`
+	SCIMConfig  map[string]string `db:"scim_config"`
+	LDAPConfig  map[string]string `db:"ldap_config"`
+	JIT         bool              `db:"jit"`
+}
+
+// initEDB executes the DDL that initializes the schemas and tables that the different IM Operands will use.
+func initEDB(ctx context.Context, config *DatastoreConfig) (result *Result) {
+	reqLogger := logf.FromContext(ctx)
+	dsn := fmt.Sprintf("host=%s user=%s dbname=%s port=%s sslmode=require", config.RWEndpoint, config.User, config.Name, config.Port)
+
+	var err error
+	rootCertPool := x509.NewCertPool()
+	rootCertPool.AppendCertsFromPEM(config.CACert)
+	var clientCert tls.Certificate
+	if clientCert, err = tls.X509KeyPair(config.ClientCert, config.ClientKey); err != nil {
+		return &Result{Error: err}
+	}
+	var connConfig *pgx.ConnConfig
+	if connConfig, err = pgx.ParseConfig(dsn); err != nil {
+		return &Result{Error: err}
+	}
+
+	connConfig.TLSConfig = &tls.Config{
+		Certificates:       []tls.Certificate{clientCert},
+		RootCAs:            rootCertPool,
+		InsecureSkipVerify: true,
+	}
+
+	queryCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var imConn *pgx.Conn
+	if imConn, err = pgx.ConnectConfig(queryCtx, connConfig); err != nil {
+		return &Result{Error: err}
+	}
+
+	var commandTag pgconn.CommandTag
+	if commandTag, err = imConn.Exec(queryCtx, initDDL); err != nil {
+		reqLogger.Error(err, "Failed to execute DDL")
+		return &Result{Error: err}
+	}
+
+	reqLogger.Info("Executed DDL", "commandTag", commandTag.String())
+
+	return &Result{}
+}

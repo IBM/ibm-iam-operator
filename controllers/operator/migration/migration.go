@@ -23,7 +23,6 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -33,7 +32,7 @@ var initDDL string
 // TODO Add any helpful properties
 type Result struct {
 	Error    error
-	Migrated bool
+	Complete bool
 }
 
 type DatastoreConfig struct {
@@ -50,13 +49,39 @@ type DatastoreConfig struct {
 // Migrate initializes the EDB database for the IM Operands and performs any additional migrations that may be needed.
 func Migrate(ctx context.Context, c chan *Result, config *DatastoreConfig) {
 	reqLogger := logf.FromContext(ctx).WithName("migration_worker")
+	reqLogger.Info("Initializing EDB schemas")
 
-	result := initEDB(logf.IntoContext(ctx, reqLogger), config)
+	result := &Result{}
+	var conn *pgx.Conn
+	var err error
+	if conn, err = getEDBConn(ctx, config); err != nil {
+		reqLogger.Error(err, "Failed to connect to DB")
+		c <- &Result{Error: err}
+		close(c)
+		return
+	}
+	defer conn.Close(ctx)
 
-	if result.Error != nil {
+	if found, err := hasSchemas(ctx, conn); err != nil {
+		reqLogger.Error(err, "Failed to get schemas")
+		result.Error = err
+		c <- result
+		close(c)
+		return
+	} else if found {
+		reqLogger.Info("Schemas found in DB; no migration required")
+		c <- result
+		close(c)
+		return
+	}
+
+	err = initEDB(logf.IntoContext(ctx, reqLogger), conn)
+
+	if err != nil {
 		reqLogger.Error(result.Error, "Failed to migrate")
+		result.Error = err
 	} else {
-		reqLogger.Info("Migration completed", "result", result)
+		reqLogger.Info("Migration completed")
 	}
 	c <- result
 	close(c)
@@ -75,26 +100,23 @@ type IdpConfig struct {
 	JIT         bool              `db:"jit"`
 }
 
-// initEDB executes the DDL that initializes the schemas and tables that the different IM Operands will use.
-func initEDB(ctx context.Context, config *DatastoreConfig) (result *Result) {
+func getEDBConn(ctx context.Context, config *DatastoreConfig) (conn *pgx.Conn, err error) {
 	reqLogger := logf.FromContext(ctx)
-	result = &Result{}
 	dsn := fmt.Sprintf("host=%s user=%s dbname=%s port=%s sslmode=require", config.RWEndpoint, config.User, config.Name, config.Port)
 
-	var err error
 	rootCertPool := x509.NewCertPool()
 	rootCertPool.AppendCertsFromPEM(config.CACert)
 	var clientCert tls.Certificate
 	if clientCert, err = tls.X509KeyPair(config.ClientCert, config.ClientKey); err != nil {
 		reqLogger.Error(err, "Failed to assemble client key pair")
-		return &Result{Error: err}
+		return nil, err
 	}
 	reqLogger.Info("Assembled client key pair")
 
 	var connConfig *pgx.ConnConfig
 	if connConfig, err = pgx.ParseConfig(dsn); err != nil {
 		reqLogger.Error(err, "Failed to parse database configuration")
-		return &Result{Error: err}
+		return nil, err
 	}
 	reqLogger.Info("Connection to DB configured")
 
@@ -104,22 +126,57 @@ func initEDB(ctx context.Context, config *DatastoreConfig) (result *Result) {
 		InsecureSkipVerify: true,
 	}
 
-	queryCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	var imConn *pgx.Conn
-	if imConn, err = pgx.ConnectConfig(queryCtx, connConfig); err != nil {
+	if conn, err = pgx.ConnectConfig(ctx, connConfig); err != nil {
 		reqLogger.Error(err, "Failed to connect to database")
-		return &Result{Error: err}
+		return nil, err
 	}
 	reqLogger.Info("Connected to DB")
 
-	var commandTag pgconn.CommandTag
-	if commandTag, err = imConn.Exec(queryCtx, initDDL); err != nil {
-		reqLogger.Error(err, "Failed to execute DDL")
-		return &Result{Error: err}
-	}
-	reqLogger.Info("Executed DDL", "commandTag", commandTag.String())
-	result.Migrated = true
+	return
+}
 
+func hasSchemas(ctx context.Context, conn *pgx.Conn) (bool, error) {
+	reqLogger := logf.FromContext(ctx)
+	var err error
+	var rows pgx.Rows
+	if rows, err = conn.Query(ctx, "SELECT schema_name FROM information_schema.schemata;"); err != nil {
+		reqLogger.Error(err, "Failed to retrieve schema names")
+		return false, err
+	}
+	defer rows.Close()
+
+	foundSchemas := map[string]bool{
+		"platformdb":    false,
+		"oauthdbschema": false,
+	}
+
+	for rows.Next() {
+		var s string
+		if err = rows.Scan(&s); err != nil {
+			return false, err
+		}
+		if _, ok := foundSchemas[s]; ok {
+			foundSchemas[s] = true
+		}
+	}
+
+	if rows.Err() != nil {
+		return false, err
+	}
+
+	for _, present := range foundSchemas {
+		if !present {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+// initEDB executes the DDL that initializes the schemas and tables that the different IM Operands will use.
+func initEDB(ctx context.Context, conn *pgx.Conn) (err error) {
+	if _, err = conn.Exec(ctx, initDDL); err != nil {
+		return err
+	}
 	return
 }

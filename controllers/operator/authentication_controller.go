@@ -123,7 +123,11 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	select {
 	case migrationResult, ok := <-dbSetupChan:
 		if !ok {
-			dbSetupChan = nil
+			if dbSetupChan == nil {
+				reqLogger.Info("Channel is nil and result is zero value")
+			} else {
+				reqLogger.Info("Channel is non-nil and result is zero value")
+			}
 			return subreconciler.ContinueReconciling()
 		}
 		reqLogger.Info("Migration completed", "result", migrationResult)

@@ -20,22 +20,26 @@ import (
 	"context"
 
 	"fmt"
+	"reflect"
+	"sync"
+
 	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
+	"github.com/IBM/ibm-iam-operator/controllers/operator/migration"
 	certmgr "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
-	"reflect"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sync"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
+	"github.com/opdev/subreconciler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -68,6 +72,113 @@ var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024
 var rule = `^([a-z0-9]){32,}$`
 var wlpClientID = ctrlCommon.GenerateRandomString(rule)
 var wlpClientSecret = ctrlCommon.GenerateRandomString(rule)
+
+var dbSetupChan chan *migration.Result
+
+func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx)
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+
+	datastoreCertSecret := &corev1.Secret{}
+	if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.DatastoreEDBSecretName, Namespace: authCR.Namespace}, datastoreCertSecret); k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Could not find EDB share Secret", "name", ctrlCommon.DatastoreEDBSecretName)
+		return subreconciler.Requeue()
+	} else if err != nil {
+		reqLogger.Error(err, "Could not get EDB share Secret", "name", ctrlCommon.DatastoreEDBSecretName)
+		return subreconciler.RequeueWithError(err)
+	}
+
+	// TODO Get datastore CM as well to configure the connection
+	// TODO Create EDB config struct for unmarshaling this CM's data
+
+	if dbSetupChan == nil {
+		reqLogger.Info("Starting a migration worker")
+		dbSetupChan = make(chan *migration.Result)
+		// TODO Add EDB config struct as an additional argument
+		go migration.Migrate(context.Background(),
+			dbSetupChan,
+			datastoreCertSecret.Data["ca.crt"],
+			datastoreCertSecret.Data["tls.crt"],
+			datastoreCertSecret.Data["tls.key"])
+		return subreconciler.Requeue()
+	}
+
+	select {
+	case migrationResult, ok := <-dbSetupChan:
+		if !ok {
+			dbSetupChan = nil
+			subreconciler.ContinueReconciling()
+		}
+		reqLogger.Info("Migration completed", "result", migrationResult)
+		// TODO Handle potential migration.Result values
+		return subreconciler.ContinueReconciling()
+	default:
+		reqLogger.Info("Migration still in progress")
+		return subreconciler.Requeue()
+	}
+}
+
+// ensureDatastoreSecretAndCM makes sure that the datastore Secret and ConfigMap are present in the services namespace;
+// these contain the configuration details that allow for connections to EDB
+func (r *AuthenticationReconciler) ensureDatastoreSecretAndCM(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "ensureDatastoreSecretAndCM")
+	reqLogger.Info("Ensure EDB datastore configuration resources available")
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+
+	cm := &corev1.ConfigMap{}
+	if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.DatastoreEDBCMName, Namespace: authCR.Namespace}, cm); k8sErrors.IsNotFound(err) {
+		reqLogger.Info("ConfigMap not available yet; requeueing",
+			"ConfigMap.Name", ctrlCommon.DatastoreEDBCMName,
+			"ConfigMap.Namespace", authCR.Namespace)
+		return subreconciler.Requeue()
+	} else if err != nil {
+		reqLogger.Error(err, "Encountered an error when trying to get ConfigMap",
+			"ConfigMap.Name", ctrlCommon.DatastoreEDBCMName,
+			"ConfigMap.Namespace", authCR.Namespace)
+		return subreconciler.RequeueWithError(err)
+	}
+	reqLogger.Info("ConfigMap found",
+		"ConfigMap.Name", ctrlCommon.DatastoreEDBCMName,
+		"ConfigMap.Namespace", authCR.Namespace)
+
+	secret := &corev1.Secret{}
+	if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.DatastoreEDBSecretName, Namespace: authCR.Namespace}, secret); k8sErrors.IsNotFound(err) {
+		reqLogger.Info("ConfigMap not available yet; requeueing",
+			"ConfigMap.Name", ctrlCommon.DatastoreEDBCMName,
+			"ConfigMap.Namespace", authCR.Namespace)
+		return subreconciler.Requeue()
+	} else if err != nil {
+		reqLogger.Error(err, "Encountered an error when trying to get ConfigMap",
+			"ConfigMap.Name", ctrlCommon.DatastoreEDBCMName,
+			"ConfigMap.Namespace", authCR.Namespace)
+		return subreconciler.RequeueWithError(err)
+	}
+	reqLogger.Info("Secret found",
+		"Secret.Name", ctrlCommon.DatastoreEDBSecretName,
+		"Secret.Namespace", authCR.Namespace)
+
+	return subreconciler.ContinueReconciling()
+}
+
+func (r *AuthenticationReconciler) getLatestAuthentication(ctx context.Context, req ctrl.Request, authentication *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx)
+
+	if err := r.Get(ctx, req.NamespacedName, authentication); err != nil {
+		if k8sErrors.IsNotFound(err) {
+			reqLogger.Info("Authentication not found; skipping reconciliation")
+			return subreconciler.DoNotRequeue()
+		}
+		reqLogger.Error(err, "Failed to get Authentication")
+		return subreconciler.RequeueWithError(err)
+	}
+	return subreconciler.ContinueReconciling()
+}
 
 // RunningOnOpenShiftCluster returns whether the Operator is running on an OpenShift cluster
 func (r *AuthenticationReconciler) RunningOnOpenShiftCluster() bool {
@@ -121,7 +232,7 @@ func needsAuditServiceDummyDataReset(a *operatorv1alpha1.Authentication) bool {
 
 // AuthenticationReconciler reconciles a Authentication object
 type AuthenticationReconciler struct {
-	Client      client.Client
+	client.Client
 	Scheme      *runtime.Scheme
 	Mutex       sync.Mutex
 	clusterType ctrlCommon.ClusterType
@@ -138,6 +249,7 @@ type AuthenticationReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
 	reqLogger := log.WithValues("Request.Namespace", req.Namespace, "Request.Name", req.Name)
+
 	needToRequeue := false
 
 	reconcileCtx := logf.IntoContext(ctx, reqLogger)
@@ -154,9 +266,9 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// Fetch the Authentication instance
 	instance := &operatorv1alpha1.Authentication{}
-	err = r.Client.Get(reconcileCtx, req.NamespacedName, instance)
+	err = r.Get(reconcileCtx, req.NamespacedName, instance)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8sErrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Set err to nil to signal the error has been handled
@@ -169,7 +281,7 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// Credit: kubebuilder book
 	finalizerName := "authentication.operator.ibm.com"
 	// Determine if the Authentication CR  is going to be deleted
-	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
+	if instance.DeletionTimestamp.IsZero() {
 		// Object not being deleted, but add our finalizer so we know to remove this object later when it is going to be deleted
 		beforeFinalizerCount := len(instance.GetFinalizers())
 		err = r.addFinalizer(reconcileCtx, finalizerName, instance)
@@ -216,6 +328,14 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			reqLogger.Info("Updated status")
 		}
 	}()
+
+	if resultHandleOpReq, errHandleOpReq := r.handleOperandRequest(ctx, req); subreconciler.ShouldHaltOrRequeue(resultHandleOpReq, errHandleOpReq) {
+		return subreconciler.Evaluate(resultHandleOpReq, errHandleOpReq)
+	}
+
+	if resultCreateEDBShareClaim, errCreateEDBShareClaim := r.createEDBShareClaim(ctx, req); subreconciler.ShouldHaltOrRequeue(resultCreateEDBShareClaim, errCreateEDBShareClaim) {
+		return subreconciler.Evaluate(resultCreateEDBShareClaim, errCreateEDBShareClaim)
+	}
 
 	// Check if this Certificate already exists and create it if it doesn't
 	reqLogger.Info("Creating ibm-iam-operand-restricted serviceaccount")
@@ -272,9 +392,18 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	if ctrlCommon.ClusterHasRouteGroupVersion() {
 		err = r.handleRoutes(ctx, instance, &needToRequeue)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !k8sErrors.IsNotFound(err) {
 			return
 		}
+	}
+
+	if resultEnsureDatastoreSecretAndCM, errEnsureDatastoreSecretAndCM := r.ensureDatastoreSecretAndCM(ctx, req); subreconciler.ShouldHaltOrRequeue(resultEnsureDatastoreSecretAndCM, errEnsureDatastoreSecretAndCM) {
+		return subreconciler.Evaluate(resultEnsureDatastoreSecretAndCM, errEnsureDatastoreSecretAndCM)
+	}
+
+	// perform any migrations that may be needed before Deployments run
+	if resultHandleMigrations, errHandleMigrations := r.handleMigrations(ctx, req); subreconciler.ShouldHaltOrRequeue(resultHandleMigrations, errHandleMigrations) {
+		return subreconciler.Evaluate(resultHandleMigrations, errHandleMigrations)
 	}
 
 	// Check if this Deployment already exists and create it if it doesn't
@@ -288,7 +417,7 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	if needsAuditServiceDummyDataReset(instance) {
 		instance.SetRequiredDummyData()
-		err = r.Client.Update(ctx, instance)
+		err = r.Update(ctx, instance)
 		if err != nil {
 			return
 		}
@@ -309,6 +438,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			Owns(&net.Ingress{}).
 			Owns(&appsv1.Deployment{}).
 			Owns(&routev1.Route{}).
+			Owns(&operatorv1alpha1.OperandRequest{}).
 			For(&operatorv1alpha1.Authentication{}).
 			Complete(r)
 	}
@@ -320,6 +450,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Service{}).
 		Owns(&net.Ingress{}).
 		Owns(&appsv1.Deployment{}).
+		Owns(&operatorv1alpha1.OperandRequest{}).
 		For(&operatorv1alpha1.Authentication{}).
 		Complete(r)
 }

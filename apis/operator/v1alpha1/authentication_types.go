@@ -201,7 +201,9 @@ type Authentication struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   AuthenticationSpec   `json:"spec,omitempty"`
+	// +kubebuilder:pruning:PreserveUnknownFields
+	Spec AuthenticationSpec `json:"spec,omitempty"`
+	// +kubebuilder:pruning:PreserveUnknownFields
 	Status AuthenticationStatus `json:"status,omitempty"`
 }
 
@@ -216,4 +218,19 @@ type AuthenticationList struct {
 
 func init() {
 	SchemeBuilder.Register(&Authentication{}, &AuthenticationList{})
+}
+
+const AnnotationMigrationComplete string = "authentication.operator.ibm.com/migration-complete"
+const AnnotationRetainMigrationArtifacts string = "authentication.operator.ibm.com/retain-migration-artifacts"
+
+func (a *Authentication) HasBeenMigrated() bool {
+	annotations := a.GetAnnotations()
+	if value, ok := annotations[AnnotationMigrationComplete]; ok && value == "true" {
+		return true
+	}
+	return false
+}
+
+func (a *Authentication) HasNotBeenMigrated() bool {
+	return !a.HasBeenMigrated()
 }

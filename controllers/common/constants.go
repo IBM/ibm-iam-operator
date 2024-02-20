@@ -18,3 +18,12 @@ package common
 
 const GlobalConfigMapName string = "ibm-cpp-config"
 const CommonServiceName string = "common-service"
+
+// Name of ConfigMap that configures external or embedded EDB for IM
+const DatastoreEDBCMName string = "im-datastore-edb-cm"
+
+// Name of Secret containing certificates for connecting to EDB
+const DatastoreEDBSecretName string = "im-datastore-edb-secret"
+
+// Name of CommonService created by IM Operator to provision EDB share
+const DatastoreEDBCSName string = "im-common-service"

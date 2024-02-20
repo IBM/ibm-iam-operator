@@ -34,7 +34,7 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 			Command: []string{
 				"bash",
 				"-c",
-				"until </dev/tcp/mongodb/27017 ; do sleep 5; done;",
+				"until </dev/tcp/common-service-db-r/5432 ; do sleep 5; done;",
 			},
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
@@ -68,7 +68,7 @@ func buildInitForMngrAndProvider(mongoDBImage string) []corev1.Container {
 			Command: []string{
 				"bash",
 				"-c",
-				"until </dev/tcp/mongodb/27017 && curl -k https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration; do sleep 5; done",
+				"until </dev/tcp/common-service-db-r/5432 && curl -k https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration; do sleep 5; done",
 			},
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
@@ -317,7 +317,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 
 	envVars = append(envVars, idpEnvVars...)
 
-	if instance.Spec.Config.EnableImpersonation == true {
+	if instance.Spec.Config.EnableImpersonation {
 		impersonationVars := []corev1.EnvVar{
 			{
 				Name:  "ENABLE_IMPERSONATION",
@@ -379,6 +379,18 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			{
 				Name:      "saml-cert",
 				MountPath: "/certs/saml-certs",
+			},
+			{
+				Name:      "pgsql-ca-cert",
+				MountPath: "/certs/pgsql-ca",
+			},
+			{
+				Name:      "pgsql-client-cert",
+				MountPath: "/certs/pgsql-client",
+			},
+			{
+				Name:      "pgsql-client-cred",
+				MountPath: "/pgsql/clientinfo",
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
@@ -687,7 +699,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 
 	envVars = append(envVars, idpEnvVars...)
 
-	if instance.Spec.Config.EnableImpersonation == true {
+	if instance.Spec.Config.EnableImpersonation {
 		impersonationVars := []corev1.EnvVar{
 			{
 				Name:  "ENABLE_IMPERSONATION",
@@ -742,6 +754,18 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 				Name:      "saml-cert",
 				MountPath: "/certs/saml-certs",
 			},
+			{
+				Name:      "pgsql-ca-cert",
+				MountPath: "/certs/pgsql-ca",
+			},
+			{
+				Name:      "pgsql-client-cert",
+				MountPath: "/certs/pgsql-client",
+			},
+			{
+				Name:      "pgsql-client-cred",
+				MountPath: "/pgsql/clientinfo",
+			},
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
@@ -774,7 +798,6 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 
 func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string, icpConsoleURL string) corev1.Container {
 
-	//@posriniv - find a better solution
 	replicaCount := int(instance.Spec.Replicas)
 	resources := instance.Spec.IdentityManager.Resources
 	if resources == nil {
@@ -1117,6 +1140,18 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			{
 				Name:      "scim-ldap-attributes-mapping",
 				MountPath: "/opt/ibm/identity-mgmt/config/scim-config",
+			},
+			{
+				Name:      "pgsql-ca-cert",
+				MountPath: "/certs/pgsql-ca",
+			},
+			{
+				Name:      "pgsql-client-cert",
+				MountPath: "/certs/pgsql-client",
+			},
+			{
+				Name:      "pgsql-client-cred",
+				MountPath: "/pgsql/clientinfo",
 			},
 		},
 		ReadinessProbe: &corev1.Probe{

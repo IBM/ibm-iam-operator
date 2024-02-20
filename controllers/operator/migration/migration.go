@@ -32,7 +32,8 @@ var initDDL string
 
 // TODO Add any helpful properties
 type Result struct {
-	Error error
+	Error    error
+	Migrated bool
 }
 
 type DatastoreConfig struct {
@@ -51,10 +52,11 @@ func Migrate(ctx context.Context, c chan *Result, config *DatastoreConfig) {
 	reqLogger := logf.FromContext(ctx).WithName("migration_worker")
 
 	result := initEDB(logf.IntoContext(ctx, reqLogger), config)
+
 	if result.Error != nil {
 		reqLogger.Error(result.Error, "Failed to migrate")
 	} else {
-		reqLogger.Info("Migration completed")
+		reqLogger.Info("Migration completed", "result", result)
 	}
 	c <- result
 	close(c)
@@ -76,6 +78,7 @@ type IdpConfig struct {
 // initEDB executes the DDL that initializes the schemas and tables that the different IM Operands will use.
 func initEDB(ctx context.Context, config *DatastoreConfig) (result *Result) {
 	reqLogger := logf.FromContext(ctx)
+	result = &Result{}
 	dsn := fmt.Sprintf("host=%s user=%s dbname=%s port=%s sslmode=require", config.RWEndpoint, config.User, config.Name, config.Port)
 
 	var err error
@@ -83,12 +86,17 @@ func initEDB(ctx context.Context, config *DatastoreConfig) (result *Result) {
 	rootCertPool.AppendCertsFromPEM(config.CACert)
 	var clientCert tls.Certificate
 	if clientCert, err = tls.X509KeyPair(config.ClientCert, config.ClientKey); err != nil {
+		reqLogger.Error(err, "Failed to assemble client key pair")
 		return &Result{Error: err}
 	}
+	reqLogger.Info("Assembled client key pair")
+
 	var connConfig *pgx.ConnConfig
 	if connConfig, err = pgx.ParseConfig(dsn); err != nil {
+		reqLogger.Error(err, "Failed to parse database configuration")
 		return &Result{Error: err}
 	}
+	reqLogger.Info("Connection to DB configured")
 
 	connConfig.TLSConfig = &tls.Config{
 		Certificates:       []tls.Certificate{clientCert},
@@ -100,16 +108,18 @@ func initEDB(ctx context.Context, config *DatastoreConfig) (result *Result) {
 	defer cancel()
 	var imConn *pgx.Conn
 	if imConn, err = pgx.ConnectConfig(queryCtx, connConfig); err != nil {
+		reqLogger.Error(err, "Failed to connect to database")
 		return &Result{Error: err}
 	}
+	reqLogger.Info("Connected to DB")
 
 	var commandTag pgconn.CommandTag
 	if commandTag, err = imConn.Exec(queryCtx, initDDL); err != nil {
 		reqLogger.Error(err, "Failed to execute DDL")
 		return &Result{Error: err}
 	}
-
 	reqLogger.Info("Executed DDL", "commandTag", commandTag.String())
+	result.Migrated = true
 
-	return &Result{}
+	return
 }

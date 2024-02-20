@@ -114,7 +114,6 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	if dbSetupChan == nil {
 		reqLogger.Info("Starting a migration worker")
 		dbSetupChan = make(chan *migration.Result)
-		// TODO Add EDB config struct as an additional argument
 		go migration.Migrate(context.Background(),
 			dbSetupChan,
 			datastoreConfig)
@@ -125,7 +124,7 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	case migrationResult, ok := <-dbSetupChan:
 		if !ok {
 			dbSetupChan = nil
-			subreconciler.ContinueReconciling()
+			return subreconciler.ContinueReconciling()
 		}
 		reqLogger.Info("Migration completed", "result", migrationResult)
 		// TODO Handle potential migration.Result values

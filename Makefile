@@ -260,7 +260,7 @@ update-version: manifests kustomize yq ## Update the Operator SemVer across the 
 ##@ Build
 
 .PHONY: build
-build: go manifests generate fmt vet ## Build manager binary.
+build: go manifests generate fmt vet images ## Build manager binary.
 	@echo "Building the manager binary"
 	@CGO_ENABLED=0 $(GO) build -o build/_output/bin/manager main.go
 	@strip $(STRIP_FLAGS) build/_output/bin/manager

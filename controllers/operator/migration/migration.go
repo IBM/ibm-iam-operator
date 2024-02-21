@@ -31,8 +31,7 @@ var initDDL string
 
 // TODO Add any helpful properties
 type Result struct {
-	Error    error
-	Complete bool
+	Error error
 }
 
 type DatastoreConfig struct {

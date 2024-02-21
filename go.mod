@@ -4,12 +4,15 @@ go 1.21
 
 require (
 	github.com/cert-manager/cert-manager v1.13.1
+	github.com/jackc/pgx/v5 v5.4.3
 	github.com/onsi/ginkgo/v2 v2.12.0
 	github.com/onsi/gomega v1.27.10
 	github.com/opdev/subreconciler v0.0.0-20230302151718-c4c8b5ec17c5
 	github.com/openshift/api v0.0.0-20231003083825-c3f7566f6ef6
 	github.com/zach-klippenstein/goregen v0.0.0-20160303162051-795b5e3961ea
 	gopkg.in/yaml.v2 v2.4.0
+	gorm.io/driver/postgres v1.5.6
+	gorm.io/gorm v1.25.7
 	k8s.io/api v0.28.2
 	k8s.io/apimachinery v0.28.2
 	k8s.io/client-go v0.28.1
@@ -41,6 +44,10 @@ require (
 	github.com/google/pprof v0.0.0-20210720184732-4bb14d4b1be1 // indirect
 	github.com/google/uuid v1.3.1 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
@@ -57,6 +64,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.25.0 // indirect
+	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/oauth2 v0.12.0 // indirect

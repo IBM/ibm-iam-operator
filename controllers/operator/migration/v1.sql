@@ -7,7 +7,7 @@ CREATE SCHEMA IF NOT EXISTS platformdb;
 CREATE TABLE IF NOT EXISTS "platformdb"."idp_configs" (
     "uid" character varying NOT NULL,
     "description" character varying,
-    "enabled" boolean DEFAULT 'true' NOT NULL,
+    "enabled" boolean DEFAULT true NOT NULL,
     "idp_config" jsonb,
     "name" character varying NOT NULL,
     "protocol" character varying(5) NOT NULL,

@@ -92,7 +92,7 @@ type IdpConfig struct {
 	Protocol    string            `db:"protocol"`
 	Type        string            `db:"type"`
 	Description string            `db:"description"`
-	Enabled     string            `db:"enabled"`
+	Enabled     bool              `db:"enabled"`
 	IDPConfig   map[string]string `db:"idp_config"`
 	SCIMConfig  map[string]string `db:"scim_config"`
 	LDAPConfig  map[string]string `db:"ldap_config"`

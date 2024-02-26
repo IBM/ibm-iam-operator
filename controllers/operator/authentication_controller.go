@@ -104,8 +104,8 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		return
 	}
 
-	var _ *migration.DatastoreConfig
-	if _, err = r.getDatastoreConfig(ctx, req); k8sErrors.IsNotFound(err) {
+	var datastoreConfig *migration.DatastoreConfig
+	if datastoreConfig, err = r.getDatastoreConfig(ctx, req); k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Could not find resources for configuring DB connection; requeueing")
 		return subreconciler.Requeue()
 	} else if err != nil {
@@ -115,11 +115,10 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 
 	if r.dbSetupChan == nil {
 		reqLogger.Info("Starting a migration worker")
-		r.dbSetupChan = make(chan *migration.Result, 1)
-		// TODO Uncomment this
-		//go migration.Migrate(context.Background(),
-		//	r.dbSetupChan,
-		//	datastoreConfig)
+		r.dbSetupChan = make(chan *migration.Result)
+		go migration.Migrate(context.Background(),
+			r.dbSetupChan,
+			datastoreConfig)
 		return subreconciler.Requeue()
 	}
 
@@ -134,12 +133,9 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 			return subreconciler.RequeueWithError(migrationResult.Error)
 		}
 		reqLogger.Info("Migration completed", "result", migrationResult)
-		// TODO Remove this
-		close(r.dbSetupChan)
 		return subreconciler.ContinueReconciling()
 	default:
 		reqLogger.Info("Migration still in progress")
-		r.dbSetupChan <- &migration.Result{}
 		return subreconciler.Requeue()
 	}
 }
@@ -353,12 +349,12 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}()
 
-	if result, err := r.handleOperandRequest(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return subreconciler.Evaluate(result, err)
+	if resultHandleOpReq, errHandleOpReq := r.handleOperandRequest(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(resultHandleOpReq, errHandleOpReq) {
+		return subreconciler.Evaluate(resultHandleOpReq, errHandleOpReq)
 	}
 
-	if result, err := r.createEDBShareClaim(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return subreconciler.Evaluate(result, err)
+	if resultCreateEDBShareClaim, errCreateEDBShareClaim := r.createEDBShareClaim(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(resultCreateEDBShareClaim, errCreateEDBShareClaim) {
+		return subreconciler.Evaluate(resultCreateEDBShareClaim, errCreateEDBShareClaim)
 	}
 
 	// Check if this Certificate already exists and create it if it doesn't
@@ -421,15 +417,13 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
-	if result, err := r.ensureDatastoreSecretAndCM(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
-		reqLogger.Info("Requeueing", "subreconciler", "ensureDatastoreSecretAndCM", "result", result, "err", err)
-		return subreconciler.Evaluate(result, err)
+	if resultEnsureDatastoreSecretAndCM, errEnsureDatastoreSecretAndCM := r.ensureDatastoreSecretAndCM(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(resultEnsureDatastoreSecretAndCM, errEnsureDatastoreSecretAndCM) {
+		return subreconciler.Evaluate(resultEnsureDatastoreSecretAndCM, errEnsureDatastoreSecretAndCM)
 	}
 
 	// perform any migrations that may be needed before Deployments run
-	if result, err := r.handleMigrations(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
-		reqLogger.Info("Requeueing", "subreconciler", "handleMigrations", "result", result, "err", err)
-		return subreconciler.Evaluate(result, err)
+	if resultHandleMigrations, errHandleMigrations := r.handleMigrations(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(resultHandleMigrations, errHandleMigrations) {
+		return subreconciler.Evaluate(resultHandleMigrations, errHandleMigrations)
 	}
 
 	// Check if this Deployment already exists and create it if it doesn't

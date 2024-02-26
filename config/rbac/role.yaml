@@ -144,6 +144,27 @@ rules:
   verbs:
   - get
   - list
+  - create
+- apiGroups:
+  - operator.ibm.com
+  resources:
+  - operandrequests
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - watch
+  - update
+  - delete
+- apiGroups:
+  - operator.ibm.com
+  resources:
+  - operandrequests/status
+  verbs:
+  - watch
+  - get
+  - list
 - apiGroups:
   - cert-manager.io
   resources:

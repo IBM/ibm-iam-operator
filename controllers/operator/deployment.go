@@ -22,6 +22,7 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/controllers/common"
+	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -299,7 +300,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	authServiceImage := common.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
-	mongoDBImage := common.GetImageRef("IM_INITCONTAINER_IMAGE")
+	initContainerImage := common.GetImageRef("IM_INITCONTAINER_IMAGE")
 	replicas := instance.Spec.Replicas
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
@@ -431,7 +432,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 					},
 					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret),
 					Containers:     buildContainers(instance, authServiceImage),
-					InitContainers: buildInitContainers(mongoDBImage),
+					InitContainers: buildInitContainers(initContainerImage),
 				},
 			},
 		},
@@ -449,7 +450,7 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	identityProviderImage := common.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
-	mongoDBImage := common.GetImageRef("IM_INITCONTAINER_IMAGE")
+	initContainerImage := common.GetImageRef("IM_INITCONTAINER_IMAGE")
 	replicas := instance.Spec.Replicas
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
@@ -581,7 +582,7 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 					},
 					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret),
 					Containers:     buildProviderContainers(instance, identityProviderImage, icpConsoleURL, saasCrnId),
-					InitContainers: buildInitForMngrAndProvider(mongoDBImage),
+					InitContainers: buildInitForMngrAndProvider(initContainerImage),
 				},
 			},
 		},
@@ -599,7 +600,7 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	identityManagerImage := common.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
-	mongoDBImage := common.GetImageRef("IM_INITCONTAINER_IMAGE")
+	initContainerImage := common.GetImageRef("IM_INITCONTAINER_IMAGE")
 	replicas := instance.Spec.Replicas
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
@@ -731,7 +732,7 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 					},
 					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret),
 					Containers:     buildManagerContainers(instance, identityManagerImage, icpConsoleURL),
-					InitContainers: buildInitForMngrAndProvider(mongoDBImage),
+					InitContainers: buildInitForMngrAndProvider(initContainerImage),
 				},
 			},
 		},
@@ -892,6 +893,49 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "icp-mongodb-client-cert",
+				},
+			},
+		},
+		{
+			Name: "pgsql-ca-cert",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: ctrlCommon.DatastoreEDBSecretName,
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "ca.crt",
+							Path: "ca.crt",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "pgsql-client-cert",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: ctrlCommon.DatastoreEDBSecretName,
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "tls.crt",
+							Path: "tls.crt",
+						},
+						{
+							Key:  "tls.key",
+							Path: "tls.key",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "pgsql-client-cred",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: ctrlCommon.DatastoreEDBCMName,
+					},
+					DefaultMode: &partialAccess,
 				},
 			},
 		},

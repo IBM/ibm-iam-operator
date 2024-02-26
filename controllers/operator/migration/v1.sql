@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS "platformdb"."idp_configs" (
     "type" character varying,
     "scim_config" jsonb,
     "jit" boolean,
-    "ldap_config" jsonb,
+    "ldap_config" json,
     CONSTRAINT "idp_configs_uid" PRIMARY KEY ("uid")
 ) WITH (oids = false);
 
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS "platformdb"."users_preferences" (
 
 
 CREATE TABLE IF NOT EXISTS "platformdb"."users" (
-    "uid" uuid NOT NULL,
+    //"uid" uuid NOT NULL,
     "user_id" character varying NOT NULL,
     "realm_id" character varying,
     "first_name" character varying,
@@ -51,13 +51,13 @@ CREATE TABLE IF NOT EXISTS "platformdb"."users" (
     CONSTRAINT "users_user_id" PRIMARY KEY ("user_id")
 ) WITH (oids = false);
 
-CREATE INDEX IF NOT EXISTS userid_idx ON platformdb.users (user_id);
-
 CREATE TABLE IF NOT EXISTS "platformdb"."users_attributes" (
     "uid" character varying NOT NULL,
     "user_uid" character varying,
     "name" character varying,
-    "value" character varying
+    "value" character varying,
+    CONSTRAINT "users_attributes_uid" PRIMARY KEY ("uid")
+    //CONSTRAINT "fk_useratt_fk" FOREIGN KEY ("user_uid") REFERENCES users ("uid")
 ) WITH (oids = false);
 
 -- End User Management
@@ -71,14 +71,16 @@ CREATE TABLE IF NOT EXISTS "platformdb"."zen_instances" (
     "product_name_url" character varying NOT NULL,
     "zen_audit_url" character varying,
     "namespace" character varying NOT NULL,
-    CONSTRAINT "zen_instances_instanceId" PRIMARY KEY ("instance_id")
+    CONSTRAINT "zen_instances_instance_id" PRIMARY KEY ("instance_id")
 ) WITH (oids = false);
 
 CREATE TABLE IF NOT EXISTS "platformdb"."zen_instances_users" (
-    "uzid" character varying NOT NULL,
+    "uz_id" character varying NOT NULL,
     "zen_instance_id" character varying NOT NULL,
     "user_id" character varying NOT NULL,
-    CONSTRAINT "zen_instances_users_uzid" PRIMARY KEY ("uzid")
+    CONSTRAINT "zen_instances_users_uz_id" PRIMARY KEY ("uz_id"),
+    CONSTRAINT "fk_zenuser_fk" FOREIGN KEY ("zen_instance_id") REFERENCES zen_instances ("instance_id"),
+    CONSTRAINT "fk_userzen_fk" FOREIGN KEY ("user_id") REFERENCES users ("user_id")
 ) WITH (oids = false);
 
 -- End Zen Integration
@@ -117,7 +119,7 @@ CREATE TABLE IF NOT EXISTS "platformdb"."members" (
     "member_id" character varying NOT NULL,
     "value" character varying,
     "display" character varying,
-    CONSTRAINT "members_memberid" PRIMARY KEY ("member_id")
+    CONSTRAINT "members_member_id" PRIMARY KEY ("member_id")
 ) WITH (oids = false);
 
 CREATE TABLE IF NOT EXISTS "platformdb"."group_members" (

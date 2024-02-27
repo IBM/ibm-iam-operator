@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS "platformdb"."users_preferences" (
 
 
 CREATE TABLE IF NOT EXISTS "platformdb"."users" (
-    //"uid" uuid NOT NULL,
+    "uid" uuid DEFAULT gen_random_uuid(),
     "user_id" character varying NOT NULL,
     "realm_id" character varying,
     "first_name" character varying,
@@ -52,12 +52,12 @@ CREATE TABLE IF NOT EXISTS "platformdb"."users" (
 ) WITH (oids = false);
 
 CREATE TABLE IF NOT EXISTS "platformdb"."users_attributes" (
-    "uid" character varying NOT NULL,
+    "uid" uuid DEFAULT gen_random_uuid(),
     "user_uid" character varying,
     "name" character varying,
     "value" character varying,
     CONSTRAINT "users_attributes_uid" PRIMARY KEY ("uid")
-    //CONSTRAINT "fk_useratt_fk" FOREIGN KEY ("user_uid") REFERENCES users ("uid")
+    CONSTRAINT "fk_useratt_fk" FOREIGN KEY ("user_uid") REFERENCES users ("uid")
 ) WITH (oids = false);
 
 -- End User Management

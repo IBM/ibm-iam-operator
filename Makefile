@@ -280,21 +280,21 @@ catalog-build: opm ## Build a catalog image.
 bundle-build: ## Build the bundle image.
 	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
-build-image-amd64: build $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on amd64
+build-image-amd64: $(GO) $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on amd64
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -a -o build/_output/bin/manager main.go
 	$(CONTAINER_CLI) run --rm --privileged docker.io/multiarch/qemu-user-static:register --reset
 	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID) -f build/Dockerfile.amd64 .
 	@\rm -f build/_output/bin/manager
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID); fi
 
-build-image-ppc64le: build $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on ppc64le
+build-image-ppc64le: $(GO) $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on ppc64le
 	CGO_ENABLED=0 GOOS=linux GOARCH=ppc64le $(GO) build -a -o build/_output/bin/manager main.go
 	$(CONTAINER_CLI) run --rm --privileged docker.io/multiarch/qemu-user-static:register --reset
 	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID) -f build/Dockerfile.ppc64le .
 	@\rm -f build/_output/bin/manager
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID); fi
 
-build-image-s390x: build $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on s390x
+build-image-s390x: $(GO) $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on s390x
 	CGO_ENABLED=0 GOOS=linux GOARCH=s390x $(GO) build -a -o build/_output/bin/manager main.go
 	$(CONTAINER_CLI) run --rm --privileged docker.io/multiarch/qemu-user-static:register --reset
 	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-s390x:$(GIT_COMMIT_ID) -f build/Dockerfile.s390x .
@@ -383,8 +383,10 @@ catalog-push: ## Push a catalog image.
 all: check test coverage build images
 
 ##@ Cleanup
-clean: ## Clean build binary
-	rm -f build/_output/bin/$(IMG)
+clean: ## Clean build and bin directories
+	rm -f build/_output/bin/*
+	chmod -R +w bin/
+	rm -rf bin/*
 
 ##@ Help
 help: ## Display this help

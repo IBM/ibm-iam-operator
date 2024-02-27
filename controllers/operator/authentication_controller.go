@@ -73,50 +73,73 @@ var rule = `^([a-z0-9]){32,}$`
 var wlpClientID = ctrlCommon.GenerateRandomString(rule)
 var wlpClientSecret = ctrlCommon.GenerateRandomString(rule)
 
-var dbSetupChan chan *migration.Result
+func (r *AuthenticationReconciler) getDatastoreConfig(ctx context.Context, req ctrl.Request) (config *migration.DatastoreConfig, err error) {
+	datastoreCertSecret := &corev1.Secret{}
+	if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.DatastoreEDBSecretName, Namespace: req.Namespace}, datastoreCertSecret); err != nil {
+		return nil, err
+	}
+
+	datastoreCertCM := &corev1.ConfigMap{}
+	if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.DatastoreEDBCMName, Namespace: req.Namespace}, datastoreCertCM); err != nil {
+		return nil, err
+	}
+
+	return &migration.DatastoreConfig{
+		Name:       datastoreCertCM.Data["DATABASE_NAME"],
+		Port:       datastoreCertCM.Data["DATABASE_PORT"],
+		User:       datastoreCertCM.Data["DATABASE_USER"],
+		RWEndpoint: datastoreCertCM.Data["DATABASE_RW_ENDPOINT"],
+		REndpoint:  datastoreCertCM.Data["DATABASE_R_ENDPOINT"],
+		CACert:     datastoreCertSecret.Data["ca.crt"],
+		ClientCert: datastoreCertSecret.Data["tls.crt"],
+		ClientKey:  datastoreCertSecret.Data["tls.key"],
+	}, err
+}
 
 func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
+	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleMigrations")
+	reqLogger.Info("Perform any pending migrations")
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 
-	datastoreCertSecret := &corev1.Secret{}
-	if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.DatastoreEDBSecretName, Namespace: authCR.Namespace}, datastoreCertSecret); k8sErrors.IsNotFound(err) {
-		reqLogger.Info("Could not find EDB share Secret", "name", ctrlCommon.DatastoreEDBSecretName)
+	var _ *migration.DatastoreConfig
+	if _, err = r.getDatastoreConfig(ctx, req); k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Could not find resources for configuring DB connection; requeueing")
 		return subreconciler.Requeue()
 	} else if err != nil {
-		reqLogger.Error(err, "Could not get EDB share Secret", "name", ctrlCommon.DatastoreEDBSecretName)
+		reqLogger.Error(err, "Failed to find resources for configuring DB connection")
 		return subreconciler.RequeueWithError(err)
 	}
 
-	// TODO Get datastore CM as well to configure the connection
-	// TODO Create EDB config struct for unmarshaling this CM's data
-
-	if dbSetupChan == nil {
+	if r.dbSetupChan == nil {
 		reqLogger.Info("Starting a migration worker")
-		dbSetupChan = make(chan *migration.Result)
-		// TODO Add EDB config struct as an additional argument
-		go migration.Migrate(context.Background(),
-			dbSetupChan,
-			datastoreCertSecret.Data["ca.crt"],
-			datastoreCertSecret.Data["tls.crt"],
-			datastoreCertSecret.Data["tls.key"])
+		r.dbSetupChan = make(chan *migration.Result, 1)
+		// TODO Uncomment this
+		//go migration.Migrate(context.Background(),
+		//	r.dbSetupChan,
+		//	datastoreConfig)
 		return subreconciler.Requeue()
 	}
 
 	select {
-	case migrationResult, ok := <-dbSetupChan:
+	case migrationResult, ok := <-r.dbSetupChan:
 		if !ok {
-			dbSetupChan = nil
-			subreconciler.ContinueReconciling()
+			reqLogger.Info("No migrations to perform; continuing")
+			return subreconciler.ContinueReconciling()
+		}
+		if migrationResult != nil && migrationResult.Error != nil {
+			reqLogger.Error(migrationResult.Error, "Encountered an error while performing the current migration")
+			return subreconciler.RequeueWithError(migrationResult.Error)
 		}
 		reqLogger.Info("Migration completed", "result", migrationResult)
-		// TODO Handle potential migration.Result values
+		// TODO Remove this
+		close(r.dbSetupChan)
 		return subreconciler.ContinueReconciling()
 	default:
 		reqLogger.Info("Migration still in progress")
+		r.dbSetupChan <- &migration.Result{}
 		return subreconciler.Requeue()
 	}
 }
@@ -236,6 +259,7 @@ type AuthenticationReconciler struct {
 	Scheme      *runtime.Scheme
 	Mutex       sync.Mutex
 	clusterType ctrlCommon.ClusterType
+	dbSetupChan chan *migration.Result
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -329,12 +353,12 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}()
 
-	if resultHandleOpReq, errHandleOpReq := r.handleOperandRequest(ctx, req); subreconciler.ShouldHaltOrRequeue(resultHandleOpReq, errHandleOpReq) {
-		return subreconciler.Evaluate(resultHandleOpReq, errHandleOpReq)
+	if result, err := r.handleOperandRequest(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return subreconciler.Evaluate(result, err)
 	}
 
-	if resultCreateEDBShareClaim, errCreateEDBShareClaim := r.createEDBShareClaim(ctx, req); subreconciler.ShouldHaltOrRequeue(resultCreateEDBShareClaim, errCreateEDBShareClaim) {
-		return subreconciler.Evaluate(resultCreateEDBShareClaim, errCreateEDBShareClaim)
+	if result, err := r.createEDBShareClaim(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return subreconciler.Evaluate(result, err)
 	}
 
 	// Check if this Certificate already exists and create it if it doesn't
@@ -397,13 +421,15 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
-	if resultEnsureDatastoreSecretAndCM, errEnsureDatastoreSecretAndCM := r.ensureDatastoreSecretAndCM(ctx, req); subreconciler.ShouldHaltOrRequeue(resultEnsureDatastoreSecretAndCM, errEnsureDatastoreSecretAndCM) {
-		return subreconciler.Evaluate(resultEnsureDatastoreSecretAndCM, errEnsureDatastoreSecretAndCM)
+	if result, err := r.ensureDatastoreSecretAndCM(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+		reqLogger.Info("Requeueing", "subreconciler", "ensureDatastoreSecretAndCM", "result", result, "err", err)
+		return subreconciler.Evaluate(result, err)
 	}
 
 	// perform any migrations that may be needed before Deployments run
-	if resultHandleMigrations, errHandleMigrations := r.handleMigrations(ctx, req); subreconciler.ShouldHaltOrRequeue(resultHandleMigrations, errHandleMigrations) {
-		return subreconciler.Evaluate(resultHandleMigrations, errHandleMigrations)
+	if result, err := r.handleMigrations(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+		reqLogger.Info("Requeueing", "subreconciler", "handleMigrations", "result", result, "err", err)
+		return subreconciler.Evaluate(result, err)
 	}
 
 	// Check if this Deployment already exists and create it if it doesn't

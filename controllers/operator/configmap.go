@@ -266,6 +266,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 					currentConfigMap.Data["DB_IDLE_TIMEOUT"] = newConfigMap.Data["DB_IDLE_TIMEOUT"]
 					currentConfigMap.Data["DB_POOL_MIN_SIZE"] = newConfigMap.Data["DB_POOL_MIN_SIZE"]
 					currentConfigMap.Data["DB_POOL_MAX_SIZE"] = newConfigMap.Data["DB_POOL_MAX_SIZE"]
+					currentConfigMap.Data["SEQL_LOGGING"] = newConfigMap.Data["SEQL_LOGGING"]
 					cmUpdateRequired = true
 				}
 				if _, keyExists := currentConfigMap.Data["OS_TOKEN_LENGTH"]; keyExists {
@@ -569,6 +570,7 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 			"DB_IDLE_TIMEOUT":                    "20000",
 			"DB_POOL_MIN_SIZE":                   "5",
 			"DB_POOL_MAX_SIZE":                   "15",
+			"SEQL_LOGGING":                       "false",
 			"MONGO_MAX_STALENESS":                "90",
 			"SCIM_LDAP_SEARCH_SIZE_LIMIT":        "4500",
 			"SCIM_LDAP_SEARCH_TIME_LIMIT":        "10",

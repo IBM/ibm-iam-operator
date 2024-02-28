@@ -48,15 +48,16 @@ CREATE TABLE IF NOT EXISTS "platformdb"."users" (
     "preferred_username" character varying,
     "display_name" character varying,
     "subject" character varying,
+    CONSTRAINT "users_uid" UNIQUE ("uid"),
     CONSTRAINT "users_user_id" PRIMARY KEY ("user_id")
 ) WITH (oids = false);
 
 CREATE TABLE IF NOT EXISTS "platformdb"."users_attributes" (
     "uid" uuid DEFAULT gen_random_uuid(),
-    "user_uid" character varying,
+    "user_uid" uuid NOT NULL,
     "name" character varying,
     "value" character varying,
-    CONSTRAINT "users_attributes_uid" PRIMARY KEY ("uid")
+    CONSTRAINT "users_attributes_uid" PRIMARY KEY ("uid"),
     CONSTRAINT "fk_useratt_fk" FOREIGN KEY ("user_uid") REFERENCES users ("uid")
 ) WITH (oids = false);
 

@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"fmt"
+	"maps"
 	"reflect"
 	"sync"
 
@@ -73,7 +74,7 @@ var rule = `^([a-z0-9]){32,}$`
 var wlpClientID = ctrlCommon.GenerateRandomString(rule)
 var wlpClientSecret = ctrlCommon.GenerateRandomString(rule)
 
-func (r *AuthenticationReconciler) getDatastoreConfig(ctx context.Context, req ctrl.Request) (config *migration.DatastoreConfig, err error) {
+func (r *AuthenticationReconciler) getPostgresDB(ctx context.Context, req ctrl.Request) (p *migration.PostgresDB, err error) {
 	datastoreCertSecret := &corev1.Secret{}
 	if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.DatastoreEDBSecretName, Namespace: req.Namespace}, datastoreCertSecret); err != nil {
 		return nil, err
@@ -84,16 +85,53 @@ func (r *AuthenticationReconciler) getDatastoreConfig(ctx context.Context, req c
 		return nil, err
 	}
 
-	return &migration.DatastoreConfig{
-		Name:       datastoreCertCM.Data["DATABASE_NAME"],
-		Port:       datastoreCertCM.Data["DATABASE_PORT"],
-		User:       datastoreCertCM.Data["DATABASE_USER"],
-		RWEndpoint: datastoreCertCM.Data["DATABASE_RW_ENDPOINT"],
-		REndpoint:  datastoreCertCM.Data["DATABASE_R_ENDPOINT"],
-		CACert:     datastoreCertSecret.Data["ca.crt"],
-		ClientCert: datastoreCertSecret.Data["tls.crt"],
-		ClientKey:  datastoreCertSecret.Data["tls.key"],
-	}, err
+	return migration.NewPostgresDB(
+		migration.Name(datastoreCertCM.Data["DATABASE_NAME"]),
+		migration.Port(datastoreCertCM.Data["DATABASE_PORT"]),
+		migration.User(datastoreCertCM.Data["DATABASE_USER"]),
+		migration.Host(datastoreCertCM.Data["DATABASE_RW_ENDPOINT"]),
+		migration.Schemas("platformdb", "oauthdbschema"),
+		migration.TLSConfig(
+			datastoreCertSecret.Data["ca.crt"],
+			datastoreCertSecret.Data["tls.crt"],
+			datastoreCertSecret.Data["tls.key"]))
+}
+
+func (r *AuthenticationReconciler) getMongoDB(ctx context.Context, req ctrl.Request) (mongo *migration.MongoDB, err error) {
+	mongoName := "platform-db"
+	mongoPort := "27017"
+	mongoHost := fmt.Sprintf("mongodb.%s.svc", req.Namespace)
+
+	mongoAdminCredsName := "icp-mongodb-admin"
+	mongoClientCertName := "icp-mongodb-client-cert"
+	mongoCACertName := "mongodb-root-ca-cert"
+
+	secrets := map[string]*corev1.Secret{
+		mongoAdminCredsName: {},
+		mongoClientCertName: {},
+		mongoCACertName:     {},
+	}
+
+	for secretName, secret := range secrets {
+		objKey := types.NamespacedName{Name: secretName, Namespace: req.Namespace}
+		if err = r.Get(ctx, objKey, secret); k8sErrors.IsNotFound(err) {
+			return nil, nil
+		} else if err != nil {
+			return nil, err
+		}
+	}
+
+	return migration.NewMongoDB(
+		migration.Name(mongoName),
+		migration.Port(mongoPort),
+		migration.Host(mongoHost),
+		migration.User(string(secrets[mongoAdminCredsName].Data["user"])),
+		migration.Password(string(secrets[mongoAdminCredsName].Data["password"])),
+		migration.Schemas(mongoName),
+		migration.TLSConfig(
+			secrets[mongoCACertName].Data["ca.crt"],
+			secrets[mongoClientCertName].Data["tls.crt"],
+			secrets[mongoClientCertName].Data["tls.key"]))
 }
 
 func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
@@ -104,44 +142,157 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		return
 	}
 
-	var _ *migration.DatastoreConfig
-	if _, err = r.getDatastoreConfig(ctx, req); k8sErrors.IsNotFound(err) {
-		reqLogger.Info("Could not find resources for configuring DB connection; requeueing")
+	var postgres *migration.PostgresDB
+	if postgres, err = r.getPostgresDB(ctx, req); k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Could not find all resources for configuring EDB connection; requeueing")
 		return subreconciler.Requeue()
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to find resources for configuring DB connection")
+		reqLogger.Error(err, "Failed to find resources for configuring EDB connection")
 		return subreconciler.RequeueWithError(err)
 	}
 
-	if r.dbSetupChan == nil {
-		reqLogger.Info("Starting a migration worker")
+	initEDB := migration.NewMigration().
+		Name("initEDB").
+		To(postgres).
+		RunFunc(migration.InitSchemas).
+		Build()
+
+	var migrations []*migration.Migration
+
+	if authCR.HasNoDBSchemaVersion() {
+		reqLogger.Info("DB schema version annotation unset; adding initialization migration")
+		migrations = append(migrations, initEDB)
+	} else {
+		reqLogger.Info("DB schema version annotation set; will not perform initialization migration")
+	}
+
+	if needToMigrate, err := r.needToMigrateFromMongo(ctx, authCR); err != nil {
+		reqLogger.Error(err, "Failed to determine whether migration from MongoDB is needed")
+		return subreconciler.RequeueWithError(err)
+	} else if needToMigrate {
+		var mongo *migration.MongoDB
+		if mongo, err = r.getMongoDB(ctx, req); k8sErrors.IsNotFound(err) {
+			reqLogger.Info("Could not find all resources for configuring MongoDB connection")
+			return subreconciler.RequeueWithError(err)
+		} else if err != nil {
+			reqLogger.Error(err, "Failed to find resources for configuring MongoDB connection")
+			return subreconciler.RequeueWithError(err)
+		}
+		migrateFromMongo := migration.NewMigration().
+			Name("MongoToV1").
+			To(postgres).
+			From(mongo).
+			RunFunc(migration.MongoToV1).
+			Build()
+		migrations = append(migrations, migrateFromMongo)
+	}
+
+	if len(migrations) > 0 && r.dbSetupChan == nil {
+		reqLogger.Info("Found migrations; starting a migration worker")
 		r.dbSetupChan = make(chan *migration.Result, 1)
-		// TODO Uncomment this
-		//go migration.Migrate(context.Background(),
-		//	r.dbSetupChan,
-		//	datastoreConfig)
+		go migration.Migrate(context.Background(),
+			r.dbSetupChan,
+			migrations...)
 		return subreconciler.Requeue()
 	}
 
+	if r.dbSetupChan == nil {
+		return subreconciler.ContinueReconciling()
+	}
+
+	// nil serves as a sentinel value to indicate that the controller should be open to performing new migrations
+	// again. The checks above ensure that, if there are migrations found, dbSetupChan is set to a new
+	// channel and the migration goroutine is kicked off, which is safe to permit into the following select, or, if
+	// dbSetupChan is still nil, meaning that no migration scenarios were identified on the cluster, that serves as
+	// an indication that the subreconciler can signal that no more work is needed for the time being.
+	//
+	// The times when nil should therefore be set are when:
+	// * There are no new migrations
+	// * One of the current migrations has failed; this is so that, once requeued, the process of identifying and
+	//   enqueueing migrations can begin anew.
 	select {
 	case migrationResult, ok := <-r.dbSetupChan:
 		if !ok {
-			reqLogger.Info("No migrations to perform; continuing")
+			reqLogger.Info("No migrations to perform; removing worker and continuing")
+			r.dbSetupChan = nil
 			return subreconciler.ContinueReconciling()
 		}
+		reqLogger.Info("Received a migration result from the worker", "result", migrationResult)
 		if migrationResult != nil && migrationResult.Error != nil {
 			reqLogger.Error(migrationResult.Error, "Encountered an error while performing the current migration")
-			return subreconciler.RequeueWithError(migrationResult.Error)
+			// Remove the failed channel now so that migration
+			r.dbSetupChan = nil
+		} else if migrationResult != nil {
+			reqLogger.Info("Completed all migrations successfully")
 		}
-		reqLogger.Info("Migration completed", "result", migrationResult)
-		// TODO Remove this
-		close(r.dbSetupChan)
-		return subreconciler.ContinueReconciling()
+		annotationsChanged := setMigrationAnnotations(authCR, migrationResult)
+		if annotationsChanged {
+			if err = r.Update(ctx, authCR); err != nil {
+				subreconciler.RequeueWithError(err)
+			}
+		}
+		if migrationResult.Error != nil {
+			subreconciler.RequeueWithError(migrationResult.Error)
+		}
+		return subreconciler.Requeue()
 	default:
 		reqLogger.Info("Migration still in progress")
 		r.dbSetupChan <- &migration.Result{}
 		return subreconciler.Requeue()
 	}
+}
+
+// setMigrationAnnotations uses the values stored in a `migration.Result` to determine whether updates to the
+// Authentication CR's annotations need to be made. Returns `true` if new annotation values were set on the CR.
+func setMigrationAnnotations(authCR *operatorv1alpha1.Authentication, result *migration.Result) (changed bool) {
+	if result == nil {
+		return false
+	}
+	var observedAnnotations, desiredAnnotations map[string]string
+	observedAnnotations = authCR.DeepCopy().GetAnnotations()
+	if observedAnnotations == nil {
+		observedAnnotations = make(map[string]string)
+		desiredAnnotations = make(map[string]string)
+	} else {
+		desiredAnnotations = authCR.DeepCopy().GetAnnotations()
+	}
+	for _, c := range result.Complete {
+		switch c.Name {
+		case "initEDB":
+			desiredAnnotations[operatorv1alpha1.AnnotationAuthDBSchemaVersion] = "1.0.0"
+		case "MongoToV1":
+			desiredAnnotations[operatorv1alpha1.AnnotationAuthMigrationComplete] = "true"
+			desiredAnnotations[operatorv1alpha1.AnnotationAuthRetainMigrationArtifacts] = "true"
+		}
+	}
+	for _, i := range result.Incomplete {
+		if i.Name == "MongoToV1" {
+			desiredAnnotations[operatorv1alpha1.AnnotationAuthMigrationComplete] = "false"
+		}
+	}
+
+	if maps.Equal(observedAnnotations, desiredAnnotations) {
+		return false
+	}
+	authCR.SetAnnotations(desiredAnnotations)
+
+	return true
+}
+
+// needToMigrateFromMongo attempts to determine whether a migration from MongoDB is needed. Returns an error when an
+// unexpected error occurs while trying to get resources from the cluster.
+func (r *AuthenticationReconciler) needToMigrateFromMongo(ctx context.Context, authCR *operatorv1alpha1.Authentication) (need bool, err error) {
+	if authCR.HasBeenMigrated() {
+		return false, nil
+	}
+	service := &corev1.Service{}
+	if err = r.Get(ctx, types.NamespacedName{Name: "mongodb", Namespace: authCR.Namespace}, service); k8sErrors.IsNotFound(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 // ensureDatastoreSecretAndCM makes sure that the datastore Secret and ConfigMap are present in the services namespace;
@@ -421,15 +572,13 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
-	if result, err := r.ensureDatastoreSecretAndCM(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
-		reqLogger.Info("Requeueing", "subreconciler", "ensureDatastoreSecretAndCM", "result", result, "err", err)
-		return subreconciler.Evaluate(result, err)
+	if subResult, err := r.ensureDatastoreSecretAndCM(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
 	}
 
 	// perform any migrations that may be needed before Deployments run
-	if result, err := r.handleMigrations(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
-		reqLogger.Info("Requeueing", "subreconciler", "handleMigrations", "result", result, "err", err)
-		return subreconciler.Evaluate(result, err)
+	if subResult, err := r.handleMigrations(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
 	}
 
 	// Check if this Deployment already exists and create it if it doesn't

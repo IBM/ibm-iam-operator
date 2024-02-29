@@ -26,12 +26,14 @@ then
   BUNDLE_DIR_PATH="${BUNDLE_DIR_PATH}-${POSTFIX}"
 fi
 
-${YQ} '.metadata.annotations.alm-examples' "${BUNDLE_DIR_PATH}/manifests/ibm-iam-operator.clusterserviceversion.yaml" > internal-crs.json
+CSV_PATH="${BUNDLE_DIR_PATH}/manifests/ibm-iam-operator.clusterserviceversion.yaml"
+
+${YQ} '.metadata.annotations.alm-examples' "${CSV_PATH}" > internal-crs.json
 ${YQ} '. += load("./hack/external-crs.json")' internal-crs.json > combined-crs.json
-${YQ} -i '.metadata.annotations.alm-examples = load_str("combined-crs.json")' bundle/manifests/ibm-iam-operator.clusterserviceversion.yaml
+${YQ} -i '.metadata.annotations.alm-examples = load_str("combined-crs.json")' "${CSV_PATH}"
 # Also need to replace the WATCH_NAMESPACE value that operator-sdk seems to overwrite with a reference to the
 # namespace-scope ConfigMap
-${YQ} -i '.spec.install.spec.deployments[].spec.template.spec.containers[].env |= map(select(.name == "WATCH_NAMESPACE").valueFrom=load("./hack/manager_patch.yaml"))' "${BUNDLE_DIR_PATH}/manifests/ibm-iam-operator.clusterserviceversion.yaml"
+${YQ} -i '.spec.install.spec.deployments[].spec.template.spec.containers[].env |= map(select(.name == "WATCH_NAMESPACE").valueFrom=load("./hack/manager_patch.yaml"))' "${CSV_PATH}"
 # Trying to include relatedImages in the config base leads to it being clobbered by operator-sdk apparently
-${YQ} -i '.spec.relatedImages = load("./hack/relatedimages.yaml")' "${BUNDLE_DIR_PATH}/manifests/ibm-iam-operator.clusterserviceversion.yaml"
+${YQ} -i '.spec.relatedImages = load("./hack/relatedimages.yaml")' "${CSV_PATH}"
 rm combined-crs.json internal-crs.json

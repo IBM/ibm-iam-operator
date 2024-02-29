@@ -168,7 +168,7 @@ GO_VERSION ?= 1.21.7
 GO ?= $(LOCALBIN)/go$(GO_VERSION)
 
 .PHONY: go
-go: $(GO) ## Install pinned version of go
+go: $(GO) ## Install pinned version of go.
 $(GO): $(LOCALBIN) # https://go.dev/doc/manage-install#installing-multiple
 ifeq (,$(shell which go 2>/dev/null))
 	@{ \
@@ -238,11 +238,11 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 .PHONY: dev-overlays
-dev-overlays:
+dev-overlays: ## Generate the dev overlays for kustomize.
 	hack/create_dev_overlays
 
 .PHONY: bundle
-bundle: manifests kustomize yq ## Build the bundle manifests
+bundle: manifests kustomize yq ## Build the bundle manifests.
 ifeq ($(MODE), dev)
 	hack/create_dev_overlays
 endif
@@ -275,7 +275,7 @@ test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
 
 .PHONY: update-version
-update-version: manifests kustomize yq ## Update the Operator SemVer across the project
+update-version: manifests kustomize yq ## Update the Operator SemVer across the project.
 	./hack/update_operator_version
 
 
@@ -302,28 +302,28 @@ catalog-build: opm ## Build a catalog image.
 bundle-build: ## Build the bundle image.
 	docker build -f $(BUNDLE_DOCKERFILE) -t $(BUNDLE_IMG) .
 
-build-image-amd64: $(GO) $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on amd64
+build-image-amd64: $(GO) $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on amd64.
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -a -o build/_output/bin/manager main.go
 	$(CONTAINER_CLI) run --rm --privileged docker.io/multiarch/qemu-user-static:register --reset
 	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID) -f build/Dockerfile.amd64 .
 	@\rm -f build/_output/bin/manager
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID); fi
 
-build-image-ppc64le: $(GO) $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on ppc64le
+build-image-ppc64le: $(GO) $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on ppc64le.
 	CGO_ENABLED=0 GOOS=linux GOARCH=ppc64le $(GO) build -a -o build/_output/bin/manager main.go
 	$(CONTAINER_CLI) run --rm --privileged docker.io/multiarch/qemu-user-static:register --reset
 	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID) -f build/Dockerfile.ppc64le .
 	@\rm -f build/_output/bin/manager
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID); fi
 
-build-image-s390x: $(GO) $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on s390x
+build-image-s390x: $(GO) $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on s390x.
 	CGO_ENABLED=0 GOOS=linux GOARCH=s390x $(GO) build -a -o build/_output/bin/manager main.go
 	$(CONTAINER_CLI) run --rm --privileged docker.io/multiarch/qemu-user-static:register --reset
 	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-s390x:$(GIT_COMMIT_ID) -f build/Dockerfile.s390x .
 	@\rm -f build/_output/bin/manager
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-s390x:$(GIT_COMMIT_ID); fi
 
-images: $(CONFIG_DOCKER_TARGET) build-image-amd64 build-image-ppc64le build-image-s390x ## Build the multi-arch manifest
+images: $(CONFIG_DOCKER_TARGET) build-image-amd64 build-image-ppc64le build-image-s390x ## Build the multi-arch manifest.
 	@MAX_PULLING_RETRY=20 RETRY_INTERVAL=30 common/scripts/multiarch_image.sh $(REGISTRY) $(IMG) $(GIT_COMMIT_ID) $(VERSION)
 
 ##@ Deployment
@@ -351,7 +351,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 	- oc delete -f config/samples/bases/operator_v1alpha1_authentication.yaml -n ${NAMESPACE}
 	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
-build-dev-image: ## Build local 
+build-dev-image: ## Build image using local architecture.
 	@echo "Building ibm-iam-operator dev image for $(LOCAL_ARCH)"
 	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-$(LOCAL_ARCH):$(VERSION) -f Dockerfile .
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-$(LOCAL_ARCH):$(GIT_COMMIT_ID); fi
@@ -381,9 +381,15 @@ catalog-push: ## Push a catalog image.
 all: check test coverage build images
 
 ##@ Cleanup
-clean: ## Clean build and bin directories
+clean: ## Clean build and bin directories.
 	rm -f build/_output/bin/*
 	chmod -R +w bin/
 	rm -rf bin/*
+	rm -rf config/default/overlays/dev
+	rm -rf config/manager/overlays/dev
+	rm -rf config/manifests/overlays/dev
+	rm -rf config/samples/overlays/dev
+	rm -rf bundle-dev
+	rm bundle-dev.Dockerfile
 
 .PHONY: all build run check install uninstall code-dev test test-e2e coverage images csv clean help

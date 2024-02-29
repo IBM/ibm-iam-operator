@@ -91,6 +91,15 @@ BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 # BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 
+BUNDLE_DOCKERFILE ?= bundle.Dockerfile
+
+MODE ?= prod
+
+ifeq ($(MODE), dev)
+	BUNDLE_DOCKERFILE = bundle-dev.Dockerfile
+	BUNDLE_GEN_FLAGS += --output-dir=bundle-dev
+endif
+
 # USE_IMAGE_DIGESTS defines if images are resolved via tags or digests
 # You can enable this value if you would like to use SHA Based Digests
 # To enable set flag to true
@@ -228,30 +237,29 @@ manifests: controller-gen ## Generate WebhookConfiguration and ClusterRole objec
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
-.PHONY: bundle-hacks
-bundle-hacks: yq bundle/manifests/ibm-iam-operator.clusterserviceversion.yaml hack/external-crs.json
-	@# Hack to add in the OperandRequest/OperandBindInfo after bundle validation; bundle validation will fail if they are
-	@# included in the examples beforehand. alm-examples is a JSON string, which makes it somewhat awkward to deal with in
-	@# kustomize. Instead, use yq to get the Authentication CR example as a JSON file, merge that example with the
-	@# OperandRequest and OperandBindInfo examples, and set alm-examples to that merged result.
-	$(YQ) '.metadata.annotations.alm-examples' bundle/manifests/ibm-iam-operator.clusterserviceversion.yaml > internal-crs.json
-	$(YQ) '. += load("./hack/external-crs.json")' internal-crs.json > combined-crs.json
-	$(YQ) -i '.metadata.annotations.alm-examples = load_str("combined-crs.json")' bundle/manifests/ibm-iam-operator.clusterserviceversion.yaml
-	@# Also need to replace the WATCH_NAMESPACE value that operator-sdk seems to overwrite with a reference to the
-	@# namespace-scope ConfigMap
-	$(YQ) -i '.spec.install.spec.deployments[].spec.template.spec.containers[].env |= map(select(.name == "WATCH_NAMESPACE").valueFrom=load("./hack/manager_patch.yaml"))' bundle/manifests/ibm-iam-operator.clusterserviceversion.yaml
-	@# Trying to include relatedImages in the config base leads to it being clobbered by operator-sdk apparently
-	$(YQ) -i '.spec.relatedImages = load("./hack/relatedimages.yaml")' bundle/manifests/ibm-iam-operator.clusterserviceversion.yaml
-	rm combined-crs.json internal-crs.json
-
-.PHONY: bundle-base
-bundle-base: manifests kustomize yq
-	operator-sdk generate kustomize manifests -q
-	$(KUSTOMIZE) build config/manifests/overlays/prod | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
-	operator-sdk bundle validate ./bundle
+.PHONY: dev-overlays
+dev-overlays:
+	hack/create_dev_overlays
 
 .PHONY: bundle
-bundle: bundle-base bundle-hacks ## Build the bundle manifests
+bundle: manifests kustomize yq ## Build the bundle manifests
+ifeq ($(MODE), dev)
+	hack/create_dev_overlays
+endif
+	operator-sdk generate kustomize manifests -q
+ifeq ($(MODE), dev)
+	cd config/manager/overlays/dev && $(KUSTOMIZE) edit set image controller=$(IMAGE_TAG_BASE):$(VERSION)
+	cp bundle.Dockerfile bundle.Dockerfile.bk
+	$(KUSTOMIZE) build config/manifests/overlays/dev | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
+	cp bundle.Dockerfile bundle-dev.Dockerfile
+	mv bundle.Dockerfile.bk bundle.Dockerfile
+	hack/patch-built-bundle "dev"
+else
+	$(KUSTOMIZE) build config/manifests/overlays/prod | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
+	operator-sdk bundle validate ./bundle
+	hack/patch-built-bundle
+endif
+
 
 .PHONY: fmt
 fmt: go ## Run go fmt against code.
@@ -265,9 +273,6 @@ vet: ## Run go vet against code.
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
-
-.PHONY: dev-bundle
-dev-bundle: dev-bundle-base bundle-hacks
 
 .PHONY: update-version
 update-version: manifests kustomize yq ## Update the Operator SemVer across the project
@@ -295,7 +300,7 @@ catalog-build: opm ## Build a catalog image.
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	docker build -f $(BUNDLE_DOCKERFILE) -t $(BUNDLE_IMG) .
 
 build-image-amd64: $(GO) $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on amd64
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -a -o build/_output/bin/manager main.go
@@ -350,13 +355,6 @@ build-dev-image: ## Build local
 	@echo "Building ibm-iam-operator dev image for $(LOCAL_ARCH)"
 	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-$(LOCAL_ARCH):$(VERSION) -f Dockerfile .
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-$(LOCAL_ARCH):$(GIT_COMMIT_ID); fi
-
-
-.PHONY: dev-bundle-base 
-dev-bundle-base: manifests kustomize yq
-	operator-sdk generate kustomize manifests -q
-	cd config/manager/overlays/dev && $(KUSTOMIZE) edit set image controller=$(IMAGE_TAG_BASE):$(VERSION)
-	$(KUSTOMIZE) build config/manifests/overlays/dev | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.

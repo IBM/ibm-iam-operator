@@ -126,9 +126,10 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
 			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:              *cpu1000,
-				corev1.ResourceMemory:           *memory1024,
-				corev1.ResourceEphemeralStorage: *memory650,
+				corev1.ResourceCPU:                      *cpu1000,
+				corev1.ResourceMemory:                   *memory1024,
+				corev1.ResourceEphemeralStorage:         *memory650,
+				corev1.ResourceHugePagesPrefix + "-2Mi": *memory150,
 			},
 			Requests: map[corev1.ResourceName]resource.Quantity{
 				corev1.ResourceCPU:              *cpu100,
@@ -434,9 +435,10 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
 			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:              *cpu1000,
-				corev1.ResourceMemory:           *memory1024,
-				corev1.ResourceEphemeralStorage: *memory550,
+				corev1.ResourceCPU:                      *cpu1000,
+				corev1.ResourceMemory:                   *memory1024,
+				corev1.ResourceEphemeralStorage:         *memory550,
+				corev1.ResourceHugePagesPrefix + "-2Mi": *memory150,
 			},
 			Requests: map[corev1.ResourceName]resource.Quantity{
 				corev1.ResourceCPU:              *cpu50,
@@ -803,9 +805,10 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
 			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:              *cpu1000,
-				corev1.ResourceMemory:           *memory1024,
-				corev1.ResourceEphemeralStorage: *memory550,
+				corev1.ResourceCPU:                      *cpu1000,
+				corev1.ResourceMemory:                   *memory1024,
+				corev1.ResourceEphemeralStorage:         *memory550,
+				corev1.ResourceHugePagesPrefix + "-2Mi": *memory150,
 			},
 			Requests: map[corev1.ResourceName]resource.Quantity{
 				corev1.ResourceCPU:              *cpu50,

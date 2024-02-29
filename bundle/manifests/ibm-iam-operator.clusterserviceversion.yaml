@@ -31,6 +31,7 @@ metadata:
                   "cpu": "1000m",
                   "ephemeral-storage": "650Mi",
                   "memory": "1Gi"
+                  "hugepages-2Mi": "100Mi"
                 },
                 "requests": {
                   "cpu": "100m",
@@ -100,6 +101,7 @@ metadata:
                   "cpu": "1000m",
                   "ephemeral-storage": "550Mi",
                   "memory": "1Gi"
+                  "hugepages-2Mi": "100Mi"
                 },
                 "requests": {
                   "cpu": "50m",
@@ -117,6 +119,7 @@ metadata:
                   "cpu": "1000m",
                   "ephemeral-storage": "550Mi",
                   "memory": "1Gi"
+                  "hugepages-2Mi": "100Mi"
                 },
                 "requests": {
                   "cpu": "50m",

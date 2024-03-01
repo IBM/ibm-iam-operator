@@ -9,6 +9,14 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// translateMongoDBFieldsToPostgresColumns ensures that the MongoDB schema is converted over to the schema written to
+// Postgres; it takes a map of MongoDB field names to their Postgres column names.
+func translateMongoDBFieldsToPostgresColumns(fieldMap map[string]string, m map[string]interface{}) {
+	for fieldName, colName := range fieldMap {
+		m[colName] = m[fieldName]
+	}
+}
+
 // IdpConfig is a row from the `platformdb.idp_configs` table
 type IdpConfig struct {
 	UID         string                 `json:"uid"`
@@ -111,6 +119,15 @@ var UserColumnNames []string = []string{
 var UsersIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "users"}
 
 func ConvertToUser(userMap map[string]interface{}, user *User) (err error) {
+	fieldMap := map[string]string{
+		"_id":                "user_id",
+		"uniqueSecurityName": "unique_security_name",
+		"userBaseDN":         "user_basedn",
+		"firstName":          "first_name",
+		"lastName":           "last_name",
+		"lastLogin":          "last_login",
+	}
+	translateMongoDBFieldsToPostgresColumns(fieldMap, userMap)
 	if _, ok := userMap["uid"]; !ok {
 		userMap["uid"] = uuid.New()
 	}
@@ -155,6 +172,13 @@ var UserPreferencesColumnNames []string = []string{
 var UsersPreferencesIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "users_preferences"}
 
 func ConvertToUserPreferences(userPrefsMap map[string]interface{}, userPrefs *UserPreferences) (err error) {
+	fieldMap := map[string]string{
+		"_id":        "user_id",
+		"lastLogin":  "last_login",
+		"lastLogout": "last_logout",
+		"loginCount": "login_count",
+	}
+	translateMongoDBFieldsToPostgresColumns(fieldMap, userPrefsMap)
 	var jsonBytes []byte
 	if jsonBytes, err = json.Marshal(userPrefsMap); err != nil {
 		return
@@ -247,6 +271,14 @@ var ZenInstanceColumnNames []string = []string{
 var ZenInstancesIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "zen_instances"}
 
 func ConvertToZenInstance(zenInstanceMap map[string]interface{}, zenInstance *ZenInstance) (err error) {
+	fieldMap := map[string]string{
+		"_id":            "instance_id",
+		"clientId":       "client_id",
+		"clientSecret":   "client_secret",
+		"productNameUrl": "product_name_url",
+		"zenAuditUrl":    "zen_audit_url",
+	}
+	translateMongoDBFieldsToPostgresColumns(fieldMap, zenInstanceMap)
 	var jsonBytes []byte
 	if jsonBytes, err = json.Marshal(zenInstanceMap); err != nil {
 		return
@@ -286,6 +318,12 @@ var ZenInstanceUserColumnNames []string = []string{
 var ZenInstanceUsersIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "zen_instances_users"}
 
 func ConvertToZenInstanceUser(zenInstanceUserMap map[string]interface{}, zenInstanceUser *ZenInstanceUser) (err error) {
+	fieldMap := map[string]string{
+		"_id":           "uzid",
+		"zenInstanceId": "zen_instance_id",
+		"usersId":       "user_id",
+	}
+	translateMongoDBFieldsToPostgresColumns(fieldMap, zenInstanceUserMap)
 	var jsonBytes []byte
 	if jsonBytes, err = json.Marshal(zenInstanceUserMap); err != nil {
 		return
@@ -324,6 +362,10 @@ var SCIMAttributesColumnNames []string = []string{
 var SCIMAttributesIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "scim_attributes"}
 
 func ConvertToSCIMAttributes(scimAttributesMap map[string]interface{}, scimAttributes *SCIMAttributes) (err error) {
+	fieldMap := map[string]string{
+		"_id": "id",
+	}
+	translateMongoDBFieldsToPostgresColumns(fieldMap, scimAttributesMap)
 	var jsonBytes []byte
 	if jsonBytes, err = json.Marshal(scimAttributesMap); err != nil {
 		return
@@ -364,6 +406,10 @@ var SCIMAttributesMappingsColumnNames []string = []string{
 var SCIMAttributesMappingsIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "scim_attributes_mappings"}
 
 func ConvertToSCIMAttributesMapping(scimAttributesMappingMap map[string]interface{}, scimAttributesMapping *SCIMAttributesMapping) (err error) {
+	fieldMap := map[string]string{
+		"_id": "idp_id",
+	}
+	translateMongoDBFieldsToPostgresColumns(fieldMap, scimAttributesMappingMap)
 	var jsonBytes []byte
 	if jsonBytes, err = json.Marshal(scimAttributesMappingMap); err != nil {
 		return

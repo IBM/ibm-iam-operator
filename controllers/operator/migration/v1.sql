@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS "platformdb"."users_attributes" (
     "name" character varying,
     "value" character varying,
     CONSTRAINT "users_attributes_uid" PRIMARY KEY ("uid"),
-    CONSTRAINT "fk_useratt_fk" FOREIGN KEY ("user_uid") REFERENCES users ("uid")
+    CONSTRAINT "fk_useratt_fk" FOREIGN KEY ("user_uid") REFERENCES platformdb.users ("uid")
 ) WITH (oids = false);
 
 -- End User Management
@@ -80,8 +80,10 @@ CREATE TABLE IF NOT EXISTS "platformdb"."zen_instances_users" (
     "zen_instance_id" character varying NOT NULL,
     "user_id" character varying NOT NULL,
     CONSTRAINT "zeninstances_users_uzid" PRIMARY KEY ("uz_id"),
-    CONSTRAINT "fk_zenuser_fk" FOREIGN KEY ("zen_instance_id") REFERENCES zen_instances ("instance_id"),
-    CONSTRAINT "fk_userzen_fk" FOREIGN KEY ("user_id") REFERENCES users ("user_id")
+    CONSTRAINT "fk_zenuser_fk" FOREIGN KEY ("zen_instance_id")
+    REFERENCES platformdb.zen_instances ("instance_id"),
+    CONSTRAINT "fk_userzen_fk" FOREIGN KEY ("user_id")
+    REFERENCES platformdb.users ("user_id")
 ) WITH (oids = false);
 
 -- End Zen Integration
@@ -127,7 +129,8 @@ CREATE TABLE IF NOT EXISTS "platformdb"."groups_members" (
     "realm_id" character varying NOT NULL,
     "group_id" character varying NOT NULL,
     "member_id" character varying NOT NULL,
-    CONSTRAINT "groupmembers_groupid_memberid,realm_id" PRIMARY KEY ("group_id,member_id,realm_id")
+    CONSTRAINT "groupmembers_groupid_memberid,realm_id"
+        PRIMARY KEY (group_id, member_id, realm_id)
 ) WITH (oids = false);
 
 -- End SCIM with JIT Flow
@@ -136,7 +139,7 @@ CREATE TABLE IF NOT EXISTS "platformdb"."groups_members" (
 
 CREATE TABLE IF NOT EXISTS platformdb.scim_server_users (
     id character varying(255) NOT NULL,
-    schemas text[],
+    schemas text [],
     "externalId" character varying(255),
     "userName" character varying(255),
     name json,
@@ -189,49 +192,50 @@ CREATE SCHEMA IF NOT EXISTS oauthdbschema;
 
 CREATE TABLE IF NOT EXISTS oauthdbschema.oauthtoken
 (
-  _id SERIAL,
-  LOOKUPKEY VARCHAR(256) NOT NULL,
-  UNIQUEID VARCHAR(2048) NOT NULL,
-  PROVIDERID VARCHAR(256) NOT NULL,
-  TYPE VARCHAR(64) NOT NULL,
-  SUBTYPE VARCHAR(64),
-  CREATEDAT BIGINT,
-  LIFETIME INT,
-  EXPIRES BIGINT,
-  TOKENSTRING VARCHAR(32768) NOT NULL,
-  CLIENTID VARCHAR(64) NOT NULL,
-  USERNAME VARCHAR(64) NOT NULL,
-  SCOPE VARCHAR(512) NOT NULL,
-  REDIRECTURI VARCHAR(2048),
-  STATEID VARCHAR(64) NOT NULL,
-  PROPS TEXT NOT NULL DEFAULT '{}',
-  CONSTRAINT PK_LOOKUPKEY PRIMARY KEY ("LOOKUPKEY")
+    _id serial,
+    lookupkey varchar(256) NOT NULL,
+    uniqueid varchar(2048) NOT NULL,
+    providerid varchar(256) NOT NULL,
+    type varchar(64) NOT NULL,
+    subtype varchar(64),
+    createdat bigint,
+    lifetime int,
+    expires bigint,
+    tokenstring varchar(32768) NOT NULL,
+    clientid varchar(64) NOT NULL,
+    username varchar(64) NOT NULL,
+    scope varchar(512) NOT NULL,
+    redirecturi varchar(2048),
+    stateid varchar(64) NOT NULL,
+    props text NOT NULL DEFAULT '{}',
+    CONSTRAINT pk_lookupkey PRIMARY KEY (lookupkey)
 );
 
 CREATE TABLE IF NOT EXISTS oauthdbschema.oauthclient
 (
-  _id SERIAL,
-  CLIENTID VARCHAR(64) NOT NULL,
-  PROVIDERID VARCHAR(256) NOT NULL,
-  CLIENTSECRET VARCHAR(256),
-  DISPLAYNAME VARCHAR(256) NOT NULL,
-  ENABLED BOOLEAN,
-  METADATA TEXT NOT NULL DEFAULT '{}',
-  CONSTRAINT PK_COMPIDCLIENTID PRIMARY KEY (PROVIDERID,CLIENTID);
+    _id serial,
+    clientid varchar(64) NOT NULL,
+    providerid varchar(256) NOT NULL,
+    clientsecret varchar(256),
+    displayname varchar(256) NOT NULL,
+    enabled boolean,
+    metadata text NOT NULL DEFAULT '{}',
+    CONSTRAINT pk_compidclientid PRIMARY KEY (providerid, clientid)
 );
 
 CREATE TABLE IF NOT EXISTS oauthdbschema.oauthconsent
 (
-  _id SERIAL,
-  CLIENTID VARCHAR(64) NOT NULL,
-  USERNAME VARCHAR(64) NOT NULL,
-  SCOPE VARCHAR(512) NOT NULL,
-  RESOURCE VARCHAR(512), 
-  PROVIDERID VARCHAR(256) NOT NULL,
-  EXPIRES BIGINT,
-  PROPS TEXT NOT NULL DEFAULT '{}'
+    _id serial,
+    clientid varchar(64) NOT NULL,
+    username varchar(64) NOT NULL,
+    scope varchar(512) NOT NULL,
+    resource varchar(512),
+    providerid varchar(256) NOT NULL,
+    expires bigint,
+    props text NOT NULL DEFAULT '{}'
 );
 
-CREATE INDEX IF NOT EXISTS OAUTH20CACHE_EXPIRES ON oauthdbschema.oauthtoken (EXPIRES ASC);
+CREATE INDEX IF NOT EXISTS oauth20cache_expires
+ON oauthdbschema.oauthtoken (expires ASC);
 
 -- End oauthdbschema Schema

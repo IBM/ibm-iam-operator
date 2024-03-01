@@ -256,7 +256,29 @@ func (p *PostgresDB) HasSchemas(ctx context.Context) (bool, error) {
 
 // InitSchemas executes the DDL that initializes the schemas and tables that the different IM Operands will use.
 func InitSchemas(ctx context.Context, to, from DBConn) (err error) {
-	return to.RunDDL(ctx, initDDL)
+	reqLogger := logf.FromContext(ctx)
+	postgres, ok := to.(*PostgresDB)
+	if !ok {
+		return fmt.Errorf("from should be an instance of Postgres")
+	}
+	if err = postgres.Connect(ctx); err != nil {
+		reqLogger.Error(err, "Failed to connect to Postgres")
+		return
+	}
+	defer postgres.Disconnect(ctx)
+
+	var schemasPresent bool
+	schemasPresent, err = postgres.HasSchemas(ctx)
+	if err != nil {
+		reqLogger.Error(err, "Failed to determine whether schemas present")
+		return
+	}
+	if !schemasPresent {
+		if err = to.RunDDL(ctx, initDDL); err != nil {
+			reqLogger.Error(err, "Failed to execute DDL")
+		}
+	}
+	return
 }
 
 func MongoToV1(ctx context.Context, to, from DBConn) (err error) {

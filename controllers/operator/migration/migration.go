@@ -340,15 +340,15 @@ func copyIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB)
 		pgx.CopyFromSlice(len(idpRows), func(i int) ([]any, error) {
 			return []any{
 				idpRows[i].UID,
-				idpRows[i].Name,
-				idpRows[i].Protocol,
-				idpRows[i].Type,
 				idpRows[i].Description,
 				idpRows[i].Enabled,
 				idpRows[i].IDPConfig,
+				idpRows[i].Name,
+				idpRows[i].Protocol,
+				idpRows[i].Type,
 				idpRows[i].SCIMConfig,
-				idpRows[i].LDAPConfig,
-				idpRows[i].JIT}, nil
+				idpRows[i].JIT,
+				idpRows[i].LDAPConfig}, nil
 		}),
 	)
 	if err != nil {

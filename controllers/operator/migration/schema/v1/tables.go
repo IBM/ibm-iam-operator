@@ -12,37 +12,38 @@ import (
 // IdpConfig is a row from the `platformdb.idp_configs` table
 type IdpConfig struct {
 	UID         string                 `json:"uid"`
-	Name        string                 `json:"name"`
-	Protocol    string                 `json:"protocol"`
-	Type        string                 `json:"type"`
 	Description string                 `json:"description"`
 	Enabled     bool                   `json:"enabled"`
 	IDPConfig   map[string]interface{} `json:"idp_config"`
+	Name        string                 `json:"name"`
+	Protocol    string                 `json:"protocol"`
+	Type        string                 `json:"type"`
 	SCIMConfig  map[string]interface{} `json:"scim_config"`
-	LDAPConfig  map[string]interface{} `json:"ldap_config"`
 	JIT         bool                   `json:"jit"`
+	LDAPConfig  map[string]interface{} `json:"ldap_config"`
 }
 
 var IdpConfigColumnNames []string = []string{
 	"uid",
-	"name",
-	"protocol",
-	"type",
 	"description",
 	"enabled",
 	"idp_config",
+	"name",
+	"protocol",
+	"type",
 	"scim_config",
-	"ldap_config",
 	"jit",
+	"ldap_config",
 }
 
 var IdpConfigsIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "idp_configs"}
 
 func ConvertToIdpConfig(idpMap map[string]interface{}, idpConfig *IdpConfig) (err error) {
-	if enabled, ok := idpMap["enabled"]; ok && (enabled == "true" || enabled == true) {
-		idpMap["enabled"] = true
-	} else {
+	// DDL defaults enabled to true
+	if enabled, ok := idpMap["enabled"]; ok && (enabled == "false" || enabled == false) {
 		idpMap["enabled"] = false
+	} else {
+		idpMap["enabled"] = true
 	}
 
 	var jsonBytes []byte
@@ -179,10 +180,10 @@ func ConvertToUsersPreferences(usersPrefsMaps []map[string]interface{}, usersPre
 
 // UserAttributes is a row from the `platformdb.users_attributes` table
 type UserAttributes struct {
-	UID     string `json:"uid"`
-	UserUID string `json:"user_uid,omitempty"`
-	Name    string `json:"name,omitempty"`
-	Value   string `json:"value,omitempty"`
+	UID     uuid.UUID `json:"uid"`
+	UserUID uuid.UUID `json:"user_uid"`
+	Name    string    `json:"name,omitempty"`
+	Value   string    `json:"value,omitempty"`
 }
 
 var UserAttributesColumnNames []string = []string{
@@ -195,6 +196,12 @@ var UserAttributesColumnNames []string = []string{
 var UsersAttributesIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "users_attributes"}
 
 func ConvertToUserAttributes(userAttrMap map[string]interface{}, userAttr *UserAttributes) (err error) {
+	if _, ok := userAttrMap["uid"]; !ok {
+		userAttrMap["uid"] = uuid.New()
+	}
+	if _, ok := userAttrMap["user_uid"]; !ok {
+		userAttrMap["user_uid"] = uuid.New()
+	}
 	var jsonBytes []byte
 	if jsonBytes, err = json.Marshal(userAttrMap); err != nil {
 		return

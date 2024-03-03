@@ -32,7 +32,7 @@ var _ = Describe("Migration", func() {
 				userPrefs = append(userPrefs, v1schema.UserPreferences{
 					UserID:     "some-id",
 					LoginCount: 0,
-					LastLogout: pgtype.Timestamptz{
+					LastLogout: &pgtype.Timestamptz{
 						Time: time.Now(),
 					},
 				})
@@ -45,7 +45,7 @@ var _ = Describe("Migration", func() {
 			BeforeEach(func() {
 				userPrefs = []v1schema.UserPreferences{
 					{
-						LastLogin: pgtype.Timestamptz{
+						LastLogin: &pgtype.Timestamptz{
 							Time: time.Now(),
 						},
 					},

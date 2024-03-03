@@ -3,6 +3,8 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -13,7 +15,13 @@ import (
 // Postgres; it takes a map of MongoDB field names to their Postgres column names.
 func translateMongoDBFieldsToPostgresColumns(fieldMap map[string]string, m map[string]interface{}) {
 	for fieldName, colName := range fieldMap {
-		m[colName] = m[fieldName]
+		if _, ok := m[fieldName]; !ok {
+			continue
+		}
+		fieldValue := reflect.ValueOf(m[fieldName])
+		if fieldValue.IsValid() && !reflect.DeepEqual(fieldValue.Interface(), reflect.Zero(fieldValue.Type())) {
+			m[colName] = m[fieldName]
+		}
 	}
 }
 
@@ -79,22 +87,22 @@ func ConvertToIdpConfigs(idpMaps []map[string]interface{}, idpRows []IdpConfig) 
 
 // User is a row from the `platformdb.users` table
 type User struct {
-	UID                uuid.UUID          `json:"uid"`
-	UserID             string             `json:"user_id"`
-	RealmID            string             `json:"realm_id,omitempty"`
-	FirstName          string             `json:"first_name,omitempty"`
-	LastName           string             `json:"last_name,omitempty"`
-	Email              string             `json:"email,omitempty"`
-	Type               string             `json:"type,omitempty"`
-	LastLogin          pgtype.Timestamptz `json:"last_login,omitempty"`
-	Status             string             `json:"status,omitempty"`
-	UserBaseDN         string             `json:"user_basedn,omitempty"`
-	Groups             []string           `json:"groups,omitempty"`
-	Role               string             `json:"role,omitempty"`
-	UniqueSecurityName string             `json:"unique_security_name,omitempty"`
-	PreferredUsername  string             `json:"preferred_username,omitempty"`
-	DisplayName        string             `json:"display_name,omitempty"`
-	Subject            string             `json:"subject,omitempty"`
+	UID                *uuid.UUID          `json:"uid"`
+	UserID             string              `json:"user_id"`
+	RealmID            string              `json:"realm_id,omitempty"`
+	FirstName          string              `json:"first_name,omitempty"`
+	LastName           string              `json:"last_name,omitempty"`
+	Email              string              `json:"email,omitempty"`
+	Type               string              `json:"type,omitempty"`
+	LastLogin          *pgtype.Timestamptz `json:"last_login,omitempty"`
+	Status             string              `json:"status,omitempty"`
+	UserBaseDN         string              `json:"user_basedn,omitempty"`
+	Groups             []string            `json:"groups,omitempty"`
+	Role               string              `json:"role,omitempty"`
+	UniqueSecurityName string              `json:"unique_security_name,omitempty"`
+	PreferredUsername  string              `json:"preferred_username,omitempty"`
+	DisplayName        string              `json:"display_name,omitempty"`
+	Subject            string              `json:"subject,omitempty"`
 }
 
 var UserColumnNames []string = []string{
@@ -119,6 +127,10 @@ var UserColumnNames []string = []string{
 var UsersIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "users"}
 
 func ConvertToUser(userMap map[string]interface{}, user *User) (err error) {
+	// If lastLogin is an empty string, delete it in order to make zero value consistent
+	if lastLogin, ok := userMap["lastLogin"]; ok && lastLogin == "" {
+		delete(userMap, "lastLogin")
+	}
 	fieldMap := map[string]string{
 		"_id":                "user_id",
 		"uniqueSecurityName": "unique_security_name",
@@ -133,11 +145,11 @@ func ConvertToUser(userMap map[string]interface{}, user *User) (err error) {
 	}
 	var jsonBytes []byte
 	if jsonBytes, err = json.Marshal(userMap); err != nil {
-		return
+		return fmt.Errorf("failed to marshal User _id=%q: %w", userMap["_id"], err)
 	}
 
 	if err = json.Unmarshal(jsonBytes, user); err != nil {
-		return
+		return fmt.Errorf("failed to unmarshal User _id=%q: %w", userMap["_id"], err)
 	}
 
 	return nil
@@ -156,10 +168,10 @@ func ConvertToUsers(userMaps []map[string]interface{}, users []User) (err error)
 
 // UserPreferences is a row from the `platformdb.users_preferences` table
 type UserPreferences struct {
-	UserID     string             `json:"user_id"`
-	LastLogin  pgtype.Timestamptz `json:"last_login"`
-	LastLogout pgtype.Timestamptz `json:"last_logout,omitempty"`
-	LoginCount int                `json:"login_count,omitempty"`
+	UserID     string              `json:"user_id"`
+	LastLogin  *pgtype.Timestamptz `json:"last_login"`
+	LastLogout *pgtype.Timestamptz `json:"last_logout,omitempty"`
+	LoginCount int                 `json:"login_count,omitempty"`
 }
 
 var UserPreferencesColumnNames []string = []string{
@@ -172,6 +184,18 @@ var UserPreferencesColumnNames []string = []string{
 var UsersPreferencesIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "users_preferences"}
 
 func ConvertToUserPreferences(userPrefsMap map[string]interface{}, userPrefs *UserPreferences) (err error) {
+	// If either of the following is an empty string, delete it in order to make zero value consistent
+	if lastLogin, ok := userPrefsMap["lastLogin"]; ok && lastLogin == "" {
+		delete(userPrefsMap, "lastLogin")
+	}
+	if lastLogin, ok := userPrefsMap["lastLogout"]; ok && lastLogin == "" {
+		delete(userPrefsMap, "lastLogout")
+	}
+	if id, ok := userPrefsMap["_id"]; ok {
+		if s, sok := id.(string); sok {
+			userPrefsMap["_id"] = strings.TrimPrefix(s, "preference_Id_")
+		}
+	}
 	fieldMap := map[string]string{
 		"_id":        "user_id",
 		"lastLogin":  "last_login",
@@ -185,7 +209,7 @@ func ConvertToUserPreferences(userPrefsMap map[string]interface{}, userPrefs *Us
 	}
 
 	if err = json.Unmarshal(jsonBytes, userPrefs); err != nil {
-		return
+		return fmt.Errorf("failed to unmarshal UserPreference _id=%q: %w", userPrefsMap["_id"], err)
 	}
 
 	return nil
@@ -204,10 +228,10 @@ func ConvertToUsersPreferences(usersPrefsMaps []map[string]interface{}, usersPre
 
 // UserAttributes is a row from the `platformdb.users_attributes` table
 type UserAttributes struct {
-	UID     uuid.UUID `json:"uid"`
-	UserUID uuid.UUID `json:"user_uid"`
-	Name    string    `json:"name,omitempty"`
-	Value   string    `json:"value,omitempty"`
+	UID     *uuid.UUID `json:"uid"`
+	UserUID *uuid.UUID `json:"user_uid"`
+	Name    string     `json:"name,omitempty"`
+	Value   string     `json:"value,omitempty"`
 }
 
 var UserAttributesColumnNames []string = []string{
@@ -304,13 +328,13 @@ func ConvertToZenInstances(zenInstanceMaps []map[string]interface{}, zenInstance
 
 // ZenInstanceUser is a row from the `platformdb.zen_instances_users` table
 type ZenInstanceUser struct {
-	UZID          string `json:"uzid"`
+	UZID          string `json:"uz_id"`
 	ZenInstanceID string `json:"zen_instance_id"`
 	UserID        string `json:"user_id"`
 }
 
 var ZenInstanceUserColumnNames []string = []string{
-	"uzid",
+	"uz_id",
 	"zen_instance_id",
 	"user_id",
 }
@@ -319,7 +343,7 @@ var ZenInstanceUsersIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "ze
 
 func ConvertToZenInstanceUser(zenInstanceUserMap map[string]interface{}, zenInstanceUser *ZenInstanceUser) (err error) {
 	fieldMap := map[string]string{
-		"_id":           "uzid",
+		"_id":           "uz_id",
 		"zenInstanceId": "zen_instance_id",
 		"usersId":       "user_id",
 	}

@@ -23,6 +23,7 @@ import (
 	"maps"
 	"reflect"
 	"sync"
+	"time"
 
 	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	"github.com/IBM/ibm-iam-operator/controllers/operator/migration"
@@ -162,8 +163,6 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	if authCR.HasNoDBSchemaVersion() {
 		reqLogger.Info("DB schema version annotation unset; adding initialization migration")
 		migrations = append(migrations, initEDB)
-	} else {
-		reqLogger.Info("DB schema version annotation set; will not perform initialization migration")
 	}
 
 	if needToMigrate, err := r.needToMigrateFromMongo(ctx, authCR); err != nil {
@@ -197,6 +196,7 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	}
 
 	if r.dbSetupChan == nil {
+		reqLogger.Info("No active or pending migrations; continuing")
 		return subreconciler.ContinueReconciling()
 	}
 
@@ -213,7 +213,7 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	select {
 	case migrationResult, ok := <-r.dbSetupChan:
 		if !ok {
-			reqLogger.Info("No migrations to perform; removing worker and continuing")
+			reqLogger.Info("No more migrations to perform and worker closed; removing worker and continuing")
 			r.dbSetupChan = nil
 			return subreconciler.ContinueReconciling()
 		}
@@ -227,7 +227,9 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		}
 		annotationsChanged := setMigrationAnnotations(authCR, migrationResult)
 		if annotationsChanged {
+			reqLogger.Info("Setting updated migration annotations on Authentication before requeue")
 			if err = r.Update(ctx, authCR); err != nil {
+				reqLogger.Error(err, "Failed to set migration annotations on Authentication")
 				subreconciler.RequeueWithError(err)
 			}
 		}
@@ -236,9 +238,9 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		}
 		return subreconciler.Requeue()
 	default:
-		reqLogger.Info("Migration still in progress")
+		reqLogger.Info("Migration still in progress; check again in 10s")
 		r.dbSetupChan <- &migration.Result{}
-		return subreconciler.Requeue()
+		return subreconciler.RequeueWithDelay(time.Second * 10)
 	}
 }
 

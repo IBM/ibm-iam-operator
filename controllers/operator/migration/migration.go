@@ -18,11 +18,12 @@ package migration
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 
 	v1schema "github.com/IBM/ibm-iam-operator/controllers/operator/migration/schema/v1"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	mongoOptions "go.mongodb.org/mongo-driver/mongo/options"
@@ -304,10 +305,11 @@ func MongoToV1(ctx context.Context, to, from DBConn) (err error) {
 	defer postgres.Disconnect(ctx)
 
 	copyFuncs := []copyFunc{
-		copyIdpConfigs,
-		copyUsers,
+		insertIdpConfigs,
+		insertUsers,
 		copyUsersPreferences,
 		copyZenInstances,
+		copyZenInstanceUsers,
 		copySCIMAttributes,
 		copySCIMAttributesMappings,
 	}
@@ -322,7 +324,7 @@ func MongoToV1(ctx context.Context, to, from DBConn) (err error) {
 	return
 }
 
-func (m *MongoDB) Find(ctx context.Context, db string, collection string, filter interface{}) (results []map[string]interface{}, err error) {
+func (m *MongoDB) FindAll(ctx context.Context, db string, collection string, filter interface{}) (results []map[string]interface{}, err error) {
 	reqLogger := logf.FromContext(ctx)
 	cursor, err := m.Client.Database(db).Collection(collection).Find(ctx, filter)
 	if err != nil {
@@ -336,13 +338,199 @@ func (m *MongoDB) Find(ctx context.Context, db string, collection string, filter
 	return
 }
 
+func insertIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	reqLogger := logf.FromContext(ctx)
+	filter := bson.D{{"migrated", bson.D{{"$ne", true}}}}
+	cursor, err := mongodb.Client.Database("platform-db").Collection("cloudpak_ibmid_v3").Find(ctx, filter)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get cursor from MongoDB")
+		return
+	}
+	errCount := 0
+	migrateCount := 0
+	for cursor.Next(ctx) {
+		var result map[string]interface{}
+		if err = cursor.Decode(&result); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document")
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+		idpConfig := &v1schema.IdpConfig{}
+		if err = v1schema.ConvertToIdpConfig(result, idpConfig); err != nil {
+			reqLogger.Error(err, "Failed to unmarshal idp_config")
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+		args := pgx.NamedArgs{
+			"UID":         idpConfig.UID,
+			"Description": idpConfig.Description,
+			"Enabled":     idpConfig.Enabled,
+			"IDPConfig":   idpConfig.IDPConfig,
+			"Name":        idpConfig.Name,
+			"Protocol":    idpConfig.Protocol,
+			"Type":        idpConfig.Type,
+			"SCIMConfig":  idpConfig.SCIMConfig,
+			"JIT":         idpConfig.JIT,
+			"LDAPConfig":  idpConfig.LDAPConfig,
+		}
+
+		query := `
+			INSERT INTO platformdb.idp_configs
+			(uid, description, enabled, idp_config, name, protocol, type, scim_config, jit, ldap_config)
+			VALUES (@UID, @Description, @Enabled, @IDPConfig, @Name, @Protocol, @Type, @SCIMConfig, @JIT, @LDAPConfig)
+			ON CONFLICT (uid) DO NOTHING
+			RETURNING uid;`
+		var uid *string
+		err := postgres.Conn.QueryRow(ctx, query, args).Scan(&uid)
+		if err != nil {
+			reqLogger.Error(err, "Failed to INSERT into table", "table", "platform-db.cloudpak_ibmid_v3")
+			errCount++
+			continue
+		}
+		updateFilter := bson.D{{"uid", idpConfig.UID}}
+		update := bson.D{{"$set", bson.D{{"migrated", true}}}}
+		updateResult, err := mongodb.Client.Database("platform-db").Collection("cloudpak_ibmid_v3").UpdateOne(ctx, updateFilter, update)
+		if err != nil {
+			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
+			errCount++
+			continue
+		}
+		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
+		migrateCount++
+	}
+	if errCount > 0 {
+		err = fmt.Errorf("encountered errors that prevented the migration of documents")
+		reqLogger.Error(err, "Migration of platform-db.cloudpak_ibmid_v3 not successful", "failedCount", errCount, "successCount", migrateCount)
+		return
+	} else if errCount == 0 && migrateCount == 0 {
+		reqLogger.Info("No documents needed to be migrated; continuing")
+		return
+	}
+
+	if err = cursor.Err(); err != nil {
+		reqLogger.Error(err, "MongoDB cursor encountered an error")
+		// TODO: Handle this further
+		return
+	}
+	reqLogger.Info("Successfully copied over IDP configs to EDB", "rowsInserted", migrateCount)
+	return
+}
+
+func insertUsers(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	reqLogger := logf.FromContext(ctx)
+	filter := bson.D{{"migrated", bson.D{{"$ne", true}}}}
+	cursor, err := mongodb.Client.Database("platform-db").Collection("Users").Find(ctx, filter)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get cursor from MongoDB")
+		return
+	}
+	errCount := 0
+	migrateCount := 0
+	for cursor.Next(ctx) {
+		var result map[string]interface{}
+		if err = cursor.Decode(&result); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document")
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+		user := &v1schema.User{}
+		if err = v1schema.ConvertToUser(result, user); err != nil {
+			reqLogger.Error(err, "Failed to unmarshal user")
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+		args := pgx.NamedArgs{
+			"UserID":             user.UserID,
+			"RealmID":            user.RealmID,
+			"FirstName":          user.FirstName,
+			"LastName":           user.LastName,
+			"Email":              user.Email,
+			"Type":               user.Type,
+			"LastLogin":          user.LastLogin,
+			"Status":             user.Status,
+			"UserBaseDN":         user.UserBaseDN,
+			"Groups":             user.Groups,
+			"Role":               user.Role,
+			"UniqueSecurityName": user.UniqueSecurityName,
+			"PreferredUsername":  user.PreferredUsername,
+			"DisplayName":        user.DisplayName,
+			"Subject":            user.Subject,
+		}
+
+		query := `
+			INSERT INTO platformdb.users
+			(uid, user_id, realm_id, first_name, last_name, email, type, last_login, status, user_basedn, groups, role, unique_security_name, preferred_username, display_name, subject)
+			VALUES (
+				  DEFAULT
+				, @UserID
+				, @RealmID
+				, @FirstName
+				, @LastName
+				, @Email
+				, @Type
+				, @LastLogin
+				, @Status
+				, @UserBaseDN
+				, @Groups
+				, @Role
+				, @UniqueSecurityName
+				, @PreferredUsername
+				, @DisplayName
+				, @Subject
+			)
+			ON CONFLICT DO NOTHING
+			RETURNING uid;`
+		var uid *string
+		err := postgres.Conn.QueryRow(ctx, query, args).Scan(&uid)
+		if err != nil {
+			reqLogger.Error(err, "Failed to INSERT into table", "table", "platform-db.users")
+			errCount++
+			continue
+		}
+		updateFilter := bson.D{{"_id", user.UserID}}
+		update := bson.D{{"$set", bson.D{{"migrated", true}}}}
+		updateResult, err := mongodb.Client.Database("platform-db").Collection("Users").UpdateOne(ctx, updateFilter, update)
+		if err != nil {
+			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
+			errCount++
+			continue
+		}
+		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
+		migrateCount++
+	}
+	if errCount > 0 {
+		err = fmt.Errorf("encountered errors that prevented the migration of documents")
+		reqLogger.Error(err, "Migration of platform-db.Users not successful", "failedCount", errCount, "successCount", migrateCount)
+		return
+	} else if errCount == 0 && migrateCount == 0 {
+		reqLogger.Info("No documents needed to be migrated; continuing")
+		return
+	}
+
+	if err = cursor.Err(); err != nil {
+		reqLogger.Error(err, "MongoDB cursor encountered an error")
+		// TODO: Handle this further
+		return
+	}
+	reqLogger.Info("Successfully copied over Users to EDB", "rowsInserted", migrateCount)
+	return
+}
+
 type copyFunc func(context.Context, *MongoDB, *PostgresDB) error
 
 func copyIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
 	reqLogger := logf.FromContext(ctx)
 	filter := bson.D{}
 	var results []map[string]interface{}
-	if results, err = mongodb.Find(ctx, "platform-db", "cloudpak_ibmid_v3", filter); err != nil {
+	if results, err = mongodb.FindAll(ctx, "platform-db", "cloudpak_ibmid_v3", filter); err != nil {
 		reqLogger.Error(err, "Failed to read all results from MongoDB")
 		return
 	}
@@ -373,8 +561,12 @@ func copyIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB)
 				idpRows[i].LDAPConfig}, nil
 		}),
 	)
-	if err != nil {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "23505" {
 		reqLogger.Error(err, "Failed to copy to postgres", "pgx.Identifier", v1schema.IdpConfigsIdentifier)
+	} else if pgErr != nil && pgErr.Code == "23505" {
+		reqLogger.Info("COPY failed due to unique constraint violation; skipping", "pgx.Identifier", v1schema.IdpConfigsIdentifier)
+		err = nil
 	}
 	return
 }
@@ -383,7 +575,7 @@ func copyUsers(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err
 	reqLogger := logf.FromContext(ctx)
 	filter := bson.D{}
 	var results []map[string]interface{}
-	if results, err = mongodb.Find(ctx, "platform-db", "Users", filter); err != nil {
+	if results, err = mongodb.FindAll(ctx, "platform-db", "Users", filter); err != nil {
 		reqLogger.Error(err, "Failed to read all results from MongoDB")
 		return
 	}
@@ -420,15 +612,19 @@ func copyUsers(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err
 				userRows[i].Subject}, nil
 		}),
 	)
-	if err != nil {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "23505" {
 		reqLogger.Error(err, "Failed to copy to postgres", "pgx.Identifier", v1schema.UsersIdentifier)
+	} else if pgErr != nil && pgErr.Code == "23505" {
+		reqLogger.Info("COPY failed due to unique constraint violation; skipping", "pgx.Identifier", v1schema.UsersIdentifier)
+		err = nil
 	}
 	return
 }
 
 func removeInvalidUserPreferences(usersPrefs []v1schema.UserPreferences) (updated []v1schema.UserPreferences) {
 	for _, userPrefs := range usersPrefs {
-		if userPrefs.LastLogin != (pgtype.Timestamptz{}) {
+		if userPrefs.LastLogin != nil {
 			updated = append(updated, userPrefs)
 		}
 	}
@@ -439,7 +635,7 @@ func copyUsersPreferences(ctx context.Context, mongodb *MongoDB, postgres *Postg
 	reqLogger := logf.FromContext(ctx)
 	filter := bson.D{}
 	var results []map[string]interface{}
-	if results, err = mongodb.Find(ctx, "platform-db", "UserPreferences", filter); err != nil {
+	if results, err = mongodb.FindAll(ctx, "platform-db", "UserPreferences", filter); err != nil {
 		reqLogger.Error(err, "Failed to read all results from MongoDB")
 		return
 	}
@@ -466,8 +662,12 @@ func copyUsersPreferences(ctx context.Context, mongodb *MongoDB, postgres *Postg
 				filteredUserPrefsRows[i].LoginCount}, nil
 		}),
 	)
-	if err != nil {
+	var pgErr *pgconn.PgError
+	if err != nil && (!errors.As(err, &pgErr) || pgErr.Code != "23505") {
 		reqLogger.Error(err, "Failed to copy to postgres", "pgx.Identifier", v1schema.UsersPreferencesIdentifier)
+	} else if pgErr != nil && pgErr.Code == "23505" {
+		reqLogger.Info("COPY failed due to unique constraint violation; skipping", "pgx.Identifier", v1schema.UsersPreferencesIdentifier)
+		err = nil
 	}
 	return
 }
@@ -476,7 +676,7 @@ func copyZenInstances(ctx context.Context, mongodb *MongoDB, postgres *PostgresD
 	reqLogger := logf.FromContext(ctx)
 	filter := bson.D{}
 	var results []map[string]interface{}
-	if results, err = mongodb.Find(ctx, "platform-db", "ZenInstance", filter); err != nil {
+	if results, err = mongodb.FindAll(ctx, "platform-db", "ZenInstance", filter); err != nil {
 		reqLogger.Error(err, "Failed to read all results from MongoDB")
 		return
 	}
@@ -503,9 +703,53 @@ func copyZenInstances(ctx context.Context, mongodb *MongoDB, postgres *PostgresD
 				zenInstanceRows[i].Namespace}, nil
 		}),
 	)
-	if err != nil {
+	var pgErr *pgconn.PgError
+	if err != nil && (!errors.As(err, &pgErr) || pgErr.Code != "23505") {
 		reqLogger.Error(err, "Failed to copy to postgres", "pgx.Identifier", v1schema.ZenInstancesIdentifier)
+	} else if pgErr != nil && pgErr.Code == "23505" {
+		reqLogger.Info("COPY failed due to unique constraint violation; skipping", "pgx.Identifier", v1schema.ZenInstancesIdentifier)
+		err = nil
 	}
+	return
+}
+
+func copyZenInstanceUsers(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	reqLogger := logf.FromContext(ctx)
+	filter := bson.D{}
+	var results []map[string]interface{}
+	if results, err = mongodb.FindAll(ctx, "platform-db", "ZenInstanceUsers", filter); err != nil {
+		reqLogger.Error(err, "Failed to read all results from MongoDB")
+		return
+	}
+	reqLogger.Info("Retrieved bson", "bson", results)
+
+	zenInstanceUserRows := make([]v1schema.ZenInstanceUser, len(results))
+	if err = v1schema.ConvertToZenInstanceUsers(results, zenInstanceUserRows); err != nil {
+		reqLogger.Error(err, "Failed to assemble user rows")
+		return
+	}
+
+	var _ int64
+	_, err = postgres.Conn.CopyFrom(
+		ctx,
+		v1schema.ZenInstanceUsersIdentifier,
+		v1schema.ZenInstanceUserColumnNames,
+		pgx.CopyFromSlice(len(zenInstanceUserRows), func(i int) ([]any, error) {
+			return []any{
+				zenInstanceUserRows[i].UZID,
+				zenInstanceUserRows[i].ZenInstanceID,
+				zenInstanceUserRows[i].UserID}, nil
+		}),
+	)
+
+	var pgErr *pgconn.PgError
+	if err != nil && (!errors.As(err, &pgErr) || pgErr.Code != "23505") {
+		reqLogger.Error(err, "Failed to copy to postgres", "pgx.Identifier", v1schema.ZenInstanceUsersIdentifier)
+	} else if pgErr != nil && pgErr.Code == "23505" {
+		reqLogger.Info("COPY failed due to unique constraint violation; skipping", "pgx.Identifier", v1schema.ZenInstanceUsersIdentifier)
+		err = nil
+	}
+
 	return
 }
 
@@ -513,7 +757,7 @@ func copySCIMAttributes(ctx context.Context, mongodb *MongoDB, postgres *Postgre
 	reqLogger := logf.FromContext(ctx)
 	filter := bson.D{}
 	var results []map[string]interface{}
-	if results, err = mongodb.Find(ctx, "platform-db", "ScimAttributes", filter); err != nil {
+	if results, err = mongodb.FindAll(ctx, "platform-db", "ScimAttributes", filter); err != nil {
 		reqLogger.Error(err, "Failed to read all results from MongoDB")
 		return
 	}
@@ -537,9 +781,14 @@ func copySCIMAttributes(ctx context.Context, mongodb *MongoDB, postgres *Postgre
 				scimAttributesRows[i].User}, nil
 		}),
 	)
-	if err != nil {
+	var pgErr *pgconn.PgError
+	if err != nil && (!errors.As(err, &pgErr) || pgErr.Code != "23505") {
 		reqLogger.Error(err, "Failed to copy to postgres", "pgx.Identifier", v1schema.SCIMAttributesIdentifier)
+	} else if pgErr != nil && pgErr.Code == "23505" {
+		reqLogger.Info("COPY failed due to unique constraint violation; skipping", "pgx.Identifier", v1schema.SCIMAttributesIdentifier)
+		err = nil
 	}
+
 	return
 }
 
@@ -547,7 +796,7 @@ func copySCIMAttributesMappings(ctx context.Context, mongodb *MongoDB, postgres 
 	reqLogger := logf.FromContext(ctx)
 	filter := bson.D{}
 	var results []map[string]interface{}
-	if results, err = mongodb.Find(ctx, "platform-db", "ScimAttributeMapping", filter); err != nil {
+	if results, err = mongodb.FindAll(ctx, "platform-db", "ScimAttributeMapping", filter); err != nil {
 		reqLogger.Error(err, "Failed to read all results from MongoDB")
 		return
 	}
@@ -572,8 +821,13 @@ func copySCIMAttributesMappings(ctx context.Context, mongodb *MongoDB, postgres 
 				scimAttributesMappingRows[i].User}, nil
 		}),
 	)
-	if err != nil {
+	var pgErr *pgconn.PgError
+	if err != nil && (!errors.As(err, &pgErr) || pgErr.Code != "23505") {
 		reqLogger.Error(err, "Failed to copy to postgres", "pgx.Identifier", v1schema.SCIMAttributesMappingsIdentifier)
+	} else if pgErr != nil && pgErr.Code == "23505" {
+		reqLogger.Info("COPY failed due to unique constraint violation; skipping", "pgx.Identifier", v1schema.SCIMAttributesMappingsIdentifier)
+		err = nil
 	}
+
 	return
 }

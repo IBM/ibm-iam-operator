@@ -13,7 +13,7 @@ import (
 
 // translateMongoDBFieldsToPostgresColumns ensures that the MongoDB schema is converted over to the schema written to
 // Postgres; it takes a map of MongoDB field names to their Postgres column names.
-func translateMongoDBFieldsToPostgresColumns(fieldMap map[string]string, m map[string]interface{}) {
+func translateMongoDBFieldsToPostgresColumns(fieldMap map[string]string, m map[string]any) {
 	for fieldName, colName := range fieldMap {
 		if _, ok := m[fieldName]; !ok {
 			continue
@@ -27,16 +27,65 @@ func translateMongoDBFieldsToPostgresColumns(fieldMap map[string]string, m map[s
 
 // IdpConfig is a row from the `platformdb.idp_configs` table
 type IdpConfig struct {
-	UID         string                 `json:"uid"`
-	Description string                 `json:"description"`
-	Enabled     bool                   `json:"enabled"`
-	IDPConfig   map[string]interface{} `json:"idp_config"`
-	Name        string                 `json:"name"`
-	Protocol    string                 `json:"protocol"`
-	Type        string                 `json:"type"`
-	SCIMConfig  map[string]interface{} `json:"scim_config"`
-	JIT         bool                   `json:"jit"`
-	LDAPConfig  map[string]interface{} `json:"ldap_config"`
+	UID         string         `json:"uid"`
+	Description string         `json:"description"`
+	Enabled     bool           `json:"enabled"`
+	IDPConfig   map[string]any `json:"idp_config"`
+	Name        string         `json:"name"`
+	Protocol    string         `json:"protocol"`
+	Type        string         `json:"type"`
+	SCIMConfig  map[string]any `json:"scim_config"`
+	JIT         bool           `json:"jit"`
+	LDAPConfig  map[string]any `json:"ldap_config"`
+}
+
+func (i *IdpConfig) ToAnySlice() []any {
+	return []any{
+		i.UID,
+		i.Description,
+		i.Enabled,
+		i.IDPConfig,
+		i.Name,
+		i.Protocol,
+		i.Type,
+		i.SCIMConfig,
+		i.JIT,
+		i.LDAPConfig,
+	}
+}
+
+func (i *IdpConfig) ToAnyMap() map[string]any {
+	m := make(map[string]any)
+	anySlice := i.ToAnySlice()
+	for i, col := range i.GetColumnNames() {
+		m[col] = anySlice[i]
+	}
+	return m
+}
+
+func (i *IdpConfig) GetColumnNames() []string {
+	return IdpConfigColumnNames
+}
+
+func (i *IdpConfig) GetTableIdentifier() pgx.Identifier {
+	return IdpConfigsIdentifier
+}
+
+func (i *IdpConfig) GetInsertSQL() string {
+	return `
+		INSERT INTO platformdb.idp_configs
+		(uid, description, enabled, idp_config, name, protocol, type, scim_config, jit, ldap_config)
+		VALUES (@uid, @description, @enabled, @idp_config, @name, @protocol, @type, @scim_config, @jit, @ldap_config)
+		ON CONFLICT (uid) DO NOTHING
+		RETURNING uid;`
+}
+
+func (i *IdpConfig) GetArgs() pgx.NamedArgs {
+	args := pgx.NamedArgs{}
+	for k, v := range i.ToAnyMap() {
+		args[k] = v
+	}
+	return args
 }
 
 var IdpConfigColumnNames []string = []string{

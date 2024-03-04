@@ -341,7 +341,7 @@ func (m *MongoDB) FindAll(ctx context.Context, db string, collection string, fil
 
 func insertIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
 	reqLogger := logf.FromContext(ctx)
-	filter := bson.D{{"migrated", bson.D{{"$ne", true}}}}
+	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
 	cursor, err := mongodb.Client.Database("platform-db").Collection("cloudpak_ibmid_v3").Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
@@ -366,25 +366,8 @@ func insertIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresD
 			err = nil
 			continue
 		}
-		args := pgx.NamedArgs{
-			"UID":         idpConfig.UID,
-			"Description": idpConfig.Description,
-			"Enabled":     idpConfig.Enabled,
-			"IDPConfig":   idpConfig.IDPConfig,
-			"Name":        idpConfig.Name,
-			"Protocol":    idpConfig.Protocol,
-			"Type":        idpConfig.Type,
-			"SCIMConfig":  idpConfig.SCIMConfig,
-			"JIT":         idpConfig.JIT,
-			"LDAPConfig":  idpConfig.LDAPConfig,
-		}
-
-		query := `
-			INSERT INTO platformdb.idp_configs
-			(uid, description, enabled, idp_config, name, protocol, type, scim_config, jit, ldap_config)
-			VALUES (@UID, @Description, @Enabled, @IDPConfig, @Name, @Protocol, @Type, @SCIMConfig, @JIT, @LDAPConfig)
-			ON CONFLICT (uid) DO NOTHING
-			RETURNING uid;`
+		query := idpConfig.GetInsertSQL()
+		args := idpConfig.GetArgs()
 		var uid *string
 		err := postgres.Conn.QueryRow(ctx, query, args).Scan(&uid)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -394,8 +377,8 @@ func insertIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresD
 			errCount++
 			continue
 		}
-		updateFilter := bson.D{{"uid", idpConfig.UID}}
-		update := bson.D{{"$set", bson.D{{"migrated", true}}}}
+		updateFilter := bson.D{{Key: "uid", Value: idpConfig.UID}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
 		updateResult, err := mongodb.Client.Database("platform-db").Collection("cloudpak_ibmid_v3").UpdateOne(ctx, updateFilter, update)
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
@@ -425,7 +408,7 @@ func insertIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresD
 
 func insertUsers(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
 	reqLogger := logf.FromContext(ctx)
-	filter := bson.D{{"migrated", bson.D{{"$ne", true}}}}
+	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
 	cursor, err := mongodb.Client.Database("platform-db").Collection("Users").Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
@@ -493,13 +476,15 @@ func insertUsers(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (e
 			RETURNING uid;`
 		var uid *string
 		err := postgres.Conn.QueryRow(ctx, query, args).Scan(&uid)
-		if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			reqLogger.Info("Row already exists in EDB")
+		} else if err != nil {
 			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.users")
 			errCount++
 			continue
 		}
-		updateFilter := bson.D{{"_id", user.UserID}}
-		update := bson.D{{"$set", bson.D{{"migrated", true}}}}
+		updateFilter := bson.D{{Key: "_id", Value: user.UserID}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
 		updateResult, err := mongodb.Client.Database("platform-db").Collection("Users").UpdateOne(ctx, updateFilter, update)
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
@@ -529,7 +514,7 @@ func insertUsers(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (e
 
 func insertUserPreferences(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
 	reqLogger := logf.FromContext(ctx)
-	filter := bson.D{{"migrated", bson.D{{"$ne", true}}}}
+	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
 	cursor, err := mongodb.Client.Database("platform-db").Collection("UserPreferences").Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
@@ -567,13 +552,15 @@ func insertUserPreferences(ctx context.Context, mongodb *MongoDB, postgres *Post
 			VALUES (@UserID, @LastLogin, @LastLogout, @LoginCount)
 			ON CONFLICT DO NOTHING;`
 		_, err := postgres.Conn.Exec(ctx, query, args)
-		if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			reqLogger.Info("Row already exists in EDB")
+		} else if err != nil {
 			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.users_preferences")
 			errCount++
 			continue
 		}
-		updateFilter := bson.D{{"_id", strings.Join([]string{"preferenceId", userPrefs.UserID}, "_")}}
-		update := bson.D{{"$set", bson.D{{"migrated", true}}}}
+		updateFilter := bson.D{{Key: "_id", Value: strings.Join([]string{"preferenceId", userPrefs.UserID}, "_")}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
 		updateResult, err := mongodb.Client.Database("platform-db").Collection("UserPreferences").UpdateOne(ctx, updateFilter, update)
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
@@ -603,8 +590,8 @@ func insertUserPreferences(ctx context.Context, mongodb *MongoDB, postgres *Post
 
 func insertZenInstances(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
 	reqLogger := logf.FromContext(ctx)
-	filter := bson.D{{"migrated", bson.D{{"$ne", true}}}}
-	cursor, err := mongodb.Client.Database("platform-db").Collection("ZenInstances").Find(ctx, filter)
+	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
+	cursor, err := mongodb.Client.Database("platform-db").Collection("ZenInstance").Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
 		return
@@ -643,14 +630,16 @@ func insertZenInstances(ctx context.Context, mongodb *MongoDB, postgres *Postgre
 			VALUES (@InstanceID, @Namespace, @ProductNameURL, @ClientID, @ClientSecret, @ZenAuditURL)
 			ON CONFLICT DO NOTHING;`
 		_, err := postgres.Conn.Exec(ctx, query, args)
-		if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			reqLogger.Info("Row already exists in EDB")
+		} else if err != nil {
 			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.zen_instances")
 			errCount++
 			continue
 		}
-		updateFilter := bson.D{{"instance_id", zenInstance.InstanceID}}
-		update := bson.D{{"$set", bson.D{{"migrated", true}}}}
-		updateResult, err := mongodb.Client.Database("platform-db").Collection("ZenInstances").UpdateOne(ctx, updateFilter, update)
+		updateFilter := bson.D{{Key: "instance_id", Value: zenInstance.InstanceID}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		updateResult, err := mongodb.Client.Database("platform-db").Collection("ZenInstance").UpdateOne(ctx, updateFilter, update)
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
 			errCount++
@@ -679,7 +668,7 @@ func insertZenInstances(ctx context.Context, mongodb *MongoDB, postgres *Postgre
 
 func insertZenInstanceUsers(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
 	reqLogger := logf.FromContext(ctx)
-	filter := bson.D{{"migrated", bson.D{{"$ne", true}}}}
+	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
 	cursor, err := mongodb.Client.Database("platform-db").Collection("ZenInstanceUsers").Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
@@ -716,13 +705,15 @@ func insertZenInstanceUsers(ctx context.Context, mongodb *MongoDB, postgres *Pos
 			VALUES (@UZID, @ZenInstanceID, @UserID)
 			ON CONFLICT DO NOTHING;`
 		_, err := postgres.Conn.Exec(ctx, query, args)
-		if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			reqLogger.Info("Row already exists in EDB")
+		} else if err != nil {
 			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.zen_instances_users")
 			errCount++
 			continue
 		}
-		updateFilter := bson.D{{"_id", zenInstanceUser.UZID}}
-		update := bson.D{{"$set", bson.D{{"migrated", true}}}}
+		updateFilter := bson.D{{Key: "_id", Value: zenInstanceUser.UZID}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
 		updateResult, err := mongodb.Client.Database("platform-db").Collection("ZenInstanceUsers").UpdateOne(ctx, updateFilter, update)
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
@@ -752,7 +743,7 @@ func insertZenInstanceUsers(ctx context.Context, mongodb *MongoDB, postgres *Pos
 
 func insertSCIMAttributes(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
 	reqLogger := logf.FromContext(ctx)
-	filter := bson.D{{"migrated", bson.D{{"$ne", true}}}}
+	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
 	cursor, err := mongodb.Client.Database("platform-db").Collection("ScimAttributes").Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
@@ -789,13 +780,15 @@ func insertSCIMAttributes(ctx context.Context, mongodb *MongoDB, postgres *Postg
 			VALUES (@ID, @Group, @User)
 			ON CONFLICT DO NOTHING;`
 		_, err := postgres.Conn.Exec(ctx, query, args)
-		if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			reqLogger.Info("Row already exists in EDB")
+		} else if err != nil {
 			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.scim_attributes")
 			errCount++
 			continue
 		}
-		updateFilter := bson.D{{"id", scimAttr.ID}}
-		update := bson.D{{"$set", bson.D{{"migrated", true}}}}
+		updateFilter := bson.D{{Key: "id", Value: scimAttr.ID}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
 		updateResult, err := mongodb.Client.Database("platform-db").Collection("ScimAttributes").UpdateOne(ctx, updateFilter, update)
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
@@ -825,7 +818,7 @@ func insertSCIMAttributes(ctx context.Context, mongodb *MongoDB, postgres *Postg
 
 func insertSCIMAttributeMappings(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
 	reqLogger := logf.FromContext(ctx)
-	filter := bson.D{{"migrated", bson.D{{"$ne", true}}}}
+	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
 	cursor, err := mongodb.Client.Database("platform-db").Collection("ScimAttributeMapping").Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
@@ -863,13 +856,15 @@ func insertSCIMAttributeMappings(ctx context.Context, mongodb *MongoDB, postgres
 			VALUES (@IdpID, @IdpType, @Group, @User)
 			ON CONFLICT DO NOTHING;`
 		_, err := postgres.Conn.Exec(ctx, query, args)
-		if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			reqLogger.Info("Row already exists in EDB")
+		} else if err != nil {
 			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.scim_attributes_mappings")
 			errCount++
 			continue
 		}
-		updateFilter := bson.D{{"_id", scimAttrMapping.IdpID}}
-		update := bson.D{{"$set", bson.D{{"migrated", true}}}}
+		updateFilter := bson.D{{Key: "_id", Value: scimAttrMapping.IdpID}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
 		updateResult, err := mongodb.Client.Database("platform-db").Collection("ScimAttributeMapping").UpdateOne(ctx, updateFilter, update)
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo")

@@ -325,14 +325,14 @@ func (r *AuthenticationReconciler) ensureDatastoreSecretAndCM(ctx context.Contex
 
 	secret := &corev1.Secret{}
 	if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.DatastoreEDBSecretName, Namespace: authCR.Namespace}, secret); k8sErrors.IsNotFound(err) {
-		reqLogger.Info("ConfigMap not available yet; requeueing",
-			"ConfigMap.Name", ctrlCommon.DatastoreEDBCMName,
-			"ConfigMap.Namespace", authCR.Namespace)
+		reqLogger.Info("Secret not available yet; requeueing",
+			"Secret.Name", ctrlCommon.DatastoreEDBSecretName,
+			"Secret.Namespace", authCR.Namespace)
 		return subreconciler.Requeue()
 	} else if err != nil {
-		reqLogger.Error(err, "Encountered an error when trying to get ConfigMap",
-			"ConfigMap.Name", ctrlCommon.DatastoreEDBCMName,
-			"ConfigMap.Namespace", authCR.Namespace)
+		reqLogger.Error(err, "Encountered an error when trying to get Secret",
+			"Secret.Name", ctrlCommon.DatastoreEDBSecretName,
+			"Secret.Namespace", authCR.Namespace)
 		return subreconciler.RequeueWithError(err)
 	}
 	reqLogger.Info("Secret found",

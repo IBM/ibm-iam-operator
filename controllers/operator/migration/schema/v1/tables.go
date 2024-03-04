@@ -193,7 +193,7 @@ func ConvertToUserPreferences(userPrefsMap map[string]interface{}, userPrefs *Us
 	}
 	if id, ok := userPrefsMap["_id"]; ok {
 		if s, sok := id.(string); sok {
-			userPrefsMap["_id"] = strings.TrimPrefix(s, "preference_Id_")
+			userPrefsMap["_id"] = strings.TrimPrefix(s, "preferenceId_")
 		}
 	}
 	fieldMap := map[string]string{

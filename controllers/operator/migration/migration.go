@@ -20,6 +20,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"strings"
 
 	v1schema "github.com/IBM/ibm-iam-operator/controllers/operator/migration/schema/v1"
 	"github.com/jackc/pgx/v5"
@@ -307,11 +308,11 @@ func MongoToV1(ctx context.Context, to, from DBConn) (err error) {
 	copyFuncs := []copyFunc{
 		insertIdpConfigs,
 		insertUsers,
-		copyUsersPreferences,
-		copyZenInstances,
-		copyZenInstanceUsers,
-		copySCIMAttributes,
-		copySCIMAttributesMappings,
+		insertUserPreferences,
+		insertZenInstances,
+		insertZenInstanceUsers,
+		insertSCIMAttributes,
+		insertSCIMAttributeMappings,
 	}
 
 	for _, f := range copyFuncs {
@@ -386,8 +387,10 @@ func insertIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresD
 			RETURNING uid;`
 		var uid *string
 		err := postgres.Conn.QueryRow(ctx, query, args).Scan(&uid)
-		if err != nil {
-			reqLogger.Error(err, "Failed to INSERT into table", "table", "platform-db.cloudpak_ibmid_v3")
+		if errors.Is(err, pgx.ErrNoRows) {
+			reqLogger.Info("Row already exists in EDB")
+		} else if err != nil {
+			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.idp_configs")
 			errCount++
 			continue
 		}
@@ -486,12 +489,12 @@ func insertUsers(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (e
 				, @DisplayName
 				, @Subject
 			)
-			ON CONFLICT DO NOTHING
+			ON CONFLICT (user_id) DO NOTHING
 			RETURNING uid;`
 		var uid *string
 		err := postgres.Conn.QueryRow(ctx, query, args).Scan(&uid)
 		if err != nil {
-			reqLogger.Error(err, "Failed to INSERT into table", "table", "platform-db.users")
+			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.users")
 			errCount++
 			continue
 		}
@@ -521,6 +524,376 @@ func insertUsers(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (e
 		return
 	}
 	reqLogger.Info("Successfully copied over Users to EDB", "rowsInserted", migrateCount)
+	return
+}
+
+func insertUserPreferences(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	reqLogger := logf.FromContext(ctx)
+	filter := bson.D{{"migrated", bson.D{{"$ne", true}}}}
+	cursor, err := mongodb.Client.Database("platform-db").Collection("UserPreferences").Find(ctx, filter)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get cursor from MongoDB")
+		return
+	}
+	errCount := 0
+	migrateCount := 0
+	for cursor.Next(ctx) {
+		var result map[string]interface{}
+		if err = cursor.Decode(&result); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document")
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+		userPrefs := &v1schema.UserPreferences{}
+		if err = v1schema.ConvertToUserPreferences(result, userPrefs); err != nil {
+			reqLogger.Error(err, "Failed to unmarshal UserPreferences")
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+		args := pgx.NamedArgs{
+			"UserID":     userPrefs.UserID,
+			"LastLogin":  userPrefs.LastLogin,
+			"LastLogout": userPrefs.LastLogout,
+			"LoginCount": userPrefs.LoginCount,
+		}
+
+		query := `
+			INSERT INTO platformdb.users_preferences
+			(user_id, last_login, last_logout, login_count)
+			VALUES (@UserID, @LastLogin, @LastLogout, @LoginCount)
+			ON CONFLICT DO NOTHING;`
+		_, err := postgres.Conn.Exec(ctx, query, args)
+		if err != nil {
+			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.users_preferences")
+			errCount++
+			continue
+		}
+		updateFilter := bson.D{{"_id", strings.Join([]string{"preferenceId", userPrefs.UserID}, "_")}}
+		update := bson.D{{"$set", bson.D{{"migrated", true}}}}
+		updateResult, err := mongodb.Client.Database("platform-db").Collection("UserPreferences").UpdateOne(ctx, updateFilter, update)
+		if err != nil {
+			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
+			errCount++
+			continue
+		}
+		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
+		migrateCount++
+	}
+	if errCount > 0 {
+		err = fmt.Errorf("encountered errors that prevented the migration of documents")
+		reqLogger.Error(err, "Migration of platform-db.UserPreferences not successful", "failedCount", errCount, "successCount", migrateCount)
+		return
+	} else if errCount == 0 && migrateCount == 0 {
+		reqLogger.Info("No documents needed to be migrated; continuing")
+		return
+	}
+
+	if err = cursor.Err(); err != nil {
+		reqLogger.Error(err, "MongoDB cursor encountered an error")
+		// TODO: Handle this further
+		return
+	}
+	reqLogger.Info("Successfully copied over UserPreferences to EDB", "rowsInserted", migrateCount)
+	return
+}
+
+func insertZenInstances(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	reqLogger := logf.FromContext(ctx)
+	filter := bson.D{{"migrated", bson.D{{"$ne", true}}}}
+	cursor, err := mongodb.Client.Database("platform-db").Collection("ZenInstances").Find(ctx, filter)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get cursor from MongoDB")
+		return
+	}
+	errCount := 0
+	migrateCount := 0
+	for cursor.Next(ctx) {
+		var result map[string]interface{}
+		if err = cursor.Decode(&result); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document")
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+		zenInstance := &v1schema.ZenInstance{}
+		if err = v1schema.ConvertToZenInstance(result, zenInstance); err != nil {
+			reqLogger.Error(err, "Failed to unmarshal ZenInstance")
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+		args := pgx.NamedArgs{
+			"InstanceID":     zenInstance.InstanceID,
+			"Namespace":      zenInstance.Namespace,
+			"ProductNameURL": zenInstance.ProductNameURL,
+			"ClientID":       zenInstance.ClientID,
+			"ClientSecret":   zenInstance.ClientSecret,
+			"ZenAuditURL":    zenInstance.ZenAuditURL,
+		}
+
+		query := `
+			INSERT INTO platformdb.zen_instances
+			(instance_id, namespace, product_name_url, client_id, client_secret, zen_audit_url)
+			VALUES (@InstanceID, @Namespace, @ProductNameURL, @ClientID, @ClientSecret, @ZenAuditURL)
+			ON CONFLICT DO NOTHING;`
+		_, err := postgres.Conn.Exec(ctx, query, args)
+		if err != nil {
+			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.zen_instances")
+			errCount++
+			continue
+		}
+		updateFilter := bson.D{{"instance_id", zenInstance.InstanceID}}
+		update := bson.D{{"$set", bson.D{{"migrated", true}}}}
+		updateResult, err := mongodb.Client.Database("platform-db").Collection("ZenInstances").UpdateOne(ctx, updateFilter, update)
+		if err != nil {
+			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
+			errCount++
+			continue
+		}
+		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
+		migrateCount++
+	}
+	if errCount > 0 {
+		err = fmt.Errorf("encountered errors that prevented the migration of documents")
+		reqLogger.Error(err, "Migration of platform-db.ZenInstances not successful", "failedCount", errCount, "successCount", migrateCount)
+		return
+	} else if errCount == 0 && migrateCount == 0 {
+		reqLogger.Info("No documents needed to be migrated; continuing")
+		return
+	}
+
+	if err = cursor.Err(); err != nil {
+		reqLogger.Error(err, "MongoDB cursor encountered an error")
+		// TODO: Handle this further
+		return
+	}
+	reqLogger.Info("Successfully copied over ZenInstances to EDB", "rowsInserted", migrateCount)
+	return
+}
+
+func insertZenInstanceUsers(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	reqLogger := logf.FromContext(ctx)
+	filter := bson.D{{"migrated", bson.D{{"$ne", true}}}}
+	cursor, err := mongodb.Client.Database("platform-db").Collection("ZenInstanceUsers").Find(ctx, filter)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get cursor from MongoDB")
+		return
+	}
+	errCount := 0
+	migrateCount := 0
+	for cursor.Next(ctx) {
+		var result map[string]interface{}
+		if err = cursor.Decode(&result); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document")
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+		zenInstanceUser := &v1schema.ZenInstanceUser{}
+		if err = v1schema.ConvertToZenInstanceUser(result, zenInstanceUser); err != nil {
+			reqLogger.Error(err, "Failed to unmarshal ZenInstanceUser")
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+		args := pgx.NamedArgs{
+			"UZID":          zenInstanceUser.UZID,
+			"UserID":        zenInstanceUser.UserID,
+			"ZenInstanceID": zenInstanceUser.ZenInstanceID,
+		}
+
+		query := `
+			INSERT INTO platformdb.zen_instances_users
+			(uz_id, zen_instance_id, user_id)
+			VALUES (@UZID, @ZenInstanceID, @UserID)
+			ON CONFLICT DO NOTHING;`
+		_, err := postgres.Conn.Exec(ctx, query, args)
+		if err != nil {
+			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.zen_instances_users")
+			errCount++
+			continue
+		}
+		updateFilter := bson.D{{"_id", zenInstanceUser.UZID}}
+		update := bson.D{{"$set", bson.D{{"migrated", true}}}}
+		updateResult, err := mongodb.Client.Database("platform-db").Collection("ZenInstanceUsers").UpdateOne(ctx, updateFilter, update)
+		if err != nil {
+			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
+			errCount++
+			continue
+		}
+		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
+		migrateCount++
+	}
+	if errCount > 0 {
+		err = fmt.Errorf("encountered errors that prevented the migration of documents")
+		reqLogger.Error(err, "Migration of platform-db.ZenInstanceUsers not successful", "failedCount", errCount, "successCount", migrateCount)
+		return
+	} else if errCount == 0 && migrateCount == 0 {
+		reqLogger.Info("No documents needed to be migrated; continuing")
+		return
+	}
+
+	if err = cursor.Err(); err != nil {
+		reqLogger.Error(err, "MongoDB cursor encountered an error")
+		// TODO: Handle this further
+		return
+	}
+	reqLogger.Info("Successfully copied over ZenInstanceUsers to EDB", "rowsInserted", migrateCount)
+	return
+}
+
+func insertSCIMAttributes(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	reqLogger := logf.FromContext(ctx)
+	filter := bson.D{{"migrated", bson.D{{"$ne", true}}}}
+	cursor, err := mongodb.Client.Database("platform-db").Collection("ScimAttributes").Find(ctx, filter)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get cursor from MongoDB")
+		return
+	}
+	errCount := 0
+	migrateCount := 0
+	for cursor.Next(ctx) {
+		var result map[string]interface{}
+		if err = cursor.Decode(&result); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document")
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+		scimAttr := &v1schema.SCIMAttributes{}
+		if err = v1schema.ConvertToSCIMAttributes(result, scimAttr); err != nil {
+			reqLogger.Error(err, "Failed to unmarshal ScimAttributes")
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+		args := pgx.NamedArgs{
+			"ID":    scimAttr.ID,
+			"Group": scimAttr.Group,
+			"User":  scimAttr.User,
+		}
+
+		query := `
+			INSERT INTO platformdb.scim_attributes
+			(id, "group", "user")
+			VALUES (@ID, @Group, @User)
+			ON CONFLICT DO NOTHING;`
+		_, err := postgres.Conn.Exec(ctx, query, args)
+		if err != nil {
+			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.scim_attributes")
+			errCount++
+			continue
+		}
+		updateFilter := bson.D{{"id", scimAttr.ID}}
+		update := bson.D{{"$set", bson.D{{"migrated", true}}}}
+		updateResult, err := mongodb.Client.Database("platform-db").Collection("ScimAttributes").UpdateOne(ctx, updateFilter, update)
+		if err != nil {
+			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
+			errCount++
+			continue
+		}
+		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
+		migrateCount++
+	}
+	if errCount > 0 {
+		err = fmt.Errorf("encountered errors that prevented the migration of documents")
+		reqLogger.Error(err, "Migration of platform-db.ScimAttributes not successful", "failedCount", errCount, "successCount", migrateCount)
+		return
+	} else if errCount == 0 && migrateCount == 0 {
+		reqLogger.Info("No documents needed to be migrated; continuing")
+		return
+	}
+
+	if err = cursor.Err(); err != nil {
+		reqLogger.Error(err, "MongoDB cursor encountered an error")
+		// TODO: Handle this further
+		return
+	}
+	reqLogger.Info("Successfully copied over ScimAttributes to EDB", "rowsInserted", migrateCount)
+	return
+}
+
+func insertSCIMAttributeMappings(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	reqLogger := logf.FromContext(ctx)
+	filter := bson.D{{"migrated", bson.D{{"$ne", true}}}}
+	cursor, err := mongodb.Client.Database("platform-db").Collection("ScimAttributeMapping").Find(ctx, filter)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get cursor from MongoDB")
+		return
+	}
+	errCount := 0
+	migrateCount := 0
+	for cursor.Next(ctx) {
+		var result map[string]interface{}
+		if err = cursor.Decode(&result); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document")
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+		scimAttrMapping := &v1schema.SCIMAttributesMapping{}
+		if err = v1schema.ConvertToSCIMAttributesMapping(result, scimAttrMapping); err != nil {
+			reqLogger.Error(err, "Failed to unmarshal ScimAttributeMapping")
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+		args := pgx.NamedArgs{
+			"IdpID":   scimAttrMapping.IdpID,
+			"IdpType": scimAttrMapping.IdpType,
+			"Group":   scimAttrMapping.Group,
+			"User":    scimAttrMapping.User,
+		}
+
+		query := `
+			INSERT INTO platformdb.scim_attributes_mappings
+			(idp_id, idp_type, "group", "user")
+			VALUES (@IdpID, @IdpType, @Group, @User)
+			ON CONFLICT DO NOTHING;`
+		_, err := postgres.Conn.Exec(ctx, query, args)
+		if err != nil {
+			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.scim_attributes_mappings")
+			errCount++
+			continue
+		}
+		updateFilter := bson.D{{"_id", scimAttrMapping.IdpID}}
+		update := bson.D{{"$set", bson.D{{"migrated", true}}}}
+		updateResult, err := mongodb.Client.Database("platform-db").Collection("ScimAttributeMapping").UpdateOne(ctx, updateFilter, update)
+		if err != nil {
+			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
+			errCount++
+			continue
+		}
+		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
+		migrateCount++
+	}
+	if errCount > 0 {
+		err = fmt.Errorf("encountered errors that prevented the migration of documents")
+		reqLogger.Error(err, "Migration of platform-db.ScimAttributeMapping not successful", "failedCount", errCount, "successCount", migrateCount)
+		return
+	} else if errCount == 0 && migrateCount == 0 {
+		reqLogger.Info("No documents needed to be migrated; continuing")
+		return
+	}
+
+	if err = cursor.Err(); err != nil {
+		reqLogger.Error(err, "MongoDB cursor encountered an error")
+		// TODO: Handle this further
+		return
+	}
+	reqLogger.Info("Successfully copied over ScimAttributeMapping to EDB", "rowsInserted", migrateCount)
 	return
 }
 

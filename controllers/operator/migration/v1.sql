@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS "platformdb"."idp_configs" (
     "type" character varying,
     "scim_config" jsonb,
     "jit" boolean,
-    "ldap_config" jsonb,
+    "ldap_config" json,
     CONSTRAINT "idp_configs_uid" PRIMARY KEY ("uid")
 ) WITH (oids = false);
 
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS "platformdb"."users_preferences" (
 
 
 CREATE TABLE IF NOT EXISTS "platformdb"."users" (
-    "uid" uuid NOT NULL,
+    "uid" uuid DEFAULT gen_random_uuid() NOT NULL,
     "user_id" character varying NOT NULL,
     "realm_id" character varying,
     "first_name" character varying,
@@ -48,16 +48,17 @@ CREATE TABLE IF NOT EXISTS "platformdb"."users" (
     "preferred_username" character varying,
     "display_name" character varying,
     "subject" character varying,
-    CONSTRAINT "users_user_id" PRIMARY KEY ("user_id")
+    CONSTRAINT "users_userid" PRIMARY KEY ("user_id"),
+    CONSTRAINT "users_uid" UNIQUE ("uid")
 ) WITH (oids = false);
 
-CREATE INDEX IF NOT EXISTS userid_idx ON platformdb.users (user_id);
-
 CREATE TABLE IF NOT EXISTS "platformdb"."users_attributes" (
-    "uid" character varying NOT NULL,
-    "user_uid" character varying,
+    "uid" uuid DEFAULT gen_random_uuid(),
+    "user_uid" uuid NOT NULL,
     "name" character varying,
-    "value" character varying
+    "value" character varying,
+    CONSTRAINT "users_attributes_uid" PRIMARY KEY ("uid"),
+    CONSTRAINT "fk_useratt_fk" FOREIGN KEY ("user_uid") REFERENCES platformdb.users ("uid")
 ) WITH (oids = false);
 
 -- End User Management
@@ -71,14 +72,18 @@ CREATE TABLE IF NOT EXISTS "platformdb"."zen_instances" (
     "product_name_url" character varying NOT NULL,
     "zen_audit_url" character varying,
     "namespace" character varying NOT NULL,
-    CONSTRAINT "zen_instances_instanceId" PRIMARY KEY ("instance_id")
+    CONSTRAINT "zen_instances_instance_id" PRIMARY KEY ("instance_id")
 ) WITH (oids = false);
 
 CREATE TABLE IF NOT EXISTS "platformdb"."zen_instances_users" (
-    "uzid" character varying NOT NULL,
+    "uz_id" character varying NOT NULL,
     "zen_instance_id" character varying NOT NULL,
     "user_id" character varying NOT NULL,
-    CONSTRAINT "zen_instances_users_uzid" PRIMARY KEY ("uzid")
+    CONSTRAINT "zeninstances_users_uzid" PRIMARY KEY ("uz_id"),
+    CONSTRAINT "fk_zenuser_fk" FOREIGN KEY ("zen_instance_id")
+    REFERENCES platformdb.zen_instances ("instance_id"),
+    CONSTRAINT "fk_userzen_fk" FOREIGN KEY ("user_id")
+    REFERENCES platformdb.users ("user_id")
 ) WITH (oids = false);
 
 -- End Zen Integration
@@ -98,7 +103,7 @@ CREATE TABLE IF NOT EXISTS "platformdb"."scim_attributes_mappings" (
     "idp_type" character varying NOT NULL,
     "group" jsonb NOT NULL,
     "user" jsonb NOT NULL,
-    CONSTRAINT "scim_attributes_mappings_id" UNIQUE ("idp_id")
+    CONSTRAINT "scim_attributemappings_idp_id" UNIQUE ("idp_id")
 ) WITH (oids = false);
 
 -- End SCIM
@@ -117,15 +122,15 @@ CREATE TABLE IF NOT EXISTS "platformdb"."members" (
     "member_id" character varying NOT NULL,
     "value" character varying,
     "display" character varying,
-    CONSTRAINT "members_memberid" PRIMARY KEY ("member_id")
+    CONSTRAINT "members_member_id" PRIMARY KEY ("member_id")
 ) WITH (oids = false);
 
-CREATE TABLE IF NOT EXISTS "platformdb"."group_members" (
+CREATE TABLE IF NOT EXISTS "platformdb"."groups_members" (
     "realm_id" character varying NOT NULL,
     "group_id" character varying NOT NULL,
     "member_id" character varying NOT NULL,
-    CONSTRAINT "group_members_group_id_member_id_realm_id"
-    PRIMARY KEY ("group_id", "member_id", "realm_id")
+    CONSTRAINT "groupmembers_groupid_memberid,realm_id"
+        PRIMARY KEY (group_id, member_id, realm_id)
 ) WITH (oids = false);
 
 -- End SCIM with JIT Flow
@@ -170,7 +175,7 @@ CREATE TABLE IF NOT EXISTS platformdb.scim_server_users_custom (
     id character varying(255) NOT NULL,
     "userattributeKey" character varying(255) NOT NULL,
     "simpleValue" character varying(255),
-    "complexValue" json
+    "complexValue" jsonb
 );
 
 
@@ -183,6 +188,7 @@ ALTER TABLE platformdb.scim_server_users_custom OWNER TO im_user;
 -- Begin oauthdbschema Schema
 
 CREATE SCHEMA IF NOT EXISTS oauthdbschema;
+
 
 CREATE TABLE IF NOT EXISTS oauthdbschema.oauthtoken
 (

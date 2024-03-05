@@ -160,8 +160,8 @@ var _ = Describe("OperandRequest handling", func() {
 				operands = &[]operatorv1alpha1.Operand{}
 				authCR = &operatorv1alpha1.Authentication{
 					TypeMeta: metav1.TypeMeta{
-						APIVersion: "v1",
-						Kind:       "ConfigMap",
+						APIVersion: "operator.ibm.com/v1alpha1",
+						Kind:       "Authentication",
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:            "example-authentication",

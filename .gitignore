@@ -25,3 +25,7 @@ bin
 
 cache
 build/_output/*
+config/**/overlays/dev
+bundle-dev
+bundle-dev.Dockerfile
+catalog_output

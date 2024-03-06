@@ -18,3 +18,6 @@
   value:
     name: IM_INITCONTAINER_IMAGE
     value: icr.io/cpopen/cpfs/im-initcontainer:4.5.0
+- op: replace
+  path: /spec/template/spec/containers/0/imagePullPolicy
+  value: IfNotPresent

@@ -115,9 +115,7 @@ func (r *AuthenticationReconciler) getMongoDB(ctx context.Context, req ctrl.Requ
 
 	for secretName, secret := range secrets {
 		objKey := types.NamespacedName{Name: secretName, Namespace: req.Namespace}
-		if err = r.Get(ctx, objKey, secret); k8sErrors.IsNotFound(err) {
-			return nil, nil
-		} else if err != nil {
+		if err = r.Get(ctx, objKey, secret); err != nil {
 			return nil, err
 		}
 	}
@@ -171,8 +169,8 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	} else if needToMigrate {
 		var mongo *migration.MongoDB
 		if mongo, err = r.getMongoDB(ctx, req); k8sErrors.IsNotFound(err) {
-			reqLogger.Info("Could not find all resources for configuring MongoDB connection")
-			return subreconciler.RequeueWithError(err)
+			reqLogger.Info("Could not find all resources for configuring MongoDB connection; requeue in 10s")
+			return subreconciler.RequeueWithDelay(10 * time.Second)
 		} else if err != nil {
 			reqLogger.Error(err, "Failed to find resources for configuring MongoDB connection")
 			return subreconciler.RequeueWithError(err)

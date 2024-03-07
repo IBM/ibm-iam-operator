@@ -20,12 +20,15 @@ import (
 	"strings"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
+	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func buildInitContainers(mongoDBImage string) []corev1.Container {
+	psqlEnvList := []string{"DATABASE_RW_ENDPOINT", "DATABASE_PORT"}
+	envVars := buildInitContainerEnvVars(psqlEnvList, ctrlCommon.DatastoreEDBCMName)
 	return []corev1.Container{
 		{
 			Name:            "init-mongodb",
@@ -34,8 +37,9 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 			Command: []string{
 				"bash",
 				"-c",
-				"until </dev/tcp/common-service-db-r/5432 ; do sleep 5; done;",
+				"until </dev/tcp/$DATABASE_RW_ENDPOINT/$DATABASE_PORT ; do sleep 5; done;",
 			},
+			Env: envVars,
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
 				RunAsNonRoot:             &trueVar,
@@ -60,6 +64,8 @@ func buildInitContainers(mongoDBImage string) []corev1.Container {
 }
 
 func buildInitForMngrAndProvider(mongoDBImage string) []corev1.Container {
+	psqlEnvList := []string{"DATABASE_RW_ENDPOINT", "DATABASE_PORT"}
+	envVars := buildInitContainerEnvVars(psqlEnvList, ctrlCommon.DatastoreEDBCMName)
 	return []corev1.Container{
 		{
 			Name:            "init-mongodb",
@@ -68,8 +74,9 @@ func buildInitForMngrAndProvider(mongoDBImage string) []corev1.Container {
 			Command: []string{
 				"bash",
 				"-c",
-				"until </dev/tcp/common-service-db-r/5432 && curl -k https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration; do sleep 5; done",
+				"until </dev/tcp/$DATABASE_RW_ENDPOINT/$DATABASE_PORT && curl -k https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration; do sleep 5; done",
 			},
+			Env: envVars,
 			SecurityContext: &corev1.SecurityContext{
 				Privileged:               &falseVar,
 				RunAsNonRoot:             &trueVar,
@@ -1216,6 +1223,27 @@ func buildIdpEnvVars(envVarList []string) []corev1.EnvVar {
 				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: "platform-auth-idp",
+					},
+					Key: varName,
+				},
+			},
+		}
+		envVars = append(envVars, envVar)
+
+	}
+	return envVars
+}
+
+func buildInitContainerEnvVars(envVarList []string, configmapName string) []corev1.EnvVar {
+
+	envVars := []corev1.EnvVar{}
+	for _, varName := range envVarList {
+		envVar := corev1.EnvVar{
+			Name: varName,
+			ValueFrom: &corev1.EnvVarSource{
+				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: configmapName,
 					},
 					Key: varName,
 				},

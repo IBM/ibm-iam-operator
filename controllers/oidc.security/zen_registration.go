@@ -21,9 +21,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/apis/oidc.security/v1"
 	"net/http"
 	"strings"
+
+	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/apis/oidc.security/v1"
 )
 
 // getZenInstanceRegistration gets the requested Zen instance registration using the ID Management API.

@@ -93,16 +93,16 @@ CREATE TABLE IF NOT EXISTS "platformdb"."zen_instances_users" (
 
 CREATE TABLE IF NOT EXISTS "platformdb"."scim_attributes" (
     "id" character varying NOT NULL,
-    "group" jsonb NOT NULL,
-    "user" jsonb NOT NULL,
+    "group" jsonb,
+    "user" jsonb,
     CONSTRAINT "scim_attributes_id" UNIQUE ("id")
 ) WITH (oids = false);
 
 CREATE TABLE IF NOT EXISTS "platformdb"."scim_attributes_mappings" (
     "idp_id" character varying NOT NULL,
     "idp_type" character varying NOT NULL,
-    "group" jsonb NOT NULL,
-    "user" jsonb NOT NULL,
+    "group" jsonb,
+    "user" jsonb,
     CONSTRAINT "scim_attributemappings_idp_id" UNIQUE ("idp_id")
 ) WITH (oids = false);
 

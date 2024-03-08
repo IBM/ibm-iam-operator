@@ -465,13 +465,13 @@ func ConvertToZenInstances(zenInstanceMaps []map[string]interface{}, zenInstance
 
 // ZenInstanceUser is a row from the `platformdb.zen_instances_users` table
 type ZenInstanceUser struct {
-	UZID          string `json:"uz_id"`
+	UID           string `json:"uid"`
 	ZenInstanceID string `json:"zen_instance_id"`
 	UserID        string `json:"user_id"`
 }
 
 var ZenInstanceUserColumnNames []string = []string{
-	"uz_id",
+	"uid",
 	"zen_instance_id",
 	"user_id",
 }
@@ -480,7 +480,7 @@ var ZenInstanceUsersIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "ze
 
 func ConvertToZenInstanceUser(zenInstanceUserMap map[string]interface{}, zenInstanceUser *ZenInstanceUser) (err error) {
 	fieldMap := map[string]string{
-		"_id":           "uz_id",
+		"_id":           "uid",
 		"zenInstanceId": "zen_instance_id",
 		"usersId":       "user_id",
 	}

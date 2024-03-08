@@ -76,10 +76,10 @@ CREATE TABLE IF NOT EXISTS "platformdb"."zen_instances" (
 ) WITH (oids = false);
 
 CREATE TABLE IF NOT EXISTS "platformdb"."zen_instances_users" (
-    "uz_id" character varying NOT NULL,
+    "uid" uuid DEFAULT gen_random_uuid(),
     "zen_instance_id" character varying NOT NULL,
     "user_id" character varying NOT NULL,
-    CONSTRAINT "zeninstances_users_uzid" PRIMARY KEY ("uz_id"),
+    CONSTRAINT "zeninstances_users_uid" PRIMARY KEY ("uid"),
     CONSTRAINT "fk_zenuser_fk" FOREIGN KEY ("zen_instance_id")
     REFERENCES platformdb.zen_instances ("instance_id"),
     CONSTRAINT "fk_userzen_fk" FOREIGN KEY ("user_id")

@@ -766,15 +766,15 @@ func insertZenInstanceUsers(ctx context.Context, mongodb *MongoDB, postgres *Pos
 			continue
 		}
 		args := pgx.NamedArgs{
-			"UZID":          zenInstanceUser.UZID,
+			"UID":           zenInstanceUser.UID,
 			"UserID":        zenInstanceUser.UserID,
 			"ZenInstanceID": zenInstanceUser.ZenInstanceID,
 		}
 
 		query := `
 			INSERT INTO platformdb.zen_instances_users
-			(uz_id, zen_instance_id, user_id)
-			VALUES (@UZID, @ZenInstanceID, @UserID)
+			(uid, zen_instance_id, user_id)
+			VALUES (DEFAULT, @ZenInstanceID, @UserID)
 			ON CONFLICT DO NOTHING;`
 		_, err := postgres.Conn.Exec(ctx, query, args)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -784,7 +784,7 @@ func insertZenInstanceUsers(ctx context.Context, mongodb *MongoDB, postgres *Pos
 			errCount++
 			continue
 		}
-		updateFilter := bson.D{{Key: "_id", Value: zenInstanceUser.UZID}}
+		updateFilter := bson.D{{Key: "_id", Value: zenInstanceUser.UID}}
 		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
 		updateResult, err := mongodb.Client.Database("platform-db").Collection("ZenInstanceUsers").UpdateOne(ctx, updateFilter, update)
 		if err != nil {
@@ -1176,7 +1176,7 @@ func copyZenInstanceUsers(ctx context.Context, mongodb *MongoDB, postgres *Postg
 		v1schema.ZenInstanceUserColumnNames,
 		pgx.CopyFromSlice(len(zenInstanceUserRows), func(i int) ([]any, error) {
 			return []any{
-				zenInstanceUserRows[i].UZID,
+				zenInstanceUserRows[i].UID,
 				zenInstanceUserRows[i].ZenInstanceID,
 				zenInstanceUserRows[i].UserID}, nil
 		}),

@@ -774,7 +774,7 @@ func insertZenInstanceUsers(ctx context.Context, mongodb *MongoDB, postgres *Pos
 		query := `
 			INSERT INTO platformdb.zen_instances_users
 			(uid, zen_instance_id, user_id)
-			VALUES (@UID, @ZenInstanceID, @UserID)
+			VALUES (DEFAULT, @ZenInstanceID, @UserID)
 			ON CONFLICT DO NOTHING;`
 		_, err := postgres.Conn.Exec(ctx, query, args)
 		if errors.Is(err, pgx.ErrNoRows) {

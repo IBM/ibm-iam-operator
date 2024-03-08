@@ -3,7 +3,7 @@ package operator
 import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 
-	"github.com/IBM/ibm-iam-operator/controllers/operator/migration"
+	"github.com/IBM/ibm-iam-operator/migration"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -1,7 +1,7 @@
 package migration
 
 import (
-	v1schema "github.com/IBM/ibm-iam-operator/controllers/operator/migration/schema/v1"
+	v1schema "github.com/IBM/ibm-iam-operator/migration/schema/v1"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"testing"
@@ -30,7 +30,7 @@ var _ = Describe("Migration", func() {
 			})
 			It("filters out that entry (partially-filled struct)", func() {
 				userPrefs = append(userPrefs, v1schema.UserPreferences{
-					UserID:     "some-id",
+					UserUID:    "some-id",
 					LoginCount: 0,
 					LastLogout: &pgtype.Timestamptz{
 						Time: time.Now(),

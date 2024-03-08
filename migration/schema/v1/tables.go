@@ -1,6 +1,7 @@
 package v1
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -10,6 +11,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+//go:embed dbinit.sql
+var DBInitMigration string
 
 // translateMongoDBFieldsToPostgresColumns ensures that the MongoDB schema is converted over to the schema written to
 // Postgres; it takes a map of MongoDB field names to their Postgres column names.
@@ -209,6 +213,14 @@ func ConvertToIdpConfig(idpMap map[string]interface{}, idpConfig *IdpConfig) (er
 
 	}
 
+	if ldapConfig, ok := idpMap["ldap_config"]; ok {
+		if ldapConfigMap, isMap := ldapConfig.(map[string]string); isMap {
+			if ldapID, hasID := ldapConfigMap["ldap_id"]; hasID {
+				idpMap["ldap_id"] = ldapID
+			}
+		}
+	}
+
 	var jsonBytes []byte
 	if jsonBytes, err = json.Marshal(idpMap); err != nil {
 		return
@@ -273,6 +285,78 @@ var UserColumnNames []string = []string{
 
 var UsersIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "users"}
 
+func (u *User) ToAnySlice() []any {
+	return []any{
+		u.UID,
+		u.UserID,
+		u.RealmID,
+		u.FirstName,
+		u.LastName,
+		u.Email,
+		u.Type,
+		u.LastLogin,
+		u.Status,
+		u.UserBaseDN,
+		u.Groups,
+		u.Role,
+		u.UniqueSecurityName,
+		u.PreferredUsername,
+		u.DisplayName,
+		u.Subject,
+	}
+}
+
+func (u *User) ToAnyMap() map[string]any {
+	m := make(map[string]any)
+	anySlice := u.ToAnySlice()
+	for i, col := range u.GetColumnNames() {
+		m[col] = anySlice[i]
+	}
+	return m
+}
+
+func (u *User) GetColumnNames() []string {
+	return UserColumnNames
+}
+
+func (u *User) GetTableIdentifier() pgx.Identifier {
+	return UsersIdentifier
+}
+
+func (u *User) GetInsertSQL() string {
+	return `
+		INSERT INTO platformdb.users
+		(uid, user_id, realm_id, first_name, last_name, email, type, last_login, status, user_basedn, groups, role, unique_security_name, preferred_username, display_name, subject)
+		VALUES (
+			  DEFAULT
+			, @user_id
+			, @realm_id
+			, @first_name
+			, @last_name
+			, @email
+			, @type
+			, @last_login
+			, @status
+			, @user_basedn
+			, @groups
+			, @role
+			, @unique_security_name
+			, @preferred_username
+			, @display_name
+			, @subject
+		)
+		ON CONFLICT (user_id) DO NOTHING
+		RETURNING uid;`
+}
+
+func (u *User) GetArgs() pgx.NamedArgs {
+	args := pgx.NamedArgs{}
+	for k, v := range u.ToAnyMap() {
+		args[k] = v
+	}
+	return args
+}
+
 func ConvertToUser(userMap map[string]interface{}, user *User) (err error) {
 	// If lastLogin is an empty string, delete it in order to make zero value consistent
 	if lastLogin, ok := userMap["lastLogin"]; ok && lastLogin == "" {
@@ -315,20 +399,65 @@ func ConvertToUsers(userMaps []map[string]interface{}, users []User) (err error)
 
 // UserPreferences is a row from the `platformdb.users_preferences` table
 type UserPreferences struct {
-	UserID     string              `json:"user_id"`
+	UID        string              `json:"uid"`
+	UserUID    string              `json:"user_uid"`
 	LastLogin  *pgtype.Timestamptz `json:"last_login"`
 	LastLogout *pgtype.Timestamptz `json:"last_logout,omitempty"`
 	LoginCount int                 `json:"login_count,omitempty"`
 }
 
 var UserPreferencesColumnNames []string = []string{
-	"user_id",
+	"uid",
+	"user_uid",
 	"last_login",
 	"last_logout",
 	"login_count",
 }
 
 var UsersPreferencesIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "users_preferences"}
+
+func (u *UserPreferences) ToAnySlice() []any {
+	return []any{
+		u.UID,
+		u.UserUID,
+		u.LastLogin,
+		u.LastLogout,
+		u.LoginCount,
+	}
+}
+
+func (u *UserPreferences) ToAnyMap() map[string]any {
+	m := make(map[string]any)
+	anySlice := u.ToAnySlice()
+	for i, col := range u.GetColumnNames() {
+		m[col] = anySlice[i]
+	}
+	return m
+}
+
+func (u *UserPreferences) GetColumnNames() []string {
+	return UserPreferencesColumnNames
+}
+
+func (u *UserPreferences) GetTableIdentifier() pgx.Identifier {
+	return UsersPreferencesIdentifier
+}
+
+func (u *UserPreferences) GetInsertSQL() string {
+	return `
+		INSERT INTO platformdb.users_preferences
+		(uid, user_uid, last_login, last_logout, login_count)
+		VALUES (DEFAULT, @user_uid, @last_login, @last_logout, @login_count)
+		ON CONFLICT DO NOTHING;`
+}
+
+func (u *UserPreferences) GetArgs() pgx.NamedArgs {
+	args := pgx.NamedArgs{}
+	for k, v := range u.ToAnyMap() {
+		args[k] = v
+	}
+	return args
+}
 
 func ConvertToUserPreferences(userPrefsMap map[string]interface{}, userPrefs *UserPreferences) (err error) {
 	// If either of the following is an empty string, delete it in order to make zero value consistent
@@ -487,6 +616,47 @@ var ZenInstanceUserColumnNames []string = []string{
 }
 
 var ZenInstanceUsersIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "zen_instances_users"}
+
+func (z *ZenInstanceUser) ToAnySlice() []any {
+	return []any{
+		z.UID,
+		z.ZenInstanceID,
+		z.UserID,
+	}
+}
+
+func (z *ZenInstanceUser) ToAnyMap() map[string]any {
+	m := make(map[string]any)
+	anySlice := z.ToAnySlice()
+	for i, col := range z.GetColumnNames() {
+		m[col] = anySlice[i]
+	}
+	return m
+}
+
+func (z *ZenInstanceUser) GetColumnNames() []string {
+	return ZenInstanceUserColumnNames
+}
+
+func (z *ZenInstanceUser) GetTableIdentifier() pgx.Identifier {
+	return ZenInstanceUsersIdentifier
+}
+
+func (z *ZenInstanceUser) GetInsertSQL() string {
+	return `
+		INSERT INTO platformdb.zen_instances_users
+		(uid, zen_instance_id, user_id)
+		VALUES (DEFAULT, @zen_instance_id, @user_id)
+		ON CONFLICT DO NOTHING;`
+}
+
+func (z *ZenInstanceUser) GetArgs() pgx.NamedArgs {
+	args := pgx.NamedArgs{}
+	for k, v := range z.ToAnyMap() {
+		args[k] = v
+	}
+	return args
+}
 
 func ConvertToZenInstanceUser(zenInstanceUserMap map[string]interface{}, zenInstanceUser *ZenInstanceUser) (err error) {
 	fieldMap := map[string]string{

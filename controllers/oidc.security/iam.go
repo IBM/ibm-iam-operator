@@ -23,12 +23,13 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/apis/oidc.security/v1"
 	"net/http"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/apis/oidc.security/v1"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type TokenInfo struct {
@@ -166,7 +167,7 @@ func createHTTPClient(caCert []byte) (httpClient *http.Client, err error) {
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCert)
 	transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: caCertPool}}
-	httpClient = &http.Client{Transport: transport}
+	httpClient = &http.Client{Transport: transport, Timeout: 10 * time.Second}
 	return
 }
 

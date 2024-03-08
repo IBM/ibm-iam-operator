@@ -25,6 +25,94 @@ func translateMongoDBFieldsToPostgresColumns(fieldMap map[string]string, m map[s
 	}
 }
 
+type OIDCClient struct {
+	ID           string `json:"_id"`
+	ClientID     string `json:"clientid"`
+	ProviderID   string `json:"providerid"`
+	ClientSecret string `json:"clientsecret"`
+	DisplayName  string `json:"displayname"`
+	Enabled      bool   `json:"enabled"`
+	Metadata     string `json:"metadata"`
+}
+
+func ConvertToOIDCClient(clientMap map[string]interface{}, oc *OIDCClient) (err error) {
+	var jsonBytes []byte
+	if jsonBytes, err = json.Marshal(clientMap); err != nil {
+		return
+	}
+
+	if err = json.Unmarshal(jsonBytes, oc); err != nil {
+		return
+	}
+
+	return nil
+}
+
+func ConvertToOIDCClients(clientMaps []map[string]interface{}, ocRows []OIDCClient) (err error) {
+	for i, clientMap := range clientMaps {
+		oc := &OIDCClient{}
+		if err = ConvertToOIDCClient(clientMap, oc); err != nil {
+			return fmt.Errorf("failed to convert map to OIDCClient: %w", err)
+		}
+		ocRows[i] = *oc
+	}
+	return
+}
+
+func (oc *OIDCClient) GetColumnNames() []string {
+	return []string{
+		"_id",
+		"clientid",
+		"providerid",
+		"clientsecret",
+		"displayname",
+		"enabled",
+		"metadata",
+	}
+}
+
+func (oc *OIDCClient) GetInsertSQL() string {
+	return `
+		INSERT INTO oauthdbschema.oauthclient
+		(_id, clientid, providerid, clientsecret, displayname, enabled, metadata)
+		VALUES (DEFAULT, @clientid, @providerid, @clientsecret, @displayname, @enabled, @metadata)
+		ON CONFLICT DO NOTHING
+		RETURNING _id;`
+}
+
+func (oc *OIDCClient) GetArgs() pgx.NamedArgs {
+	args := pgx.NamedArgs{}
+	for k, v := range oc.ToAnyMap() {
+		args[k] = v
+	}
+	return args
+}
+
+func (oc *OIDCClient) GetTableIdentifier() pgx.Identifier {
+	return pgx.Identifier{"oauthdbschema", "oauthclient"}
+}
+
+func (oc *OIDCClient) ToAnySlice() []any {
+	return []any{
+		oc.ID,
+		oc.ClientID,
+		oc.ProviderID,
+		oc.ClientSecret,
+		oc.DisplayName,
+		oc.Enabled,
+		oc.Metadata,
+	}
+}
+
+func (oc *OIDCClient) ToAnyMap() map[string]any {
+	m := make(map[string]any)
+	anySlice := oc.ToAnySlice()
+	for i, col := range oc.GetColumnNames() {
+		m[col] = anySlice[i]
+	}
+	return m
+}
+
 // IdpConfig is a row from the `platformdb.idp_configs` table
 type IdpConfig struct {
 	UID         string         `json:"uid"`

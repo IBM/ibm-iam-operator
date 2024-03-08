@@ -306,6 +306,7 @@ func MongoToV1(ctx context.Context, to, from DBConn) (err error) {
 	defer postgres.Disconnect(ctx)
 
 	copyFuncs := []copyFunc{
+		insertOIDCClients,
 		insertIdpConfigs,
 		insertUsers,
 		insertUserPreferences,
@@ -336,6 +337,77 @@ func (m *MongoDB) FindAll(ctx context.Context, db string, collection string, fil
 		reqLogger.Error(err, "Failed to read all results from MongoDB")
 		return
 	}
+	return
+}
+
+func insertOIDCClients(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	reqLogger := logf.FromContext(ctx)
+	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
+	// Omit the "_id" field because serial provided by Postgres will be used instead
+	projection := bson.D{{Key: "_id", Value: 0}}
+	dbName := "OAuthDBSchema"
+	collectionName := "OauthClient"
+	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter, mongoOptions.Find().SetProjection(projection))
+	if err != nil {
+		reqLogger.Error(err, "Failed to get cursor from MongoDB")
+		return
+	}
+	errCount := 0
+	migrateCount := 0
+	for cursor.Next(ctx) {
+		var result map[string]interface{}
+		if err = cursor.Decode(&result); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document")
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+		oc := &v1schema.OIDCClient{}
+		if err = v1schema.ConvertToOIDCClient(result, oc); err != nil {
+			reqLogger.Error(err, "Failed to unmarshal oauthclient")
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+		query := oc.GetInsertSQL()
+		args := oc.GetArgs()
+		var id *string
+		err := postgres.Conn.QueryRow(ctx, query, args).Scan(&id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			reqLogger.Info("Row already exists in EDB")
+		} else if err != nil {
+			reqLogger.Error(err, "Failed to INSERT into table", "table", "oauthdbschema.oauthclient")
+			errCount++
+			continue
+		}
+		updateFilter := bson.D{{Key: "_id", Value: oc.ID}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
+		if err != nil {
+			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
+			errCount++
+			continue
+		}
+		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
+		migrateCount++
+	}
+	if errCount > 0 {
+		err = fmt.Errorf("encountered errors that prevented the migration of documents")
+		reqLogger.Error(err, "Migration of oauthdbschema.oauthclient not successful", "failedCount", errCount, "successCount", migrateCount)
+		return
+	} else if errCount == 0 && migrateCount == 0 {
+		reqLogger.Info("No documents needed to be migrated; continuing")
+		return
+	}
+
+	if err = cursor.Err(); err != nil {
+		reqLogger.Error(err, "MongoDB cursor encountered an error")
+		// TODO: Handle this further
+		return
+	}
+	reqLogger.Info("Successfully copied over OIDC clients to EDB", "rowsInserted", migrateCount)
 	return
 }
 

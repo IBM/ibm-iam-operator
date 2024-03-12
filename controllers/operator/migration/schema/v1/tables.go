@@ -204,7 +204,6 @@ func ConvertToIdpConfig(idpMap map[string]interface{}, idpConfig *IdpConfig) (er
 		if ldap_config, ok := ldap_config.(map[string]interface{}); ok {
 			// If ldap_config is already a map, fetch the ldap_id
 			ldap_id := ldap_config["ldap_id"]
-			delete(idpMap, "ldap_config") // delete the ldap_config json and introduce ldap_id string
 			idpMap["ldap_id"] = ldap_id
 		}
 

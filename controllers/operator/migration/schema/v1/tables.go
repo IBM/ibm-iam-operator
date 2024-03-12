@@ -124,7 +124,7 @@ type IdpConfig struct {
 	Type        string         `json:"type"`
 	SCIMConfig  map[string]any `json:"scim_config"`
 	JIT         bool           `json:"jit"`
-	LDAPConfig  map[string]any `json:"ldap_config"`
+	LDAPId      string         `json:"ldap_id"`
 }
 
 func (i *IdpConfig) ToAnySlice() []any {
@@ -138,7 +138,7 @@ func (i *IdpConfig) ToAnySlice() []any {
 		i.Type,
 		i.SCIMConfig,
 		i.JIT,
-		i.LDAPConfig,
+		i.LDAPId,
 	}
 }
 
@@ -162,8 +162,8 @@ func (i *IdpConfig) GetTableIdentifier() pgx.Identifier {
 func (i *IdpConfig) GetInsertSQL() string {
 	return `
 		INSERT INTO platformdb.idp_configs
-		(uid, description, enabled, idp_config, name, protocol, type, scim_config, jit, ldap_config)
-		VALUES (@uid, @description, @enabled, @idp_config, @name, @protocol, @type, @scim_config, @jit, @ldap_config)
+		(uid, description, enabled, idp_config, name, protocol, type, scim_config, jit, ldap_id)
+		VALUES (@uid, @description, @enabled, @idp_config, @name, @protocol, @type, @scim_config, @jit, @ldap_id)
 		ON CONFLICT (uid) DO NOTHING
 		RETURNING uid;`
 }
@@ -186,7 +186,7 @@ var IdpConfigColumnNames []string = []string{
 	"type",
 	"scim_config",
 	"jit",
-	"ldap_config",
+	"ldap_id",
 }
 
 var IdpConfigsIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "idp_configs"}
@@ -197,6 +197,17 @@ func ConvertToIdpConfig(idpMap map[string]interface{}, idpConfig *IdpConfig) (er
 		idpMap["enabled"] = false
 	} else {
 		idpMap["enabled"] = true
+	}
+	// SAML with LDAP dependency mongo document will have ldap_config: {ldap_id: <value>}
+	// which directly maps to ldap_id column in sql
+	if ldap_config, ok := idpMap["ldap_config"]; ok {
+		if ldap_config, ok := ldap_config.(map[string]interface{}); ok {
+			// If ldap_config is already a map, fetch the ldap_id
+			ldap_id := ldap_config["ldap_id"]
+			delete(idpMap, "ldap_config") // delete the ldap_config json and introduce ldap_id string
+			idpMap["ldap_id"] = ldap_id
+		}
+
 	}
 
 	var jsonBytes []byte

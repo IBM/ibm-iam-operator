@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS "platformdb"."idp_configs" (
     "type" character varying,
     "scim_config" jsonb,
     "jit" boolean,
-    "ldap_config" json,
+    "ldap_id" character varying,
     CONSTRAINT "idp_configs_uid" PRIMARY KEY ("uid")
 ) WITH (oids = false);
 

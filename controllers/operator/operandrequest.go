@@ -70,8 +70,6 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 
 	desiredOperands := []operatorv1alpha1.Operand{
 		{Name: "ibm-idp-config-ui-operator"},
-		// TODO Remove this
-		{Name: "ibm-im-mongodb-operator"},
 	}
 
 	if err = r.addEmbeddedEDBIfNeeded(ctx, authCR, &desiredOperands); err != nil {
@@ -131,8 +129,7 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 	observedOperands := observedOpReq.Spec.Requests[0].Operands
 	observedMongoDBOperand := getMongoDBOperatorOperand(observedOpReq)
 
-	if r.needToMigrateMongoDB(ctx, authCR) {
-		// If the current OpReq has a MongoDB Operand, that needs to be kept - add to desired list
+	if r.needToPreserveMongoDBInOpReq(ctx, authCR) {
 		if observedMongoDBOperand != nil {
 			desiredOperands = append(desiredOperands, *observedMongoDBOperand)
 		}
@@ -229,8 +226,15 @@ func isIBMMongoDBOperator(name string) bool {
 	return strings.HasPrefix(name, "ibm-") && strings.HasSuffix(name, "-mongodb-operator")
 }
 
+// needToMigrateMongoDB indicates whether the reconciler should prepare for migrating data from MongoDB
 func (r *AuthenticationReconciler) needToMigrateMongoDB(ctx context.Context, authCR *operatorv1alpha1.Authentication) bool {
 	return authCR.HasNotBeenMigrated() && r.servicesNamespaceHasMongoDBService(ctx, authCR)
+}
+
+// needToPreserveMongoDBInOpReq indicates whether the reconciler should keep the requirement for MongoDB in its
+// OperandRequest
+func (r *AuthenticationReconciler) needToPreserveMongoDBInOpReq(ctx context.Context, authCR *operatorv1alpha1.Authentication) bool {
+	return r.needToMigrateMongoDB(ctx, authCR) || authCR.IsRetainingArtifacts()
 }
 
 func getOperandByName(opReq *operatorv1alpha1.OperandRequest, name string) *operatorv1alpha1.Operand {

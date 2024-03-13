@@ -236,18 +236,6 @@ func (a *Authentication) HasNotBeenMigrated() bool {
 	return !a.HasBeenMigrated()
 }
 
-func (a *Authentication) IsRetainingArtifacts() bool {
-	annotations := a.GetAnnotations()
-	if value, ok := annotations[AnnotationAuthRetainMigrationArtifacts]; ok && value == "true" {
-		return true
-	}
-	return false
-}
-
-func (a *Authentication) IsNotRetainingArtifacts() bool {
-	return !a.IsRetainingArtifacts()
-}
-
 func (a *Authentication) HasDBSchemaVersion() bool {
 	annotations := a.GetAnnotations()
 	if _, ok := annotations[AnnotationAuthDBSchemaVersion]; ok {

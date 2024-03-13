@@ -125,7 +125,7 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 						"productName":                        "IBM Cloud Platform Common Services",
 						"productID":                          "068a62892a1e4db39641342e592daa25",
 						"productMetric":                      "FREE",
-						"clusterhealth.ibm.com/dependencies": "cert-manager",
+						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb",
 					},
 				},
 				Spec: corev1.PodSpec{

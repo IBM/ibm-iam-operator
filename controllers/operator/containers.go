@@ -26,13 +26,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func buildInitContainers(initImage string) []corev1.Container {
+func buildInitContainers(mongoDBImage string) []corev1.Container {
 	psqlEnvList := []string{"DATABASE_RW_ENDPOINT", "DATABASE_PORT"}
 	envVars := buildInitContainerEnvVars(psqlEnvList, ctrlCommon.DatastoreEDBCMName)
 	return []corev1.Container{
 		{
-			Name:            "init-db",
-			Image:           initImage,
+			Name:            "init-mongodb",
+			Image:           mongoDBImage,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"bash",
@@ -63,13 +63,13 @@ func buildInitContainers(initImage string) []corev1.Container {
 	}
 }
 
-func buildInitForMngrAndProvider(initImage string) []corev1.Container {
+func buildInitForMngrAndProvider(mongoDBImage string) []corev1.Container {
 	psqlEnvList := []string{"DATABASE_RW_ENDPOINT", "DATABASE_PORT"}
 	envVars := buildInitContainerEnvVars(psqlEnvList, ctrlCommon.DatastoreEDBCMName)
 	return []corev1.Container{
 		{
-			Name:            "init-db",
-			Image:           initImage,
+			Name:            "init-mongodb",
+			Image:           mongoDBImage,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"bash",
@@ -151,8 +151,38 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 
 	envVars := []corev1.EnvVar{
 		{
+			Name:  "MONGO_DB_NAME",
+			Value: "platform-db",
+		},
+		{
 			Name:  "MEMORY",
 			Value: libertyMemory,
+		},
+		{
+			Name:  "MONGO_COLLECTION",
+			Value: "iam",
+		},
+		{
+			Name: "MONGO_USERNAME",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "icp-mongodb-admin",
+					},
+					Key: "user",
+				},
+			},
+		},
+		{
+			Name: "MONGO_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "icp-mongodb-admin",
+					},
+					Key: "password",
+				},
+			},
 		},
 		{
 			Name: "POD_NAME",
@@ -171,6 +201,19 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 					FieldPath:  "metadata.namespace",
 				},
 			},
+		},
+		{
+			Name:  "MONGO_HOST",
+			Value: "mongodb",
+		},
+		{
+			Name:  "MONGO_PORT",
+			Value: "27017",
+		},
+
+		{
+			Name:  "MONGO_AUTHSOURCE",
+			Value: "admin",
 		},
 		{
 			Name: "WLP_CLIENT_ID",
@@ -276,7 +319,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 	idpEnvVarList := []string{"NODE_ENV", "MASTER_HOST", "IDENTITY_PROVIDER_URL", "HTTP_ONLY", "SESSION_TIMEOUT", "LDAP_RECURSIVE_SEARCH", "LDAP_ATTR_CACHE_SIZE", "LDAP_ATTR_CACHE_TIMEOUT", "LDAP_ATTR_CACHE_ENABLED", "LDAP_ATTR_CACHE_SIZELIMIT",
 		"LDAP_SEARCH_CACHE_SIZE", "LDAP_SEARCH_CACHE_TIMEOUT", "LDAP_CTX_POOL_INITSIZE", "LDAP_CTX_POOL_MAXSIZE", "LDAP_CTX_POOL_TIMEOUT", "LDAP_CTX_POOL_WAITTIME", "LDAP_CTX_POOL_PREFERREDSIZE", "IDENTITY_PROVIDER_URL", "IDENTITY_MGMT_URL", "LDAP_SEARCH_CACHE_ENABLED", "LDAP_SEARCH_CACHE_SIZELIMIT", "IDTOKEN_LIFETIME", "IBMID_CLIENT_ID", "IBMID_CLIENT_ISSUER",
 		"SAML_NAMEID_FORMAT", "FIPS_ENABLED", "LOGJAM_DHKEYSIZE_2048_BITS_ENABLED", "LOG_LEVEL_AUTHSVC", "LIBERTY_DEBUG_ENABLED", "NONCE_ENABLED", "CLAIMS_SUPPORTED", "CLAIMS_MAP", "SCOPE_CLAIM", "OIDC_ISSUER_URL",
-		"DB_CONNECT_TIMEOUT", "DB_IDLE_TIMEOUT", "DB_POOL_MIN_SIZE", "DB_POOL_MAX_SIZE", "SEQL_LOGGING"}
+		"MONGO_READ_TIMEOUT", "MONGO_MAX_STALENESS", "MONGO_READ_PREFERENCE", "DB_CONNECT_TIMEOUT", "MONGO_SELECTION_TIMEOUT", "DB_IDLE_TIMEOUT", "DB_POOL_MIN_SIZE", "DB_POOL_MAX_SIZE", "SEQL_LOGGING"}
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
 
 	envVars = append(envVars, idpEnvVars...)
@@ -331,6 +374,14 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			{
 				Name:      "ldaps-ca-cert",
 				MountPath: "/opt/ibm/ldaps",
+			},
+			{
+				Name:      "mongodb-ca-cert",
+				MountPath: "/certs/mongodb-ca",
+			},
+			{
+				Name:      "mongodb-client-cert",
+				MountPath: "/certs/mongodb-client",
 			},
 			{
 				Name:      "saml-cert",
@@ -402,6 +453,10 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		}
 	}
 	envVars := []corev1.EnvVar{
+		{
+			Name:  "MONGO_DB_NAME",
+			Value: "platform-db",
+		},
 		{
 			Name:  "SERVICE_NAME",
 			Value: "platform-identity-provider",
@@ -489,6 +544,46 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 					Key: "outputEncoding",
 				},
 			},
+		},
+		{
+			Name:  "MONGO_COLLECTION",
+			Value: "iam",
+		},
+		{
+			Name: "MONGO_USERNAME",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "icp-mongodb-admin",
+					},
+					Key: "user",
+				},
+			},
+		},
+		{
+			Name: "MONGO_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "icp-mongodb-admin",
+					},
+					Key: "password",
+				},
+			},
+		},
+
+		{
+			Name:  "MONGO_HOST",
+			Value: "mongodb",
+		},
+		{
+			Name:  "MONGO_PORT",
+			Value: "27017",
+		},
+
+		{
+			Name:  "MONGO_AUTHSOURCE",
+			Value: "admin",
 		},
 		{
 			Name:  "service_crn_id",
@@ -655,6 +750,14 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 				MountPath: "/opt/ibm/identity-provider/certs",
 			},
 			{
+				Name:      "mongodb-ca-cert",
+				MountPath: "/certs/mongodb-ca",
+			},
+			{
+				Name:      "mongodb-client-cert",
+				MountPath: "/certs/mongodb-client",
+			},
+			{
 				Name:      "saml-cert",
 				MountPath: "/certs/saml-certs",
 			},
@@ -729,6 +832,10 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 
 	envVars := []corev1.EnvVar{
 		{
+			Name:  "MONGO_DB_NAME",
+			Value: "platform-db",
+		},
+		{
 			Name:  "SERVICE_NAME",
 			Value: "platform-identity-management",
 		},
@@ -773,6 +880,21 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			},
 		},
 		{
+			Name:  "MONGO_COLLECTION",
+			Value: "iam",
+		},
+		{
+			Name: "MONGO_USERNAME",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "icp-mongodb-admin",
+					},
+					Key: "user",
+				},
+			},
+		},
+		{
 			Name: "OAUTH2_CLIENT_REGISTRATION_SECRET",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
@@ -786,6 +908,31 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		{
 			Name:  "AUTHZ_DISABLED",
 			Value: "true",
+		},
+		{
+			Name: "MONGO_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "icp-mongodb-admin",
+					},
+					Key: "password",
+				},
+			},
+		},
+
+		{
+			Name:  "MONGO_HOST",
+			Value: "mongodb",
+		},
+		{
+			Name:  "MONGO_PORT",
+			Value: "27017",
+		},
+
+		{
+			Name:  "MONGO_AUTHSOURCE",
+			Value: "admin",
 		},
 		{
 			Name:  "OPENSHIFT_URL",
@@ -988,6 +1135,14 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			{
 				Name:      "platform-identity-management",
 				MountPath: "/opt/ibm/identity-mgmt/server/certs",
+			},
+			{
+				Name:      "mongodb-ca-cert",
+				MountPath: "/certs/mongodb-ca",
+			},
+			{
+				Name:      "mongodb-client-cert",
+				MountPath: "/certs/mongodb-client",
 			},
 			{
 				Name:      "scim-ldap-attributes-mapping",

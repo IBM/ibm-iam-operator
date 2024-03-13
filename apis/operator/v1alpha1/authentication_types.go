@@ -238,7 +238,7 @@ func (a *Authentication) HasNotBeenMigrated() bool {
 
 func (a *Authentication) IsRetainingArtifacts() bool {
 	annotations := a.GetAnnotations()
-	if value, ok := annotations[AnnotationAuthRetainMigrationArtifacts]; ok && value == "true" {
+	if value, ok := annotations[AnnotationAuthRetainMigrationArtifacts]; !ok || value == "true" {
 		return true
 	}
 	return false

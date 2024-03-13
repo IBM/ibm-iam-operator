@@ -998,7 +998,7 @@ func copyIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB)
 				idpRows[i].Type,
 				idpRows[i].SCIMConfig,
 				idpRows[i].JIT,
-				idpRows[i].LDAPId}, nil
+				idpRows[i].LDAPConfig}, nil
 		}),
 	)
 	var pgErr *pgconn.PgError

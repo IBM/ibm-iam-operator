@@ -80,8 +80,9 @@ var _ = Describe("IdpConfig", func() {
 					"LDAP_GROUPIDMAP":       "*:cn",
 					"LDAP_GROUPMEMBERIDMAP": "groupOfUniqueNames:uniquemember",
 				}
-				idpConfig := ConvertV2DirectoryToV3IdpConfig(dirMap)
+				idpConfig, err := ConvertV2DirectoryToV3IdpConfig(dirMap)
 				Expect(idpConfig).ToNot(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(idpConfig.Name).To(Equal("openLDAP"))
 				Expect(idpConfig.Type).To(Equal("Custom"))
 				Expect(idpConfig.Protocol).To(Equal("ldap"))
@@ -108,7 +109,7 @@ var _ = Describe("IdpConfig", func() {
 			})
 		})
 		Context("When Directory map has CP3MIGRATED", func() {
-			It("returns nil when it is set to \"true\"", func() {
+			It("returns a valid pointer to a IdpConfig when it is set to \"true\"", func() {
 				dirMap = map[string]any{
 					"_id":                   "someidentifier",
 					"LDAP_ID":               "openLDAP",
@@ -127,10 +128,34 @@ var _ = Describe("IdpConfig", func() {
 					"LDAP_GROUPMEMBERIDMAP": "groupOfUniqueNames:uniquemember",
 					"CP3MIGRATED":           "true",
 				}
-				idpConfig := ConvertV2DirectoryToV3IdpConfig(dirMap)
-				Expect(idpConfig).To(BeNil())
+				idpConfig, err := ConvertV2DirectoryToV3IdpConfig(dirMap)
+				Expect(idpConfig).ToNot(BeNil())
+				Expect(err).ToNot(HaveOccurred())
+				Expect(idpConfig.Name).To(Equal("openLDAP"))
+				Expect(idpConfig.Type).To(Equal("Custom"))
+				Expect(idpConfig.Protocol).To(Equal("ldap"))
+				Expect(idpConfig.UID).To(Equal("someidentifier"))
+				Expect(idpConfig.Description).To(Equal(""))
+				Expect(idpConfig.IDPConfig).ToNot(BeEmpty())
+				Expect(idpConfig.IDPConfig).Should(HaveKeyWithValue("ldap_id", "openLDAP"))
+				Expect(idpConfig.IDPConfig).Should(HaveKeyWithValue("ldap_realm", "openLDAPRealm"))
+				Expect(idpConfig.IDPConfig).Should(HaveKeyWithValue("ldap_host", "100.100.100.100"))
+				Expect(idpConfig.IDPConfig).Should(HaveKeyWithValue("ldap_port", "389"))
+				Expect(idpConfig.IDPConfig).Should(HaveKeyWithValue("ldap_ignorecase", "true"))
+				Expect(idpConfig.IDPConfig).Should(HaveKeyWithValue("ldap_basedn", "dc=ibm,dc=com"))
+				Expect(idpConfig.IDPConfig).Should(HaveKeyWithValue("ldap_binddn", "cn=example,dc=ibm,dc=com"))
+				Expect(idpConfig.IDPConfig).Should(HaveKeyWithValue("ldap_bindpassword", "supersecret"))
+				Expect(idpConfig.IDPConfig).Should(HaveKeyWithValue("ldap_type", "Custom"))
+				Expect(idpConfig.IDPConfig).Should(HaveKeyWithValue("ldap_userfilter", "(&(uid=%v)(objectclass=person))"))
+				Expect(idpConfig.IDPConfig).Should(HaveKeyWithValue("ldap_groupfilter", "(&(cn=%v)(objectclass=groupOfUniqueNames))"))
+				Expect(idpConfig.IDPConfig).Should(HaveKeyWithValue("ldap_useridmap", "*:uid"))
+				Expect(idpConfig.IDPConfig).Should(HaveKeyWithValue("ldap_groupidmap", "*:cn"))
+				Expect(idpConfig.IDPConfig).Should(HaveKeyWithValue("ldap_groupmemberidmap", "groupOfUniqueNames:uniquemember"))
+				Expect(idpConfig.IDPConfig).ShouldNot(HaveKey("ldap_nestedsearch"))
+				Expect(idpConfig.IDPConfig).ShouldNot(HaveKey("ldap_pagingsearch"))
+				Expect(idpConfig.IDPConfig).ShouldNot(HaveKey("ldap_pagingsize"))
 			})
-			It("returns a valid point to a IdpConfig when it is not set to \"true\"", func() {
+			It("returns a valid pointer to a IdpConfig when it is not set to \"true\"", func() {
 				dirMap = map[string]any{
 					"_id":                   "someidentifier",
 					"LDAP_ID":               "openLDAP",
@@ -149,8 +174,9 @@ var _ = Describe("IdpConfig", func() {
 					"LDAP_GROUPMEMBERIDMAP": "groupOfUniqueNames:uniquemember",
 					"CP3MIGRATED":           "false",
 				}
-				idpConfig := ConvertV2DirectoryToV3IdpConfig(dirMap)
+				idpConfig, err := ConvertV2DirectoryToV3IdpConfig(dirMap)
 				Expect(idpConfig).ToNot(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(idpConfig.Name).To(Equal("openLDAP"))
 				Expect(idpConfig.Type).To(Equal("Custom"))
 				Expect(idpConfig.Protocol).To(Equal("ldap"))
@@ -194,8 +220,9 @@ var _ = Describe("IdpConfig", func() {
 					"LDAP_GROUPMEMBERIDMAP": "groupOfUniqueNames:uniquemember",
 					"CP3MIGRATED":           "trueish",
 				}
-				idpConfig := ConvertV2DirectoryToV3IdpConfig(dirMap)
+				idpConfig, err := ConvertV2DirectoryToV3IdpConfig(dirMap)
 				Expect(idpConfig).ToNot(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(idpConfig.Name).To(Equal("openLDAP"))
 				Expect(idpConfig.Type).To(Equal("Custom"))
 				Expect(idpConfig.Protocol).To(Equal("ldap"))
@@ -240,8 +267,9 @@ var _ = Describe("IdpConfig", func() {
 					"LDAP_GROUPIDMAP":       "*:cn",
 					"LDAP_GROUPMEMBERIDMAP": "groupOfUniqueNames:uniquemember",
 				}
-				idpConfig := ConvertV2DirectoryToV3IdpConfig(dirMap)
+				idpConfig, err := ConvertV2DirectoryToV3IdpConfig(dirMap)
 				Expect(idpConfig).To(BeNil())
+				Expect(err).To(HaveOccurred())
 			})
 		})
 	})

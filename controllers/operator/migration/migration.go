@@ -308,6 +308,7 @@ func MongoToV1(ctx context.Context, to, from DBConn) (err error) {
 	copyFuncs := []copyFunc{
 		insertOIDCClients,
 		insertIdpConfigs,
+		insertDirectoriesAsIdpConfigs,
 		insertUsers,
 		insertUserPreferences,
 		insertZenInstances,
@@ -480,7 +481,12 @@ func insertIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresD
 
 func insertDirectoriesAsIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
 	reqLogger := logf.FromContext(ctx)
-	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
+	filter := bson.M{
+		"$and": bson.A{
+			bson.M{"migrated": bson.M{"$ne": true}},
+			bson.M{"CP3MIGRATED": bson.M{"$ne": "true"}},
+		},
+	}
 	cursor, err := mongodb.Client.Database("platform-db").Collection("Directory").Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
@@ -498,10 +504,15 @@ func insertDirectoriesAsIdpConfigs(ctx context.Context, mongodb *MongoDB, postgr
 			continue
 		}
 
-		idpConfig := v1schema.ConvertV2DirectoryToV3IdpConfig(result)
+		var idpConfig *v1schema.IdpConfig
+		var uid string
+		if idpConfig, err = v1schema.ConvertV2DirectoryToV3IdpConfig(result); err != nil {
+			reqLogger.Error(err, "Failed to convert Directory to v3-compatible IDP config")
+			errCount++
+			continue
+		}
 		query := idpConfig.GetInsertSQL()
 		args := idpConfig.GetArgs()
-		var uid *string
 		err := postgres.Conn.QueryRow(ctx, query, args).Scan(&uid)
 		if errors.Is(err, pgx.ErrNoRows) {
 			reqLogger.Info("Row already exists in EDB")
@@ -510,7 +521,7 @@ func insertDirectoriesAsIdpConfigs(ctx context.Context, mongodb *MongoDB, postgr
 			errCount++
 			continue
 		}
-		updateFilter := bson.D{{Key: "_id", Value: idpConfig.UID}}
+		updateFilter := bson.D{{Key: "_id", Value: uid}}
 		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
 		updateResult, err := mongodb.Client.Database("platform-db").Collection("Directory").UpdateOne(ctx, updateFilter, update)
 		if err != nil {

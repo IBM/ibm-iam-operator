@@ -604,29 +604,24 @@ func ConvertToSCIMAttributesMappingSlice(scimAttributesMappingMaps []map[string]
 	return
 }
 
-func ConvertV2DirectoryToV3IdpConfig(dirMap map[string]any) (v3Config *IdpConfig) {
-	// cp3 migration already performed on this, so no need to migrate again
-	if cp3Migrated, ok := dirMap["CP3MIGRATED"]; ok && cp3Migrated == "true" {
-		return
-	}
-
+func ConvertV2DirectoryToV3IdpConfig(dirMap map[string]any) (v3Config *IdpConfig, err error) {
 	v3Config = &IdpConfig{}
 	idpConfig := make(map[string]any)
 
 	if uid, ok := dirMap["_id"]; ok {
 		if v3Config.UID, ok = uid.(string); !ok {
-			return nil
+			return nil, fmt.Errorf("_id of Directory is not a string")
 		}
 	}
 	if id, ok := dirMap["LDAP_ID"]; ok {
 		if v3Config.Name, ok = id.(string); !ok {
-			return nil
+			return nil, fmt.Errorf("LDAP_ID of Directory is not a string")
 		}
 		idpConfig["ldap_id"] = id
 	}
 	if lType, ok := dirMap["LDAP_TYPE"]; ok {
 		if v3Config.Type, ok = lType.(string); !ok {
-			return nil
+			return nil, fmt.Errorf("LDAP_TYPE of Directory is not a string")
 		}
 		idpConfig["ldap_type"] = lType
 	}

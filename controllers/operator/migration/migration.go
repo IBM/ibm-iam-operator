@@ -478,6 +478,67 @@ func insertIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresD
 	return
 }
 
+func insertDirectoriesAsIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	reqLogger := logf.FromContext(ctx)
+	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
+	cursor, err := mongodb.Client.Database("platform-db").Collection("Directory").Find(ctx, filter)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get cursor from MongoDB")
+		return
+	}
+	errCount := 0
+	migrateCount := 0
+	for cursor.Next(ctx) {
+		var result map[string]interface{}
+		if err = cursor.Decode(&result); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document")
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+
+		idpConfig := v1schema.ConvertV2DirectoryToV3IdpConfig(result)
+		query := idpConfig.GetInsertSQL()
+		args := idpConfig.GetArgs()
+		var uid *string
+		err := postgres.Conn.QueryRow(ctx, query, args).Scan(&uid)
+		if errors.Is(err, pgx.ErrNoRows) {
+			reqLogger.Info("Row already exists in EDB")
+		} else if err != nil {
+			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.idp_configs")
+			errCount++
+			continue
+		}
+		updateFilter := bson.D{{Key: "_id", Value: idpConfig.UID}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		updateResult, err := mongodb.Client.Database("platform-db").Collection("Directory").UpdateOne(ctx, updateFilter, update)
+		if err != nil {
+			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
+			errCount++
+			continue
+		}
+		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
+		migrateCount++
+	}
+	if errCount > 0 {
+		err = fmt.Errorf("encountered errors that prevented the migration of documents")
+		reqLogger.Error(err, "Migration of platform-db.Directory not successful", "failedCount", errCount, "successCount", migrateCount)
+		return
+	} else if errCount == 0 && migrateCount == 0 {
+		reqLogger.Info("No documents needed to be migrated; continuing")
+		return
+	}
+
+	if err = cursor.Err(); err != nil {
+		reqLogger.Error(err, "MongoDB cursor encountered an error")
+		// TODO: Handle this further
+		return
+	}
+	reqLogger.Info("Successfully copied over IDP configs to EDB", "rowsInserted", migrateCount)
+	return
+}
+
 func insertUsers(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
 	reqLogger := logf.FromContext(ctx)
 	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}

@@ -603,3 +603,87 @@ func ConvertToSCIMAttributesMappingSlice(scimAttributesMappingMaps []map[string]
 	}
 	return
 }
+
+func ConvertV2DirectoryToV3IdpConfig(dirMap map[string]any) (v3Config *IdpConfig) {
+	// cp3 migration already performed on this, so no need to migrate again
+	if cp3Migrated, ok := dirMap["CP3MIGRATED"]; ok && cp3Migrated == "true" {
+		return
+	}
+
+	v3Config = &IdpConfig{}
+	idpConfig := make(map[string]any)
+
+	if uid, ok := dirMap["_id"]; ok {
+		if v3Config.UID, ok = uid.(string); !ok {
+			return nil
+		}
+	}
+	if id, ok := dirMap["LDAP_ID"]; ok {
+		if v3Config.Name, ok = id.(string); !ok {
+			return nil
+		}
+		idpConfig["ldap_id"] = id
+	}
+	if lType, ok := dirMap["LDAP_TYPE"]; ok {
+		if v3Config.Type, ok = lType.(string); !ok {
+			return nil
+		}
+		idpConfig["ldap_type"] = lType
+	}
+	if realm, ok := dirMap["LDAP_REALM"]; ok {
+		idpConfig["ldap_realm"] = realm
+	}
+	if url, ok := dirMap["LDAP_URL"]; ok {
+		idpConfig["ldap_url"] = url
+	}
+	if host, ok := dirMap["LDAP_HOST"]; ok {
+		idpConfig["ldap_host"] = host
+	}
+	if port, ok := dirMap["LDAP_PORT"]; ok {
+		idpConfig["ldap_port"] = port
+	}
+	if protocol, ok := dirMap["LDAP_PROTOCOL"]; ok {
+		idpConfig["ldap_protocol"] = protocol
+	}
+	if basedn, ok := dirMap["LDAP_BASEDN"]; ok {
+		idpConfig["ldap_basedn"] = basedn
+	}
+	if binddn, ok := dirMap["LDAP_BINDDN"]; ok {
+		idpConfig["ldap_binddn"] = binddn
+	}
+	if bindpassword, ok := dirMap["LDAP_BINDPASSWORD"]; ok {
+		idpConfig["ldap_bindpassword"] = bindpassword
+	}
+	if ignoreCase, ok := dirMap["LDAP_IGNORECASE"]; ok {
+		idpConfig["ldap_ignorecase"] = ignoreCase
+	}
+	if userfilter, ok := dirMap["LDAP_USERFILTER"]; ok {
+		idpConfig["ldap_userfilter"] = userfilter
+	}
+	if useridmap, ok := dirMap["LDAP_USERIDMAP"]; ok {
+		idpConfig["ldap_useridmap"] = useridmap
+	}
+	if groupfilter, ok := dirMap["LDAP_GROUPFILTER"]; ok {
+		idpConfig["ldap_groupfilter"] = groupfilter
+	}
+	if groupidmap, ok := dirMap["LDAP_GROUPIDMAP"]; ok {
+		idpConfig["ldap_groupidmap"] = groupidmap
+	}
+	if groupmemberidmap, ok := dirMap["LDAP_GROUPMEMBERIDMAP"]; ok {
+		idpConfig["ldap_groupmemberidmap"] = groupmemberidmap
+	}
+	if nestedSearch, ok := dirMap["LDAP_NESTEDSEARCH"]; ok {
+		idpConfig["ldap_nestedsearch"] = nestedSearch
+	}
+	if pagingSearch, ok := dirMap["LDAP_PAGINGSEARCH"]; ok {
+		idpConfig["ldap_pagingsearch"] = pagingSearch
+	}
+	if pagingSize, ok := dirMap["LDAP_PAGINGSIZE"]; ok {
+		idpConfig["ldap_pagingsize"] = pagingSize
+	}
+	v3Config.Description = ""
+	v3Config.Protocol = "ldap"
+	v3Config.IDPConfig = idpConfig
+
+	return
+}

@@ -308,6 +308,8 @@ func MongoToV1(ctx context.Context, to, from DBConn) (err error) {
 	copyFuncs := []copyFunc{
 		insertOIDCClients,
 		insertIdpConfigs,
+		insertDirectoriesAsIdpConfigs,
+		insertV2SamlAsIdpConfig,
 		insertUsers,
 		insertUserPreferences,
 		insertZenInstances,
@@ -341,12 +343,12 @@ func (m *MongoDB) FindAll(ctx context.Context, db string, collection string, fil
 }
 
 func insertOIDCClients(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
-	reqLogger := logf.FromContext(ctx)
+	dbName := "OAuthDBSchema"
+	collectionName := "OauthClient"
+	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
 	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
 	// Omit the "_id" field because serial provided by Postgres will be used instead
 	projection := bson.D{{Key: "_id", Value: 0}}
-	dbName := "OAuthDBSchema"
-	collectionName := "OauthClient"
 	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter, mongoOptions.Find().SetProjection(projection))
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
@@ -412,9 +414,11 @@ func insertOIDCClients(ctx context.Context, mongodb *MongoDB, postgres *Postgres
 }
 
 func insertIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
-	reqLogger := logf.FromContext(ctx)
+	dbName := "platform-db"
+	collectionName := "cloudpak_ibmid_v3"
+	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
 	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
-	cursor, err := mongodb.Client.Database("platform-db").Collection("cloudpak_ibmid_v3").Find(ctx, filter)
+	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
 		return
@@ -478,10 +482,187 @@ func insertIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresD
 	return
 }
 
+func insertDirectoriesAsIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	dbName := "platform-db"
+	collectionName := "Directory"
+	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
+	filter := bson.M{
+		"$and": bson.A{
+			bson.M{"migrated": bson.M{"$ne": true}},
+			bson.M{"CP3MIGRATED": bson.M{"$ne": "true"}},
+		},
+	}
+	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get cursor from MongoDB")
+		return
+	}
+	errCount := 0
+	migrateCount := 0
+	for cursor.Next(ctx) {
+		var result map[string]interface{}
+		if err = cursor.Decode(&result); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document")
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+
+		var idpConfig *v1schema.IdpConfig
+		var uid string
+		if idpConfig, err = v1schema.ConvertV2DirectoryToV3IdpConfig(result); err != nil {
+			reqLogger.Error(err, "Failed to convert Directory to v3-compatible IDP config")
+			errCount++
+			continue
+		}
+		query := idpConfig.GetInsertSQL()
+		args := idpConfig.GetArgs()
+		err := postgres.Conn.QueryRow(ctx, query, args).Scan(&uid)
+		if errors.Is(err, pgx.ErrNoRows) {
+			reqLogger.Info("Row already exists in EDB")
+		} else if err != nil {
+			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.idp_configs")
+			errCount++
+			continue
+		}
+		updateFilter := bson.D{{Key: "id", Value: idpConfig.UID}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
+		if err != nil {
+			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
+			errCount++
+			continue
+		}
+		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
+		migrateCount++
+	}
+	if errCount > 0 {
+		err = fmt.Errorf("encountered errors that prevented the migration of documents")
+		reqLogger.Error(err, "Migration of platform-db.Directory not successful", "failedCount", errCount, "successCount", migrateCount)
+		return
+	} else if errCount == 0 && migrateCount == 0 {
+		reqLogger.Info("No documents needed to be migrated; continuing")
+		return
+	}
+
+	if err = cursor.Err(); err != nil {
+		reqLogger.Error(err, "MongoDB cursor encountered an error")
+		// TODO: Handle this further
+		return
+	}
+	reqLogger.Info("Successfully copied over IDP configs to EDB", "rowsInserted", migrateCount)
+	return
+}
+
+func insertV2SamlAsIdpConfig(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	dbName := "platform-db"
+	collectionName := "cloudpak_ibmid_v2"
+	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
+	v3SamlFilter := bson.M{"protocol": "saml"}
+	v3Saml := &v1schema.IdpConfig{}
+	err = mongodb.Client.Database(dbName).Collection("cloudpak_ibmid_v3").FindOne(ctx, v3SamlFilter).Decode(v3Saml)
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		reqLogger.Error(err, "Failed to read v3 SAML document from MongoDB", "MongoDB.DB", "platform-db", "MongoDB.Collection", "cloudpak_ibmid_v3")
+		return
+	} else if err == nil {
+		reqLogger.Info("A v3 SAML IdP already existed, so migration of v2 configuration will be skipped",
+			"MongoDB.DB", "platform-db",
+			"MongoDB.Collection", "cloudpak_ibmid_v3")
+		return
+	}
+	filter := bson.M{"migrated": bson.M{"$ne": true}}
+	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get cursor from MongoDB", "MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
+		return
+	}
+	errCount := 0
+	migrateCount := 0
+	for cursor.Next(ctx) {
+		var result map[string]interface{}
+		if err = cursor.Decode(&result); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document", "MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+
+		var idpConfig *v1schema.IdpConfig
+		var uid string
+		if idpConfig, err = v1schema.ConvertV2SamlToIdpConfig(result); err != nil {
+			reqLogger.Error(err, "Failed to convert SAML to v3-compatible IDP config")
+			errCount++
+			continue
+		}
+		type samlMeta struct {
+			Metadata string `bson:"metadata"`
+		}
+		saml := samlMeta{}
+		err = mongodb.Client.Database("samlDB").Collection("saml").FindOne(ctx, bson.D{}).Decode(&saml)
+		if err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document for saml metadata", "MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
+			errCount++
+			err = nil
+			continue
+		}
+		idpConfig.IDPConfig["idp_metadata"] = saml.Metadata
+		query := idpConfig.GetInsertSQL()
+		args := idpConfig.GetArgs()
+		err := postgres.Conn.QueryRow(ctx, query, args).Scan(&uid)
+		if errors.Is(err, pgx.ErrNoRows) {
+			reqLogger.Info("Row already exists in EDB")
+		} else if err != nil {
+			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.idp_configs")
+			errCount++
+			continue
+		}
+		updateFilter := bson.D{{Key: "protocol", Value: "saml"}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
+		if err != nil {
+			reqLogger.Error(err, "Failed to write back migration completion to Mongo", "MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
+			errCount++
+			continue
+		}
+		reqLogger.Info("Wrote back document migration", "updateResult", updateResult, "MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
+
+		samlDBUpdateFilter := bson.D{{Key: "name", Value: "saml"}}
+		samlDBUpdate := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		samlUpdateResult, err := mongodb.Client.Database("samlDB").Collection("saml").UpdateOne(ctx, samlDBUpdateFilter, samlDBUpdate)
+		if err != nil {
+			reqLogger.Error(err, "Failed to write back migration completion to Mongo", "MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
+			errCount++
+			continue
+		}
+		reqLogger.Info("Wrote back document migration", "updateResult", samlUpdateResult, "MongoDB.DB", "samlDB", "MongoDB.Collection", "saml")
+		migrateCount++
+	}
+	if errCount > 0 {
+		err = fmt.Errorf("encountered errors that prevented the migration of documents")
+		reqLogger.Error(err, "Migration of platform-db.cloudpak_ibmid_v2 not successful", "failedCount", errCount, "successCount", migrateCount)
+		return
+	} else if errCount == 0 && migrateCount == 0 {
+		reqLogger.Info("No documents needed to be migrated; continuing")
+		return
+	}
+
+	if err = cursor.Err(); err != nil {
+		reqLogger.Error(err, "MongoDB cursor encountered an error")
+		// TODO: Handle this further
+		return
+	}
+	reqLogger.Info("Successfully copied over IDP configs to EDB", "rowsInserted", migrateCount)
+	return
+}
+
 func insertUsers(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	dbName := "platform-db"
+	collectionName := "Users"
 	reqLogger := logf.FromContext(ctx)
 	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
-	cursor, err := mongodb.Client.Database("platform-db").Collection("Users").Find(ctx, filter)
+	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
 		return
@@ -557,7 +738,7 @@ func insertUsers(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (e
 		}
 		updateFilter := bson.D{{Key: "_id", Value: user.UserID}}
 		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
-		updateResult, err := mongodb.Client.Database("platform-db").Collection("Users").UpdateOne(ctx, updateFilter, update)
+		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
 			errCount++
@@ -661,9 +842,11 @@ func insertUserPreferences(ctx context.Context, mongodb *MongoDB, postgres *Post
 }
 
 func insertZenInstances(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
-	reqLogger := logf.FromContext(ctx)
+	dbName := "platform-db"
+	collectionName := "ZenInstance"
+	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
 	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
-	cursor, err := mongodb.Client.Database("platform-db").Collection("ZenInstance").Find(ctx, filter)
+	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
 		return
@@ -814,9 +997,11 @@ func insertZenInstanceUsers(ctx context.Context, mongodb *MongoDB, postgres *Pos
 }
 
 func insertSCIMAttributes(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
-	reqLogger := logf.FromContext(ctx)
+	dbName := "platform-db"
+	collectionName := "ScimAttributes"
+	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
 	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
-	cursor, err := mongodb.Client.Database("platform-db").Collection("ScimAttributes").Find(ctx, filter)
+	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
 		return
@@ -861,7 +1046,7 @@ func insertSCIMAttributes(ctx context.Context, mongodb *MongoDB, postgres *Postg
 		}
 		updateFilter := bson.D{{Key: "id", Value: scimAttr.ID}}
 		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
-		updateResult, err := mongodb.Client.Database("platform-db").Collection("ScimAttributes").UpdateOne(ctx, updateFilter, update)
+		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
 			errCount++
@@ -889,9 +1074,11 @@ func insertSCIMAttributes(ctx context.Context, mongodb *MongoDB, postgres *Postg
 }
 
 func insertSCIMAttributeMappings(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
-	reqLogger := logf.FromContext(ctx)
+	dbName := "platform-db"
+	collectionName := "ScimAttributeMapping"
+	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
 	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
-	cursor, err := mongodb.Client.Database("platform-db").Collection("ScimAttributeMapping").Find(ctx, filter)
+	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
 		return
@@ -937,7 +1124,7 @@ func insertSCIMAttributeMappings(ctx context.Context, mongodb *MongoDB, postgres
 		}
 		updateFilter := bson.D{{Key: "_id", Value: scimAttrMapping.IdpID}}
 		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
-		updateResult, err := mongodb.Client.Database("platform-db").Collection("ScimAttributeMapping").UpdateOne(ctx, updateFilter, update)
+		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
 			errCount++

@@ -23,12 +23,11 @@ CREATE TABLE IF NOT EXISTS "platformdb"."idp_configs" (
 -- User Management
 
 CREATE TABLE IF NOT EXISTS "platformdb"."users_preferences" (
-    "uid" uuid DEFAULT gen_random_uuid() NOT NULL,
-    "user_uid" uuid NOT NULL,
+    "user_id" character varying NOT NULL,
     "last_login" timestamptz NOT NULL,
     "last_logout" timestamptz,
     "login_count" int,
-    CONSTRAINT "users_preferences_uid" PRIMARY KEY ("uid")
+    CONSTRAINT "users_preferences_userid" PRIMARY KEY ("user_id")
 ) WITH (oids = false);
 
 CREATE TABLE IF NOT EXISTS "platformdb"."users" (

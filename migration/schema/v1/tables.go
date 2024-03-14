@@ -399,16 +399,14 @@ func ConvertToUsers(userMaps []map[string]interface{}, users []User) (err error)
 
 // UserPreferences is a row from the `platformdb.users_preferences` table
 type UserPreferences struct {
-	UID        string              `json:"uid"`
-	UserUID    string              `json:"user_uid"`
+	UserID     string              `json:"user_id"`
 	LastLogin  *pgtype.Timestamptz `json:"last_login"`
 	LastLogout *pgtype.Timestamptz `json:"last_logout,omitempty"`
 	LoginCount int                 `json:"login_count,omitempty"`
 }
 
 var UserPreferencesColumnNames []string = []string{
-	"uid",
-	"user_uid",
+	"user_id",
 	"last_login",
 	"last_logout",
 	"login_count",
@@ -418,8 +416,7 @@ var UsersPreferencesIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "us
 
 func (u *UserPreferences) ToAnySlice() []any {
 	return []any{
-		u.UID,
-		u.UserUID,
+		u.UserID,
 		u.LastLogin,
 		u.LastLogout,
 		u.LoginCount,
@@ -446,8 +443,8 @@ func (u *UserPreferences) GetTableIdentifier() pgx.Identifier {
 func (u *UserPreferences) GetInsertSQL() string {
 	return `
 		INSERT INTO platformdb.users_preferences
-		(uid, user_uid, last_login, last_logout, login_count)
-		VALUES (DEFAULT, @user_uid, @last_login, @last_logout, @login_count)
+		(user_id, last_login, last_logout, login_count)
+		VALUES (@user_id, @last_login, @last_logout, @login_count)
 		ON CONFLICT DO NOTHING;`
 }
 

@@ -739,11 +739,10 @@ func migrateUserPreferencesRowForUser(ctx context.Context, mongodb *MongoDB, pos
 			reqLogger.Error(err, "Failed to unmarshal UserPreferences", "identifier", v1schema.UsersPreferencesIdentifier)
 			return err
 		}
-		userPrefs.UserUID = user.UID.String()
 		args := userPrefs.GetArgs()
 
 		query := userPrefs.GetInsertSQL()
-		reqLogger.Info("Executing query for UserPreferences", "preferenceId", preferenceId, "uid", userPrefs.UserUID)
+		reqLogger.Info("Executing query for UserPreferences", "preferenceId", preferenceId, "user_id", userPrefs.UserID)
 		_, err = postgres.Conn.Exec(ctx, query, args)
 		if errors.Is(err, pgx.ErrNoRows) {
 			reqLogger.Info("Row already exists in EDB")

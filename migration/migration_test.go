@@ -30,7 +30,7 @@ var _ = Describe("Migration", func() {
 			})
 			It("filters out that entry (partially-filled struct)", func() {
 				userPrefs = append(userPrefs, v1schema.UserPreferences{
-					UserUID:    "some-id",
+					UserID:     "some-id",
 					LoginCount: 0,
 					LastLogout: &pgtype.Timestamptz{
 						Time: time.Now(),

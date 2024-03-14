@@ -309,6 +309,7 @@ func MongoToV1(ctx context.Context, to, from DBConn) (err error) {
 		insertOIDCClients,
 		insertIdpConfigs,
 		insertDirectoriesAsIdpConfigs,
+		insertV2SamlAsIdpConfig,
 		insertUsers,
 		insertUserPreferences,
 		insertZenInstances,
@@ -535,6 +536,94 @@ func insertDirectoriesAsIdpConfigs(ctx context.Context, mongodb *MongoDB, postgr
 	if errCount > 0 {
 		err = fmt.Errorf("encountered errors that prevented the migration of documents")
 		reqLogger.Error(err, "Migration of platform-db.Directory not successful", "failedCount", errCount, "successCount", migrateCount)
+		return
+	} else if errCount == 0 && migrateCount == 0 {
+		reqLogger.Info("No documents needed to be migrated; continuing")
+		return
+	}
+
+	if err = cursor.Err(); err != nil {
+		reqLogger.Error(err, "MongoDB cursor encountered an error")
+		// TODO: Handle this further
+		return
+	}
+	reqLogger.Info("Successfully copied over IDP configs to EDB", "rowsInserted", migrateCount)
+	return
+}
+
+func insertV2SamlAsIdpConfig(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	reqLogger := logf.FromContext(ctx)
+	v3SamlFilter := bson.M{"protocol": "saml"}
+	v3Saml := &v1schema.IdpConfig{}
+	err = mongodb.Client.Database("platform-db").Collection("cloudpak_ibmid_v3").FindOne(ctx, v3SamlFilter).Decode(v3Saml)
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		reqLogger.Error(err, "Failed to read v3 SAML document from MongoDB")
+		return
+	} else if err == nil {
+		reqLogger.Info("A v3 SAML configuration already existed, so migration of v2 configuration will be skipped")
+		return
+	}
+	filter := bson.M{"migrated": bson.M{"$ne": true}}
+	cursor, err := mongodb.Client.Database("platform-db").Collection("cloudpak_ibmid_v2").Find(ctx, filter)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get cursor from MongoDB")
+		return
+	}
+	errCount := 0
+	migrateCount := 0
+	for cursor.Next(ctx) {
+		var result map[string]interface{}
+		if err = cursor.Decode(&result); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document")
+			// TODO: Handle this further
+			errCount++
+			err = nil
+			continue
+		}
+
+		var idpConfig *v1schema.IdpConfig
+		var uid string
+		if idpConfig, err = v1schema.ConvertV2SamlToIdpConfig(result); err != nil {
+			reqLogger.Error(err, "Failed to convert SAML to v3-compatible IDP config")
+			errCount++
+			continue
+		}
+		type samlMeta struct {
+			Metadata string `bson:"metadata"`
+		}
+		saml := samlMeta{}
+		err = mongodb.Client.Database("samlDB").Collection("saml").FindOne(ctx, bson.D{}).Decode(&saml)
+		if err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document for saml metadata")
+			errCount++
+			err = nil
+			continue
+		}
+		idpConfig.IDPConfig["idp_metadata"] = saml.Metadata
+		query := idpConfig.GetInsertSQL()
+		args := idpConfig.GetArgs()
+		err := postgres.Conn.QueryRow(ctx, query, args).Scan(&uid)
+		if errors.Is(err, pgx.ErrNoRows) {
+			reqLogger.Info("Row already exists in EDB")
+		} else if err != nil {
+			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.idp_configs")
+			errCount++
+			continue
+		}
+		updateFilter := bson.D{{Key: "_id", Value: uid}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		updateResult, err := mongodb.Client.Database("platform-db").Collection("cloudpak_ibmid_v2").UpdateOne(ctx, updateFilter, update)
+		if err != nil {
+			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
+			errCount++
+			continue
+		}
+		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
+		migrateCount++
+	}
+	if errCount > 0 {
+		err = fmt.Errorf("encountered errors that prevented the migration of documents")
+		reqLogger.Error(err, "Migration of platform-db.cloudpak_ibmid_v2 not successful", "failedCount", errCount, "successCount", migrateCount)
 		return
 	} else if errCount == 0 && migrateCount == 0 {
 		reqLogger.Info("No documents needed to be migrated; continuing")

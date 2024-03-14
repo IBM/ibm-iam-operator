@@ -273,4 +273,148 @@ var _ = Describe("IdpConfig", func() {
 			})
 		})
 	})
+	Describe("ConvertV2SamlToIdpConfig", func() {
+		var samlMap map[string]any
+		It("converts basic V2 SAML to V3 IdP", func() {
+			tokenAttrMap := map[string]string{
+				"uid":        "uid",
+				"first_name": "firstName",
+				"last_name":  "lastName",
+				"groups":     "blueGroups",
+				"email":      "emailAddress",
+			}
+			samlMap = map[string]any{
+				"name":                     "w3id-sample-saml",
+				"description":              "w3id-sample-saml-test",
+				"protocol":                 "saml",
+				"idp_type":                 "default",
+				"scim":                     "no",
+				"saml_ldap":                "None",
+				"jit":                      "yes",
+				"token_attribute_mappings": tokenAttrMap,
+				"status":                   "enabled",
+			}
+			idpConfig, err := ConvertV2SamlToIdpConfig(samlMap)
+			Expect(idpConfig).ToNot(BeNil())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(idpConfig).To(HaveField("Name", "w3id-sample-saml"))
+			Expect(idpConfig).To(HaveField("Description", "w3id-sample-saml-test"))
+			Expect(idpConfig).To(HaveField("Protocol", "saml"))
+			Expect(idpConfig).To(HaveField("Type", "default"))
+			Expect(idpConfig).To(HaveField("JIT", true))
+			Expect(idpConfig.IDPConfig).ToNot(BeEmpty())
+			Expect(idpConfig.IDPConfig).To(HaveKey("token_attribute_mappings"))
+			Expect(idpConfig.IDPConfig["token_attribute_mappings"]).To(HaveKeyWithValue("sub", "uid"))
+			Expect(idpConfig.IDPConfig["token_attribute_mappings"]).To(HaveKeyWithValue("given_name", "firstName"))
+			Expect(idpConfig.IDPConfig["token_attribute_mappings"]).To(HaveKeyWithValue("family_name", "lastName"))
+			Expect(idpConfig.IDPConfig["token_attribute_mappings"]).To(HaveKeyWithValue("groups", "blueGroups"))
+			Expect(idpConfig.IDPConfig["token_attribute_mappings"]).To(HaveKeyWithValue("email", "emailAddress"))
+		})
+
+		It("converts V2 SAML with SCIM dependency registration to V3 IdP", func() {
+			samlMap = map[string]any{
+				"name":                     "idp_saml_isv",
+				"description":              "This is a saml isv config",
+				"protocol":                 "saml",
+				"idp_type":                 "isv",
+				"scim":                     "yes",
+				"scim_base_path":           "https://example.ibm.com/v2.0/",
+				"token_attribute_mappings": map[string]string{"uid": "userID", "first_name": "given_name", "last_name": "family_name", "groups": "groupIds", "email": "email"},
+				"jit":                      "yes",
+				"scim_attribute_mappings": map[string]any{
+					"user": map[string]any{
+						"principalName": "userName",
+						"givenName":     "name.givenName",
+						"middleName":    "name.middleName",
+						"familyName":    "name.familyName",
+						"formatted":     "name.formatted",
+					},
+					"group": map[string]any{
+						"principalName": "displayName",
+						"created":       "meta.created",
+						"lastModified":  "meta.lastModified",
+					},
+				},
+				"config": map[string]any{
+					"grant_type":    "client_credentials",
+					"token_url":     "https://example.ibm.com/v1.0/endpoint/default/token",
+					"client_id":     "9de6991f-a6e0-4aab-af3a-d8abd8c9cc95",
+					"client_secret": "somesecret",
+				},
+				"status": "enabled",
+			}
+			idpConfig, err := ConvertV2SamlToIdpConfig(samlMap)
+			Expect(idpConfig).ToNot(BeNil())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(idpConfig).To(HaveField("Name", "idp_saml_isv"))
+			Expect(idpConfig).To(HaveField("Description", "This is a saml isv config"))
+			Expect(idpConfig).To(HaveField("Protocol", "saml"))
+			Expect(idpConfig).To(HaveField("Type", "isv"))
+			Expect(idpConfig).To(HaveField("JIT", true))
+			Expect(idpConfig.IDPConfig).ToNot(BeEmpty())
+			Expect(idpConfig.IDPConfig).To(HaveKey("token_attribute_mappings"))
+			Expect(idpConfig.IDPConfig["token_attribute_mappings"]).To(HaveKeyWithValue("sub", "userID"))
+			Expect(idpConfig.IDPConfig["token_attribute_mappings"]).To(HaveKeyWithValue("given_name", "given_name"))
+			Expect(idpConfig.IDPConfig["token_attribute_mappings"]).To(HaveKeyWithValue("family_name", "family_name"))
+			Expect(idpConfig.IDPConfig["token_attribute_mappings"]).To(HaveKeyWithValue("groups", "groupIds"))
+			Expect(idpConfig.IDPConfig["token_attribute_mappings"]).To(HaveKeyWithValue("email", "email"))
+			Expect(idpConfig.SCIMConfig).To(HaveKeyWithValue("scim_base_path", "https://example.ibm.com/v2.0/"))
+			Expect(idpConfig.SCIMConfig).To(HaveKeyWithValue("grant_type", "client_credentials"))
+			Expect(idpConfig.SCIMConfig).To(HaveKeyWithValue("token_url", "https://example.ibm.com/v1.0/endpoint/default/token"))
+			Expect(idpConfig.SCIMConfig).To(HaveKeyWithValue("client_id", "9de6991f-a6e0-4aab-af3a-d8abd8c9cc95"))
+			Expect(idpConfig.SCIMConfig).To(HaveKeyWithValue("client_secret", "somesecret"))
+			Expect(idpConfig.SCIMConfig).To(HaveKey("scim_attribute_mappings"))
+			Expect(idpConfig.SCIMConfig["scim_attribute_mappings"]).To(HaveKey("user"))
+			Expect(idpConfig.SCIMConfig["scim_attribute_mappings"]).To(HaveKey("group"))
+			var user map[string]any
+			var group map[string]any
+			if value, ok := idpConfig.SCIMConfig["scim_attribute_mappings"].(map[string]any); ok {
+				user = value["user"].(map[string]any)
+				group = value["group"].(map[string]any)
+			}
+			Expect(user).To(HaveKeyWithValue("principalName", "userName"))
+			Expect(user).To(HaveKeyWithValue("givenName", "name.givenName"))
+			Expect(user).To(HaveKeyWithValue("middleName", "name.middleName"))
+			Expect(user).To(HaveKeyWithValue("familyName", "name.familyName"))
+			Expect(user).To(HaveKeyWithValue("formatted", "name.formatted"))
+			Expect(group).To(HaveKeyWithValue("principalName", "displayName"))
+			Expect(group).To(HaveKeyWithValue("created", "meta.created"))
+			Expect(group).To(HaveKeyWithValue("lastModified", "meta.lastModified"))
+		})
+
+		It("converts V2 SAML with LDAP dependency to V3 IdP", func() {
+			samlMap = map[string]any{
+				"name":        "tivoli-saml-test",
+				"description": "saml bluepages with ldap",
+				"protocol":    "saml",
+				"idp_type":    "default",
+				"saml_ldap":   "IBM Tivoli Directory Server",
+				"token_attribute_mappings": map[string]string{
+					"uid":        "uid",
+					"first_name": "firstName",
+					"last_name":  "lastName",
+					"groups":     "blueGroups",
+					"email":      "email",
+				},
+				"jit":    "no",
+				"status": "enabled",
+			}
+			idpConfig, err := ConvertV2SamlToIdpConfig(samlMap)
+			Expect(idpConfig).ToNot(BeNil())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(idpConfig).To(HaveField("Name", "tivoli-saml-test"))
+			Expect(idpConfig).To(HaveField("Description", "saml bluepages with ldap"))
+			Expect(idpConfig).To(HaveField("Protocol", "saml"))
+			Expect(idpConfig).To(HaveField("Type", "default"))
+			Expect(idpConfig).To(HaveField("JIT", false))
+			Expect(idpConfig.IDPConfig).ToNot(BeEmpty())
+			Expect(idpConfig.IDPConfig).To(HaveKey("token_attribute_mappings"))
+			Expect(idpConfig.IDPConfig["token_attribute_mappings"]).To(HaveKeyWithValue("sub", "uid"))
+			Expect(idpConfig.IDPConfig["token_attribute_mappings"]).To(HaveKeyWithValue("given_name", "firstName"))
+			Expect(idpConfig.IDPConfig["token_attribute_mappings"]).To(HaveKeyWithValue("family_name", "lastName"))
+			Expect(idpConfig.IDPConfig["token_attribute_mappings"]).To(HaveKeyWithValue("groups", "blueGroups"))
+			Expect(idpConfig.IDPConfig["token_attribute_mappings"]).To(HaveKeyWithValue("email", "email"))
+			Expect(idpConfig.LDAPId).To(Equal("IBM Tivoli Directory Server"))
+		})
+	})
 })

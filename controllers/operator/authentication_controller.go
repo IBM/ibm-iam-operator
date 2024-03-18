@@ -75,7 +75,7 @@ var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024
 var rule = `^([a-z0-9]){32,}$`
 var wlpClientID = ctrlCommon.GenerateRandomString(rule)
 var wlpClientSecret = ctrlCommon.GenerateRandomString(rule)
-var finalizerName = "authentication.operator.ibm.com"
+var finalizerName = "authentication.operator.ibm.com/finalizer"
 
 func (r *AuthenticationReconciler) addFinalizers(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "addFinalizers")
@@ -209,7 +209,7 @@ func (r *AuthenticationReconciler) handleRetainAnnotation(ctx context.Context, r
 			reqLogger.Error(err, "Failed to get Secret", "Secret.Name", secret.Name)
 			return subreconciler.RequeueWithError(err)
 		}
-		removed := controllerutil.RemoveFinalizer(service, finalizerName)
+		removed := controllerutil.RemoveFinalizer(secret, finalizerName)
 		if removed {
 			reqLogger.Info("Removed finalizer to Secret", "Secret.Name", secret.Name)
 			if err := r.Update(ctx, secret); err != nil && k8sErrors.IsNotFound(err) {

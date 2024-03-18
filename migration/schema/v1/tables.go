@@ -775,9 +775,9 @@ func ConvertV2DirectoryToV3IdpConfig(dirMap map[string]any) (v3Config *IdpConfig
 	v3Config = &IdpConfig{}
 	idpConfig := make(map[string]any)
 
-	if uid, ok := dirMap["_id"]; ok {
+	if uid, ok := dirMap["id"]; ok {
 		if v3Config.UID, ok = uid.(string); !ok {
-			return nil, fmt.Errorf("_id of Directory is not a string")
+			return nil, fmt.Errorf("id of Directory is not a string")
 		}
 	}
 	if id, ok := dirMap["LDAP_ID"]; ok {
@@ -855,6 +855,8 @@ func ConvertV2SamlToIdpConfig(samlMap map[string]any) (v3Config *IdpConfig, err 
 	idpConfig := make(map[string]any)
 	scimConfig := make(map[string]any)
 	tokenAttributeMapping := make(map[string]any)
+	//  only one SAML connection is supported, hence uid is kept always as 'defaultSP'
+	v3Config.UID = "defaultSP"
 
 	if protocol, ok := samlMap["protocol"]; ok {
 		if v3Config.Protocol, ok = protocol.(string); !ok {

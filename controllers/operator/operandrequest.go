@@ -70,8 +70,6 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 
 	desiredOperands := []operatorv1alpha1.Operand{
 		{Name: "ibm-idp-config-ui-operator"},
-		// TODO Remove this
-		{Name: "ibm-im-mongodb-operator"},
 	}
 
 	if err = r.addEmbeddedEDBIfNeeded(ctx, authCR, &desiredOperands); err != nil {

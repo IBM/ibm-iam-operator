@@ -111,7 +111,7 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 			return subreconciler.RequeueWithError(err)
 		}
 		reqLogger.Info("Created OperandRequest", "OperandRequestName", opReqName)
-		return subreconciler.Requeue()
+		return subreconciler.RequeueWithDelay(opreqWait)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get OperandRequest", "OperandRequestName", opReqName)
 		return subreconciler.RequeueWithError(err)
@@ -158,7 +158,7 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 			return subreconciler.RequeueWithError(err)
 		}
 		reqLogger.Info("Updated OperandRequest successfully", "OperandRequestName", opReqName)
-		return subreconciler.Requeue()
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
 
 	reqLogger.Info("No changes to OperandRequest; continue", "OperandRequestName", opReqName)
@@ -307,5 +307,5 @@ func (r *AuthenticationReconciler) createEDBShareClaim(ctx context.Context, req 
 		return subreconciler.RequeueWithError(err)
 	}
 	reqLogger.Info("Created CommonService CR for shared EDB claim successfully")
-	return subreconciler.Requeue()
+	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }

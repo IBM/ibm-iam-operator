@@ -71,6 +71,15 @@ var memory550 = resource.NewQuantity(550*1024*1024, resource.BinarySI)   // 550M
 var memory650 = resource.NewQuantity(650*1024*1024, resource.BinarySI)   // 650Mi
 var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024Mi
 
+// migrationWait is used when still waiting on a result to be produced by the migration worker
+var migrationWait time.Duration = 10 * time.Second
+
+// opreqWait is used for the resources that interact with and originate from OperandRequests
+var opreqWait time.Duration = 100 * time.Millisecond
+
+// defaultLowerWait is used in instances where a requeue is needed quickly, regardless of previous requeues
+var defaultLowerWait time.Duration = 5 * time.Millisecond
+
 var rule = `^([a-z0-9]){32,}$`
 var wlpClientID = ctrlCommon.GenerateRandomString(rule)
 var wlpClientSecret = ctrlCommon.GenerateRandomString(rule)
@@ -144,7 +153,7 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	var postgres *migration.PostgresDB
 	if postgres, err = r.getPostgresDB(ctx, req); k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Could not find all resources for configuring EDB connection; requeueing")
-		return subreconciler.Requeue()
+		return subreconciler.RequeueWithDelay(opreqWait)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to find resources for configuring EDB connection")
 		return subreconciler.RequeueWithError(err)
@@ -169,8 +178,8 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	} else if needToMigrate {
 		var mongo *migration.MongoDB
 		if mongo, err = r.getMongoDB(ctx, req); k8sErrors.IsNotFound(err) {
-			reqLogger.Info("Could not find all resources for configuring MongoDB connection; requeue in 10s")
-			return subreconciler.RequeueWithDelay(10 * time.Second)
+			reqLogger.Info("Could not find all resources for configuring MongoDB connection; requeueing")
+			return subreconciler.RequeueWithDelay(opreqWait)
 		} else if err != nil {
 			reqLogger.Error(err, "Failed to find resources for configuring MongoDB connection")
 			return subreconciler.RequeueWithError(err)
@@ -190,7 +199,7 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		go migration.Migrate(context.Background(),
 			r.dbSetupChan,
 			migrations...)
-		return subreconciler.Requeue()
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
 
 	if r.dbSetupChan == nil {
@@ -232,13 +241,13 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 			}
 		}
 		if migrationResult.Error != nil {
-			subreconciler.RequeueWithError(migrationResult.Error)
+			subreconciler.RequeueWithDelayAndError(defaultLowerWait, migrationResult.Error)
 		}
-		return subreconciler.Requeue()
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	default:
 		reqLogger.Info("Migration still in progress; check again in 10s")
 		r.dbSetupChan <- &migration.Result{}
-		return subreconciler.RequeueWithDelay(time.Second * 10)
+		return subreconciler.RequeueWithDelay(migrationWait)
 	}
 }
 
@@ -310,7 +319,7 @@ func (r *AuthenticationReconciler) ensureDatastoreSecretAndCM(ctx context.Contex
 		reqLogger.Info("ConfigMap not available yet; requeueing",
 			"ConfigMap.Name", ctrlCommon.DatastoreEDBCMName,
 			"ConfigMap.Namespace", authCR.Namespace)
-		return subreconciler.Requeue()
+		return subreconciler.RequeueWithDelay(opreqWait)
 	} else if err != nil {
 		reqLogger.Error(err, "Encountered an error when trying to get ConfigMap",
 			"ConfigMap.Name", ctrlCommon.DatastoreEDBCMName,
@@ -326,7 +335,7 @@ func (r *AuthenticationReconciler) ensureDatastoreSecretAndCM(ctx context.Contex
 		reqLogger.Info("Secret not available yet; requeueing",
 			"Secret.Name", ctrlCommon.DatastoreEDBSecretName,
 			"Secret.Namespace", authCR.Namespace)
-		return subreconciler.Requeue()
+		return subreconciler.RequeueWithDelay(opreqWait)
 	} else if err != nil {
 		reqLogger.Error(err, "Encountered an error when trying to get Secret",
 			"Secret.Name", ctrlCommon.DatastoreEDBSecretName,

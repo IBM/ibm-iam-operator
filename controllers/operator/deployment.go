@@ -338,7 +338,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 						"productName":                        "IBM Cloud Platform Common Services",
 						"productID":                          "068a62892a1e4db39641342e592daa25",
 						"productMetric":                      "FREE",
-						"clusterhealth.ibm.com/dependencies": "cert-manager",
+						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -488,7 +488,7 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 						"productName":                        "IBM Cloud Platform Common Services",
 						"productID":                          "068a62892a1e4db39641342e592daa25",
 						"productMetric":                      "FREE",
-						"clusterhealth.ibm.com/dependencies": "cert-manager",
+						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -638,7 +638,7 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 						"productName":                        "IBM Cloud Platform Common Services",
 						"productID":                          "068a62892a1e4db39641342e592daa25",
 						"productMetric":                      "FREE",
-						"clusterhealth.ibm.com/dependencies": "cert-manager",
+						"clusterhealth.ibm.com/dependencies": "cert-manager, common-mongodb",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -877,6 +877,22 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume
 							Path: "ca.crt",
 						},
 					},
+				},
+			},
+		},
+		{
+			Name: "mongodb-ca-cert",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "mongodb-root-ca-cert",
+				},
+			},
+		},
+		{
+			Name: "mongodb-client-cert",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "icp-mongodb-client-cert",
 				},
 			},
 		},

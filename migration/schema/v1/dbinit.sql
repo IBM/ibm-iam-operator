@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS "platformdb"."idp_configs" (
     "enabled" boolean DEFAULT true NOT NULL,
     "idp_config" jsonb,
     "name" character varying NOT NULL,
-    "protocol" character varying(5) NOT NULL,
+    "protocol" character varying(10) NOT NULL,
     "type" character varying,
     "scim_config" jsonb,
     "jit" boolean,
@@ -21,15 +21,6 @@ CREATE TABLE IF NOT EXISTS "platformdb"."idp_configs" (
 -- End Identity Provider Configuration
 
 -- User Management
-
-CREATE TABLE IF NOT EXISTS "platformdb"."users_preferences" (
-    "user_id" character varying NOT NULL,
-    "last_login" timestamptz NOT NULL,
-    "last_logout" timestamptz,
-    "login_count" int,
-    CONSTRAINT "users_preferences_userid" PRIMARY KEY ("user_id")
-) WITH (oids = false);
-
 
 CREATE TABLE IF NOT EXISTS "platformdb"."users" (
     "uid" uuid DEFAULT gen_random_uuid() NOT NULL,
@@ -52,13 +43,24 @@ CREATE TABLE IF NOT EXISTS "platformdb"."users" (
     CONSTRAINT "users_uid" UNIQUE ("uid")
 ) WITH (oids = false);
 
+CREATE TABLE IF NOT EXISTS "platformdb"."users_preferences" (
+    "uid" uuid DEFAULT gen_random_uuid() NOT NULL,
+    "user_uid" uuid NOT NULL,
+    "last_login" timestamptz NOT NULL,
+    "last_logout" timestamptz,
+    "login_count" int,
+    CONSTRAINT "users_preferences_uid" PRIMARY KEY ("uid"),
+    CONSTRAINT "users_preferences_useruid" UNIQUE ("user_uid"),
+    CONSTRAINT "fk_userpref_fk" FOREIGN KEY ("user_uid") REFERENCES "platformdb"."users" ("uid")
+) WITH (oids = false);
+
 CREATE TABLE IF NOT EXISTS "platformdb"."users_attributes" (
     "uid" uuid DEFAULT gen_random_uuid(),
     "user_uid" uuid NOT NULL,
     "name" character varying,
     "value" character varying,
     CONSTRAINT "users_attributes_uid" PRIMARY KEY ("uid"),
-    CONSTRAINT "fk_useratt_fk" FOREIGN KEY ("user_uid") REFERENCES platformdb.users ("uid")
+    CONSTRAINT "fk_useratt_fk" FOREIGN KEY ("user_uid") REFERENCES "platformdb"."users" ("uid")
 ) WITH (oids = false);
 
 -- End User Management
@@ -81,11 +83,10 @@ CREATE TABLE IF NOT EXISTS "platformdb"."zen_instances_users" (
     "user_id" character varying NOT NULL,
     CONSTRAINT "zeninstances_users_uid" PRIMARY KEY ("uid"),
     CONSTRAINT "fk_zenuser_fk" FOREIGN KEY ("zen_instance_id")
-    REFERENCES platformdb.zen_instances ("instance_id"),
+    REFERENCES "platformdb"."zen_instances" ("instance_id"),
     CONSTRAINT "fk_userzen_fk" FOREIGN KEY ("user_id")
-    REFERENCES platformdb.users ("user_id")
+    REFERENCES "platformdb"."users" ("user_id")
 ) WITH (oids = false);
-
 -- End Zen Integration
 
 
@@ -105,81 +106,105 @@ CREATE TABLE IF NOT EXISTS "platformdb"."scim_attributes_mappings" (
     "user" jsonb,
     CONSTRAINT "scim_attributemappings_idp_id" UNIQUE ("idp_id")
 ) WITH (oids = false);
-
 -- End SCIM
 
 -- Begin SCIM with JIT Flow
 
 CREATE TABLE IF NOT EXISTS "platformdb"."groups" (
+    "uid" uuid DEFAULT gen_random_uuid() NOT NULL,
     "group_id" character varying NOT NULL,
     "display_name" character varying NOT NULL,
-    "type" character varying NOT NULL,
     "realm_id" character varying NOT NULL,
-    CONSTRAINT "groups_groupid" PRIMARY KEY ("group_id")
+    CONSTRAINT "groups_group_id_realm_id" UNIQUE ("group_id", "realm_id"),
+    CONSTRAINT "groups_pkey" PRIMARY KEY ("uid")
 ) WITH (oids = false);
 
-CREATE TABLE IF NOT EXISTS "platformdb"."members" (
-    "member_id" character varying NOT NULL,
-    "value" character varying,
-    "display" character varying,
-    CONSTRAINT "members_member_id" PRIMARY KEY ("member_id")
+CREATE TABLE IF NOT EXISTS "platformdb"."users_groups" (
+    "user_uid" uuid NOT NULL,
+    "group_uid" uuid NOT NULL,
+    CONSTRAINT "users_groups_pkey" PRIMARY KEY ("user_uid", "group_uid")
 ) WITH (oids = false);
 
-CREATE TABLE IF NOT EXISTS "platformdb"."groups_members" (
-    "realm_id" character varying NOT NULL,
-    "group_id" character varying NOT NULL,
-    "member_id" character varying NOT NULL,
-    CONSTRAINT "groupmembers_groupid_memberid,realm_id"
-        PRIMARY KEY (group_id, member_id, realm_id)
-) WITH (oids = false);
+ALTER TABLE ONLY "platformdb"."users_groups"
+ADD CONSTRAINT "users_groups_group_uid_fkey"
+FOREIGN KEY (group_uid) REFERENCES "platformdb"."groups" (uid) NOT DEFERRABLE;
+ALTER TABLE ONLY "platformdb"."users_groups"
+ADD CONSTRAINT "users_groups_user_uid_fkey"
+FOREIGN KEY (user_uid) REFERENCES "platformdb"."users" (uid) NOT DEFERRABLE;
 
 -- End SCIM with JIT Flow
 
 -- Begin SCIM Server Integration
 
-CREATE TABLE IF NOT EXISTS platformdb.scim_server_users (
+CREATE TABLE "platformdb"."scim_server_users" (
     id character varying(255) NOT NULL,
     schemas text [],
-    "externalId" character varying(255),
-    "userName" character varying(255),
-    name json,
-    "displayName" character varying(255),
-    title character varying(255),
-    "nickName" character varying(255),
-    "profileUrl" character varying(255),
-    emails json,
-    addresses json,
-    "phoneNumbers" json,
-    ims json,
-    photos json,
-    "userType" character varying(255),
-    "preferredLanguage" character varying(255),
-    locale character varying(255),
-    timezone character varying(255),
-    "x509Certificates" json,
-    active character varying(255),
-    password character varying(255),
-    meta json,
-    groups json,
-    "employeeNumber" character varying(255),
-    "costCenter" character varying(255),
-    organization character varying(255),
-    division character varying(255),
-    department character varying(255),
-    manager json
-);
+    external_id character varying(255),
+    user_name character varying(255),
+    name jsonb,
+    display_name character varying(255),
+    emails jsonb,
+    addresses jsonb,
+    phone_numbers jsonb,
+    user_type character varying(255),
+    active boolean,
+    meta jsonb,
+    groups jsonb
+) WITH (oids = false);
 
-ALTER TABLE platformdb.scim_server_users OWNER TO im_user;
+ALTER TABLE ONLY platformdb.scim_server_users
+ADD CONSTRAINT scim_server_users_pkey PRIMARY KEY (id);
 
-CREATE TABLE IF NOT EXISTS platformdb.scim_server_users_custom (
+CREATE TABLE platformdb.scim_server_users_custom (
+    scim_server_user_uid character varying(255) NOT NULL,
+    attribute_key character varying(255) NOT NULL,
+    schema_name character varying(255),
+    attribute_value character varying,
+    attribute_value_complex jsonb
+) WITH (oids = false);
+
+ALTER TABLE ONLY platformdb.scim_server_users_custom
+ADD CONSTRAINT scim_server_users_custom_pkey
+PRIMARY KEY (scim_server_user_uid, attribute_key);
+
+ALTER TABLE ONLY platformdb.scim_server_users_custom
+ADD CONSTRAINT scim_server_users_custom_scim_server_user_uid_fkey
+FOREIGN KEY (scim_server_user_uid)
+REFERENCES "platformdb"."scim_server_users" (id)
+ON UPDATE CASCADE
+ON DELETE CASCADE;
+
+CREATE TABLE "platformdb"."scim_server_groups" (
     id character varying(255) NOT NULL,
-    "userattributeKey" character varying(255) NOT NULL,
-    "simpleValue" character varying(255),
-    "complexValue" jsonb
-);
+    schemas text [],
+    members jsonb,
+    display_name character varying(255),
+    meta jsonb
+) WITH (oids = false);
+
+ALTER TABLE ONLY platformdb.scim_server_groups
+ADD CONSTRAINT scim_server_groups_pkey
+PRIMARY KEY (id);
 
 
-ALTER TABLE platformdb.scim_server_users_custom OWNER TO im_user;
+CREATE TABLE platformdb.scim_server_groups_custom (
+    scim_server_group_uid character varying(255) NOT NULL,
+    attribute_key character varying(255) NOT NULL,
+    schema_name character varying(255),
+    attribute_value character varying,
+    attribute_value_complex jsonb
+) WITH (oids = false);
+
+ALTER TABLE ONLY platformdb.scim_server_groups_custom
+ADD CONSTRAINT scim_server_groups_custom_pkey
+PRIMARY KEY (scim_server_group_uid, attribute_key);
+
+ALTER TABLE ONLY platformdb.scim_server_groups_custom
+ADD CONSTRAINT scim_server_groups_custom_scim_server_group_uid_fkey
+FOREIGN KEY (scim_server_group_uid)
+REFERENCES platformdb.scim_server_groups (id)
+ON UPDATE CASCADE
+ON DELETE CASCADE;
 
 -- End SCIM Server Integration
 

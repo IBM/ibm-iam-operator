@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	"github.com/opdev/subreconciler"
@@ -71,9 +72,185 @@ var memory550 = resource.NewQuantity(550*1024*1024, resource.BinarySI)   // 550M
 var memory650 = resource.NewQuantity(650*1024*1024, resource.BinarySI)   // 650Mi
 var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024Mi
 
+// migrationWait is used when still waiting on a result to be produced by the migration worker
+var migrationWait time.Duration = 10 * time.Second
+
+// opreqWait is used for the resources that interact with and originate from OperandRequests
+var opreqWait time.Duration = 100 * time.Millisecond
+
+// defaultLowerWait is used in instances where a requeue is needed quickly, regardless of previous requeues
+var defaultLowerWait time.Duration = 5 * time.Millisecond
+
 var rule = `^([a-z0-9]){32,}$`
 var wlpClientID = ctrlCommon.GenerateRandomString(rule)
 var wlpClientSecret = ctrlCommon.GenerateRandomString(rule)
+
+// finalizerName is the finalizer appended to the Authentication CR
+var finalizerName = "authentication.operator.ibm.com"
+
+// FinalizerMigration is the finalizer appended to resources that are being retained during migration
+const FinalizerMigration string = "authentication.operator.ibm.com/migration"
+
+func (r *AuthenticationReconciler) addFinalizers(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "addFinalizers")
+	reqLogger.Info("Add finalizers to MongoDB resources in case migration is needed")
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+
+	if needToMigrate, err := r.needToMigrateFromMongo(ctx, authCR); !needToMigrate && err == nil {
+		reqLogger.Info("No MongoDB migration required, so no need for finalizers; continuing")
+		return subreconciler.ContinueReconciling()
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to determine whether migration from MongoDB is needed")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	updated := false
+	service := &corev1.Service{}
+	serviceKey := types.NamespacedName{Name: "mongodb", Namespace: req.Namespace}
+	if err = r.Get(ctx, serviceKey, service); k8sErrors.IsNotFound(err) {
+		return subreconciler.ContinueReconciling()
+	} else if err != nil {
+		return subreconciler.RequeueWithError(err)
+	}
+	added := controllerutil.AddFinalizer(service, FinalizerMigration)
+	if added {
+		reqLogger.Info("Added finalizer to Service", "Service.Name", service.Name)
+		if err := r.Update(ctx, service); err != nil {
+			reqLogger.Error(err, "Failed to update Service to add finalizer", "Service.Name", service.Name)
+			return subreconciler.RequeueWithError(err)
+		}
+		updated = true
+	} else {
+		reqLogger.Info("Finalizer was already set on Service", "Service.Name", service.Name)
+	}
+
+	mongoAdminCredsName := "icp-mongodb-admin"
+	mongoClientCertName := "icp-mongodb-client-cert"
+	mongoCACertName := "mongodb-root-ca-cert"
+
+	secrets := map[string]*corev1.Secret{
+		mongoAdminCredsName: {},
+		mongoClientCertName: {},
+		mongoCACertName:     {},
+	}
+
+	for secretName, secret := range secrets {
+		objKey := types.NamespacedName{Name: secretName, Namespace: req.Namespace}
+		if err = r.Get(ctx, objKey, secret); k8sErrors.IsNotFound(err) {
+
+		} else if err != nil {
+			reqLogger.Error(err, "Failed to get Secret", "Secret.Name", secret.Name)
+			return subreconciler.RequeueWithError(err)
+		}
+		added := controllerutil.AddFinalizer(secret, FinalizerMigration)
+		if !added {
+			reqLogger.Info("Finalizer was already set on Secret", "Secret.Name", secret.Name)
+			continue
+		}
+		reqLogger.Info("Added finalizer to Secret")
+		if err := r.Update(ctx, secret); err != nil {
+			reqLogger.Error(err, "Failed to update Secret to add finalizer")
+			return subreconciler.RequeueWithError(err)
+		}
+		updated = true
+	}
+
+	if updated {
+		reqLogger.Info("Resources updated with finalizers; requeueing")
+		subreconciler.Requeue()
+	}
+
+	return subreconciler.ContinueReconciling()
+}
+
+func (r *AuthenticationReconciler) handleRetainAnnotation(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleRetainAnnotation")
+	reqLogger.Info("Clean up MongoDB resources if no longer being retained")
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+
+	// if retain annotation is unset or set to true - continue reconciling
+	if authCR.IsRetainingArtifacts() {
+		reqLogger.Info("Annotation does not signal a need to clean up resources; continuing")
+		return subreconciler.ContinueReconciling()
+	}
+	// remove finalizer from MongoDB resources
+	// delete these resources
+	service := &corev1.Service{}
+	serviceKey := types.NamespacedName{Name: "mongodb", Namespace: req.Namespace}
+	if err = r.Get(ctx, serviceKey, service); k8sErrors.IsNotFound(err) {
+		return subreconciler.ContinueReconciling()
+	} else if err != nil {
+		return subreconciler.RequeueWithError(err)
+	}
+	removed := controllerutil.RemoveFinalizer(service, FinalizerMigration)
+	if removed {
+		reqLogger.Info("Removed finalizer to Service", "Service.Name", service.Name)
+		if err := r.Update(ctx, service); err != nil && k8sErrors.IsNotFound(err) {
+			reqLogger.Error(err, "Failed to update Service to add finalizer", "Service.Name", service.Name)
+			return subreconciler.RequeueWithError(err)
+		}
+	} else {
+		reqLogger.Info("Finalizer was not set on Service", "Service.Name", service.Name)
+	}
+	if err = r.Get(ctx, serviceKey, service); err != nil && !k8sErrors.IsNotFound(err) {
+		return subreconciler.RequeueWithError(err)
+	}
+	if err = r.Delete(ctx, service); err != nil && !k8sErrors.IsNotFound(err) {
+		return subreconciler.RequeueWithError(err)
+	}
+
+	mongoAdminCredsName := "icp-mongodb-admin"
+	mongoClientCertName := "icp-mongodb-client-cert"
+	mongoCACertName := "mongodb-root-ca-cert"
+
+	secrets := map[string]*corev1.Secret{
+		mongoAdminCredsName: {},
+		mongoClientCertName: {},
+		mongoCACertName:     {},
+	}
+
+	for secretName, secret := range secrets {
+		objKey := types.NamespacedName{Name: secretName, Namespace: req.Namespace}
+		if err = r.Get(ctx, objKey, secret); k8sErrors.IsNotFound(err) {
+			continue
+		} else if err != nil {
+			reqLogger.Error(err, "Failed to get Secret", "Secret.Name", secret.Name)
+			return subreconciler.RequeueWithError(err)
+		}
+		removed := controllerutil.RemoveFinalizer(secret, FinalizerMigration)
+		if removed {
+			reqLogger.Info("Removed finalizer to Secret", "Secret.Name", secret.Name)
+			if err := r.Update(ctx, secret); err != nil && k8sErrors.IsNotFound(err) {
+				reqLogger.Error(err, "Failed to update Secret to add finalizer", "Secret.Name", secret.Name)
+				return subreconciler.RequeueWithError(err)
+			}
+		} else {
+			reqLogger.Info("Finalizer was not set on Secret", "Secret.Name", secret.Name)
+		}
+		if err = r.Get(ctx, objKey, secret); err != nil && !k8sErrors.IsNotFound(err) {
+			return subreconciler.RequeueWithError(err)
+		}
+		if err = r.Delete(ctx, secret); err != nil && !k8sErrors.IsNotFound(err) {
+			return subreconciler.RequeueWithError(err)
+		}
+	}
+
+	delete(authCR.Annotations, operatorv1alpha1.AnnotationAuthMigrationComplete)
+	delete(authCR.Annotations, operatorv1alpha1.AnnotationAuthRetainMigrationArtifacts)
+
+	if err = r.Update(ctx, authCR); err != nil {
+		reqLogger.Error(err, "Failed to remove annotations from Authentication")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	return subreconciler.Requeue()
+}
 
 func (r *AuthenticationReconciler) getPostgresDB(ctx context.Context, req ctrl.Request) (p *migration.PostgresDB, err error) {
 	datastoreCertSecret := &corev1.Secret{}
@@ -144,7 +321,7 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	var postgres *migration.PostgresDB
 	if postgres, err = r.getPostgresDB(ctx, req); k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Could not find all resources for configuring EDB connection; requeueing")
-		return subreconciler.Requeue()
+		return subreconciler.RequeueWithDelay(opreqWait)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to find resources for configuring EDB connection")
 		return subreconciler.RequeueWithError(err)
@@ -169,8 +346,8 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	} else if needToMigrate {
 		var mongo *migration.MongoDB
 		if mongo, err = r.getMongoDB(ctx, req); k8sErrors.IsNotFound(err) {
-			reqLogger.Info("Could not find all resources for configuring MongoDB connection; requeue in 10s")
-			return subreconciler.RequeueWithDelay(10 * time.Second)
+			reqLogger.Info("Could not find all resources for configuring MongoDB connection; requeueing")
+			return subreconciler.RequeueWithDelay(opreqWait)
 		} else if err != nil {
 			reqLogger.Error(err, "Failed to find resources for configuring MongoDB connection")
 			return subreconciler.RequeueWithError(err)
@@ -190,7 +367,7 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		go migration.Migrate(context.Background(),
 			r.dbSetupChan,
 			migrations...)
-		return subreconciler.Requeue()
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
 
 	if r.dbSetupChan == nil {
@@ -232,13 +409,12 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 			}
 		}
 		if migrationResult.Error != nil {
-			subreconciler.RequeueWithError(migrationResult.Error)
+			subreconciler.RequeueWithDelayAndError(defaultLowerWait, migrationResult.Error)
 		}
-		return subreconciler.Requeue()
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	default:
 		reqLogger.Info("Migration still in progress; check again in 10s")
-		r.dbSetupChan <- &migration.Result{}
-		return subreconciler.RequeueWithDelay(time.Second * 10)
+		return subreconciler.RequeueWithDelay(migrationWait)
 	}
 }
 
@@ -310,7 +486,7 @@ func (r *AuthenticationReconciler) ensureDatastoreSecretAndCM(ctx context.Contex
 		reqLogger.Info("ConfigMap not available yet; requeueing",
 			"ConfigMap.Name", ctrlCommon.DatastoreEDBCMName,
 			"ConfigMap.Namespace", authCR.Namespace)
-		return subreconciler.Requeue()
+		return subreconciler.RequeueWithDelay(opreqWait)
 	} else if err != nil {
 		reqLogger.Error(err, "Encountered an error when trying to get ConfigMap",
 			"ConfigMap.Name", ctrlCommon.DatastoreEDBCMName,
@@ -326,7 +502,7 @@ func (r *AuthenticationReconciler) ensureDatastoreSecretAndCM(ctx context.Contex
 		reqLogger.Info("Secret not available yet; requeueing",
 			"Secret.Name", ctrlCommon.DatastoreEDBSecretName,
 			"Secret.Namespace", authCR.Namespace)
-		return subreconciler.Requeue()
+		return subreconciler.RequeueWithDelay(opreqWait)
 	} else if err != nil {
 		reqLogger.Error(err, "Encountered an error when trying to get Secret",
 			"Secret.Name", ctrlCommon.DatastoreEDBSecretName,
@@ -504,8 +680,16 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}()
 
+	if subResult, err := r.addFinalizers(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
+
 	if result, err := r.handleOperandRequest(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return subreconciler.Evaluate(result, err)
+	}
+
+	if subResult, err := r.handleRetainAnnotation(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
 	}
 
 	if result, err := r.createEDBShareClaim(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {

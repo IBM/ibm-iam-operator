@@ -124,7 +124,7 @@ type IdpConfig struct {
 	Type        string         `json:"type"`
 	SCIMConfig  map[string]any `json:"scim_config"`
 	JIT         bool           `json:"jit"`
-	LDAPConfig  map[string]any `json:"ldap_config"`
+	LDAPId      string         `json:"ldap_id"`
 }
 
 func (i *IdpConfig) ToAnySlice() []any {
@@ -138,7 +138,7 @@ func (i *IdpConfig) ToAnySlice() []any {
 		i.Type,
 		i.SCIMConfig,
 		i.JIT,
-		i.LDAPConfig,
+		i.LDAPId,
 	}
 }
 
@@ -162,8 +162,8 @@ func (i *IdpConfig) GetTableIdentifier() pgx.Identifier {
 func (i *IdpConfig) GetInsertSQL() string {
 	return `
 		INSERT INTO platformdb.idp_configs
-		(uid, description, enabled, idp_config, name, protocol, type, scim_config, jit, ldap_config)
-		VALUES (@uid, @description, @enabled, @idp_config, @name, @protocol, @type, @scim_config, @jit, @ldap_config)
+		(uid, description, enabled, idp_config, name, protocol, type, scim_config, jit, ldap_id)
+		VALUES (@uid, @description, @enabled, @idp_config, @name, @protocol, @type, @scim_config, @jit, @ldap_id)
 		ON CONFLICT (uid) DO NOTHING
 		RETURNING uid;`
 }
@@ -186,7 +186,7 @@ var IdpConfigColumnNames []string = []string{
 	"type",
 	"scim_config",
 	"jit",
-	"ldap_config",
+	"ldap_id",
 }
 
 var IdpConfigsIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "idp_configs"}
@@ -197,6 +197,16 @@ func ConvertToIdpConfig(idpMap map[string]interface{}, idpConfig *IdpConfig) (er
 		idpMap["enabled"] = false
 	} else {
 		idpMap["enabled"] = true
+	}
+	// SAML with LDAP dependency mongo document will have ldap_config: {ldap_id: <value>}
+	// which directly maps to ldap_id column in sql
+	if ldap_config, ok := idpMap["ldap_config"]; ok {
+		if ldap_config, ok := ldap_config.(map[string]interface{}); ok {
+			// If ldap_config is already a map, fetch the ldap_id
+			ldap_id := ldap_config["ldap_id"]
+			idpMap["ldap_id"] = ldap_id
+		}
+
 	}
 
 	var jsonBytes []byte
@@ -591,5 +601,204 @@ func ConvertToSCIMAttributesMappingSlice(scimAttributesMappingMaps []map[string]
 		}
 		scimAttributesMappingSlice[i] = *scimAttributesMapping
 	}
+	return
+}
+
+func ConvertV2DirectoryToV3IdpConfig(dirMap map[string]any) (v3Config *IdpConfig, err error) {
+	v3Config = &IdpConfig{}
+	idpConfig := make(map[string]any)
+
+	if uid, ok := dirMap["id"]; ok {
+		if v3Config.UID, ok = uid.(string); !ok {
+			return nil, fmt.Errorf("id of Directory is not a string")
+		}
+	}
+	if id, ok := dirMap["LDAP_ID"]; ok {
+		if v3Config.Name, ok = id.(string); !ok {
+			return nil, fmt.Errorf("LDAP_ID of Directory is not a string")
+		}
+		idpConfig["ldap_id"] = id
+	}
+	if lType, ok := dirMap["LDAP_TYPE"]; ok {
+		if v3Config.Type, ok = lType.(string); !ok {
+			return nil, fmt.Errorf("LDAP_TYPE of Directory is not a string")
+		}
+		idpConfig["ldap_type"] = lType
+	}
+	if realm, ok := dirMap["LDAP_REALM"]; ok {
+		idpConfig["ldap_realm"] = realm
+	}
+	if url, ok := dirMap["LDAP_URL"]; ok {
+		idpConfig["ldap_url"] = url
+	}
+	if host, ok := dirMap["LDAP_HOST"]; ok {
+		idpConfig["ldap_host"] = host
+	}
+	if port, ok := dirMap["LDAP_PORT"]; ok {
+		idpConfig["ldap_port"] = port
+	}
+	if protocol, ok := dirMap["LDAP_PROTOCOL"]; ok {
+		idpConfig["ldap_protocol"] = protocol
+	}
+	if basedn, ok := dirMap["LDAP_BASEDN"]; ok {
+		idpConfig["ldap_basedn"] = basedn
+	}
+	if binddn, ok := dirMap["LDAP_BINDDN"]; ok {
+		idpConfig["ldap_binddn"] = binddn
+	}
+	if bindpassword, ok := dirMap["LDAP_BINDPASSWORD"]; ok {
+		idpConfig["ldap_bindpassword"] = bindpassword
+	}
+	if ignoreCase, ok := dirMap["LDAP_IGNORECASE"]; ok {
+		idpConfig["ldap_ignorecase"] = ignoreCase
+	}
+	if userfilter, ok := dirMap["LDAP_USERFILTER"]; ok {
+		idpConfig["ldap_userfilter"] = userfilter
+	}
+	if useridmap, ok := dirMap["LDAP_USERIDMAP"]; ok {
+		idpConfig["ldap_useridmap"] = useridmap
+	}
+	if groupfilter, ok := dirMap["LDAP_GROUPFILTER"]; ok {
+		idpConfig["ldap_groupfilter"] = groupfilter
+	}
+	if groupidmap, ok := dirMap["LDAP_GROUPIDMAP"]; ok {
+		idpConfig["ldap_groupidmap"] = groupidmap
+	}
+	if groupmemberidmap, ok := dirMap["LDAP_GROUPMEMBERIDMAP"]; ok {
+		idpConfig["ldap_groupmemberidmap"] = groupmemberidmap
+	}
+	if nestedSearch, ok := dirMap["LDAP_NESTEDSEARCH"]; ok {
+		idpConfig["ldap_nestedsearch"] = nestedSearch
+	}
+	if pagingSearch, ok := dirMap["LDAP_PAGINGSEARCH"]; ok {
+		idpConfig["ldap_pagingsearch"] = pagingSearch
+	}
+	if pagingSize, ok := dirMap["LDAP_PAGINGSIZE"]; ok {
+		idpConfig["ldap_pagingsize"] = pagingSize
+	}
+	v3Config.Description = ""
+	v3Config.Protocol = "ldap"
+	v3Config.IDPConfig = idpConfig
+	v3Config.Enabled = true
+
+	return
+}
+
+func ConvertV2SamlToIdpConfig(samlMap map[string]any) (v3Config *IdpConfig, err error) {
+	v3Config = &IdpConfig{}
+	idpConfig := make(map[string]any)
+	scimConfig := make(map[string]any)
+	tokenAttributeMapping := make(map[string]any)
+	v3Config.UID = "defaultSP"
+
+	if protocol, ok := samlMap["protocol"]; ok {
+		if v3Config.Protocol, ok = protocol.(string); !ok {
+			return nil, fmt.Errorf("protocol of SAML is not a string")
+		} else if v3Config.Protocol != "saml" {
+			return nil, fmt.Errorf("protocol of SAML is not \"saml\"")
+		}
+	} else {
+		return nil, fmt.Errorf("protocol of SAML is not set")
+	}
+	if name, ok := samlMap["name"]; ok {
+		if v3Config.Name, ok = name.(string); !ok {
+			return nil, fmt.Errorf("name of SAML is not a string")
+		}
+	}
+	if description, ok := samlMap["description"]; ok {
+		if v3Config.Description, ok = description.(string); !ok {
+			return nil, fmt.Errorf("description of SAML is not a string")
+		}
+	}
+	if iType, ok := samlMap["idp_type"]; ok {
+		if v3Config.Type, ok = iType.(string); !ok {
+			return nil, fmt.Errorf("idp_type of SAML is not a string")
+		}
+	}
+	if jit, ok := samlMap["jit"]; ok {
+		if jitString, ok := jit.(string); ok && jitString == "yes" {
+			v3Config.JIT = true
+		}
+	}
+	if value, ok := samlMap["saml_ldap"]; ok {
+		if samlLdap, ok := value.(string); ok && strings.ToLower(samlLdap) != "none" {
+			v3Config.LDAPId = samlLdap
+		}
+	}
+	if value, ok := samlMap["token_attribute_mappings"]; ok {
+		if mappings, ok := value.(map[string]string); ok {
+			tokenAttributeMapping["sub"] = ""
+			tokenAttributeMapping["given_name"] = ""
+			tokenAttributeMapping["family_name"] = ""
+			tokenAttributeMapping["groups"] = ""
+			tokenAttributeMapping["email"] = ""
+			if sub, ok := mappings["uid"]; ok {
+				tokenAttributeMapping["sub"] = sub
+			}
+			if givenName, ok := mappings["first_name"]; ok {
+				tokenAttributeMapping["given_name"] = givenName
+			}
+			if familyName, ok := mappings["last_name"]; ok {
+				tokenAttributeMapping["family_name"] = familyName
+			}
+			if groups, ok := mappings["groups"]; ok {
+				tokenAttributeMapping["groups"] = groups
+			}
+			if email, ok := mappings["email"]; ok {
+				tokenAttributeMapping["email"] = email
+			}
+		}
+	}
+	idpConfig["token_attribute_mappings"] = tokenAttributeMapping
+	v3Config.IDPConfig = idpConfig
+
+	if value, ok := samlMap["scim"]; ok {
+		if scimEnabled, ok := value.(string); !ok || scimEnabled != "yes" {
+			return
+		}
+	}
+	if value, ok := samlMap["scim_base_path"]; !ok {
+		return
+	} else {
+		scimConfig["scim_base_path"] = ""
+		if scimBasePath, ok := value.(string); ok {
+			scimConfig["scim_base_path"] = scimBasePath
+		}
+	}
+	scimConfig["grant_type"] = ""
+	scimConfig["token_url"] = ""
+	scimConfig["client_id"] = ""
+	scimConfig["client_secret"] = ""
+
+	if value, ok := samlMap["config"]; ok {
+		if config, ok := value.(map[string]any); ok {
+			if grantType, ok := config["grant_type"]; ok {
+				scimConfig["grant_type"] = grantType
+			}
+			if tokenUrl, ok := config["token_url"]; ok {
+				scimConfig["token_url"] = tokenUrl
+			}
+			if clientId, ok := config["client_id"]; ok {
+				scimConfig["client_id"] = clientId
+			}
+			if clientSecret, ok := config["client_secret"]; ok {
+				scimConfig["client_secret"] = clientSecret
+			}
+		}
+	}
+	scimAttributeMappings := make(map[string]any)
+	if value, ok := samlMap["scim_attribute_mappings"]; ok {
+		if mappings, ok := value.(map[string]any); ok {
+			if user, ok := mappings["user"]; ok {
+				scimAttributeMappings["user"] = user
+			}
+			if group, ok := mappings["group"]; ok {
+				scimAttributeMappings["group"] = group
+			}
+		}
+	}
+	scimConfig["scim_attribute_mappings"] = scimAttributeMappings
+	v3Config.SCIMConfig = scimConfig
+	v3Config.Enabled = true
 	return
 }

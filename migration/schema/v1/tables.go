@@ -246,22 +246,21 @@ func ConvertToIdpConfigs(idpMaps []map[string]interface{}, idpRows []IdpConfig) 
 
 // User is a row from the `platformdb.users` table
 type User struct {
-	UID                *uuid.UUID          `json:"uid"`
-	UserID             string              `json:"user_id"`
-	RealmID            string              `json:"realm_id,omitempty"`
-	FirstName          string              `json:"first_name,omitempty"`
-	LastName           string              `json:"last_name,omitempty"`
-	Email              string              `json:"email,omitempty"`
-	Type               string              `json:"type,omitempty"`
-	LastLogin          *pgtype.Timestamptz `json:"last_login,omitempty"`
-	Status             string              `json:"status,omitempty"`
-	UserBaseDN         string              `json:"user_basedn,omitempty"`
-	Groups             []string            `json:"groups,omitempty"`
-	Role               string              `json:"role,omitempty"`
-	UniqueSecurityName string              `json:"unique_security_name,omitempty"`
-	PreferredUsername  string              `json:"preferred_username,omitempty"`
-	DisplayName        string              `json:"display_name,omitempty"`
-	Subject            string              `json:"subject,omitempty"`
+	UID                *uuid.UUID `json:"uid"`
+	UserID             string     `json:"user_id"`
+	RealmID            string     `json:"realm_id,omitempty"`
+	FirstName          string     `json:"first_name,omitempty"`
+	LastName           string     `json:"last_name,omitempty"`
+	Email              string     `json:"email,omitempty"`
+	Type               string     `json:"type,omitempty"`
+	Status             string     `json:"status,omitempty"`
+	UserBaseDN         string     `json:"user_basedn,omitempty"`
+	Groups             []string   `json:"groups,omitempty"`
+	Role               string     `json:"role,omitempty"`
+	UniqueSecurityName string     `json:"unique_security_name,omitempty"`
+	PreferredUsername  string     `json:"preferred_username,omitempty"`
+	DisplayName        string     `json:"display_name,omitempty"`
+	Subject            string     `json:"subject,omitempty"`
 }
 
 var UserColumnNames []string = []string{
@@ -272,7 +271,6 @@ var UserColumnNames []string = []string{
 	"last_name",
 	"email",
 	"type",
-	"last_login",
 	"status",
 	"user_basedn",
 	"groups",
@@ -294,7 +292,6 @@ func (u *User) ToAnySlice() []any {
 		u.LastName,
 		u.Email,
 		u.Type,
-		u.LastLogin,
 		u.Status,
 		u.UserBaseDN,
 		u.Groups,
@@ -326,7 +323,7 @@ func (u *User) GetTableIdentifier() pgx.Identifier {
 func (u *User) GetInsertSQL() string {
 	return `
 		INSERT INTO platformdb.users
-		(uid, user_id, realm_id, first_name, last_name, email, type, last_login, status, user_basedn, groups, role, unique_security_name, preferred_username, display_name, subject)
+		(uid, user_id, realm_id, first_name, last_name, email, type, status, user_basedn, groups, role, unique_security_name, preferred_username, display_name, subject)
 		VALUES (
 			  DEFAULT
 			, @user_id
@@ -335,7 +332,6 @@ func (u *User) GetInsertSQL() string {
 			, @last_name
 			, @email
 			, @type
-			, @last_login
 			, @status
 			, @user_basedn
 			, @groups
@@ -368,7 +364,6 @@ func ConvertToUser(userMap map[string]interface{}, user *User) (err error) {
 		"userBaseDN":         "user_basedn",
 		"firstName":          "first_name",
 		"lastName":           "last_name",
-		"lastLogin":          "last_login",
 	}
 	translateMongoDBFieldsToPostgresColumns(fieldMap, userMap)
 	if _, ok := userMap["uid"]; !ok {

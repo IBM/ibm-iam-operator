@@ -30,7 +30,6 @@ CREATE TABLE IF NOT EXISTS "platformdb"."users" (
     "last_name" character varying,
     "email" character varying,
     "type" character varying,
-    "last_login" timestamptz,
     "status" character varying,
     "user_basedn" character varying,
     "groups" text ARRAY,

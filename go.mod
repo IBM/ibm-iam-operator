@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/cert-manager/cert-manager v1.13.1
 	github.com/google/uuid v1.6.0
-	github.com/jackc/pgx/v5 v5.5.3
+	github.com/jackc/pgx/v5 v5.5.4
 	github.com/onsi/ginkgo/v2 v2.12.0
 	github.com/onsi/gomega v1.27.10
 	github.com/opdev/subreconciler v0.0.0-20230302151718-c4c8b5ec17c5

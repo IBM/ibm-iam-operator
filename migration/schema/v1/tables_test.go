@@ -64,7 +64,7 @@ var _ = Describe("IdpConfig", func() {
 		Context("When Directory map is valid", func() {
 			It("produces a valid pointer to an IdpConfig struct", func() {
 				dirMap = map[string]any{
-					"id":                    "someidentifier",
+					"_id":                   "someidentifier",
 					"LDAP_ID":               "openLDAP",
 					"LDAP_REALM":            "openLDAPRealm",
 					"LDAP_HOST":             "100.100.100.100",
@@ -111,7 +111,7 @@ var _ = Describe("IdpConfig", func() {
 		Context("When Directory map has CP3MIGRATED", func() {
 			It("returns a valid pointer to a IdpConfig when it is set to \"true\"", func() {
 				dirMap = map[string]any{
-					"id":                    "someidentifier",
+					"_id":                   "someidentifier",
 					"LDAP_ID":               "openLDAP",
 					"LDAP_REALM":            "openLDAPRealm",
 					"LDAP_HOST":             "100.100.100.100",
@@ -157,7 +157,7 @@ var _ = Describe("IdpConfig", func() {
 			})
 			It("returns a valid pointer to a IdpConfig when it is not set to \"true\"", func() {
 				dirMap = map[string]any{
-					"id":                    "someidentifier",
+					"_id":                   "someidentifier",
 					"LDAP_ID":               "openLDAP",
 					"LDAP_REALM":            "openLDAPRealm",
 					"LDAP_HOST":             "100.100.100.100",
@@ -203,7 +203,7 @@ var _ = Describe("IdpConfig", func() {
 			})
 			It("returns a valid point to a IdpConfig when it is not set to \"true\"", func() {
 				dirMap = map[string]any{
-					"id":                    "someidentifier",
+					"_id":                   "someidentifier",
 					"LDAP_ID":               "openLDAP",
 					"LDAP_REALM":            "openLDAPRealm",
 					"LDAP_HOST":             "100.100.100.100",
@@ -251,7 +251,7 @@ var _ = Describe("IdpConfig", func() {
 		Context("When Directory map is invalid", func() {
 			It("returns nil", func() {
 				dirMap = map[string]any{
-					"id":                    "someidentifier",
+					"_id":                   "someidentifier",
 					"LDAP_ID":               123,
 					"LDAP_REALM":            "openLDAPRealm",
 					"LDAP_HOST":             "100.100.100.100",

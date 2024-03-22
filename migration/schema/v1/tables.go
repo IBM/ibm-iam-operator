@@ -773,9 +773,9 @@ func ConvertV2DirectoryToV3IdpConfig(dirMap map[string]any) (v3Config *IdpConfig
 	v3Config = &IdpConfig{}
 	idpConfig := make(map[string]any)
 
-	if uid, ok := dirMap["id"]; ok {
+	if uid, ok := dirMap["_id"]; ok {
 		if v3Config.UID, ok = uid.(string); !ok {
-			return nil, fmt.Errorf("id of Directory is not a string")
+			return nil, fmt.Errorf("_id of Directory is not a string")
 		}
 	}
 	if id, ok := dirMap["LDAP_ID"]; ok {

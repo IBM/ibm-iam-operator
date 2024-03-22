@@ -281,6 +281,7 @@ func InitSchemas(ctx context.Context, to, from DBConn) (err error) {
 func MongoToV1(ctx context.Context, to, from DBConn) (err error) {
 	reqLogger := logf.FromContext(ctx)
 	mongodb, ok := from.(*MongoDB)
+	reqLogger.Info("Connecting to MongoDB", "MongoDB.Host", mongodb.Host, "MongoDB.Port", mongodb.Port)
 	if !ok {
 		return fmt.Errorf("from should be an instance of MongoDB")
 	}
@@ -291,6 +292,7 @@ func MongoToV1(ctx context.Context, to, from DBConn) (err error) {
 	defer mongodb.Disconnect(ctx)
 
 	postgres, ok := to.(*PostgresDB)
+	reqLogger.Info("Connecting to PostgresDB", "PostgresDB.Host", postgres.Host, "PostgresDB.Port", postgres.Port)
 	if !ok {
 		return fmt.Errorf("from should be an instance of Postgres")
 	}

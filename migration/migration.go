@@ -499,7 +499,7 @@ func insertDirectoriesAsIdpConfigs(ctx context.Context, mongodb *MongoDB, postgr
 			errCount++
 			continue
 		}
-		updateFilter := bson.D{{Key: "id", Value: idpConfig.UID}}
+		updateFilter := bson.D{{Key: "_id", Value: idpConfig.UID}}
 		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
 		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
 		if err != nil {

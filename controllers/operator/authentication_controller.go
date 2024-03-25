@@ -91,7 +91,54 @@ var finalizerName = "authentication.operator.ibm.com"
 // FinalizerMigration is the finalizer appended to resources that are being retained during migration
 const FinalizerMigration string = "authentication.operator.ibm.com/migration"
 
-func (r *AuthenticationReconciler) addFinalizers(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+func (r *AuthenticationReconciler) addMigrationFinalizer(ctx context.Context, key client.ObjectKey, obj client.Object) (updated bool, err error) {
+	if err = r.Get(ctx, key, obj); k8sErrors.IsNotFound(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+
+	added := controllerutil.AddFinalizer(obj, FinalizerMigration)
+	if added {
+		if err := r.Update(ctx, obj); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func (r *AuthenticationReconciler) finalizeMigrationObject(ctx context.Context, key client.ObjectKey, obj client.Object) (finalized bool, err error) {
+	if err = r.Get(ctx, key, obj); k8sErrors.IsNotFound(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+
+	removed := controllerutil.RemoveFinalizer(obj, FinalizerMigration)
+	if removed {
+		if err := r.Update(ctx, obj); k8sErrors.IsNotFound(err) {
+			return false, nil
+		} else if err != nil {
+			return false, err
+		}
+
+		if err = r.Get(ctx, key, obj); k8sErrors.IsNotFound(err) {
+			return true, nil
+		} else if err != nil {
+			return false, err
+		}
+	}
+
+	if err = r.Delete(ctx, obj); err != nil && !k8sErrors.IsNotFound(err) {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func (r *AuthenticationReconciler) addMigrationFinalizers(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "addFinalizers")
 	reqLogger.Info("Add finalizers to MongoDB resources in case migration is needed")
 	authCR := &operatorv1alpha1.Authentication{}
@@ -108,54 +155,41 @@ func (r *AuthenticationReconciler) addFinalizers(ctx context.Context, req ctrl.R
 	}
 
 	updated := false
-	service := &corev1.Service{}
-	serviceKey := types.NamespacedName{Name: "mongodb", Namespace: req.Namespace}
-	if err = r.Get(ctx, serviceKey, service); k8sErrors.IsNotFound(err) {
-		return subreconciler.ContinueReconciling()
-	} else if err != nil {
-		return subreconciler.RequeueWithError(err)
-	}
-	added := controllerutil.AddFinalizer(service, FinalizerMigration)
-	if added {
-		reqLogger.Info("Added finalizer to Service", "Service.Name", service.Name)
-		if err := r.Update(ctx, service); err != nil {
-			reqLogger.Error(err, "Failed to update Service to add finalizer", "Service.Name", service.Name)
-			return subreconciler.RequeueWithError(err)
-		}
-		updated = true
-	} else {
-		reqLogger.Info("Finalizer was already set on Service", "Service.Name", service.Name)
-	}
 
+	mongoDBServiceName := "mongodb"
+	mongoDBPreloadCMName := "mongodb-preload-endpoint"
 	mongoAdminCredsName := "icp-mongodb-admin"
 	mongoClientCertName := "icp-mongodb-client-cert"
 	mongoCACertName := "mongodb-root-ca-cert"
-
-	secrets := map[string]*corev1.Secret{
-		mongoAdminCredsName: {},
-		mongoClientCertName: {},
-		mongoCACertName:     {},
+	toAddFinalizer := map[client.ObjectKey]client.Object{
+		types.NamespacedName{Name: mongoDBServiceName, Namespace: req.Namespace}:   &corev1.Service{},
+		types.NamespacedName{Name: mongoDBPreloadCMName, Namespace: req.Namespace}: &corev1.ConfigMap{},
+		types.NamespacedName{Name: mongoAdminCredsName, Namespace: req.Namespace}:  &corev1.Secret{},
+		types.NamespacedName{Name: mongoClientCertName, Namespace: req.Namespace}:  &corev1.Secret{},
+		types.NamespacedName{Name: mongoCACertName, Namespace: req.Namespace}:      &corev1.Secret{},
 	}
 
-	for secretName, secret := range secrets {
-		objKey := types.NamespacedName{Name: secretName, Namespace: req.Namespace}
-		if err = r.Get(ctx, objKey, secret); k8sErrors.IsNotFound(err) {
-
+	for key, obj := range toAddFinalizer {
+		var objUpdated bool
+		if objUpdated, err = r.addMigrationFinalizer(ctx, key, obj); k8sErrors.IsNotFound(err) {
+			reqLogger.Info("Object not found; not adding migration finalizer",
+				"Object.Name", key.Name,
+				"Object.Namespace", key.Namespace)
 		} else if err != nil {
-			reqLogger.Error(err, "Failed to get Secret", "Secret.Name", secret.Name)
+			reqLogger.Error(err, "Failed to update object due to an unexpected error",
+				"Object.Name", key.Name,
+				"Object.Namespace", key.Namespace)
 			return subreconciler.RequeueWithError(err)
+		} else if objUpdated {
+			reqLogger.Info("Migration finalizer written to object",
+				"Object.Name", key.Name,
+				"Object.Namespace", key.Namespace)
+			updated = true
+		} else {
+			reqLogger.Info("Object already had migration finalizer",
+				"Object.Name", key.Name,
+				"Object.Namespace", key.Namespace)
 		}
-		added := controllerutil.AddFinalizer(secret, FinalizerMigration)
-		if !added {
-			reqLogger.Info("Finalizer was already set on Secret", "Secret.Name", secret.Name)
-			continue
-		}
-		reqLogger.Info("Added finalizer to Secret")
-		if err := r.Update(ctx, secret); err != nil {
-			reqLogger.Error(err, "Failed to update Secret to add finalizer")
-			return subreconciler.RequeueWithError(err)
-		}
-		updated = true
 	}
 
 	if updated {
@@ -179,65 +213,36 @@ func (r *AuthenticationReconciler) handleRetainAnnotation(ctx context.Context, r
 		reqLogger.Info("Annotation does not signal a need to clean up resources; continuing")
 		return subreconciler.ContinueReconciling()
 	}
-	// remove finalizer from MongoDB resources
-	// delete these resources
-	service := &corev1.Service{}
-	serviceKey := types.NamespacedName{Name: "mongodb", Namespace: req.Namespace}
-	if err = r.Get(ctx, serviceKey, service); k8sErrors.IsNotFound(err) {
-		return subreconciler.ContinueReconciling()
-	} else if err != nil {
-		return subreconciler.RequeueWithError(err)
-	}
-	removed := controllerutil.RemoveFinalizer(service, FinalizerMigration)
-	if removed {
-		reqLogger.Info("Removed finalizer to Service", "Service.Name", service.Name)
-		if err := r.Update(ctx, service); err != nil && k8sErrors.IsNotFound(err) {
-			reqLogger.Error(err, "Failed to update Service to add finalizer", "Service.Name", service.Name)
-			return subreconciler.RequeueWithError(err)
-		}
-	} else {
-		reqLogger.Info("Finalizer was not set on Service", "Service.Name", service.Name)
-	}
-	if err = r.Get(ctx, serviceKey, service); err != nil && !k8sErrors.IsNotFound(err) {
-		return subreconciler.RequeueWithError(err)
-	}
-	if err = r.Delete(ctx, service); err != nil && !k8sErrors.IsNotFound(err) {
-		return subreconciler.RequeueWithError(err)
-	}
+	reqLogger.Info("Annotation signals a need to clean up resources")
 
+	mongoDBServiceName := "mongodb"
+	mongoDBPreloadCMName := "mongodb-preload-endpoint"
 	mongoAdminCredsName := "icp-mongodb-admin"
 	mongoClientCertName := "icp-mongodb-client-cert"
 	mongoCACertName := "mongodb-root-ca-cert"
-
-	secrets := map[string]*corev1.Secret{
-		mongoAdminCredsName: {},
-		mongoClientCertName: {},
-		mongoCACertName:     {},
+	toFinalize := map[client.ObjectKey]client.Object{
+		types.NamespacedName{Name: mongoDBServiceName, Namespace: req.Namespace}:   &corev1.Service{},
+		types.NamespacedName{Name: mongoDBPreloadCMName, Namespace: req.Namespace}: &corev1.ConfigMap{},
+		types.NamespacedName{Name: mongoAdminCredsName, Namespace: req.Namespace}:  &corev1.Secret{},
+		types.NamespacedName{Name: mongoClientCertName, Namespace: req.Namespace}:  &corev1.Secret{},
+		types.NamespacedName{Name: mongoCACertName, Namespace: req.Namespace}:      &corev1.Secret{},
 	}
 
-	for secretName, secret := range secrets {
-		objKey := types.NamespacedName{Name: secretName, Namespace: req.Namespace}
-		if err = r.Get(ctx, objKey, secret); k8sErrors.IsNotFound(err) {
-			continue
-		} else if err != nil {
-			reqLogger.Error(err, "Failed to get Secret", "Secret.Name", secret.Name)
+	for key, obj := range toFinalize {
+		var objUpdated bool
+		if objUpdated, err = r.finalizeMigrationObject(ctx, key, obj); err != nil {
+			reqLogger.Error(err, "Failed to finalize object due to an unexpected error; requeueing",
+				"Object.Name", key.Name,
+				"Object.Namespace", key.Namespace)
 			return subreconciler.RequeueWithError(err)
-		}
-		removed := controllerutil.RemoveFinalizer(secret, FinalizerMigration)
-		if removed {
-			reqLogger.Info("Removed finalizer to Secret", "Secret.Name", secret.Name)
-			if err := r.Update(ctx, secret); err != nil && k8sErrors.IsNotFound(err) {
-				reqLogger.Error(err, "Failed to update Secret to add finalizer", "Secret.Name", secret.Name)
-				return subreconciler.RequeueWithError(err)
-			}
+		} else if objUpdated {
+			reqLogger.Info("Object was finalized",
+				"Object.Name", key.Name,
+				"Object.Namespace", key.Namespace)
 		} else {
-			reqLogger.Info("Finalizer was not set on Secret", "Secret.Name", secret.Name)
-		}
-		if err = r.Get(ctx, objKey, secret); err != nil && !k8sErrors.IsNotFound(err) {
-			return subreconciler.RequeueWithError(err)
-		}
-		if err = r.Delete(ctx, secret); err != nil && !k8sErrors.IsNotFound(err) {
-			return subreconciler.RequeueWithError(err)
+			reqLogger.Info("Object was not found",
+				"Object.Name", key.Name,
+				"Object.Namespace", key.Namespace)
 		}
 	}
 
@@ -248,6 +253,8 @@ func (r *AuthenticationReconciler) handleRetainAnnotation(ctx context.Context, r
 		reqLogger.Error(err, "Failed to remove annotations from Authentication")
 		return subreconciler.RequeueWithError(err)
 	}
+
+	reqLogger.Info("All migration objects finalized; requeueing")
 
 	return subreconciler.Requeue()
 }
@@ -275,10 +282,30 @@ func (r *AuthenticationReconciler) getPostgresDB(ctx context.Context, req ctrl.R
 			datastoreCertSecret.Data["tls.key"]))
 }
 
+func (r *AuthenticationReconciler) getMongoHost(ctx context.Context, namespace string) (mongoHost string, err error) {
+	var preloadCM *corev1.ConfigMap
+	mongoHost = fmt.Sprintf("mongodb.%s.svc", namespace)
+	if preloadCM, err = r.getPreloadMongoDBConfigMap(ctx, namespace); err != nil {
+		return
+	} else if preloadCM != nil {
+		var ok bool
+		mongoHost, ok = preloadCM.Data["ENDPOINT"]
+		if !ok {
+			err = fmt.Errorf("no ENDPOINT defined on ConfigMap %q", preloadCM.Name)
+			return
+		}
+	}
+
+	return
+}
+
 func (r *AuthenticationReconciler) getMongoDB(ctx context.Context, req ctrl.Request) (mongo *migration.MongoDB, err error) {
 	mongoName := "platform-db"
 	mongoPort := "27017"
-	mongoHost := fmt.Sprintf("mongodb.%s.svc", req.Namespace)
+	mongoHost, err := r.getMongoHost(ctx, req.Namespace)
+	if err != nil {
+		return nil, err
+	}
 
 	mongoAdminCredsName := "icp-mongodb-admin"
 	mongoClientCertName := "icp-mongodb-client-cert"
@@ -455,20 +482,53 @@ func setMigrationAnnotations(authCR *operatorv1alpha1.Authentication, result *mi
 	return true
 }
 
-// needToMigrateFromMongo attempts to determine whether a migration from MongoDB is needed. Returns an error when an
-// unexpected error occurs while trying to get resources from the cluster.
-func (r *AuthenticationReconciler) needToMigrateFromMongo(ctx context.Context, authCR *operatorv1alpha1.Authentication) (need bool, err error) {
-	if authCR.HasBeenMigrated() {
-		return false, nil
+func (r *AuthenticationReconciler) getPreloadMongoDBConfigMap(ctx context.Context, namespace string) (cm *corev1.ConfigMap, err error) {
+	cm = &corev1.ConfigMap{}
+	preloadConfigMapKey := types.NamespacedName{Name: "mongodb-preload-endpoint", Namespace: namespace}
+	if err = r.Get(ctx, preloadConfigMapKey, cm); k8sErrors.IsNotFound(err) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
 	}
+	return cm, nil
+}
+
+func (r *AuthenticationReconciler) hasPreloadMongoDBConfigMap(ctx context.Context, namespace string) (has bool, err error) {
+	cm, err := r.getPreloadMongoDBConfigMap(ctx, namespace)
+	return cm != nil, err
+}
+
+func (r *AuthenticationReconciler) hasMongoDBService(ctx context.Context, authCR *operatorv1alpha1.Authentication) (has bool, err error) {
 	service := &corev1.Service{}
 	if err = r.Get(ctx, types.NamespacedName{Name: "mongodb", Namespace: authCR.Namespace}, service); k8sErrors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
 		return false, err
 	}
-
 	return true, nil
+}
+
+// needToMigrateFromMongo attempts to determine whether a migration from MongoDB is needed. Returns an error when an
+// unexpected error occurs while trying to get resources from the cluster.
+func (r *AuthenticationReconciler) needToMigrateFromMongo(ctx context.Context, authCR *operatorv1alpha1.Authentication) (need bool, err error) {
+	if authCR.HasBeenMigrated() {
+		return false, nil
+	}
+
+	var hasResource bool
+	if hasResource, err = r.hasPreloadMongoDBConfigMap(ctx, authCR.Namespace); hasResource {
+		return true, nil
+	} else if err != nil {
+		return false, err
+	}
+
+	if hasResource, err = r.hasMongoDBService(ctx, authCR); hasResource {
+		return true, nil
+	} else if err != nil {
+		return false, err
+	}
+
+	return false, nil
 }
 
 // ensureDatastoreSecretAndCM makes sure that the datastore Secret and ConfigMap are present in the services namespace;
@@ -680,7 +740,7 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}()
 
-	if subResult, err := r.addFinalizers(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+	if subResult, err := r.addMigrationFinalizers(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
 	}
 

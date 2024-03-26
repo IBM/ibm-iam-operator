@@ -59,3 +59,21 @@ var _ = Describe("Migration", func() {
 		})
 	})
 })
+
+var _ = DescribeTable("xorDecode",
+	func(encoded, decoded string, shouldError bool) {
+		value, err := xorDecode(encoded)
+		Expect(value).To(Equal(decoded))
+		if shouldError {
+			Expect(err).To(HaveOccurred())
+		} else {
+			Expect(err).ToNot(HaveOccurred())
+		}
+	},
+	Entry("Returns the decoded string when it has the prefix", "{xor}LDo8LTor", "secret", false),
+	Entry("Returns the decoded string when it does not have the prefix", "LDo8LTor", "secret", false),
+	Entry("Returns an empty string when argument is empty", "", "", false),
+	Entry("Returns error when input has malformed prefix", "{{xor}", "", true),
+	Entry("Returns error when input with prefix is not valid base64", "{xor}&#&(*asdbasdf", "", true),
+	Entry("Returns error when input without prefix is not valid base64", "&#&(*asdbasdf", "", true),
+)

@@ -50,7 +50,9 @@ CREATE TABLE IF NOT EXISTS "platformdb"."users_preferences" (
     "login_count" int,
     CONSTRAINT "users_preferences_uid" PRIMARY KEY ("uid"),
     CONSTRAINT "users_preferences_useruid" UNIQUE ("user_uid"),
-    CONSTRAINT "fk_userpref_fk" FOREIGN KEY ("user_uid") REFERENCES "platformdb"."users" ("uid")
+    CONSTRAINT "fk_userpref_fk"
+    FOREIGN KEY ("user_uid")
+    REFERENCES "platformdb"."users" ("uid")
 ) WITH (oids = false);
 
 CREATE TABLE IF NOT EXISTS "platformdb"."users_attributes" (
@@ -59,7 +61,9 @@ CREATE TABLE IF NOT EXISTS "platformdb"."users_attributes" (
     "name" character varying,
     "value" character varying,
     CONSTRAINT "users_attributes_uid" PRIMARY KEY ("uid"),
-    CONSTRAINT "fk_useratt_fk" FOREIGN KEY ("user_uid") REFERENCES "platformdb"."users" ("uid")
+    CONSTRAINT "fk_useratt_fk"
+    FOREIGN KEY ("user_uid")
+    REFERENCES "platformdb"."users" ("uid")
 ) WITH (oids = false);
 
 -- End User Management
@@ -204,6 +208,20 @@ FOREIGN KEY (scim_server_group_uid)
 REFERENCES platformdb.scim_server_groups (id)
 ON UPDATE CASCADE
 ON DELETE CASCADE;
+
+CREATE VIEW
+platformdb.view_scim_server_users_custom AS SELECT
+    scim_server_user_uid,
+    jsonb_object_agg(attribute_key, attribute_value) AS col_value,
+    jsonb_object_agg(attribute_key, attribute_value_complex) AS col_complex
+FROM platformdb.scim_server_users_custom
+GROUP BY (scim_server_user_uid);
+CREATE VIEW platformdb.view_scim_server_groups_custom AS SELECT
+    scim_server_group_uid,
+    jsonb_object_agg(attribute_key, attribute_value) AS col_value,
+    jsonb_object_agg(attribute_key, attribute_value_complex) AS col_complex
+FROM platformdb.scim_server_groups_custom
+GROUP BY (scim_server_group_uid);
 
 -- End SCIM Server Integration
 

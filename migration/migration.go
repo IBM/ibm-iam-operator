@@ -17,6 +17,7 @@ package migration
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"strings"
@@ -281,6 +282,7 @@ func InitSchemas(ctx context.Context, to, from DBConn) (err error) {
 func MongoToV1(ctx context.Context, to, from DBConn) (err error) {
 	reqLogger := logf.FromContext(ctx)
 	mongodb, ok := from.(*MongoDB)
+	reqLogger.Info("Connecting to MongoDB", "MongoDB.Host", mongodb.Host, "MongoDB.Port", mongodb.Port)
 	if !ok {
 		return fmt.Errorf("from should be an instance of MongoDB")
 	}
@@ -291,6 +293,7 @@ func MongoToV1(ctx context.Context, to, from DBConn) (err error) {
 	defer mongodb.Disconnect(ctx)
 
 	postgres, ok := to.(*PostgresDB)
+	reqLogger.Info("Connecting to PostgresDB", "PostgresDB.Host", postgres.Host, "PostgresDB.Port", postgres.Port)
 	if !ok {
 		return fmt.Errorf("from should be an instance of Postgres")
 	}
@@ -497,7 +500,7 @@ func insertDirectoriesAsIdpConfigs(ctx context.Context, mongodb *MongoDB, postgr
 			errCount++
 			continue
 		}
-		updateFilter := bson.D{{Key: "id", Value: idpConfig.UID}}
+		updateFilter := bson.D{{Key: "_id", Value: idpConfig.UID}}
 		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
 		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
 		if err != nil {
@@ -794,6 +797,52 @@ func migrateUserPreferencesRowForUser(ctx context.Context, mongodb *MongoDB, pos
 	return
 }
 
+// xorDecode decodes an xor-encoded string
+func xorDecode(e string) (d string, err error) {
+	xorPrefix := "{xor}"
+	eWithoutPrefix := strings.TrimPrefix(e, xorPrefix)
+	var decodedFromBase64 []byte
+	if decodedFromBase64, err = base64.StdEncoding.DecodeString(eWithoutPrefix); err != nil {
+		return "", fmt.Errorf("failed to decode xor string: %w", err)
+	}
+	var dBytes []byte
+	for _, b := range decodedFromBase64 {
+		dBytes = append(dBytes, b^'_')
+	}
+	return string(dBytes), nil
+}
+
+func setClientSecretIfEmpty(ctx context.Context, mongodb *MongoDB, zenInstance *v1schema.ZenInstance) (set bool, err error) {
+	if zenInstance.ClientSecret != "" {
+		return
+	}
+
+	dbName := "OAuthDBSchema"
+	collectionName := "OauthClient"
+	clientIDFilter := bson.D{{Key: "CLIENTID", Value: zenInstance.ClientID}}
+	oc := &v1schema.OIDCClient{}
+	err = mongodb.Client.
+		Database(dbName).
+		Collection(collectionName).
+		FindOne(ctx, clientIDFilter).
+		Decode(oc)
+	if err != nil {
+		err = fmt.Errorf("failed to get OauthClient for ZenInstance: %w", err)
+		return
+	}
+
+	decodedSecret, err := xorDecode(oc.ClientSecret)
+	if err != nil {
+		err = fmt.Errorf("failed to decode client_secret for ZenInstance: %w", err)
+		return
+	}
+
+	zenInstance.ClientSecret = decodedSecret
+	set = true
+
+	return
+}
+
 func insertZenInstances(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
 	dbName := "platform-db"
 	collectionName := "ZenInstance"
@@ -814,6 +863,7 @@ func insertZenInstances(ctx context.Context, mongodb *MongoDB, postgres *Postgre
 			err = nil
 			continue
 		}
+
 		zenInstance := &v1schema.ZenInstance{}
 		if err = v1schema.ConvertToZenInstance(result, zenInstance); err != nil {
 			reqLogger.Error(err, "Failed to unmarshal ZenInstance")
@@ -821,20 +871,16 @@ func insertZenInstances(ctx context.Context, mongodb *MongoDB, postgres *Postgre
 			err = nil
 			continue
 		}
-		args := pgx.NamedArgs{
-			"InstanceID":     zenInstance.InstanceID,
-			"Namespace":      zenInstance.Namespace,
-			"ProductNameURL": zenInstance.ProductNameURL,
-			"ClientID":       zenInstance.ClientID,
-			"ClientSecret":   zenInstance.ClientSecret,
-			"ZenAuditURL":    zenInstance.ZenAuditURL,
+
+		if _, err = setClientSecretIfEmpty(ctx, mongodb, zenInstance); err != nil {
+			reqLogger.Error(err, "Failed to set client_secret on ZenInstance")
+			errCount++
+			err = nil
+			continue
 		}
 
-		query := `
-			INSERT INTO platformdb.zen_instances
-			(instance_id, namespace, product_name_url, client_id, client_secret, zen_audit_url)
-			VALUES (@InstanceID, @Namespace, @ProductNameURL, @ClientID, @ClientSecret, @ZenAuditURL)
-			ON CONFLICT DO NOTHING;`
+		args := zenInstance.GetArgs()
+		query := zenInstance.GetInsertSQL()
 		_, err := postgres.Conn.Exec(ctx, query, args)
 		if errors.Is(err, pgx.ErrNoRows) {
 			reqLogger.Info("Row already exists in EDB")
@@ -843,6 +889,7 @@ func insertZenInstances(ctx context.Context, mongodb *MongoDB, postgres *Postgre
 			errCount++
 			continue
 		}
+
 		updateFilter := bson.D{{Key: "_id", Value: result["_id"]}}
 		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
 		updateResult, err := mongodb.Client.Database("platform-db").Collection("ZenInstance").UpdateOne(ctx, updateFilter, update)

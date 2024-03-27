@@ -565,6 +565,50 @@ var ZenInstanceColumnNames []string = []string{
 
 var ZenInstancesIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "zen_instances"}
 
+func (z *ZenInstance) ToAnySlice() []any {
+	return []any{
+		z.InstanceID,
+		z.ClientID,
+		z.ClientSecret,
+		z.ProductNameURL,
+		z.ZenAuditURL,
+		z.Namespace,
+	}
+}
+
+func (z *ZenInstance) GetColumnNames() []string {
+	return ZenInstanceColumnNames
+}
+
+func (z *ZenInstance) ToAnyMap() map[string]any {
+	m := make(map[string]any)
+	anySlice := z.ToAnySlice()
+	for i, col := range z.GetColumnNames() {
+		m[col] = anySlice[i]
+	}
+	return m
+}
+
+func (z *ZenInstance) GetTableIdentifier() pgx.Identifier {
+	return ZenInstancesIdentifier
+}
+
+func (z *ZenInstance) GetInsertSQL() string {
+	return `
+		INSERT INTO platformdb.zen_instances
+		(instance_id, namespace, product_name_url, client_id, client_secret, zen_audit_url)
+		VALUES (@instance_id, @namespace, @product_name_url, @client_id, @client_secret, @zen_audit_url)
+		ON CONFLICT DO NOTHING;`
+}
+
+func (z *ZenInstance) GetArgs() pgx.NamedArgs {
+	args := pgx.NamedArgs{}
+	for k, v := range z.ToAnyMap() {
+		args[k] = v
+	}
+	return args
+}
+
 func ConvertToZenInstance(zenInstanceMap map[string]interface{}, zenInstance *ZenInstance) (err error) {
 	fieldMap := map[string]string{
 		"_id":            "instance_id",
@@ -773,9 +817,9 @@ func ConvertV2DirectoryToV3IdpConfig(dirMap map[string]any) (v3Config *IdpConfig
 	v3Config = &IdpConfig{}
 	idpConfig := make(map[string]any)
 
-	if uid, ok := dirMap["id"]; ok {
+	if uid, ok := dirMap["_id"]; ok {
 		if v3Config.UID, ok = uid.(string); !ok {
-			return nil, fmt.Errorf("id of Directory is not a string")
+			return nil, fmt.Errorf("_id of Directory is not a string")
 		}
 	}
 	if id, ok := dirMap["LDAP_ID"]; ok {

@@ -1011,3 +1011,39 @@ func ConvertV2SamlToIdpConfig(samlMap map[string]any) (v3Config *IdpConfig, err 
 	v3Config.Enabled = true
 	return
 }
+
+// Group is respretation of a row in "platformdb"."groups" table
+type Group struct {
+	GroupID     string `json:"group_id,omitempty"`
+	DisplayName string `json:"display_name,omitempty"`
+	RealmID     string `json:"realm_id,omitempty"`
+}
+
+func ConvertToGroup(grp map[string]any) (g *Group) {
+	group := &Group{}
+	group.GroupID = grp["_id"].(string)
+	group.DisplayName = grp["displayName"].(string)
+	group.RealmID = "defaultSP"
+	return group
+}
+
+// UserGroup is respretation of a row in "platformdb"."users_groups" table
+type UserGroup struct {
+	UserUID  *uuid.UUID `json:"user_uid"`
+	GroupUID *uuid.UUID `json:"group_uid"`
+}
+
+func (g *Group) GetInsertSQL() string {
+	return `
+		INSERT INTO platformdb.groups(group_id, display_name, realm_id)
+		VALUES (@group_id, @display_name, @realm_id) ON CONFLICT DO NOTHING;`
+}
+
+func (ug *UserGroup) GetInsertSQL() string {
+	return `
+		INSERT INTO platformdb.users_groups(user_uid, group_uid)
+		VALUES (
+			(SELECT uid from platformdb.users WHERE subject=@subject AND realm_id=@realm_id),
+			(SELECT uid from platformdb.groups WHERE group_id=@group_id AND realm_id=@realm_id),
+		) ON CONFLICT DO NOTHING;`
+}

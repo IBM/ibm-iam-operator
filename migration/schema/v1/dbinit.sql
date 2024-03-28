@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS "platformdb"."users_preferences" (
     CONSTRAINT "fk_userpref_fk"
     FOREIGN KEY ("user_uid")
     REFERENCES "platformdb"."users" ("uid")
+    ON DELETE CASCADE
 ) WITH (oids = false);
 
 CREATE TABLE IF NOT EXISTS "platformdb"."users_attributes" (

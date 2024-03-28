@@ -131,10 +131,10 @@ CREATE TABLE IF NOT EXISTS "platformdb"."users_groups" (
 
 ALTER TABLE ONLY "platformdb"."users_groups"
 ADD CONSTRAINT "users_groups_group_uid_fkey"
-FOREIGN KEY (group_uid) REFERENCES "platformdb"."groups" (uid) NOT DEFERRABLE;
+FOREIGN KEY (group_uid) REFERENCES "platformdb"."groups" (uid) ON DELETE CASCADE;
 ALTER TABLE ONLY "platformdb"."users_groups"
 ADD CONSTRAINT "users_groups_user_uid_fkey"
-FOREIGN KEY (user_uid) REFERENCES "platformdb"."users" (uid) NOT DEFERRABLE;
+FOREIGN KEY (user_uid) REFERENCES "platformdb"."users" (uid) ON DELETE CASCADE;
 
 -- End SCIM with JIT Flow
 

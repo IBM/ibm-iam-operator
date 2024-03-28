@@ -1011,3 +1011,66 @@ func ConvertV2SamlToIdpConfig(samlMap map[string]any) (v3Config *IdpConfig, err 
 	v3Config.Enabled = true
 	return
 }
+
+// Group is respretation of a row in "platformdb"."groups" table
+type Group struct {
+	GroupID     string `json:"group_id"`
+	DisplayName string `json:"display_name"`
+	RealmID     string `json:"realm_id"`
+}
+
+func ConvertToGroup(grp map[string]any) (g *Group, err error) {
+	group := &Group{}
+	if groupId, ok := grp["_id"]; ok {
+		if group.GroupID, ok = groupId.(string); !ok {
+			return nil, fmt.Errorf("_id of group is not a string")
+		}
+	}
+	if dName, ok := grp["displayName"]; ok {
+		if group.DisplayName, ok = dName.(string); !ok {
+			return nil, fmt.Errorf("displayName of group is not a string")
+		}
+	}
+	group.RealmID = "defaultSP"
+	return
+}
+
+func (g *Group) GetInsertSQL() string {
+	return `
+		INSERT INTO platformdb.groups(group_id, display_name, realm_id)
+		VALUES (@group_id, @display_name, @realm_id) ON CONFLICT DO NOTHING;`
+}
+
+// UserGroup is respretation of a row in "platformdb"."users_groups" table
+type UserGroup struct {
+	UserUID  *uuid.UUID `json:"user_uid"`
+	GroupUID *uuid.UUID `json:"group_uid"`
+}
+
+type Member struct {
+	Value   string `json:"value"`
+	Display string `json:"display"`
+}
+
+func GetMembersForGroup(grp map[string]any) (m []string, err error) {
+	result := make([]string, 0)
+	var members []Member
+	if m, ok := grp["members"]; ok {
+		if members, ok = m.([]Member); !ok {
+			return nil, fmt.Errorf("members is not of type []Member")
+		}
+		for _, member := range members {
+			result = append(result, member.Value)
+		}
+	}
+	return result, nil
+}
+
+func (ug *UserGroup) GetInsertSQL() string {
+	return `
+		INSERT INTO platformdb.users_groups(user_uid, group_uid)
+		VALUES (
+			(SELECT uid from platformdb.users WHERE subject=@subject AND realm_id=@realm_id),
+			(SELECT uid from platformdb.groups WHERE group_id=@group_id AND realm_id=@realm_id),
+		) ON CONFLICT DO NOTHING;`
+}

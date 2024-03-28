@@ -27,3 +27,12 @@ const DatastoreEDBSecretName string = "im-datastore-edb-secret"
 
 // Name of CommonService created by IM Operator to provision EDB share
 const DatastoreEDBCSName string = "im-common-service"
+
+type DeploymentName string
+
+// The current names of Deployments managed by this Operator
+const (
+	PlatformIdentityProvider   DeploymentName = "platform-identity-provider"
+	PlatformIdentityManagement DeploymentName = "platform-identity-management"
+	PlatformAuthService        DeploymentName = "platform-auth-service"
+)

@@ -1019,8 +1019,8 @@ type Group struct {
 	RealmID     string `json:"realm_id"`
 }
 
-func ConvertToGroup(grp map[string]any) (g *Group, err error) {
-	group := &Group{}
+func ConvertToGroup(grp map[string]any) (group *Group, err error) {
+	group = &Group{}
 	if groupId, ok := grp["_id"]; ok {
 		if group.GroupID, ok = groupId.(string); !ok {
 			return nil, fmt.Errorf("_id of group is not a string")
@@ -1052,8 +1052,8 @@ type Member struct {
 	Display string `json:"display"`
 }
 
-func GetMembersForGroup(grp map[string]any) (m []string, err error) {
-	result := make([]string, 0)
+func GetMembersForGroup(grp map[string]any) (result []string, err error) {
+	result = make([]string, 0)
 	var members []Member
 	if m, ok := grp["members"]; ok {
 		if members, ok = m.([]Member); !ok {
@@ -1063,7 +1063,7 @@ func GetMembersForGroup(grp map[string]any) (m []string, err error) {
 			result = append(result, member.Value)
 		}
 	}
-	return result, nil
+	return
 }
 
 func (ug *UserGroup) GetInsertSQL() string {

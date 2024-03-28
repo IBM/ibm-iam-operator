@@ -418,3 +418,47 @@ var _ = Describe("IdpConfig", func() {
 		})
 	})
 })
+
+var _ = Describe("SCIM JIT Migration", func() {
+	Describe("Converts input map to Group struct", func() {
+		var grp map[string]any
+		It("Converts foo to bar", func() {
+			grp = map[string]any{
+				"_id":         "test-group",
+				"displayName": "test-group",
+			}
+			group, err := ConvertToGroup(grp)
+			Expect(group).ToNot(BeNil())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(group).To(HaveField("GroupID", "test-group"))
+			Expect(group).To(HaveField("DisplayName", "test-group"))
+			Expect(group).To(HaveField("RealmID", "defaultSP"))
+		})
+	})
+
+	Describe("GetMembersForGroup", func() {
+		var grp map[string]any
+		It("Returns all member.value as slice", func() {
+			grp = map[string]any{
+				"members": []Member{
+					{
+						Value:   "test-user-1",
+						Display: "Test User 1",
+					},
+					{
+						Value:   "test-user-2",
+						Display: "Test User 2",
+					},
+				},
+			}
+			members, err := GetMembersForGroup(grp)
+			Expect(members).ToNot(BeNil())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(members)).To(Equal(2))
+			Expect(members).To(HaveExactElements(
+				"test-user-1",
+				"test-user-2",
+			))
+		})
+	})
+})

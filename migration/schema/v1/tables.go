@@ -1014,17 +1014,31 @@ func ConvertV2SamlToIdpConfig(samlMap map[string]any) (v3Config *IdpConfig, err 
 
 // Group is respretation of a row in "platformdb"."groups" table
 type Group struct {
-	GroupID     string `json:"group_id,omitempty"`
-	DisplayName string `json:"display_name,omitempty"`
-	RealmID     string `json:"realm_id,omitempty"`
+	GroupID     string `json:"group_id"`
+	DisplayName string `json:"display_name"`
+	RealmID     string `json:"realm_id"`
 }
 
-func ConvertToGroup(grp map[string]any) (g *Group) {
+func ConvertToGroup(grp map[string]any) (g *Group, err error) {
 	group := &Group{}
-	group.GroupID = grp["_id"].(string)
-	group.DisplayName = grp["displayName"].(string)
+	if groupId, ok := grp["_id"]; ok {
+		if group.GroupID, ok = groupId.(string); !ok {
+			return nil, fmt.Errorf("_id of group is not a string")
+		}
+	}
+	if dName, ok := grp["displayName"]; ok {
+		if group.DisplayName, ok = dName.(string); !ok {
+			return nil, fmt.Errorf("displayName of group is not a string")
+		}
+	}
 	group.RealmID = "defaultSP"
-	return group
+	return
+}
+
+func (g *Group) GetInsertSQL() string {
+	return `
+		INSERT INTO platformdb.groups(group_id, display_name, realm_id)
+		VALUES (@group_id, @display_name, @realm_id) ON CONFLICT DO NOTHING;`
 }
 
 // UserGroup is respretation of a row in "platformdb"."users_groups" table
@@ -1033,10 +1047,23 @@ type UserGroup struct {
 	GroupUID *uuid.UUID `json:"group_uid"`
 }
 
-func (g *Group) GetInsertSQL() string {
-	return `
-		INSERT INTO platformdb.groups(group_id, display_name, realm_id)
-		VALUES (@group_id, @display_name, @realm_id) ON CONFLICT DO NOTHING;`
+type Member struct {
+	Value   string `json:"value"`
+	Display string `json:"display"`
+}
+
+func GetMembersForGroup(grp map[string]any) (m []string, err error) {
+	result := make([]string, 0)
+	var members []Member
+	if m, ok := grp["members"]; ok {
+		if members, ok = m.([]Member); !ok {
+			return nil, fmt.Errorf("members is not of type []Member")
+		}
+		for _, member := range members {
+			result = append(result, member.Value)
+		}
+	}
+	return result, nil
 }
 
 func (ug *UserGroup) GetInsertSQL() string {

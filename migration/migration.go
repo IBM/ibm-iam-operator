@@ -34,8 +34,7 @@ import (
 type Result struct {
 	Complete   []*Migration
 	Incomplete []*Migration
-
-	Error error
+	Error      error
 }
 
 type DBConn interface {
@@ -313,6 +312,7 @@ func MongoToV1(ctx context.Context, to, from DBConn) (err error) {
 		insertSCIMAttributes,
 		insertSCIMAttributeMappings,
 		insertGroups,
+		insertUserGroupMappings,
 	}
 
 	for _, f := range copyFuncs {
@@ -1146,7 +1146,7 @@ func insertGroups(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (
 	filter := bson.M{
 		"$and": bson.A{
 			bson.M{"migrated": bson.M{"$ne": true}},
-			bson.M{"type": "//^SAML$//i"},
+			bson.M{"type": bson.M{"$regex": "//^SAML$//i"}},
 		},
 	}
 	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
@@ -1164,7 +1164,12 @@ func insertGroups(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (
 			err = nil
 			continue
 		}
-		group := v1schema.ConvertToGroup(result)
+		var group *v1schema.Group
+		if group, err = v1schema.ConvertToGroup(result); err != nil {
+			reqLogger.Error(err, "Failed to convert group")
+			errCount++
+			continue
+		}
 		args := pgx.NamedArgs{
 			"group_id":     group.GroupID,
 			"display_name": group.DisplayName,
@@ -1203,7 +1208,98 @@ func insertGroups(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (
 		return
 	}
 	reqLogger.Info("Successfully copied over Groups to EDB", "rowsInserted", migrateCount)
-	return nil
+	return
+}
+
+func insertUserGroupMappings(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	dbName := "platform-db"
+	collectionName := "Groups"
+	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
+	/*
+	 * Filter groups that have been migrated already by func insertGroups
+	 * but at least one of their members haven't been mapped in Xref table
+	 */
+	filter := bson.M{
+		"$and": bson.A{
+			bson.M{"migrated": bson.M{"$eq": true}},
+			bson.M{"allMemberRefMigrated": bson.M{"$ne": true}},
+		},
+	}
+	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get cursor from MongoDB")
+		return
+	}
+	errCount := 0
+	migrateCount := 0
+	var ug *v1schema.UserGroup
+	for cursor.Next(ctx) {
+		var result map[string]interface{}
+		if err = cursor.Decode(&result); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document")
+			errCount++
+			err = nil
+			continue
+		}
+		var group *v1schema.Group
+		if group, err = v1schema.ConvertToGroup(result); err != nil {
+			reqLogger.Error(err, "Failed to convert group")
+			errCount++
+			continue
+		}
+		var members []string
+		if members, err = v1schema.GetMembersForGroup(result); err != nil {
+			reqLogger.Error(err, "Failed to get members for group", group.GroupID)
+			errCount++
+			continue
+		}
+		membersNotMigrated := 0
+		for _, subject := range members {
+			args := pgx.NamedArgs{
+				"subject":   subject,
+				"group_uid": group.GroupID,
+				"realm_id":  group.RealmID,
+			}
+			query := ug.GetInsertSQL()
+			_, err = postgres.Conn.Exec(ctx, query, args)
+			if errors.Is(err, pgx.ErrNoRows) {
+				reqLogger.Info("Row already exists in EDB")
+			} else if err != nil {
+				reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.users_groups")
+				membersNotMigrated++
+				continue
+			}
+		}
+		if membersNotMigrated != 0 {
+			reqLogger.Error(err, "Could create references for", membersNotMigrated, "out of", len(members), "members for group", group.GroupID)
+			errCount++
+			continue
+		}
+		updateFilter := bson.D{{Key: "_id", Value: group.GroupID}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "allMemberRefMigrated", Value: true}}}}
+		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
+		if err != nil {
+			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
+			errCount++
+			continue
+		}
+		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
+		migrateCount++
+	}
+	if errCount > 0 {
+		err = fmt.Errorf("encountered errors that prevented the migration of documents")
+		reqLogger.Error(err, "Migration of platform-db.users_groups not successful", "failedCount", errCount, "successCount", migrateCount)
+		return
+	} else if errCount == 0 && migrateCount == 0 {
+		reqLogger.Info("No documents needed to be migrated; continuing")
+		return
+	}
+	if err = cursor.Err(); err != nil {
+		reqLogger.Error(err, "MongoDB cursor encountered an error")
+		return
+	}
+	reqLogger.Info("Successfully referenced all Members to Group in EDB", "rowsInserted", migrateCount)
+	return
 }
 
 type copyFunc func(context.Context, *MongoDB, *PostgresDB) error

@@ -147,28 +147,6 @@ metadata:
         },
         {
           "apiVersion": "operator.ibm.com/v1alpha1",
-          "kind": "OperandRequest",
-          "metadata": {
-            "name": "ibm-iam-request"
-          },
-          "spec": {
-            "requests": [
-              {
-                "operands": [
-                  {
-                    "name": "ibm-im-mongodb-operator"
-                  },
-                  {
-                    "name": "ibm-idp-config-ui-operator"
-                  }
-                ],
-                "registry": "common-service"
-              }
-            ]
-          }
-        },
-        {
-          "apiVersion": "operator.ibm.com/v1alpha1",
           "kind": "OperandBindInfo",
           "metadata": {
             "name": "ibm-iam-bindinfo"
@@ -213,7 +191,7 @@ metadata:
     categories: Security
     certified: "false"
     containerImage: icr.io/cpopen/ibm-iam-operator:4.5.0
-    createdAt: "2024-02-15T02:00:59Z"
+    createdAt: "2024-03-07T14:22:15Z"
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage the lifecycle of IAM services. With this operator, you can simply deploy and upgrade the IAM services
     olm.skipRange: <4.5.0
     operators.operatorframework.io/builder: operator-sdk-v1.33.0
@@ -318,6 +296,7 @@ spec:
             app.kubernetes.io/instance: ibm-iam-operator
             app.kubernetes.io/managed-by: ibm-iam-operator
             app.kubernetes.io/name: ibm-iam-operator
+            productName: IBM_Cloud_Platform_Common_Services
           name: ibm-iam-operator
           spec:
             replicas: 1
@@ -337,6 +316,7 @@ spec:
                   app.kubernetes.io/name: ibm-iam-operator
                   intent: projected
                   name: ibm-iam-operator
+                  productName: IBM_Cloud_Platform_Common_Services
               spec:
                 affinity:
                   nodeAffinity:

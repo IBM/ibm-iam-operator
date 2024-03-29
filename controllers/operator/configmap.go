@@ -259,17 +259,14 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 					currentConfigMap.Data["PREFERRED_LOGIN"] = newConfigMap.Data["PREFERRED_LOGIN"]
 					cmUpdateRequired = true
 				}
-				if _, keyExists := currentConfigMap.Data["MONGO_READ_TIMEOUT"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				if _, keyExists := currentConfigMap.Data["DB_CONNECT_TIMEOUT"]; !keyExists {
+					reqLogger.Info("Updating an existing Configmap with connection pooling information", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.Scheme)
-					currentConfigMap.Data["MONGO_READ_TIMEOUT"] = newConfigMap.Data["MONGO_READ_TIMEOUT"]
-					currentConfigMap.Data["MONGO_MAX_STALENESS"] = newConfigMap.Data["MONGO_MAX_STALENESS"]
-					currentConfigMap.Data["MONGO_READ_PREFERENCE"] = newConfigMap.Data["MONGO_READ_PREFERENCE"]
-					currentConfigMap.Data["MONGO_CONNECT_TIMEOUT"] = newConfigMap.Data["MONGO_CONNECT_TIMEOUT"]
-					currentConfigMap.Data["MONGO_SELECTION_TIMEOUT"] = newConfigMap.Data["MONGO_SELECTION_TIMEOUT"]
-					currentConfigMap.Data["MONGO_WAIT_TIME"] = newConfigMap.Data["MONGO_WAIT_TIME"]
-					currentConfigMap.Data["MONGO_POOL_MIN_SIZE"] = newConfigMap.Data["MONGO_POOL_MIN_SIZE"]
-					currentConfigMap.Data["MONGO_POOL_MAX_SIZE"] = newConfigMap.Data["MONGO_POOL_MAX_SIZE"]
+					currentConfigMap.Data["DB_CONNECT_TIMEOUT"] = newConfigMap.Data["DB_CONNECT_TIMEOUT"]
+					currentConfigMap.Data["DB_IDLE_TIMEOUT"] = newConfigMap.Data["DB_IDLE_TIMEOUT"]
+					currentConfigMap.Data["DB_POOL_MIN_SIZE"] = newConfigMap.Data["DB_POOL_MIN_SIZE"]
+					currentConfigMap.Data["DB_POOL_MAX_SIZE"] = newConfigMap.Data["DB_POOL_MAX_SIZE"]
+					currentConfigMap.Data["SEQL_LOGGING"] = newConfigMap.Data["SEQL_LOGGING"]
 					cmUpdateRequired = true
 				}
 				if _, keyExists := currentConfigMap.Data["OS_TOKEN_LENGTH"]; keyExists {
@@ -566,14 +563,11 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 			"IBMID_PROFILE_CLIENT_ID":            "1c36586c-cf48-4bce-9b9b-1a0480cc798b",
 			"IBMID_PROFILE_FIELDS":               "displayName,name,emails",
 			"SAML_NAMEID_FORMAT":                 "unspecified",
-			"MONGO_READ_TIMEOUT":                 "40000",
-			"MONGO_READ_PREFERENCE":              "primaryPreferred",
-			"MONGO_CONNECT_TIMEOUT":              "30000",
-			"MONGO_SELECTION_TIMEOUT":            "30000",
-			"MONGO_WAIT_TIME":                    "20000",
-			"MONGO_POOL_MIN_SIZE":                "5",
-			"MONGO_POOL_MAX_SIZE":                "15",
-			"MONGO_MAX_STALENESS":                "90",
+			"DB_CONNECT_TIMEOUT":                 "60000",
+			"DB_IDLE_TIMEOUT":                    "20000",
+			"DB_POOL_MIN_SIZE":                   "5",
+			"DB_POOL_MAX_SIZE":                   "15",
+			"SEQL_LOGGING":                       "false",
 			"SCIM_LDAP_SEARCH_SIZE_LIMIT":        "4500",
 			"SCIM_LDAP_SEARCH_TIME_LIMIT":        "10",
 			"SCIM_ASYNC_PARALLEL_LIMIT":          "100",

@@ -220,12 +220,13 @@ func init() {
 	SchemeBuilder.Register(&Authentication{}, &AuthenticationList{})
 }
 
-const AnnotationMigrationComplete string = "authentication.operator.ibm.com/migration-complete"
-const AnnotationRetainMigrationArtifacts string = "authentication.operator.ibm.com/retain-migration-artifacts"
+const AnnotationAuthMigrationComplete string = "authentication.operator.ibm.com/migration-complete"
+const AnnotationAuthRetainMigrationArtifacts string = "authentication.operator.ibm.com/retain-migration-artifacts"
+const AnnotationAuthDBSchemaVersion string = "authentication.operator.ibm.com/db-schema-version"
 
 func (a *Authentication) HasBeenMigrated() bool {
 	annotations := a.GetAnnotations()
-	if value, ok := annotations[AnnotationMigrationComplete]; ok && value == "true" {
+	if value, ok := annotations[AnnotationAuthMigrationComplete]; ok && value == "true" {
 		return true
 	}
 	return false
@@ -233,4 +234,28 @@ func (a *Authentication) HasBeenMigrated() bool {
 
 func (a *Authentication) HasNotBeenMigrated() bool {
 	return !a.HasBeenMigrated()
+}
+
+func (a *Authentication) IsRetainingArtifacts() bool {
+	annotations := a.GetAnnotations()
+	if value, ok := annotations[AnnotationAuthRetainMigrationArtifacts]; !ok || value == "true" {
+		return true
+	}
+	return false
+}
+
+func (a *Authentication) IsNotRetainingArtifacts() bool {
+	return !a.IsRetainingArtifacts()
+}
+
+func (a *Authentication) HasDBSchemaVersion() bool {
+	annotations := a.GetAnnotations()
+	if _, ok := annotations[AnnotationAuthDBSchemaVersion]; ok {
+		return true
+	}
+	return false
+}
+
+func (a *Authentication) HasNoDBSchemaVersion() bool {
+	return !a.HasDBSchemaVersion()
 }

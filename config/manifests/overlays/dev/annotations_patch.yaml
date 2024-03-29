@@ -1,6 +1,0 @@
-- op: add
-  path: "/metadata/annotations/olm.skipRange"
-  value: <4.5.0
-- op: add
-  path: "/metadata/annotations/containerImage"
-  value: icr.io/cpopen/ibm-iam-operator:4.5.0

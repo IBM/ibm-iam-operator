@@ -19,7 +19,6 @@ package operator
 import (
 	"context"
 	"reflect"
-	"strings"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
@@ -58,11 +57,12 @@ func (r *AuthenticationReconciler) addEmbeddedEDBIfNeeded(ctx context.Context, a
 // handleOperandRequest manages the ibm-iam-request OperandRequest and adds or removes Operand entries from it depending
 // upon what the IM install needs. At a minimum, the UI Operator is included.
 func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleOperandRequest")
-
 	opReqName := "ibm-iam-request"
-
-	reqLogger.Info("Ensure that OperandRequest is updated with correct Operands", "OperandRequestName", opReqName)
+	reqLogger := logf.FromContext(ctx).WithValues(
+		"subreconciler", "handleOperandRequest",
+		"OperandRequest.Name", opReqName,
+		"OperandRequest.Namespace", req.Namespace)
+	reqLogger.Info("Ensure that OperandRequest is updated with correct Operands")
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
@@ -70,8 +70,6 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 
 	desiredOperands := []operatorv1alpha1.Operand{
 		{Name: "ibm-idp-config-ui-operator"},
-		// TODO Remove this
-		{Name: "ibm-im-mongodb-operator"},
 	}
 
 	if err = r.addEmbeddedEDBIfNeeded(ctx, authCR, &desiredOperands); err != nil {
@@ -82,10 +80,7 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 	err = r.Get(ctx, types.NamespacedName{Name: opReqName, Namespace: authCR.Namespace}, observedOpReq)
 
 	if k8sErrors.IsNotFound(err) {
-		if r.needToMigrateMongoDB(ctx, authCR) {
-			desiredOperands = append(desiredOperands, operatorv1alpha1.Operand{Name: "ibm-im-mongodb-operator"})
-		}
-
+		reqLogger.Info("OperandRequest not found, creating")
 		desiredRequests := []operatorv1alpha1.Request{
 			{Registry: "common-service", RegistryNamespace: authCR.Namespace, Operands: desiredOperands},
 		}
@@ -105,15 +100,16 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 		}
 
 		if err = r.Create(ctx, desiredOpReq); k8sErrors.IsAlreadyExists(err) {
-			reqLogger.Info("OperandRequest already exists", "OperandRequestName", opReqName)
+			reqLogger.Info("OperandRequest already exists; continuing")
+			return subreconciler.ContinueReconciling()
 		} else if err != nil {
-			reqLogger.Error(err, "Failed to create OperandRequest", "OperandRequestName", opReqName)
+			reqLogger.Error(err, "Failed to create OperandRequest")
 			return subreconciler.RequeueWithError(err)
 		}
-		reqLogger.Info("Created OperandRequest", "OperandRequestName", opReqName)
-		return subreconciler.Requeue()
+		reqLogger.Info("Created OperandRequest")
+		return subreconciler.RequeueWithDelay(opreqWait)
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get OperandRequest", "OperandRequestName", opReqName)
+		reqLogger.Error(err, "Failed to get OperandRequest")
 		return subreconciler.RequeueWithError(err)
 	}
 
@@ -129,13 +125,11 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 	}
 
 	observedOperands := observedOpReq.Spec.Requests[0].Operands
-	observedMongoDBOperand := getMongoDBOperatorOperand(observedOpReq)
+	observedMongoDBOperand := getMongoDBOperandFromOpReq(observedOpReq)
 
-	if r.needToMigrateMongoDB(ctx, authCR) {
-		// If the current OpReq has a MongoDB Operand, that needs to be kept - add to desired list
-		if observedMongoDBOperand != nil {
-			desiredOperands = append(desiredOperands, *observedMongoDBOperand)
-		}
+	if r.needToPreserveMongoDBInOpReq(ctx, authCR) && observedMongoDBOperand != nil &&
+		!hasMongoDBOperandFromOperands(desiredOperands) {
+		desiredOperands = append(desiredOperands, *observedMongoDBOperand)
 	}
 
 	if !operandsAreEqual(observedOperands, desiredOperands) {
@@ -150,18 +144,18 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 
 	if changed {
 		if err = controllerutil.SetOwnerReference(authCR, observedOpReq, r.Scheme); err != nil {
-			reqLogger.Error(err, "Failed to set owner reference on OperandRequest", "OperandRequestName", opReqName)
+			reqLogger.Error(err, "Failed to set owner reference on OperandRequest")
 			return subreconciler.RequeueWithError(err)
 		}
 		if err = r.Update(ctx, observedOpReq); err != nil {
-			reqLogger.Error(err, "Failed to update OperandRequest", "OperandRequestName", opReqName)
+			reqLogger.Error(err, "Failed to update OperandRequest")
 			return subreconciler.RequeueWithError(err)
 		}
-		reqLogger.Info("Updated OperandRequest successfully", "OperandRequestName", opReqName)
-		return subreconciler.Requeue()
+		reqLogger.Info("Updated OperandRequest successfully")
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
 
-	reqLogger.Info("No changes to OperandRequest; continue", "OperandRequestName", opReqName)
+	reqLogger.Info("No changes to OperandRequest; continue")
 	return subreconciler.ContinueReconciling()
 }
 
@@ -213,27 +207,29 @@ func (r *AuthenticationReconciler) needsEmbeddedEDB(ctx context.Context, authCR 
 }
 
 func (r *AuthenticationReconciler) servicesNamespaceHasMongoDBService(ctx context.Context, authCR *operatorv1alpha1.Authentication) bool {
-	reqLogger := logf.FromContext(ctx)
 	service := &corev1.Service{}
 	mongoDBServiceName := "mongodb"
 	err := r.Get(ctx, types.NamespacedName{Name: mongoDBServiceName, Namespace: authCR.Namespace}, service)
-	if err != nil {
-		reqLogger.Error(err, "Failed to get MongoDB Service")
-		return false
-	}
-
-	return true
+	return err == nil
 }
 
 func isIBMMongoDBOperator(name string) bool {
-	return strings.HasPrefix(name, "ibm-") && strings.HasSuffix(name, "-mongodb-operator")
+	const earlierMongoDBOperatorName string = "ibm-mongodb-operator"
+	const newerMongoDBOperatorName string = "ibm-im-mongodb-operator"
+	return name == earlierMongoDBOperatorName || name == newerMongoDBOperatorName
 }
 
 func (r *AuthenticationReconciler) needToMigrateMongoDB(ctx context.Context, authCR *operatorv1alpha1.Authentication) bool {
 	return authCR.HasNotBeenMigrated() && r.servicesNamespaceHasMongoDBService(ctx, authCR)
 }
 
-func getOperandByName(opReq *operatorv1alpha1.OperandRequest, name string) *operatorv1alpha1.Operand {
+// needToPreserveMongoDBInOpReq indicates whether the reconciler should keep the requirement for MongoDB in its
+// OperandRequest
+func (r *AuthenticationReconciler) needToPreserveMongoDBInOpReq(ctx context.Context, authCR *operatorv1alpha1.Authentication) bool {
+	return r.needToMigrateMongoDB(ctx, authCR) || authCR.IsRetainingArtifacts()
+}
+
+func getMongoDBOperandFromOpReq(opReq *operatorv1alpha1.OperandRequest) *operatorv1alpha1.Operand {
 	if len(opReq.Spec.Requests) == 0 {
 		return nil
 	}
@@ -241,30 +237,25 @@ func getOperandByName(opReq *operatorv1alpha1.OperandRequest, name string) *oper
 		if request.Registry != "common-service" {
 			continue
 		}
-		for _, operand := range request.Operands {
-			if operand.Name == name {
-				return &operand
-			}
+		o := getMongoDBOperandFromOperands(request.Operands)
+		if o != nil {
+			return o
 		}
 	}
 	return nil
 }
 
-func getMongoDBOperatorOperand(opReq *operatorv1alpha1.OperandRequest) *operatorv1alpha1.Operand {
-	if len(opReq.Spec.Requests) == 0 {
-		return nil
-	}
-	for _, request := range opReq.Spec.Requests {
-		if request.Registry != "common-service" {
-			continue
-		}
-		for _, operand := range request.Operands {
-			if isIBMMongoDBOperator(operand.Name) {
-				return &operand
-			}
+func getMongoDBOperandFromOperands(operands []operatorv1alpha1.Operand) *operatorv1alpha1.Operand {
+	for _, operand := range operands {
+		if isIBMMongoDBOperator(operand.Name) {
+			return &operand
 		}
 	}
 	return nil
+}
+
+func hasMongoDBOperandFromOperands(operands []operatorv1alpha1.Operand) bool {
+	return getMongoDBOperandFromOperands(operands) != nil
 }
 
 // createEDBShareClaim requests a share of the embedded EDB Common Service via the creation of a CommonService object.
@@ -307,5 +298,5 @@ func (r *AuthenticationReconciler) createEDBShareClaim(ctx context.Context, req 
 		return subreconciler.RequeueWithError(err)
 	}
 	reqLogger.Info("Created CommonService CR for shared EDB claim successfully")
-	return subreconciler.Requeue()
+	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }

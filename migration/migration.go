@@ -38,6 +38,14 @@ type Result struct {
 	Error error
 }
 
+func (r *Result) IsFailure() bool {
+	return r.Error != nil && len(r.Incomplete) > 0
+}
+
+func (r *Result) IsSuccess() bool {
+	return !r.IsFailure()
+}
+
 type DBConn interface {
 	Connect(context.Context) error
 	Configure(...DBOption) error
@@ -684,6 +692,12 @@ func insertUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *Post
 			err = nil
 			continue
 		}
+		if _, err = setUserV3Role(ctx, mongodb, user); err != nil {
+			reqLogger.Error(err, "Failed to set role for user")
+			errCount++
+			err = nil
+			continue
+		}
 		var uid *uuid.UUID
 		if uid, err = insertUser(ctx, postgres, user); err != nil {
 			errCount++
@@ -842,6 +856,42 @@ func setClientSecretIfEmpty(ctx context.Context, mongodb *MongoDB, zenInstance *
 	zenInstance.ClientSecret = decodedSecret
 	set = true
 
+	return
+}
+
+func getHighestRoleForUserFromTeam(userID string, team *v1schema.Team) (role v1schema.Role) {
+	teamUser := team.Users.GetUser(userID)
+	if teamUser == nil {
+		return v1schema.Authenticated
+	}
+	return teamUser.Roles.GetHighestRole()
+}
+
+func setUserV3Role(ctx context.Context, mongodb *MongoDB, user *v1schema.User) (set bool, err error) {
+	if user.Role != "" {
+		return
+	}
+	dbName := "platform-db"
+	collectionName := "Team"
+	filter := bson.D{}
+	cursor, err := mongodb.Client.
+		Database(dbName).
+		Collection(collectionName).
+		Find(ctx, filter)
+
+	var highest v1schema.Role
+	for cursor.Next(ctx) {
+		team := &v1schema.Team{}
+		if err = cursor.Decode(&team); err != nil {
+			return
+		}
+
+		if current := getHighestRoleForUserFromTeam(user.UserID, team); current > highest {
+			highest = current
+		}
+	}
+	user.Role = highest.ToV3String()
+	set = true
 	return
 }
 

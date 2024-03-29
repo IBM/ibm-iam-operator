@@ -34,6 +34,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -394,6 +395,12 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		go migration.Migrate(context.Background(),
 			r.dbSetupChan,
 			migrations...)
+		condition := operatorv1alpha1.NewMigrationInProgressCondition()
+		meta.SetStatusCondition(&authCR.Status.Conditions, *condition)
+		if err = r.Client.Status().Update(ctx, authCR); err != nil {
+			reqLogger.Error(err, "Failed to set condition on Authentication", "condition", operatorv1alpha1.ConditionMigrated)
+			return subreconciler.RequeueWithDelayAndError(defaultLowerWait, err)
+		}
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
 
@@ -422,10 +429,25 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		reqLogger.Info("Received a migration result from the worker", "result", migrationResult)
 		if migrationResult != nil && migrationResult.Error != nil {
 			reqLogger.Error(migrationResult.Error, "Encountered an error while performing the current migration")
-			// Remove the failed channel now so that migration
+			// Remove the failed channel now so that migration can repeat on next reconcile loop
 			r.dbSetupChan = nil
+			condition := operatorv1alpha1.NewMigrationFailureCondition(migrationResult.Incomplete[0].Name)
+			meta.SetStatusCondition(&authCR.Status.Conditions, *condition)
+			if err = r.Client.Status().Update(ctx, authCR); err != nil {
+				reqLogger.Error(err, "Failed to set condition on Authentication", "condition", operatorv1alpha1.ConditionMigrated)
+				return subreconciler.RequeueWithDelayAndError(defaultLowerWait, migrationResult.Error)
+			}
 		} else if migrationResult != nil {
 			reqLogger.Info("Completed all migrations successfully")
+			condition := operatorv1alpha1.NewMigrationSuccessCondition()
+			meta.SetStatusCondition(&authCR.Status.Conditions, *condition)
+			if err = r.Client.Status().Update(ctx, authCR); err != nil {
+				reqLogger.Error(err, "Failed to set condition on Authentication", "condition", operatorv1alpha1.ConditionMigrated)
+				return subreconciler.RequeueWithDelayAndError(defaultLowerWait, migrationResult.Error)
+			}
+		}
+		if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+			return subreconciler.RequeueWithDelay(defaultLowerWait)
 		}
 		annotationsChanged := setMigrationAnnotations(authCR, migrationResult)
 		if annotationsChanged {
@@ -803,7 +825,10 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 	// create clusterrole and clusterrolebinding
 	r.createClusterRole(instance)
-	r.createClusterRoleBinding(instance)
+
+	if subResult, err := r.handleClusterRoleBinding(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
 
 	r.ReconcileRemoveIngresses(ctx, instance, &needToRequeue)
 	// updates redirecturi annotations to serviceaccount

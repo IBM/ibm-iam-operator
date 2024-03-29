@@ -1012,6 +1012,116 @@ func ConvertV2SamlToIdpConfig(samlMap map[string]any) (v3Config *IdpConfig, err 
 	return
 }
 
+type Role int
+
+const (
+	Authenticated Role = iota
+	Viewer
+	Auditor
+	Editor
+	Operator
+	Administrator
+	CloudPakAdmin
+	ClusterAdmin
+)
+
+// ToString returns an IAM-compatible role name as a string.
+func (r Role) ToString() (s string) {
+	switch r {
+	case ClusterAdmin:
+		return "ClusterAdministrator"
+	case CloudPakAdmin:
+		return "CloudPakAdministrator"
+	case Administrator:
+		return "Administrator"
+	case Operator:
+		return "Operator"
+	case Editor:
+		return "Editor"
+	case Viewer:
+		return "Viewer"
+	case Auditor:
+		return "Auditor"
+	default:
+		return
+	}
+}
+
+// GetRole takes a string role name and returns the corresponding Role. If the string is not a known name, it returns
+// the lowest role.
+func GetRole(s string) (r Role) {
+	switch s {
+	case "ClusterAdministrator":
+		return ClusterAdmin
+	case "CloudPakAdministrator":
+		return CloudPakAdmin
+	case "Administrator":
+		return Administrator
+	case "Operator":
+		return Operator
+	case "Editor":
+		return Editor
+	case "Viewer":
+		return Viewer
+	case "Auditor":
+		return Auditor
+	default:
+		return Authenticated
+	}
+}
+
+// ToV3String returns an IM-compatible role name as a string. In IM, there are only three valid roles - Administrator,
+// Viewer, and Authenticated.
+func (r Role) ToV3String() (s string) {
+	if r >= Administrator && r <= ClusterAdmin {
+		return Administrator.ToString()
+	} else if r >= Viewer && r < Administrator {
+		return Viewer.ToString()
+	} else {
+		return Authenticated.ToString()
+	}
+}
+
+type TeamRole struct {
+	ID string `bson:"id"`
+}
+
+type TeamRoles []*TeamRole
+
+func (t TeamRoles) GetHighestRole() (highest Role) {
+	crnPrefix := "crn:v1:icp:private:iam::::role:"
+	for _, r := range t {
+		if r == nil {
+			continue
+		}
+		if current := GetRole(strings.TrimPrefix(r.ID, crnPrefix)); current > highest {
+			highest = current
+		}
+	}
+	return
+}
+
+type TeamUser struct {
+	UserID string    `bson:"userId"`
+	Roles  TeamRoles `bson:"roles"`
+}
+
+type TeamUsers []*TeamUser
+
+func (t TeamUsers) GetUser(id string) (user *TeamUser) {
+	for _, user := range t {
+		if user.UserID == id {
+			return user
+		}
+	}
+	return nil
+}
+
+type Team struct {
+	ID    string    `bson:"_id"`
+	Users TeamUsers `bson:"users"`
+}
+
 // ScimServerUser is a row from the `platformdb.scim_server_users` table
 type ScimServerUser struct {
 	ID           string         `json:"id"`

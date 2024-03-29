@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sync"
 
@@ -188,8 +189,44 @@ func (a *Authentication) SetService(ctx context.Context, service ServiceStatus, 
 
 // AuthenticationStatus defines the observed state of Authentication
 type AuthenticationStatus struct {
-	Nodes   []string      `json:"nodes"`
-	Service ServiceStatus `json:"service,omitempty"`
+	Nodes      []string           `json:"nodes"`
+	Service    ServiceStatus      `json:"service,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
+const ConditionMigrated string = "MigrationsPerformed"
+const MessageMigrationSuccess string = "All migrations completed successfully"
+const MessageMigrationInProgress string = "Migrations are currently being performed; monitor progress in the IM Operator \"migration_worker\" logs"
+const ReasonMigrationSuccess string = "Complete"
+const ReasonMigrationInProgress string = "InProgress"
+const ReasonMigrationFailure string = "Failed"
+
+func NewMigrationSuccessCondition() *metav1.Condition {
+	return &metav1.Condition{
+		Type:    ConditionMigrated,
+		Status:  metav1.ConditionTrue,
+		Reason:  ReasonMigrationSuccess,
+		Message: MessageMigrationSuccess,
+	}
+}
+
+func NewMigrationInProgressCondition() *metav1.Condition {
+	return &metav1.Condition{
+		Type:    ConditionMigrated,
+		Status:  metav1.ConditionFalse,
+		Reason:  ReasonMigrationInProgress,
+		Message: MessageMigrationInProgress,
+	}
+}
+
+func NewMigrationFailureCondition(name string) *metav1.Condition {
+	message := fmt.Sprintf("Migration %q failed; review the IM Operator \"migration_worker\" logs for more information", name)
+	return &metav1.Condition{
+		Type:    ConditionMigrated,
+		Status:  metav1.ConditionFalse,
+		Reason:  ReasonMigrationFailure,
+		Message: message,
+	}
 }
 
 //+kubebuilder:object:root=true

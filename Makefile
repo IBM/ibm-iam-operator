@@ -163,7 +163,7 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 KUSTOMIZE_VERSION ?= v3.8.9
 CONTROLLER_TOOLS_VERSION ?= v0.11.4
 YQ_VERSION ?= v4.40.5
-GO_VERSION ?= 1.21.7
+GO_VERSION ?= 1.21.8
 
 # This pinned version of go has its version pinned to its name, so order of operations is inverted here.
 GO ?= $(LOCALBIN)/go$(GO_VERSION)
@@ -264,7 +264,7 @@ endif
 
 .PHONY: fmt
 fmt: go ## Run go fmt against code.
-	test -s $(LOCALBIN)/gofmt 2>&1 || $(GO) build -o $(LOCALBIN)/gofmt ${HOME}/sdk/go1.21.7/src/cmd/gofmt
+	test -s $(LOCALBIN)/gofmt 2>&1 || $(GO) build -o $(LOCALBIN)/gofmt ${HOME}/sdk/go$(GO_VERSION)/src/cmd/gofmt
 	$(GO) fmt ./...
 
 .PHONY: vet

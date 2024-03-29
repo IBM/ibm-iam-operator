@@ -21,17 +21,20 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/IBM/ibm-iam-operator/controllers/common"
 
 	"fmt"
 
+	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -62,6 +65,8 @@ const (
 	AdministratorRole string = "Administrator"
 )
 const controllerName = "controller_oidc_client"
+
+const baseDeploymentWaitTime time.Duration = time.Minute
 
 var Clock clock.Clock = clock.RealClock{}
 var log = logf.Log.WithName(controllerName)
@@ -102,70 +107,110 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 	return subreconciler.Evaluate(subreconciler.DoNotRequeue())
 }
 
-func (r *ClientReconciler) updateStatus(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	reqLogger.Info("Marking Client Ready condition as \"True\"")
+// Begin subreconcilers
+
+// addFinalizer first performs any required migration steps on the Client if it was created using
+// icp-oidcclient-watcher, then adds this controller's finalizer to it.
+func (r *ClientReconciler) addFinalizer(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "addFinalizer")
+	reqLogger.Info("Add finalizer to Client if not already present")
 
 	clientCR := &oidcsecurityv1.Client{}
+
 	if result, err = r.getLatestClient(ctx, req, clientCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
-	condition := metav1.Condition{
-		Type:    oidcsecurityv1.ClientConditionReady,
-		Status:  metav1.ConditionTrue,
-		Reason:  ReasonCreateClientSuccessful,
-		Message: MessageClientSuccessful,
+
+	migrated := migrateCP2Client(ctx, clientCR)
+
+	added := controllerutil.AddFinalizer(clientCR, CP3FinalizerName)
+	if added {
+		reqLogger.Info("Added missing finalizer to Client")
 	}
-	meta.SetStatusCondition(&clientCR.Status.Conditions, condition)
-	reqLogger.Info("Updating Client status")
-	if err := r.Status().Update(ctx, clientCR); err != nil {
+
+	if migrated || added {
+		if err := r.Update(ctx, clientCR); err != nil {
+			reqLogger.Error(err, "Failed to update Client to add finalizer")
+			return subreconciler.RequeueWithError(err)
+		}
+	} else {
+		reqLogger.Info("All Client finalizers were already set; skipping")
+	}
+
+	return subreconciler.ContinueReconciling()
+}
+
+// handleDeletion performs finalizing tasks and removes any finalizers set by this Operator to allow for safe deletion
+// of a Client if it has been marked for deletion.
+func (r *ClientReconciler) handleDeletion(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleDeletion")
+	reqLogger.Info("Handle cleanup of Client if it has been marked for deletion")
+
+	clientCR := &oidcsecurityv1.Client{}
+	requestMethod := http.MethodDelete
+
+	if _, err = r.getLatestClient(ctx, req, clientCR); err != nil {
+		if k8sErrors.IsNotFound(err) {
+			// Assume that the Client was already deleted
+			return subreconciler.DoNotRequeue()
+		}
+		reqLogger.Error(err, "Failed to get latest Client")
+		reqLogger.Info("Updating status")
+		if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, requestMethod); err != nil {
+			reqLogger.Error(err, "Failed to update Client status")
+			return subreconciler.RequeueWithError(err)
+		}
+		return subreconciler.RequeueWithError(err)
+	}
+
+	if isNotMarkedForDeletion(clientCR) {
+		reqLogger.Info("Client is not being deleted; skipping")
+		return subreconciler.ContinueReconciling()
+	}
+
+	reqLogger.Info("Client is marked for deletion")
+
+	if result, err = r.finalizeClient(ctx, req); subreconciler.ShouldRequeue(result, err) {
+		if err == nil {
+			return subreconciler.Requeue()
+		}
+		reqLogger.Error(err, "Error occurred while finalizing Client")
+		reqLogger.Info("Updating status")
+		if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, requestMethod); err != nil {
+			reqLogger.Error(err, "Failed to update Client status")
+			return subreconciler.RequeueWithError(err)
+		}
+		return subreconciler.RequeueWithError(err)
+	}
+
+	reqLogger.Info("Updating status")
+	if err = r.writeErrorConditionsAndEvents(ctx, clientCR, err, requestMethod); err != nil {
 		reqLogger.Error(err, "Failed to update Client status")
 		return subreconciler.RequeueWithError(err)
 	}
 
-	return subreconciler.ContinueReconciling()
-}
-
-func (r *ClientReconciler) getLatestClient(ctx context.Context, req ctrl.Request, client *oidcsecurityv1.Client) (*ctrl.Result, error) {
-	reqLogger := logf.FromContext(ctx)
-
-	if err := r.Get(ctx, req.NamespacedName, client); err != nil {
-		if k8sErrors.IsNotFound(err) {
-			reqLogger.Info("Client not found; skipping reconciliation")
-			return subreconciler.DoNotRequeue()
-		}
-		reqLogger.Error(err, "Failed to get Client")
+	// Writing status out means the Client needs to be retrieved again
+	if err = r.Get(ctx, req.NamespacedName, clientCR); err != nil {
+		reqLogger.Error(err, "Failed to fetch Client")
 		return subreconciler.RequeueWithError(err)
 	}
-	return subreconciler.ContinueReconciling()
-}
 
-// isMarkedForDeletion returns true if the Client is in the process of being deleted
-func isMarkedForDeletion(client *oidcsecurityv1.Client) bool {
-	return client.GetDeletionTimestamp() != nil
-}
+	// This condition is to handle deleteEvent during upgrade , when we still have cp2 finalizers
+	controllerutil.RemoveFinalizer(clientCR, CP2FinalizerName)
+	controllerutil.RemoveFinalizer(clientCR, CP3FinalizerName)
 
-// isNotMarkedForDeletion returns the inverse of isMarkedForDeletion
-func isNotMarkedForDeletion(client *oidcsecurityv1.Client) bool {
-	return !isMarkedForDeletion(client)
-}
-
-// createPostfixedName creates a new name that stays below the Kubernetes max length for a name with a postfix.
-func createPostfixedName(original, postfix string) (newName string) {
-	const k8sMaxNameLength int = 253
-	const separator = "-"
-	if len(original)+len(postfix)+1 > k8sMaxNameLength {
-		// Max length minus postfix length with separator
-		truncLen := k8sMaxNameLength - len(postfix) - 1
-		return strings.Join([]string{original[:truncLen], postfix}, separator)
+	if err = r.Update(ctx, clientCR); err != nil {
+		reqLogger.Error(err, "Failed to remove finalizers")
+		return subreconciler.RequeueWithError(err)
 	}
-	return strings.Join([]string{original, postfix}, separator)
+
+	return subreconciler.DoNotRequeue()
 }
 
 // ensureSecretAndClientIdSet checks a Client CR to be sure that its corresponding Secret containing the client ID and
 // client secret has been created and that the ID on the CR itself has been set to match the value in the Secret.
 func (r *ClientReconciler) ensureSecretAndClientIdSet(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
+	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "ensureSecretAndClientIdSet")
 	reqLogger.Info("Ensuring Secret and Client ID are set")
 
 	clientCR := &oidcsecurityv1.Client{}
@@ -232,122 +277,10 @@ func (r *ClientReconciler) ensureSecretAndClientIdSet(ctx context.Context, req c
 	return subreconciler.ContinueReconciling()
 }
 
-// finalizeClient performs all clean up that needs to be performed before a Client CR can be deleted safely.
-func (r *ClientReconciler) finalizeClient(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	clientCR := &oidcsecurityv1.Client{}
-
-	if _, err = r.getLatestClient(ctx, req, clientCR); err != nil {
-		if k8sErrors.IsNotFound(err) {
-			// Assume that the Client was already deleted
-			return subreconciler.DoNotRequeue()
-		}
-		return subreconciler.RequeueWithError(err)
-	}
-
-	config := &AuthenticationConfig{}
-	err = GetConfig(ctx, &r.Client, config)
-	if err != nil {
-		reqLogger.Error(err, "Failed to gather Authentication configuration")
-		return subreconciler.RequeueWithError(err)
-	}
-
-	if clientCR.Spec.ZenInstanceId != "" {
-		reqLogger.Info("Client has a zenInstanceId, attempt to delete the matching Zen instance")
-		err = r.unregisterZenInstance(ctx, clientCR, config)
-		if err != nil {
-			reqLogger.Error(err, "Zen instance registration deletion failed", "zenInstanceId", clientCR.Spec.ZenInstanceId)
-			return subreconciler.RequeueWithError(err)
-		}
-		reqLogger.Info("Zen instance registration deletion succeeded", "ZenInstanceId", clientCR.Spec.ZenInstanceId)
-	}
-
-	reqLogger.Info("Deleting annotations from ibm-iam-operand-restricted ServiceAccount")
-	if result, err = r.removeAnnotationFromSA(ctx, req); subreconciler.ShouldRequeue(result, err) {
-		return subreconciler.RequeueWithError(err)
-	}
-
-	reqLogger.Info("Attempting deletion of the OIDC client registration")
-	_, err = r.deleteClientRegistration(ctx, clientCR, config)
-	if err != nil {
-		return subreconciler.RequeueWithError(err)
-	}
-	reqLogger.Info("Client registration successfully deleted")
-
-	return subreconciler.ContinueReconciling()
-}
-
-// handleDeletion performs finalizing tasks and removes any finalizers set by this Operator to allow for safe deletion
-// of a Client if it has been marked for deletion.
-func (r *ClientReconciler) handleDeletion(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	reqLogger.Info("Handle cleanup of Client if it has been marked for deletion")
-
-	clientCR := &oidcsecurityv1.Client{}
-	requestMethod := http.MethodDelete
-
-	if _, err = r.getLatestClient(ctx, req, clientCR); err != nil {
-		if k8sErrors.IsNotFound(err) {
-			// Assume that the Client was already deleted
-			return subreconciler.DoNotRequeue()
-		}
-		reqLogger.Error(err, "Failed to get latest Client")
-		reqLogger.Info("Updating status")
-		if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, requestMethod); err != nil {
-			reqLogger.Error(err, "Failed to update Client status")
-			return subreconciler.RequeueWithError(err)
-		}
-		return subreconciler.RequeueWithError(err)
-	}
-
-	if isNotMarkedForDeletion(clientCR) {
-		reqLogger.Info("Client is not being deleted; skipping")
-		return subreconciler.ContinueReconciling()
-	}
-
-	reqLogger.Info("Client is marked for deletion")
-
-	if result, err = r.finalizeClient(ctx, req); subreconciler.ShouldRequeue(result, err) {
-		if err == nil {
-			return subreconciler.Requeue()
-		}
-		reqLogger.Error(err, "Error occurred while finalizing Client")
-		reqLogger.Info("Updating status")
-		if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, requestMethod); err != nil {
-			reqLogger.Error(err, "Failed to update Client status")
-			return subreconciler.RequeueWithError(err)
-		}
-		return subreconciler.RequeueWithError(err)
-	}
-
-	reqLogger.Info("Updating status")
-	if err = r.writeErrorConditionsAndEvents(ctx, clientCR, err, requestMethod); err != nil {
-		reqLogger.Error(err, "Failed to update Client status")
-		return subreconciler.RequeueWithError(err)
-	}
-
-	// Writing status out means the Client needs to be retrieved again
-	if err = r.Get(ctx, req.NamespacedName, clientCR); err != nil {
-		reqLogger.Error(err, "Failed to fetch Client")
-		return subreconciler.RequeueWithError(err)
-	}
-
-	// This condition is to handle deleteEvent during upgrade , when we still have cp2 finalizers
-	controllerutil.RemoveFinalizer(clientCR, CP2FinalizerName)
-	controllerutil.RemoveFinalizer(clientCR, CP3FinalizerName)
-
-	if err = r.Update(ctx, clientCR); err != nil {
-		reqLogger.Error(err, "Failed to remove finalizers")
-		return subreconciler.RequeueWithError(err)
-	}
-
-	return subreconciler.DoNotRequeue()
-}
-
 // processOidcRegistration creates a new OIDC client or updates an existing one with whatever state is observed in the
 // Client CR.
 func (r *ClientReconciler) processOidcRegistration(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
+	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "processOidcRegistration")
 	reqLogger.Info("Processing OIDC client registration")
 
 	var requestMethod string
@@ -363,6 +296,29 @@ func (r *ClientReconciler) processOidcRegistration(ctx context.Context, req ctrl
 		reqLogger.Error(err, "Failed to gather Authentication configuration")
 		return subreconciler.RequeueWithError(err)
 	}
+
+	var authenticationNamespace string
+	if authenticationNamespace, err = config.GetAuthenticationNamespace(); err != nil {
+		reqLogger.Error(err, "No Authentication CR found to determine services namespace")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	available, err := r.isDeploymentAvailable(ctx, common.PlatformIdentityProvider, authenticationNamespace)
+	if err != nil {
+		reqLogger.Error(err, "Deployment needed for OIDC registration could not be retrieved",
+			"Deployment.Name", common.PlatformIdentityProvider,
+			"Deployment.Namespace", authenticationNamespace)
+		return subreconciler.RequeueWithDelayAndError(wait.Jitter(baseDeploymentWaitTime, 1.0), err)
+	} else if !available {
+		reqLogger.Info("Deployment is not available yet; requeueing",
+			"Deployment.Name", common.PlatformIdentityProvider,
+			"Deployment.Namespace", authenticationNamespace)
+		return subreconciler.RequeueWithDelay(wait.Jitter(baseDeploymentWaitTime, 1.0))
+	}
+
+	reqLogger.Info("Deployment is available",
+		"Deployment.Name", common.PlatformIdentityProvider,
+		"Deployment.Namespace", authenticationNamespace)
 
 	// Attempt to get the Client registration; if it isn't there, create a new one, otherwise, update
 	_, err = r.getClientRegistration(ctx, clientCR, config)
@@ -403,66 +359,10 @@ func (r *ClientReconciler) processOidcRegistration(ctx context.Context, req ctrl
 	return subreconciler.ContinueReconciling()
 }
 
-// migrateCP2Client updates an existing Client that has the finalizer from the icp-oidcclient-watcher Operator and
-// replaces it with this controller's. It also adds the Administrator role if the Client is not configured for use with
-// an instance of Zen and has no roles specified. Returns whether a change to the Client was made.
-func migrateCP2Client(ctx context.Context, clientCR *oidcsecurityv1.Client) (clientChanged bool) {
-	reqLogger := logf.FromContext(ctx)
-
-	if !controllerutil.ContainsFinalizer(clientCR, CP2FinalizerName) {
-		return false
-	}
-
-	if clientCR.Spec.ZenInstanceId == "" && len(clientCR.Spec.Roles) == 0 {
-		reqLogger.Info("Upgrade check : Non-ZEN cp2 Client CR Role would be updated : ", "Role", AdministratorRole)
-		clientCR.Spec.Roles = append(clientCR.Spec.Roles, AdministratorRole)
-		reqLogger.Info("Upgrade check : Non-ZEN CP2 Client CR Finalizers would be updated : ", "Finalizer", CP3FinalizerName)
-		controllerutil.RemoveFinalizer(clientCR, CP2FinalizerName)
-		return true
-	} else if clientCR.Spec.ZenInstanceId != "" {
-		reqLogger.Info("Upgrade check : ZEN cp2 Client CR Finalizers would be updated : ", "Finalizer", CP3FinalizerName)
-		controllerutil.RemoveFinalizer(clientCR, CP2FinalizerName)
-		return true
-	}
-
-	return false
-}
-
-// addFinalizer first performs any required migration steps on the Client if it was created using
-// icp-oidcclient-watcher, then adds this controller's finalizer to it.
-func (r *ClientReconciler) addFinalizer(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	reqLogger.Info("Add finalizer to Client if not already present")
-
-	clientCR := &oidcsecurityv1.Client{}
-
-	if result, err = r.getLatestClient(ctx, req, clientCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return
-	}
-
-	migrated := migrateCP2Client(ctx, clientCR)
-
-	added := controllerutil.AddFinalizer(clientCR, CP3FinalizerName)
-	if added {
-		reqLogger.Info("Added missing finalizer to Client")
-	}
-
-	if migrated || added {
-		if err := r.Update(ctx, clientCR); err != nil {
-			reqLogger.Error(err, "Failed to update Client to add finalizer")
-			return subreconciler.RequeueWithError(err)
-		}
-	} else {
-		reqLogger.Info("All Client finalizers were already set; skipping")
-	}
-
-	return subreconciler.ContinueReconciling()
-}
-
 // annotateServiceAccount updates ibm-iam-operand-restricted SA with redirecturi's present in the Client CR for
 // updateClient Call
 func (r *ClientReconciler) annotateServiceAccount(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
+	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "annotateServiceAccount")
 	reqLogger.Info("Add any missing Client annotations to ibm-iam-operand-restricted ServiceAccount")
 
 	clientCR := &oidcsecurityv1.Client{}
@@ -522,6 +422,247 @@ func (r *ClientReconciler) annotateServiceAccount(ctx context.Context, req ctrl.
 	reqLogger.Info("ibm-iam-operand-restricted SA is updated with annotations successfully")
 
 	return subreconciler.Requeue()
+}
+
+// processZenRegistration registers the OIDC client credentials for use with the Zen instance that has the same ID as
+// the one specified on the Client CR's .spec.ZenInstanceId.
+func (r *ClientReconciler) processZenRegistration(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "processZenRegistration")
+	reqLogger.Info("Processing Zen instance registration for Client, if configured")
+	clientCR := &oidcsecurityv1.Client{}
+
+	if result, err = r.getLatestClient(ctx, req, clientCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+
+	if clientCR.Spec.ZenInstanceId == "" {
+		reqLogger.Info("Zen instance ID not specified on Client, skipping Zen registration")
+		return subreconciler.ContinueReconciling()
+	}
+
+	config := &AuthenticationConfig{}
+	err = GetConfig(ctx, &r.Client, config)
+	if err != nil {
+		reqLogger.Error(err, "Failed to gather Authentication configuration")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	var authenticationNamespace string
+	if authenticationNamespace, err = config.GetAuthenticationNamespace(); err != nil {
+		reqLogger.Error(err, "No Authentication CR found to determine services namespace")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	available, err := r.isDeploymentAvailable(ctx, common.PlatformIdentityManagement, authenticationNamespace)
+	if err != nil {
+		reqLogger.Error(err, "Deployment needed for OIDC registration could not be retrieved",
+			"Deployment.Name", common.PlatformIdentityManagement,
+			"Deployment.Namespace", authenticationNamespace)
+		return subreconciler.RequeueWithDelayAndError(wait.Jitter(baseDeploymentWaitTime, 1.0), err)
+	} else if !available {
+		reqLogger.Info("Deployment is not available yet; requeueing",
+			"Deployment.Name", common.PlatformIdentityManagement,
+			"Deployment.Namespace", authenticationNamespace)
+		return subreconciler.RequeueWithDelay(wait.Jitter(baseDeploymentWaitTime, 1.0))
+	}
+
+	reqLogger.Info("Deployment is available",
+		"Deployment.Name", common.PlatformIdentityManagement,
+		"Deployment.Namespace", authenticationNamespace)
+
+	var zenReg *ZenInstance
+	zenReg, err = r.getZenInstanceRegistration(ctx, clientCR, config)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get Zen instance")
+		if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, http.MethodPost); err != nil {
+			reqLogger.Error(err, "Failed ot update Client status")
+			return subreconciler.RequeueWithError(err)
+		}
+		return subreconciler.RequeueWithError(err)
+	}
+
+	if zenReg != nil {
+		//Zen registration exists - currently updates to the zen registration are not supported
+		reqLogger.Info("Zen registration already exists for oidc client - the zen instance will not be updated",
+			"clientId", clientCR.Spec.ClientId, "zenInstanceId", clientCR.Spec.ZenInstanceId)
+		return subreconciler.ContinueReconciling()
+	}
+
+	clientCreds, err := r.GetClientCreds(ctx, clientCR)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get client credentials from Secret", "secretName", clientCR.Spec.Secret)
+		r.Recorder.Event(clientCR, corev1.EventTypeWarning, ReasonCreateZenRegistrationFailed, err.Error())
+		reqLogger.Info("Updating status")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	//Zen registration does not exist, create
+	reqLogger.Info("Creating Zen registration for client")
+	if err = r.registerZenInstance(ctx, clientCR, clientCreds, config); err != nil {
+		reqLogger.Error(err, "Failed to create Zen registration")
+		if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, http.MethodPost); err != nil {
+			reqLogger.Error(err, "Failed ot update Client status")
+			return subreconciler.RequeueWithError(err)
+		}
+
+		return subreconciler.RequeueWithError(err)
+	}
+
+	return subreconciler.ContinueReconciling()
+}
+
+// updateStatus sets success-related conditions in the Client CR's status.
+func (r *ClientReconciler) updateStatus(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "updateStatus")
+	reqLogger.Info("Marking Client Ready condition as \"True\"")
+
+	clientCR := &oidcsecurityv1.Client{}
+	if result, err = r.getLatestClient(ctx, req, clientCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+	condition := metav1.Condition{
+		Type:    oidcsecurityv1.ClientConditionReady,
+		Status:  metav1.ConditionTrue,
+		Reason:  ReasonCreateClientSuccessful,
+		Message: MessageClientSuccessful,
+	}
+	meta.SetStatusCondition(&clientCR.Status.Conditions, condition)
+	reqLogger.Info("Updating Client status")
+	if err := r.Status().Update(ctx, clientCR); err != nil {
+		reqLogger.Error(err, "Failed to update Client status")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	return subreconciler.ContinueReconciling()
+}
+
+// End subreconcilers
+
+func (r *ClientReconciler) getLatestClient(ctx context.Context, req ctrl.Request, client *oidcsecurityv1.Client) (*ctrl.Result, error) {
+	reqLogger := logf.FromContext(ctx)
+
+	if err := r.Get(ctx, req.NamespacedName, client); err != nil {
+		if k8sErrors.IsNotFound(err) {
+			reqLogger.Info("Client not found; skipping reconciliation")
+			return subreconciler.DoNotRequeue()
+		}
+		reqLogger.Error(err, "Failed to get Client")
+		return subreconciler.RequeueWithError(err)
+	}
+	return subreconciler.ContinueReconciling()
+}
+
+// isMarkedForDeletion returns true if the Client is in the process of being deleted
+func isMarkedForDeletion(client *oidcsecurityv1.Client) bool {
+	return client.GetDeletionTimestamp() != nil
+}
+
+// isNotMarkedForDeletion returns the inverse of isMarkedForDeletion
+func isNotMarkedForDeletion(client *oidcsecurityv1.Client) bool {
+	return !isMarkedForDeletion(client)
+}
+
+// createPostfixedName creates a new name that stays below the Kubernetes max length for a name with a postfix.
+func createPostfixedName(original, postfix string) (newName string) {
+	const k8sMaxNameLength int = 253
+	const separator = "-"
+	if len(original)+len(postfix)+1 > k8sMaxNameLength {
+		// Max length minus postfix length with separator
+		truncLen := k8sMaxNameLength - len(postfix) - 1
+		return strings.Join([]string{original[:truncLen], postfix}, separator)
+	}
+	return strings.Join([]string{original, postfix}, separator)
+}
+
+// finalizeClient performs all clean up that needs to be performed before a Client CR can be deleted safely.
+func (r *ClientReconciler) finalizeClient(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx)
+	clientCR := &oidcsecurityv1.Client{}
+
+	if _, err = r.getLatestClient(ctx, req, clientCR); err != nil {
+		if k8sErrors.IsNotFound(err) {
+			// Assume that the Client was already deleted
+			return subreconciler.DoNotRequeue()
+		}
+		return subreconciler.RequeueWithError(err)
+	}
+
+	config := &AuthenticationConfig{}
+	err = GetConfig(ctx, &r.Client, config)
+	if err != nil {
+		reqLogger.Error(err, "Failed to gather Authentication configuration")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	if clientCR.Spec.ZenInstanceId != "" {
+		reqLogger.Info("Client has a zenInstanceId, attempt to delete the matching Zen instance")
+		err = r.unregisterZenInstance(ctx, clientCR, config)
+		if err != nil {
+			reqLogger.Error(err, "Zen instance registration deletion failed", "zenInstanceId", clientCR.Spec.ZenInstanceId)
+			return subreconciler.RequeueWithError(err)
+		}
+		reqLogger.Info("Zen instance registration deletion succeeded", "ZenInstanceId", clientCR.Spec.ZenInstanceId)
+	}
+
+	reqLogger.Info("Deleting annotations from ibm-iam-operand-restricted ServiceAccount")
+	if result, err = r.removeAnnotationFromSA(ctx, req); subreconciler.ShouldRequeue(result, err) {
+		return subreconciler.RequeueWithError(err)
+	}
+
+	reqLogger.Info("Attempting deletion of the OIDC client registration")
+	_, err = r.deleteClientRegistration(ctx, clientCR, config)
+	if err != nil {
+		return subreconciler.RequeueWithError(err)
+	}
+	reqLogger.Info("Client registration successfully deleted")
+
+	return subreconciler.ContinueReconciling()
+}
+
+func isDeploymentConditionTrue(conditions []v1.DeploymentCondition, conditionType v1.DeploymentConditionType) bool {
+	for _, condition := range conditions {
+		if condition.Type == conditionType {
+			return condition.Status == corev1.ConditionTrue
+		}
+	}
+	return false
+}
+
+func (r *ClientReconciler) isDeploymentAvailable(ctx context.Context, deploymentName common.DeploymentName, namespace string) (available bool, err error) {
+	key := types.NamespacedName{
+		Name:      string(deploymentName),
+		Namespace: namespace,
+	}
+	deploy := &v1.Deployment{}
+	if err = r.Get(ctx, key, deploy); err != nil {
+		return
+	}
+	return isDeploymentConditionTrue(deploy.Status.Conditions, v1.DeploymentAvailable), nil
+}
+
+// migrateCP2Client updates an existing Client that has the finalizer from the icp-oidcclient-watcher Operator and
+// replaces it with this controller's. It also adds the Administrator role if the Client is not configured for use with
+// an instance of Zen and has no roles specified. Returns whether a change to the Client was made.
+func migrateCP2Client(ctx context.Context, clientCR *oidcsecurityv1.Client) (clientChanged bool) {
+	reqLogger := logf.FromContext(ctx)
+
+	if !controllerutil.ContainsFinalizer(clientCR, CP2FinalizerName) {
+		return false
+	}
+
+	if clientCR.Spec.ZenInstanceId == "" && len(clientCR.Spec.Roles) == 0 {
+		reqLogger.Info("Upgrade check : Non-ZEN cp2 Client CR Role would be updated : ", "Role", AdministratorRole)
+		clientCR.Spec.Roles = append(clientCR.Spec.Roles, AdministratorRole)
+		reqLogger.Info("Upgrade check : Non-ZEN CP2 Client CR Finalizers would be updated : ", "Finalizer", CP3FinalizerName)
+		controllerutil.RemoveFinalizer(clientCR, CP2FinalizerName)
+		return true
+	} else if clientCR.Spec.ZenInstanceId != "" {
+		reqLogger.Info("Upgrade check : ZEN cp2 Client CR Finalizers would be updated : ", "Finalizer", CP3FinalizerName)
+		controllerutil.RemoveFinalizer(clientCR, CP2FinalizerName)
+		return true
+	}
+
+	return false
 }
 
 func containsString(slice []string, s string) bool {
@@ -670,70 +811,6 @@ func (r *ClientReconciler) removeAnnotationFromSA(ctx context.Context, req ctrl.
 	reqLogger.Info("Annotations for Client removed from ibm-iam-operand-restricted SA successfully")
 
 	return subreconciler.Requeue()
-}
-
-// processZenRegistration registers the OIDC client credentials for use with the Zen instance that has the same ID as
-// the one specified on the Client CR's .spec.ZenInstanceId.
-func (r *ClientReconciler) processZenRegistration(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	reqLogger.Info("Processing Zen instance registration for Client, if configured")
-	clientCR := &oidcsecurityv1.Client{}
-
-	if result, err = r.getLatestClient(ctx, req, clientCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return
-	}
-
-	if clientCR.Spec.ZenInstanceId == "" {
-		reqLogger.Info("Zen instance ID not specified on Client, skipping Zen registration")
-		return subreconciler.ContinueReconciling()
-	}
-
-	config := &AuthenticationConfig{}
-	err = GetConfig(ctx, &r.Client, config)
-	if err != nil {
-		reqLogger.Error(err, "Failed to gather Authentication configuration")
-		return subreconciler.RequeueWithError(err)
-	}
-
-	var zenReg *ZenInstance
-	zenReg, err = r.getZenInstanceRegistration(ctx, clientCR, config)
-	if err != nil {
-		reqLogger.Error(err, "Failed to get Zen instance")
-		if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, http.MethodPost); err != nil {
-			reqLogger.Error(err, "Failed ot update Client status")
-			return subreconciler.RequeueWithError(err)
-		}
-		return subreconciler.RequeueWithError(err)
-	}
-
-	if zenReg != nil {
-		//Zen registration exists - currently updates to the zen registration are not supported
-		reqLogger.Info("Zen registration already exists for oidc client - the zen instance will not be updated",
-			"clientId", clientCR.Spec.ClientId, "zenInstanceId", clientCR.Spec.ZenInstanceId)
-		return subreconciler.ContinueReconciling()
-	}
-
-	clientCreds, err := r.GetClientCreds(ctx, clientCR)
-	if err != nil {
-		reqLogger.Error(err, "Failed to get client credentials from Secret", "secretName", clientCR.Spec.Secret)
-		r.Recorder.Event(clientCR, corev1.EventTypeWarning, ReasonCreateZenRegistrationFailed, err.Error())
-		reqLogger.Info("Updating status")
-		return subreconciler.RequeueWithError(err)
-	}
-
-	//Zen registration does not exist, create
-	reqLogger.Info("Creating Zen registration for client")
-	if err = r.registerZenInstance(ctx, clientCR, clientCreds, config); err != nil {
-		reqLogger.Error(err, "Failed to create Zen registration")
-		if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, http.MethodPost); err != nil {
-			reqLogger.Error(err, "Failed ot update Client status")
-			return subreconciler.RequeueWithError(err)
-		}
-
-		return subreconciler.RequeueWithError(err)
-	}
-
-	return subreconciler.ContinueReconciling()
 }
 
 // SetupWithManager sets up the controller with the Manager.

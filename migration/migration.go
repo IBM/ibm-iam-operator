@@ -38,6 +38,14 @@ type Result struct {
 	Error error
 }
 
+func (r *Result) IsFailure() bool {
+	return r.Error != nil && len(r.Incomplete) > 0
+}
+
+func (r *Result) IsSuccess() bool {
+	return !r.IsFailure()
+}
+
 type DBConn interface {
 	Connect(context.Context) error
 	Configure(...DBOption) error

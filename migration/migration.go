@@ -1648,16 +1648,18 @@ func insertGroupsAndMemberRefs(ctx context.Context, mongodb *MongoDB, postgres *
 			continue
 		}
 		membersNotMigrated := 0
-		for _, member := range group.Members {
-			args := member.GetArgs()
-			args["groupId"] = group.GroupID
-			_, err = postgres.Conn.Exec(ctx, xrefQuery, args)
-			if errors.Is(err, pgx.ErrNoRows) {
-				reqLogger.Info("Row already exists in EDB")
-			} else if err != nil {
-				reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.users_groups")
-				membersNotMigrated++
-				continue
+		if group.Members != nil {
+			for _, member := range group.Members {
+				args := member.GetArgs()
+				args["groupId"] = group.GroupID
+				_, err = postgres.Conn.Exec(ctx, xrefQuery, args)
+				if errors.Is(err, pgx.ErrNoRows) {
+					reqLogger.Info("Row already exists in EDB")
+				} else if err != nil {
+					reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.users_groups")
+					membersNotMigrated++
+					continue
+				}
 			}
 		}
 		if membersNotMigrated != 0 {

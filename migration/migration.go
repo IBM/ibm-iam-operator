@@ -1146,7 +1146,7 @@ func insertGroups(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (
 	filter := bson.M{
 		"$and": bson.A{
 			bson.M{"migrated": bson.M{"$ne": true}},
-			bson.M{"type": bson.M{"$regex": "//^SAML$//i"}},
+			bson.M{"type": bson.M{"$eq": "SAML"}},
 		},
 	}
 	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)

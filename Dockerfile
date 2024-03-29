@@ -13,7 +13,7 @@
 #
 
 # Build the manager binary
-FROM docker.io/golang:1.21-bullseye as builder
+FROM golang:1.21.8-bullseye as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests

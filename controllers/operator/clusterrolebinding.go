@@ -29,9 +29,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// handleClusterRoleBinding creates the ibm-iam-operand-restricted ClusterRoleBinding that binds the
-// ibm-iam-operand-restricted ClusterRole to the ibm-iam-operand-restricted ServiceAccount in the services namespace for
-// this Authentication instance. If another ClusterRoleBinding already exists,
+// handleClusterRoleBinding creates a ClusterRoleBinding that binds the ibm-iam-operand-restricted ClusterRole to the
+// ibm-iam-operand-restricted ServiceAccount in the services namespace for this Authentication instance.
 func (r *AuthenticationReconciler) handleClusterRoleBinding(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleClusterRoleBinding")
 	reqLogger.Info("Ensure that the ClusterRoleBinding is created")

@@ -1625,13 +1625,10 @@ func insertGroupsAndMemberRefs(ctx context.Context, mongodb *MongoDB, postgres *
 	}
 	errCount := 0
 	migrateCount := 0
-	var (
-		group v1schema.Group
-		xref  v1schema.UserGroup
-	)
-	query := group.GetInsertSQL()
+	var xref v1schema.UserGroup
 	xrefQuery := xref.GetInsertSQL()
 	for cursor.Next(ctx) {
+		var group v1schema.Group
 		if err = cursor.Decode(&group); err != nil {
 			reqLogger.Error(err, "Failed to decode Mongo document")
 			errCount++
@@ -1639,6 +1636,7 @@ func insertGroupsAndMemberRefs(ctx context.Context, mongodb *MongoDB, postgres *
 			continue
 		}
 		args := group.GetArgs()
+		query := group.GetInsertSQL()
 		_, err = postgres.Conn.Exec(ctx, query, args)
 		if errors.Is(err, pgx.ErrNoRows) {
 			reqLogger.Info("Row already exists in EDB")

@@ -825,7 +825,10 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 	// create clusterrole and clusterrolebinding
 	r.createClusterRole(instance)
-	r.createClusterRoleBinding(instance)
+
+	if subResult, err := r.handleClusterRoleBinding(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
 
 	r.ReconcileRemoveIngresses(ctx, instance, &needToRequeue)
 	// updates redirecturi annotations to serviceaccount

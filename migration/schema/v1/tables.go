@@ -1461,3 +1461,49 @@ func (ssgc *ScimServerGroupCustom) GetArgs() pgx.NamedArgs {
 	}
 	return args
 }
+
+type Group struct {
+	GroupID     string   `bson:"_id"`
+	DisplayName string   `bson:"displayName"`
+	Members     []Member `bson:"members"`
+}
+
+type Member struct {
+	Value   string `bson:"value"`
+	Display string `bson:"display"`
+}
+
+func (g *Group) GetArgs() pgx.NamedArgs {
+	return pgx.NamedArgs{
+		"groupId":     g.GroupID,
+		"displayName": g.DisplayName,
+		"realmId":     "defaultSP",
+	}
+}
+
+func (m *Member) GetArgs() pgx.NamedArgs {
+	return pgx.NamedArgs{
+		"subject": m.Value,
+		"realmId": "defaultSP",
+	}
+}
+
+func (g *Group) GetInsertSQL() string {
+	return `
+		INSERT INTO platformdb.groups(group_id, display_name, realm_id)
+		VALUES (@groupId, @displayName, @realmId) ON CONFLICT DO NOTHING;`
+}
+
+type UserGroup struct {
+	UserUID  *uuid.UUID `json:"user_uid"`
+	GroupUID *uuid.UUID `json:"group_uid"`
+}
+
+func (ug *UserGroup) GetInsertSQL() string {
+	return `
+		INSERT INTO platformdb.users_groups(user_uid, group_uid)
+		VALUES (
+			(SELECT uid from platformdb.users WHERE subject=@subject AND realm_id=@realmId),
+			(SELECT uid from platformdb.groups WHERE group_id=@groupId AND realm_id=@realmId)
+		) ON CONFLICT DO NOTHING;`
+}

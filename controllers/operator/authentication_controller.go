@@ -419,7 +419,7 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 			r.dbSetupChan = nil
 			return subreconciler.ContinueReconciling()
 		}
-		reqLogger.Info("Received a migration result from the worker", "result", migrationResult)
+		reqLogger.Info("Received a migration result from the worker")
 		if migrationResult != nil && migrationResult.Error != nil {
 			reqLogger.Error(migrationResult.Error, "Encountered an error while performing the current migration")
 			// Remove the failed channel now so that migration

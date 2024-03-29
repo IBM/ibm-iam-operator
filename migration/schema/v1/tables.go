@@ -1020,6 +1020,7 @@ type Group struct {
 }
 
 func ConvertToGroup(grp map[string]any) (group *Group, err error) {
+	fmt.Println("Group map:", grp)
 	group = &Group{}
 	if groupId, ok := grp["_id"]; ok {
 		if group.GroupID, ok = groupId.(string); !ok {
@@ -1047,21 +1048,22 @@ type UserGroup struct {
 	GroupUID *uuid.UUID `json:"group_uid"`
 }
 
-type Member struct {
-	Value   string `json:"value"`
-	Display string `json:"display"`
-}
-
 func GetMembersForGroup(grp map[string]any) (result []string, err error) {
 	result = make([]string, 0)
-	var members []Member
-	if m, ok := grp["members"]; ok {
-		if members, ok = m.([]Member); !ok {
-			return nil, fmt.Errorf("members is not of type []Member")
+	members, ok := grp["members"].([]map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("unable to extract members data")
+	}
+	for i, member := range members {
+		value, ok := member["value"].(string)
+		if !ok {
+			fmt.Printf("Error: Invalid member data at index %d\n", i)
+			continue
 		}
-		for _, member := range members {
-			result = append(result, member.Value)
-		}
+		result = append(result, value)
+	}
+	if len(result) != len(members) {
+		return nil, fmt.Errorf("unable to extact value for every members")
 	}
 	return
 }

@@ -1146,7 +1146,7 @@ func insertGroups(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (
 	filter := bson.M{
 		"$and": bson.A{
 			bson.M{"migrated": bson.M{"$ne": true}},
-			bson.M{"type": bson.M{"$eq": "SAML"}},
+			bson.M{"type": bson.M{"$regex": "/^SAML$/i"}},
 		},
 	}
 	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
@@ -1249,7 +1249,7 @@ func insertUserGroupMappings(ctx context.Context, mongodb *MongoDB, postgres *Po
 		}
 		var members []string
 		if members, err = v1schema.GetMembersForGroup(result); err != nil {
-			reqLogger.Error(err, "Failed to get members for group", group.GroupID)
+			reqLogger.Error(err, fmt.Sprintf("Failed to get members for group %s", group.GroupID))
 			errCount++
 			continue
 		}
@@ -1271,7 +1271,7 @@ func insertUserGroupMappings(ctx context.Context, mongodb *MongoDB, postgres *Po
 			}
 		}
 		if membersNotMigrated != 0 {
-			reqLogger.Error(err, "Could create references for", membersNotMigrated, "out of", len(members), "members for group", group.GroupID)
+			reqLogger.Error(err, fmt.Sprintf("Could create references for %d out of %d members for group: %s", membersNotMigrated, len(members), group.GroupID))
 			errCount++
 			continue
 		}

@@ -420,44 +420,52 @@ var _ = Describe("IdpConfig", func() {
 })
 
 var _ = Describe("SCIM JIT Migration", func() {
-	Describe("Converts input map to Group struct", func() {
+	Describe("ConvertToGroup", func() {
 		var grp map[string]any
-		It("Converts foo to bar", func() {
-			grp = map[string]any{
-				"_id":         "test-group",
-				"displayName": "test-group",
+		It("Converts input map to Group struct", func() {
+			grp = map[string]interface{}{
+				"_id":         "icpgroup1",
+				"displayName": "icpgroup1",
+				"members": []map[string]interface{}{
+					{"display": "Icpuser One", "value": "icpuser1@ibm.com"},
+					{"display": "Icpuser Two", "value": "icpuser2@ibm.com"},
+				},
+				"type": "SAML",
 			}
 			group, err := ConvertToGroup(grp)
 			Expect(group).ToNot(BeNil())
 			Expect(err).ToNot(HaveOccurred())
-			Expect(group).To(HaveField("GroupID", "test-group"))
-			Expect(group).To(HaveField("DisplayName", "test-group"))
+			Expect(group).To(HaveField("GroupID", "icpgroup1"))
+			Expect(group).To(HaveField("DisplayName", "icpgroup1"))
 			Expect(group).To(HaveField("RealmID", "defaultSP"))
 		})
 	})
 
 	Describe("GetMembersForGroup", func() {
-		var grp map[string]any
+		var grp map[string]interface{}
 		It("Returns all member.value as slice", func() {
-			grp = map[string]any{
-				"members": []Member{
-					{
-						Value:   "test-user-1",
-						Display: "Test User 1",
-					},
-					{
-						Value:   "test-user-2",
-						Display: "Test User 2",
-					},
+			grp = map[string]interface{}{
+				"_id":         "icpgroup1",
+				"displayName": "Iicpgroup1",
+				"members": []map[string]interface{}{
+					{"display": "Icpuser One", "value": "icpuser1@ibm.com"},
+					{"display": "Icpuser Two", "value": "icpuser2@ibm.com"},
+					{"display": "Icpuser Three", "value": "icpuser3@ibm.com"},
+					{"display": "Icpuser Four", "value": "icpuser4@ibm.com"},
+					{"display": "Icpuser Five", "value": "icpuser5@ibm.com"},
 				},
+				"type": "SAML",
 			}
 			members, err := GetMembersForGroup(grp)
 			Expect(members).ToNot(BeNil())
 			Expect(err).ToNot(HaveOccurred())
-			Expect(len(members)).To(Equal(2))
+			Expect(len(members)).To(Equal(5))
 			Expect(members).To(HaveExactElements(
-				"test-user-1",
-				"test-user-2",
+				"icpuser1@ibm.com",
+				"icpuser2@ibm.com",
+				"icpuser3@ibm.com",
+				"icpuser4@ibm.com",
+				"icpuser5@ibm.com",
 			))
 		})
 	})

@@ -1260,6 +1260,12 @@ func insertSSUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *Po
 		ssUserCustomMap := populateSSUserCustomMap(ssUserMap)
 		ssUserCustomSchemaMap := populateSSUserCustomSchemaMap(ssUserCustomMap)
 		ssUser, err = getSSUserFromMap(ssUserMap)
+		if err != nil {
+			reqLogger.Error(err, "Failed to convert map to ScimServerUser")
+			errCount++
+			err = nil
+			continue
+		}
 		id := ssUser.ID
 		if err = insertSSUser(ctx, postgres, ssUser); err != nil {
 			errCount++
@@ -1427,6 +1433,12 @@ func insertSSGroupRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *P
 		ssGroupCustomMap := populateSSGroupCustomMap(ssGroupMap)
 		ssGroupCustomSchemaMap := populateSSGroupCustomSchemaMap(ssGroupCustomMap)
 		ssGroup, err = getSSGroupFromMap(ssGroupMap)
+		if err != nil {
+			reqLogger.Error(err, "Failed to convert map to ScimServerGroup")
+			errCount++
+			err = nil
+			continue
+		}
 		id := ssGroup.ID
 		if err = insertSSGroup(ctx, postgres, ssGroup); err != nil {
 			errCount++
@@ -1534,9 +1546,7 @@ func contains(slice []string, str string) bool {
 }
 
 func populateSSUserCustomMap(ssUserMap map[string]any) map[string]any {
-	if _, ok := ssUserMap["_id"]; ok {
-		delete(ssUserMap, "_id")
-	}
+	delete(ssUserMap, "_id")
 	ssUserCustomMap := make(map[string]any)
 	for key, value := range ssUserMap {
 		if !contains(v1schema.ScimServerUsersMongoFieldNames, key) {
@@ -1547,9 +1557,7 @@ func populateSSUserCustomMap(ssUserMap map[string]any) map[string]any {
 }
 
 func populateSSGroupCustomMap(ssGroupMap map[string]any) map[string]any {
-	if _, ok := ssGroupMap["_id"]; ok {
-		delete(ssGroupMap, "_id")
-	}
+	delete(ssGroupMap, "_id")
 	ssGroupCustomMap := make(map[string]any)
 	for key, value := range ssGroupMap {
 		if !contains(v1schema.ScimServerGroupsMongoFieldNames, key) {

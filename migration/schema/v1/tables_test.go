@@ -418,3 +418,85 @@ var _ = Describe("IdpConfig", func() {
 		})
 	})
 })
+
+var _ = DescribeTable("TeamUsers.GetUser", func(id string, expected *TeamUser) {
+	users := TeamUsers{
+		&TeamUser{UserID: "user1", Roles: TeamRoles{&TeamRole{ID: "crn:v1:icp:private:iam::::role:ClusterAdministrator"}}},
+		&TeamUser{UserID: "user2", Roles: TeamRoles{&TeamRole{ID: "crn:v1:icp:private:iam::::role:Viewer"}}},
+		&TeamUser{UserID: "user3", Roles: TeamRoles{&TeamRole{ID: "crn:v1:icp:private:iam::::role:Editor"}}},
+		&TeamUser{UserID: "user4", Roles: TeamRoles{&TeamRole{ID: "crn:v1:icp:private:iam::::role:Administrator"}}},
+		&TeamUser{UserID: "user4", Roles: TeamRoles{&TeamRole{ID: "crn:v1:icp:private:iam::::role:"}}},
+		&TeamUser{UserID: "user5", Roles: TeamRoles{&TeamRole{ID: ""}}},
+	}
+	actual := users.GetUser(id)
+	Expect(actual).To(Equal(expected))
+},
+	Entry("", "user1", &TeamUser{UserID: "user1", Roles: TeamRoles{&TeamRole{ID: "crn:v1:icp:private:iam::::role:ClusterAdministrator"}}}),
+	Entry("", "user2", &TeamUser{UserID: "user2", Roles: TeamRoles{&TeamRole{ID: "crn:v1:icp:private:iam::::role:Viewer"}}}),
+	Entry("", "user3", &TeamUser{UserID: "user3", Roles: TeamRoles{&TeamRole{ID: "crn:v1:icp:private:iam::::role:Editor"}}}),
+	Entry("", "user4", &TeamUser{UserID: "user4", Roles: TeamRoles{&TeamRole{ID: "crn:v1:icp:private:iam::::role:Administrator"}}}),
+	Entry("", "user5", &TeamUser{UserID: "user5", Roles: TeamRoles{&TeamRole{ID: ""}}}),
+	Entry("", "user0", nil),
+)
+
+var _ = DescribeTable("TeamRoles.GetHighestRole", func(roles TeamRoles, expected Role) {
+	actual := roles.GetHighestRole()
+	Expect(actual).To(Equal(expected))
+},
+	Entry("Returns correct role from role CRN", TeamRoles{&TeamRole{ID: "crn:v1:icp:private:iam::::role:ClusterAdministrator"}}, ClusterAdmin),
+	Entry("Returns Authenticated role when *TeamRole has empty ID", TeamRoles{&TeamRole{ID: ""}}, Authenticated),
+	Entry("Returns Authenticated role when *TeamRole is nil", nil, Authenticated),
+	Entry("Retrieves highest role among elements in TeamRoles", TeamRoles{
+		&TeamRole{ID: "crn:v1:icp:private:iam::::role:Administrator"},
+		&TeamRole{ID: "crn:v1:icp:private:iam::::role:"},
+		&TeamRole{ID: "crn:v1:icp:private:iam::::role:ClusterAdministrator"},
+		&TeamRole{ID: "crn:v1:icp:private:iam::::role:Viewer"},
+		nil,
+	}, ClusterAdmin),
+	Entry("Returns Authenticated role if CRN prefix is invalid", TeamRoles{&TeamRole{ID: "crncrn:v1:icp:private:iam::::role:ClusterAdministrator"}}, Authenticated),
+)
+
+var _ = DescribeTable("Role.ToV3String", func(r Role, expected string) {
+	actual := r.ToV3String()
+	Expect(actual).To(Equal(expected))
+},
+	Entry("ClusterAdministrator is converted to Administrator for V3", ClusterAdmin, "Administrator"),
+	Entry("CloudPakAdministrator is converted to Administrator for V3", CloudPakAdmin, "Administrator"),
+	Entry("Administrator is Administrator for V3", Administrator, "Administrator"),
+	Entry("Operator is converted to Viewer for V3", Operator, "Viewer"),
+	Entry("Editor is converted to Viewer for V3", Editor, "Viewer"),
+	Entry("Viewer is Viewer for V3", Viewer, "Viewer"),
+	Entry("Auditor is converted to Viewer for V3", Auditor, "Viewer"),
+	Entry("Authenticated is \"\" for V3", Authenticated, ""),
+	Entry("Anything else is the Authenticated role", Role(8), ""),
+)
+
+var _ = DescribeTable("GetRole", func(s string, expected Role) {
+	actual := GetRole(s)
+	Expect(actual).To(Equal(expected))
+},
+	Entry("ClusterAdministrator has corresponding role", "ClusterAdministrator", ClusterAdmin),
+	Entry("CloudPakAdministrator has corresponding role", "CloudPakAdministrator", CloudPakAdmin),
+	Entry("Administrator has corresponding role", "Administrator", Administrator),
+	Entry("Operator has corresponding role", "Operator", Operator),
+	Entry("Editor has corresponding role", "Editor", Editor),
+	Entry("Auditor has corresponding role", "Auditor", Auditor),
+	Entry("Viewer has corresponding role", "Viewer", Viewer),
+	Entry("\"\" has corresponding role", "", Authenticated),
+	Entry("Anything else is the Authenticated role", "someotherstring", Authenticated),
+)
+
+var _ = DescribeTable("Role.ToString", func(r Role, expected string) {
+	actual := r.ToString()
+	Expect(actual).To(Equal(expected))
+},
+	Entry("ClusterAdministrator", ClusterAdmin, "ClusterAdministrator"),
+	Entry("CloudPakAdministrator", CloudPakAdmin, "CloudPakAdministrator"),
+	Entry("Administrator", Administrator, "Administrator"),
+	Entry("Operator", Operator, "Operator"),
+	Entry("Editor", Editor, "Editor"),
+	Entry("Auditor", Auditor, "Auditor"),
+	Entry("Viewer", Viewer, "Viewer"),
+	Entry("\"\"", Authenticated, ""),
+	Entry("\"\"", Role(8), ""),
+)

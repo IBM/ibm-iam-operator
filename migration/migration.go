@@ -38,6 +38,14 @@ type Result struct {
 	Error error
 }
 
+func (r *Result) IsFailure() bool {
+	return r.Error != nil && len(r.Incomplete) > 0
+}
+
+func (r *Result) IsSuccess() bool {
+	return !r.IsFailure()
+}
+
 type DBConn interface {
 	Connect(context.Context) error
 	Configure(...DBOption) error
@@ -312,6 +320,9 @@ func MongoToV1(ctx context.Context, to, from DBConn) (err error) {
 		insertUserRelatedRows,
 		insertSCIMAttributes,
 		insertSCIMAttributeMappings,
+		insertSSUserRelatedRows,
+		insertSSGroupRelatedRows,
+		insertGroupsAndMemberRefs,
 	}
 
 	for _, f := range copyFuncs {
@@ -682,6 +693,12 @@ func insertUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *Post
 			err = nil
 			continue
 		}
+		if _, err = setUserV3Role(ctx, mongodb, user); err != nil {
+			reqLogger.Error(err, "Failed to set role for user")
+			errCount++
+			err = nil
+			continue
+		}
 		var uid *uuid.UUID
 		if uid, err = insertUser(ctx, postgres, user); err != nil {
 			errCount++
@@ -840,6 +857,42 @@ func setClientSecretIfEmpty(ctx context.Context, mongodb *MongoDB, zenInstance *
 	zenInstance.ClientSecret = decodedSecret
 	set = true
 
+	return
+}
+
+func getHighestRoleForUserFromTeam(userID string, team *v1schema.Team) (role v1schema.Role) {
+	teamUser := team.Users.GetUser(userID)
+	if teamUser == nil {
+		return v1schema.Authenticated
+	}
+	return teamUser.Roles.GetHighestRole()
+}
+
+func setUserV3Role(ctx context.Context, mongodb *MongoDB, user *v1schema.User) (set bool, err error) {
+	if user.Role != "" {
+		return
+	}
+	dbName := "platform-db"
+	collectionName := "Team"
+	filter := bson.D{}
+	cursor, err := mongodb.Client.
+		Database(dbName).
+		Collection(collectionName).
+		Find(ctx, filter)
+
+	var highest v1schema.Role
+	for cursor.Next(ctx) {
+		team := &v1schema.Team{}
+		if err = cursor.Decode(&team); err != nil {
+			return
+		}
+
+		if current := getHighestRoleForUserFromTeam(user.UserID, team); current > highest {
+			highest = current
+		}
+	}
+	user.Role = highest.ToV3String()
+	set = true
 	return
 }
 
@@ -1135,6 +1188,507 @@ func removeInvalidUserPreferences(usersPrefs []v1schema.UserPreferences) (update
 			updated = append(updated, userPrefs)
 		}
 	}
+	return
+}
+
+func getSSUserFromMap(result map[string]any) (ssUser *v1schema.ScimServerUser, err error) {
+	ssUser = &v1schema.ScimServerUser{}
+	if err = v1schema.ConvertToScimServerUser(result, ssUser); err != nil {
+		err = fmt.Errorf("failed to unmarshal into scimserveruser: %w", err)
+		ssUser = nil
+		return
+	}
+	return
+}
+
+func insertSSUser(ctx context.Context, postgres *PostgresDB, ssUser *v1schema.ScimServerUser) (err error) {
+	reqLogger := logf.FromContext(ctx)
+	args := ssUser.GetArgs()
+	query := ssUser.GetInsertSQL()
+	var id *string
+	err = postgres.Conn.QueryRow(ctx, query, args).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		reqLogger.Info("Row already exists in EDB table platformdb.scim_server_users")
+		return nil
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.scim_server_users")
+		return err
+	}
+	return
+}
+
+func insertSSUserCustom(ctx context.Context, postgres *PostgresDB, ssUserCustom *v1schema.ScimServerUserCustom) (err error) {
+	reqLogger := logf.FromContext(ctx)
+	args := ssUserCustom.GetArgs()
+	query := ssUserCustom.GetInsertSQL()
+	var id *string
+	err = postgres.Conn.QueryRow(ctx, query, args).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		reqLogger.Info("Row already exists in EDB table platformdb.scim_server_users_custom")
+		return nil
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.scim_server_users_custom")
+		return err
+	}
+	return
+}
+
+func insertSSUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	dbName := "platform-db"
+	collectionName := "ScimServerUsers"
+	reqLogger := logf.FromContext(ctx)
+	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
+	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get cursor from MongoDB")
+		return
+	}
+	errCount := 0
+	migrateCount := 0
+	for cursor.Next(ctx) {
+		var ssUser *v1schema.ScimServerUser
+		// mongo doc is split into 3 maps
+		// ssUserMap - goes as a row into scim_server_users table
+		// ssUserCustomMap - goes as a multiple rows into scim_server_users_custom table
+		// ssUserCustomSchemaMap - goes as a multiple rows into scim_server_users_custom table
+		var ssUserMap map[string]interface{}
+		if err = cursor.Decode(&ssUserMap); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document")
+			errCount++
+			err = nil
+			continue
+		}
+		ssUserCustomMap := populateSSUserCustomMap(ssUserMap)
+		ssUserCustomSchemaMap := populateSSUserCustomSchemaMap(ssUserCustomMap)
+		ssUser, err = getSSUserFromMap(ssUserMap)
+		if err != nil {
+			reqLogger.Error(err, "Failed to convert map to ScimServerUser")
+			errCount++
+			err = nil
+			continue
+		}
+		id := ssUser.ID
+		if err = insertSSUser(ctx, postgres, ssUser); err != nil {
+			errCount++
+			err = nil
+			continue
+		}
+		for key, value := range ssUserCustomMap {
+			switch v := value.(type) {
+			case string:
+				ssUserCustom := &v1schema.ScimServerUserCustom{
+					ScimServerUserUID: id,
+					AttributeKey:      key,
+					AttributeValue:    v,
+				}
+				if err = insertSSUserCustom(ctx, postgres, ssUserCustom); err != nil {
+					errCount++
+					err = nil
+					continue
+				}
+			case any:
+				ssUserCustom := &v1schema.ScimServerUserCustom{
+					ScimServerUserUID:     id,
+					AttributeKey:          key,
+					AttributeValueComplex: v,
+				}
+				if err = insertSSUserCustom(ctx, postgres, ssUserCustom); err != nil {
+					errCount++
+					err = nil
+					continue
+				}
+			}
+		}
+		for key, value := range ssUserCustomSchemaMap {
+			schemaName := key
+			switch v := value.(type) {
+			case string:
+				reqLogger.Info("invalid format")
+			case map[string]any:
+				for k, val := range v {
+					switch v := val.(type) {
+					case string:
+						ssUserCustom := &v1schema.ScimServerUserCustom{
+							ScimServerUserUID: id,
+							AttributeKey:      k,
+							AttributeValue:    v,
+							SchemaName:        schemaName,
+						}
+						if err = insertSSUserCustom(ctx, postgres, ssUserCustom); err != nil {
+							errCount++
+							err = nil
+							continue
+						}
+					case any:
+						ssUserCustom := &v1schema.ScimServerUserCustom{
+							ScimServerUserUID:     id,
+							AttributeKey:          k,
+							AttributeValueComplex: v,
+							SchemaName:            schemaName,
+						}
+						if err = insertSSUserCustom(ctx, postgres, ssUserCustom); err != nil {
+							errCount++
+							err = nil
+							continue
+						}
+					}
+				}
+			}
+		}
+		updateFilter := bson.D{{Key: "id", Value: id}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
+		if err != nil {
+			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
+			errCount++
+			continue
+		}
+		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
+		migrateCount++
+
+	}
+	if errCount > 0 {
+		err = fmt.Errorf("encountered errors that prevented the migration of documents")
+		reqLogger.Error(err, "Migration of platform-db.ScimServerUsers not successful", "failedCount", errCount, "successCount", migrateCount)
+		return
+	} else if errCount == 0 && migrateCount == 0 {
+		reqLogger.Info("No documents needed to be migrated; continuing", "identifier", v1schema.ScimServerUsersIdentifier)
+		return
+	}
+
+	if err = cursor.Err(); err != nil {
+		reqLogger.Error(err, "MongoDB cursor encountered an error")
+		return
+	}
+	reqLogger.Info("Successfully copied over ScimServerUsers to EDB", "docsMigrated", migrateCount)
+	return
+}
+
+func getSSGroupFromMap(result map[string]any) (ssGroup *v1schema.ScimServerGroup, err error) {
+	ssGroup = &v1schema.ScimServerGroup{}
+	if err = v1schema.ConvertToScimServerGroup(result, ssGroup); err != nil {
+		err = fmt.Errorf("failed to unmarshal into scimservergroup: %w", err)
+		ssGroup = nil
+		return
+	}
+	return
+}
+
+func insertSSGroup(ctx context.Context, postgres *PostgresDB, ssGroup *v1schema.ScimServerGroup) (err error) {
+	reqLogger := logf.FromContext(ctx)
+	args := ssGroup.GetArgs()
+	query := ssGroup.GetInsertSQL()
+	var id *string
+	err = postgres.Conn.QueryRow(ctx, query, args).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		reqLogger.Info("Row already exists in EDB table platformdb.scim_server_groups")
+		return nil
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.scim_server_groups")
+		return err
+	}
+	return
+}
+
+func insertSSGroupCustom(ctx context.Context, postgres *PostgresDB, ssGroupCustom *v1schema.ScimServerGroupCustom) (err error) {
+	reqLogger := logf.FromContext(ctx)
+	args := ssGroupCustom.GetArgs()
+	query := ssGroupCustom.GetInsertSQL()
+	var id *string
+	err = postgres.Conn.QueryRow(ctx, query, args).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		reqLogger.Info("Row already exists in EDB table platformdb.scim_server_groups_custom")
+		return nil
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.scim_server_groups_custom")
+		return err
+	}
+	return
+}
+
+func insertSSGroupRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	dbName := "platform-db"
+	collectionName := "ScimServerGroups"
+	reqLogger := logf.FromContext(ctx)
+	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
+	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get cursor from MongoDB")
+		return
+	}
+	errCount := 0
+	migrateCount := 0
+	for cursor.Next(ctx) {
+		var ssGroup *v1schema.ScimServerGroup
+		// mongo doc is split into 3 maps
+		// ssGroupMap - goes as a row into scim_server_groups table
+		// ssGroupCustomMap - goes as a multiple rows into scim_server_groups_custom table
+		// ssGroupCustomSchemaMap - goes as a multiple rows into scim_server_groups_custom table
+		var ssGroupMap map[string]interface{}
+		if err = cursor.Decode(&ssGroupMap); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document")
+			errCount++
+			err = nil
+			continue
+		}
+		ssGroupCustomMap := populateSSGroupCustomMap(ssGroupMap)
+		ssGroupCustomSchemaMap := populateSSGroupCustomSchemaMap(ssGroupCustomMap)
+		ssGroup, err = getSSGroupFromMap(ssGroupMap)
+		if err != nil {
+			reqLogger.Error(err, "Failed to convert map to ScimServerGroup")
+			errCount++
+			err = nil
+			continue
+		}
+		id := ssGroup.ID
+		if err = insertSSGroup(ctx, postgres, ssGroup); err != nil {
+			errCount++
+			err = nil
+			continue
+		}
+		for key, value := range ssGroupCustomMap {
+			switch v := value.(type) {
+			case string:
+				ssGroupCustom := &v1schema.ScimServerGroupCustom{
+					ScimServerGroupUID: id,
+					AttributeKey:       key,
+					AttributeValue:     v,
+				}
+				if err = insertSSGroupCustom(ctx, postgres, ssGroupCustom); err != nil {
+					errCount++
+					err = nil
+					continue
+				}
+			case any:
+				ssGroupCustom := &v1schema.ScimServerGroupCustom{
+					ScimServerGroupUID:    id,
+					AttributeKey:          key,
+					AttributeValueComplex: v,
+				}
+				if err = insertSSGroupCustom(ctx, postgres, ssGroupCustom); err != nil {
+					errCount++
+					err = nil
+					continue
+				}
+			}
+		}
+		for key, value := range ssGroupCustomSchemaMap {
+			schemaName := key
+			switch v := value.(type) {
+			case string:
+				reqLogger.Info("invalid format")
+			case map[string]any:
+				for k, val := range v {
+					switch v := val.(type) {
+					case string:
+						ssGroupCustom := &v1schema.ScimServerGroupCustom{
+							ScimServerGroupUID: id,
+							AttributeKey:       k,
+							AttributeValue:     v,
+							SchemaName:         schemaName,
+						}
+						if err = insertSSGroupCustom(ctx, postgres, ssGroupCustom); err != nil {
+							errCount++
+							err = nil
+							continue
+						}
+					case any:
+						ssGroupCustom := &v1schema.ScimServerGroupCustom{
+							ScimServerGroupUID:    id,
+							AttributeKey:          k,
+							AttributeValueComplex: v,
+							SchemaName:            schemaName,
+						}
+						if err = insertSSGroupCustom(ctx, postgres, ssGroupCustom); err != nil {
+							errCount++
+							err = nil
+							continue
+						}
+					}
+				}
+			}
+		}
+		updateFilter := bson.D{{Key: "id", Value: id}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
+		if err != nil {
+			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
+			errCount++
+			continue
+		}
+		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
+		migrateCount++
+
+	}
+	if errCount > 0 {
+		err = fmt.Errorf("encountered errors that prevented the migration of documents")
+		reqLogger.Error(err, "Migration of platform-db.ScimServerGroups not successful", "failedCount", errCount, "successCount", migrateCount)
+		return
+	} else if errCount == 0 && migrateCount == 0 {
+		reqLogger.Info("No documents needed to be migrated; continuing", "identifier", v1schema.ScimServerUsersIdentifier)
+		return
+	}
+
+	if err = cursor.Err(); err != nil {
+		reqLogger.Error(err, "MongoDB cursor encountered an error")
+		return
+	}
+	reqLogger.Info("Successfully copied over ScimServerGroups to EDB", "docsMigrated", migrateCount)
+	return
+}
+
+func contains(slice []string, str string) bool {
+	for _, s := range slice {
+		if s == str {
+			return true
+		}
+	}
+	return false
+}
+
+func populateSSUserCustomMap(ssUserMap map[string]any) map[string]any {
+	delete(ssUserMap, "_id")
+	ssUserCustomMap := make(map[string]any)
+	for key, value := range ssUserMap {
+		if !contains(v1schema.ScimServerUsersMongoFieldNames, key) {
+			ssUserCustomMap[key] = value
+		}
+	}
+	return ssUserCustomMap
+}
+
+func populateSSGroupCustomMap(ssGroupMap map[string]any) map[string]any {
+	delete(ssGroupMap, "_id")
+	ssGroupCustomMap := make(map[string]any)
+	for key, value := range ssGroupMap {
+		if !contains(v1schema.ScimServerGroupsMongoFieldNames, key) {
+			ssGroupCustomMap[key] = value
+		}
+	}
+	return ssGroupCustomMap
+}
+
+func populateSSUserCustomSchemaMap(ssUserCustomMap map[string]any) map[string]any {
+	usrSchemaMap := make(map[string]interface{})
+	usrSchemaPrefix := "urn:ietf:params:scim:schemas"
+	for key, value := range ssUserCustomMap {
+		if strings.HasPrefix(key, usrSchemaPrefix) {
+			if strings.Contains(key, "replaceDot") {
+				newKey := strings.ReplaceAll(key, "replaceDot", ".")
+				usrSchemaMap[newKey] = value
+			} else if strings.Contains(key, "replaceDollar") {
+				newKey := strings.ReplaceAll(key, "replaceDollar", "$")
+				usrSchemaMap[newKey] = value
+			} else {
+				usrSchemaMap[key] = value
+			}
+			delete(ssUserCustomMap, key)
+		}
+	}
+	return usrSchemaMap
+}
+
+func populateSSGroupCustomSchemaMap(ssGroupCustomMap map[string]any) map[string]any {
+	grpSchemaMap := make(map[string]interface{})
+	grpSchemaPrefix := "urn:ietf:params:scim:schemas"
+	for key, value := range ssGroupCustomMap {
+		if strings.HasPrefix(key, grpSchemaPrefix) {
+			if strings.Contains(key, "replaceDot") {
+				newKey := strings.ReplaceAll(key, "replaceDot", ".")
+				grpSchemaMap[newKey] = value
+			} else if strings.Contains(key, "replaceDollar") {
+				newKey := strings.ReplaceAll(key, "replaceDollar", "$")
+				grpSchemaMap[newKey] = value
+			} else {
+				grpSchemaMap[key] = value
+			}
+			delete(ssGroupCustomMap, key)
+		}
+	}
+	return grpSchemaMap
+}
+
+func insertGroupsAndMemberRefs(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	dbName := "platform-db"
+	collectionName := "Groups"
+	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
+	filter := bson.M{
+		"$and": bson.A{
+			bson.M{"migrated": bson.M{"$ne": true}},
+			bson.M{"type": bson.M{"$eq": "SAML"}},
+		},
+	}
+	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get cursor from MongoDB")
+		return
+	}
+	errCount := 0
+	migrateCount := 0
+	var xref v1schema.UserGroup
+	xrefQuery := xref.GetInsertSQL()
+	for cursor.Next(ctx) {
+		var group v1schema.Group
+		if err = cursor.Decode(&group); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document")
+			errCount++
+			err = nil
+			continue
+		}
+		args := group.GetArgs()
+		query := group.GetInsertSQL()
+		_, err = postgres.Conn.Exec(ctx, query, args)
+		if errors.Is(err, pgx.ErrNoRows) {
+			reqLogger.Info("Row already exists in EDB")
+		} else if err != nil {
+			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.groups")
+			errCount++
+			continue
+		}
+		membersNotMigrated := 0
+		if group.Members != nil {
+			for _, member := range group.Members {
+				args := member.GetArgs()
+				args["groupId"] = group.GroupID
+				_, err = postgres.Conn.Exec(ctx, xrefQuery, args)
+				if errors.Is(err, pgx.ErrNoRows) {
+					reqLogger.Info("Row already exists in EDB")
+				} else if err != nil {
+					reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.users_groups")
+					membersNotMigrated++
+					continue
+				}
+			}
+		}
+		if membersNotMigrated != 0 {
+			reqLogger.Error(err, fmt.Sprintf("%d of %d members could not be migrated for group %s", membersNotMigrated, len(group.Members), group.GroupID))
+			errCount++
+			continue
+		}
+		updateFilter := bson.D{{Key: "_id", Value: group.GroupID}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
+		if err != nil {
+			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
+			errCount++
+			continue
+		}
+		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
+		migrateCount++
+	}
+	if errCount > 0 {
+		err = fmt.Errorf("encountered errors that prevented the migration of documents")
+		reqLogger.Error(err, "Migration of platform-db.groups not successful", "failedCount", errCount, "successCount", migrateCount)
+		return
+	} else if errCount == 0 && migrateCount == 0 {
+		reqLogger.Info("No documents needed to be migrated; continuing")
+		return
+	}
+	if err = cursor.Err(); err != nil {
+		reqLogger.Error(err, "MongoDB cursor encountered an error")
+		return
+	}
+	reqLogger.Info("Successfully copied over Groups to EDB", "rowsInserted", migrateCount)
 	return
 }
 

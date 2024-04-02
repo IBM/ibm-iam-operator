@@ -374,10 +374,6 @@ func ConvertToUser(userMap map[string]interface{}, user *User) (err error) {
 	if _, ok := userMap["uid"]; !ok {
 		userMap["uid"] = uuid.New()
 	}
-	// for SAML type, directoryId can be considered as 'defaultSP'
-	if _, ok := userMap["directoryId"]; !ok && userMap["type"] == "SAML" {
-		userMap["directoryId"] = "defaultSP"
-	}
 	var jsonBytes []byte
 	if jsonBytes, err = json.Marshal(userMap); err != nil {
 		return fmt.Errorf("failed to marshal User _id=%q: %w", userMap["_id"], err)

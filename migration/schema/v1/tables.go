@@ -1483,8 +1483,9 @@ func (g *Group) GetArgs() pgx.NamedArgs {
 
 func (m *Member) GetArgs() pgx.NamedArgs {
 	return pgx.NamedArgs{
-		"subject": m.Value,
+		"userId":  m.Value,
 		"realmId": "defaultSP",
+		"type":    "SAML",
 	}
 }
 
@@ -1503,7 +1504,7 @@ func (ug *UserGroup) GetInsertSQL() string {
 	return `
 		INSERT INTO platformdb.users_groups(user_uid, group_uid)
 		VALUES (
-			(SELECT uid from platformdb.users WHERE subject=@subject AND realm_id=@realmId),
+			(SELECT uid from platformdb.users WHERE user_id=@userId AND (realm_id=@realmId OR type=@type)),
 			(SELECT uid from platformdb.groups WHERE group_id=@groupId AND realm_id=@realmId)
 		) ON CONFLICT DO NOTHING;`
 }

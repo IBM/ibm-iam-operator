@@ -358,6 +358,10 @@ func ConvertToUser(userMap map[string]interface{}, user *User) (err error) {
 	if lastLogin, ok := userMap["lastLogin"]; ok && lastLogin == "" {
 		delete(userMap, "lastLogin")
 	}
+	// for SAML type, directoryId can be considered as 'defaultSP'
+	if _, ok := userMap["directoryId"]; !ok && userMap["type"] == "SAML" {
+		userMap["directoryId"] = "defaultSP"
+	}
 	fieldMap := map[string]string{
 		"_id":                "user_id",
 		"uniqueSecurityName": "unique_security_name",
@@ -369,10 +373,6 @@ func ConvertToUser(userMap map[string]interface{}, user *User) (err error) {
 	translateMongoDBFieldsToPostgresColumns(fieldMap, userMap)
 	if _, ok := userMap["uid"]; !ok {
 		userMap["uid"] = uuid.New()
-	}
-	// for SAML type, directoryId can be considered as 'defaultSP'
-	if _, ok := userMap["directoryId"]; !ok && userMap["type"] == "SAML" {
-		userMap["directoryId"] = "defaultSP"
 	}
 	var jsonBytes []byte
 	if jsonBytes, err = json.Marshal(userMap); err != nil {

@@ -374,6 +374,10 @@ func ConvertToUser(userMap map[string]interface{}, user *User) (err error) {
 	if _, ok := userMap["uid"]; !ok {
 		userMap["uid"] = uuid.New()
 	}
+	// for SAML type, directoryId can be considered as 'defaultSP'
+	if _, ok := userMap["directoryId"]; !ok && userMap["type"] == "SAML" {
+		userMap["directoryId"] = "defaultSP"
+	}
 	var jsonBytes []byte
 	if jsonBytes, err = json.Marshal(userMap); err != nil {
 		return fmt.Errorf("failed to marshal User _id=%q: %w", userMap["_id"], err)
@@ -1488,8 +1492,9 @@ func (g *Group) GetArgs() pgx.NamedArgs {
 
 func (m *Member) GetArgs() pgx.NamedArgs {
 	return pgx.NamedArgs{
-		"subject": m.Value,
+		"userId":  m.Value,
 		"realmId": "defaultSP",
+		"type":    "SAML",
 	}
 }
 
@@ -1508,7 +1513,7 @@ func (ug *UserGroup) GetInsertSQL() string {
 	return `
 		INSERT INTO platformdb.users_groups(user_uid, group_uid)
 		VALUES (
-			(SELECT uid from platformdb.users WHERE subject=@subject AND realm_id=@realmId),
+			(SELECT uid from platformdb.users WHERE user_id=@userId AND (realm_id=@realmId OR type=@type)),
 			(SELECT uid from platformdb.groups WHERE group_id=@groupId AND realm_id=@realmId)
 		) ON CONFLICT DO NOTHING;`
 }

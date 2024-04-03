@@ -1646,6 +1646,7 @@ func insertGroupsAndMemberRefs(ctx context.Context, mongodb *MongoDB, postgres *
 			continue
 		}
 		membersNotMigrated := 0
+		acknowledgeErr := true
 		if group.Members != nil {
 			for _, member := range group.Members {
 				args := member.GetArgs()
@@ -1655,14 +1656,22 @@ func insertGroupsAndMemberRefs(ctx context.Context, mongodb *MongoDB, postgres *
 					reqLogger.Info("Row already exists in EDB")
 				} else if err != nil {
 					reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.users_groups")
-					membersNotMigrated++
+					if strings.Contains(err.Error(), "SQLSTATE 23502") {
+						reqLogger.Error(errors.New("platformdb.users_groups mapping encountered SQLSTATE 23502 error"), fmt.Sprintf("Group ID = %s, Member Value = %s", group.GroupID, member.Value))
+						acknowledgeErr = false
+						err = nil // reset error to nil
+					} else {
+						membersNotMigrated++
+					}
 					continue
 				}
 			}
 		}
 		if membersNotMigrated != 0 {
 			reqLogger.Error(err, fmt.Sprintf("%d of %d members could not be migrated for group %s", membersNotMigrated, len(group.Members), group.GroupID))
-			errCount++
+			if acknowledgeErr {
+				errCount++
+			}
 			continue
 		}
 		updateFilter := bson.D{{Key: "_id", Value: group.GroupID}}

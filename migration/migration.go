@@ -1660,8 +1660,9 @@ func insertGroupsAndMemberRefs(ctx context.Context, mongodb *MongoDB, postgres *
 						reqLogger.Error(errors.New("platformdb.users_groups mapping encountered SQLSTATE 23502 error"), fmt.Sprintf("Group ID = %s, Member Value = %s", group.GroupID, member.Value))
 						acknowledgeErr = false
 						err = nil // reset error to nil
+					} else {
+						membersNotMigrated++
 					}
-					membersNotMigrated++
 					continue
 				}
 			}

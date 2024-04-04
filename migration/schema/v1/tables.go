@@ -358,12 +358,17 @@ func ConvertToUser(userMap map[string]interface{}, user *User) (err error) {
 	if lastLogin, ok := userMap["lastLogin"]; ok && lastLogin == "" {
 		delete(userMap, "lastLogin")
 	}
+	// for SAML type, directoryId can be considered as 'defaultSP'
+	if _, ok := userMap["directoryId"]; !ok && userMap["type"] == "SAML" {
+		userMap["directoryId"] = "defaultSP"
+	}
 	fieldMap := map[string]string{
 		"_id":                "user_id",
 		"uniqueSecurityName": "unique_security_name",
 		"userBaseDN":         "user_basedn",
 		"firstName":          "first_name",
 		"lastName":           "last_name",
+		"directoryId":        "realm_id",
 	}
 	translateMongoDBFieldsToPostgresColumns(fieldMap, userMap)
 	if _, ok := userMap["uid"]; !ok {
@@ -1010,4 +1015,501 @@ func ConvertV2SamlToIdpConfig(samlMap map[string]any) (v3Config *IdpConfig, err 
 	v3Config.SCIMConfig = scimConfig
 	v3Config.Enabled = true
 	return
+}
+
+type Role int
+
+const (
+	Authenticated Role = iota
+	Viewer
+	Auditor
+	Editor
+	Operator
+	Administrator
+	CloudPakAdmin
+	ClusterAdmin
+)
+
+// ToString returns an IAM-compatible role name as a string.
+func (r Role) ToString() (s string) {
+	switch r {
+	case ClusterAdmin:
+		return "ClusterAdministrator"
+	case CloudPakAdmin:
+		return "CloudPakAdministrator"
+	case Administrator:
+		return "Administrator"
+	case Operator:
+		return "Operator"
+	case Editor:
+		return "Editor"
+	case Viewer:
+		return "Viewer"
+	case Auditor:
+		return "Auditor"
+	default:
+		return
+	}
+}
+
+// GetRole takes a string role name and returns the corresponding Role. If the string is not a known name, it returns
+// the lowest role.
+func GetRole(s string) (r Role) {
+	switch s {
+	case "ClusterAdministrator":
+		return ClusterAdmin
+	case "CloudPakAdministrator":
+		return CloudPakAdmin
+	case "Administrator":
+		return Administrator
+	case "Operator":
+		return Operator
+	case "Editor":
+		return Editor
+	case "Viewer":
+		return Viewer
+	case "Auditor":
+		return Auditor
+	default:
+		return Authenticated
+	}
+}
+
+// ToV3String returns an IM-compatible role name as a string. In IM, there are only three valid roles - Administrator,
+// Viewer, and Authenticated.
+func (r Role) ToV3String() (s string) {
+	if r >= Administrator && r <= ClusterAdmin {
+		return Administrator.ToString()
+	} else if r >= Viewer && r < Administrator {
+		return Viewer.ToString()
+	} else {
+		return Authenticated.ToString()
+	}
+}
+
+type TeamRole struct {
+	ID string `bson:"id"`
+}
+
+type TeamRoles []*TeamRole
+
+func (t TeamRoles) GetHighestRole() (highest Role) {
+	crnPrefix := "crn:v1:icp:private:iam::::role:"
+	for _, r := range t {
+		if r == nil {
+			continue
+		}
+		if current := GetRole(strings.TrimPrefix(r.ID, crnPrefix)); current > highest {
+			highest = current
+		}
+	}
+	return
+}
+
+type TeamUser struct {
+	UserID string    `bson:"userId"`
+	Roles  TeamRoles `bson:"roles"`
+}
+
+type TeamUsers []*TeamUser
+
+func (t TeamUsers) GetUser(id string) (user *TeamUser) {
+	for _, user := range t {
+		if user.UserID == id {
+			return user
+		}
+	}
+	return nil
+}
+
+type Team struct {
+	ID    string    `bson:"_id"`
+	Users TeamUsers `bson:"users"`
+}
+
+// ScimServerUser is a row from the `platformdb.scim_server_users` table
+type ScimServerUser struct {
+	ID           string         `json:"id"`
+	Schemas      []string       `json:"schemas,omitempty"`
+	ExternalID   string         `json:"external_id,omitempty"`
+	UserName     string         `json:"user_name,omitempty"`
+	Name         map[string]any `json:"name,omitempty"`
+	DisplayName  string         `json:"display_name,omitempty"`
+	Emails       []any          `json:"emails,omitempty"`
+	Addresses    []any          `json:"addresses,omitempty"`
+	PhoneNumbers []any          `json:"phone_numbers,omitempty"`
+	USerType     string         `json:"user_type,omitempty"`
+	Active       bool           `json:"active,omitempty"`
+	Meta         map[string]any `json:"meta,omitempty"`
+	Groups       []any          `json:"groups,omitempty"`
+}
+
+var ScimServerUsersColumnNames []string = []string{
+	"id",
+	"schemas",
+	"external_id",
+	"user_name",
+	"name",
+	"display_name",
+	"emails",
+	"addresses",
+	"phone_numbers",
+	"user_type",
+	"active",
+	"meta",
+	"groups",
+}
+
+var ScimServerUsersMongoFieldNames []string = []string{
+	"id",
+	"schemas",
+	"externalId",
+	"userName",
+	"name",
+	"displayName",
+	"emails",
+	"addresses",
+	"phoneNumbers",
+	"userType",
+	"active",
+	"meta",
+	"groups",
+}
+
+var ScimServerUsersIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "scim_server_users"}
+
+func (ssu *ScimServerUser) ToAnySlice() []any {
+	return []any{
+		ssu.ID,
+		ssu.Schemas,
+		ssu.ExternalID,
+		ssu.UserName,
+		ssu.Name,
+		ssu.DisplayName,
+		ssu.Emails,
+		ssu.Addresses,
+		ssu.PhoneNumbers,
+		ssu.USerType,
+		ssu.Active,
+		ssu.Meta,
+		ssu.Groups,
+	}
+}
+
+func (ssu *ScimServerUser) ToAnyMap() map[string]any {
+	m := make(map[string]any)
+	anySlice := ssu.ToAnySlice()
+	for i, col := range ssu.GetColumnNames() {
+		m[col] = anySlice[i]
+	}
+	return m
+}
+
+func (ssu *ScimServerUser) GetColumnNames() []string {
+	return ScimServerUsersColumnNames
+}
+
+func (ssu *ScimServerUser) GetTableIdentifier() pgx.Identifier {
+	return ScimServerUsersIdentifier
+}
+
+func (ssu *ScimServerUser) GetInsertSQL() string {
+	return `
+		INSERT INTO platformdb.scim_server_users
+		(id, schemas, external_id, user_name, name, display_name, emails, addresses, phone_numbers, user_type, active, meta, groups)
+		VALUES (@id, @schemas, @external_id, @user_name, @name, @display_name, @emails, @addresses, @phone_numbers, @user_type, @active, @meta, @groups)
+		ON CONFLICT DO NOTHING RETURNING id;`
+}
+
+func (ssu *ScimServerUser) GetArgs() pgx.NamedArgs {
+	args := pgx.NamedArgs{}
+	for k, v := range ssu.ToAnyMap() {
+		args[k] = v
+	}
+	return args
+}
+
+func ConvertToScimServerUser(scimServerUserMap map[string]interface{}, scimServerUser *ScimServerUser) (err error) {
+	if _, ok := scimServerUserMap["_id"]; ok {
+		delete(scimServerUserMap, "_id")
+	}
+	fieldMap := map[string]string{
+		"externalId":   "external_id",
+		"userName":     "user_name",
+		"displayName":  "display_name",
+		"phoneNumbers": "phone_numbers",
+		"userType":     "user_type",
+	}
+	translateMongoDBFieldsToPostgresColumns(fieldMap, scimServerUserMap)
+	var jsonBytes []byte
+	if jsonBytes, err = json.Marshal(scimServerUserMap); err != nil {
+		return
+	}
+
+	if err = json.Unmarshal(jsonBytes, scimServerUser); err != nil {
+		return fmt.Errorf("failed to unmarshal ScimServerUser id=%q: %w", scimServerUserMap["id"], err)
+	}
+
+	return nil
+}
+
+// ScimServerUserCustom is a row from the `platformdb.scim_server_users_custom` table
+type ScimServerUserCustom struct {
+	ScimServerUserUID     string `json:"scim_server_user_uid"`
+	AttributeKey          string `json:"attribute_key"`
+	SchemaName            string `json:"schema_name,omitempty"`
+	AttributeValue        string `json:"attribute_value,omitempty"`
+	AttributeValueComplex any    `json:"attribute_value_complex,omitempty"`
+}
+
+var ScimServerUsersCustomColumnNames []string = []string{
+	"scim_server_user_uid",
+	"attribute_key",
+	"schema_name",
+	"attribute_value",
+	"attribute_value_complex",
+}
+
+var ScimServerUsersCustomIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "scim_server_users_custom"}
+
+func (ssuc *ScimServerUserCustom) ToAnySlice() []any {
+	return []any{
+		ssuc.ScimServerUserUID,
+		ssuc.AttributeKey,
+		ssuc.SchemaName,
+		ssuc.AttributeValue,
+		ssuc.AttributeValueComplex,
+	}
+}
+
+func (ssuc *ScimServerUserCustom) ToAnyMap() map[string]any {
+	m := make(map[string]any)
+	anySlice := ssuc.ToAnySlice()
+	for i, col := range ssuc.GetColumnNames() {
+		m[col] = anySlice[i]
+	}
+	return m
+}
+
+func (ssuc *ScimServerUserCustom) GetColumnNames() []string {
+	return ScimServerUsersCustomColumnNames
+}
+
+func (ssuc *ScimServerUserCustom) GetTableIdentifier() pgx.Identifier {
+	return ScimServerUsersCustomIdentifier
+}
+
+func (ssuc *ScimServerUserCustom) GetInsertSQL() string {
+	return `
+		INSERT INTO platformdb.scim_server_users_custom
+		(scim_server_user_uid, attribute_key, schema_name, attribute_value, attribute_value_complex)
+		VALUES (@scim_server_user_uid, @attribute_key, @schema_name, @attribute_value, @attribute_value_complex)
+		ON CONFLICT DO NOTHING RETURNING scim_server_user_uid;`
+}
+
+func (ssuc *ScimServerUserCustom) GetArgs() pgx.NamedArgs {
+	args := pgx.NamedArgs{}
+	for k, v := range ssuc.ToAnyMap() {
+		args[k] = v
+	}
+	return args
+}
+
+// ScimServerGroup is a row from the `platformdb.scim_server_groups` table
+type ScimServerGroup struct {
+	ID          string         `json:"id"`
+	Schemas     []string       `json:"schemas,omitempty"`
+	DisplayName string         `json:"display_name,omitempty"`
+	Meta        map[string]any `json:"meta,omitempty"`
+	Members     []any          `json:"members,omitempty"`
+}
+
+var ScimServerGroupsColumnNames []string = []string{
+	"id",
+	"schemas",
+	"display_name",
+	"meta",
+	"members",
+}
+
+var ScimServerGroupsMongoFieldNames []string = []string{
+	"id",
+	"schemas",
+	"displayName",
+	"meta",
+	"members",
+}
+
+var ScimServerGroupsIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "scim_server_groups"}
+
+func (ssg *ScimServerGroup) ToAnySlice() []any {
+	return []any{
+		ssg.ID,
+		ssg.Schemas,
+		ssg.DisplayName,
+		ssg.Meta,
+		ssg.Members,
+	}
+}
+
+func (ssg *ScimServerGroup) ToAnyMap() map[string]any {
+	m := make(map[string]any)
+	anySlice := ssg.ToAnySlice()
+	for i, col := range ssg.GetColumnNames() {
+		m[col] = anySlice[i]
+	}
+	return m
+}
+
+func (ssg *ScimServerGroup) GetColumnNames() []string {
+	return ScimServerGroupsColumnNames
+}
+
+func (ssg *ScimServerGroup) GetTableIdentifier() pgx.Identifier {
+	return ScimServerGroupsIdentifier
+}
+
+func (ssg *ScimServerGroup) GetInsertSQL() string {
+	return `
+		INSERT INTO platformdb.scim_server_groups
+		(id, schemas, members, display_name, meta)
+		VALUES (@id, @schemas, @members, @display_name, @meta)
+		ON CONFLICT DO NOTHING RETURNING id;`
+}
+
+func (ssg *ScimServerGroup) GetArgs() pgx.NamedArgs {
+	args := pgx.NamedArgs{}
+	for k, v := range ssg.ToAnyMap() {
+		args[k] = v
+	}
+	return args
+}
+
+func ConvertToScimServerGroup(scimServerGroupMap map[string]interface{}, scimServerGroup *ScimServerGroup) (err error) {
+	if _, ok := scimServerGroupMap["_id"]; ok {
+		delete(scimServerGroupMap, "_id")
+	}
+	fieldMap := map[string]string{
+		"displayName": "display_name",
+	}
+	translateMongoDBFieldsToPostgresColumns(fieldMap, scimServerGroupMap)
+	var jsonBytes []byte
+	if jsonBytes, err = json.Marshal(scimServerGroupMap); err != nil {
+		return
+	}
+
+	if err = json.Unmarshal(jsonBytes, scimServerGroup); err != nil {
+		return fmt.Errorf("failed to unmarshal ScimServerGroup id=%q: %w", scimServerGroupMap["id"], err)
+	}
+
+	return nil
+}
+
+// ScimServerGroupCustom is a row from the `platformdb.scim_server_groups_custom` table
+type ScimServerGroupCustom struct {
+	ScimServerGroupUID    string `json:"scim_server_group_uid"`
+	AttributeKey          string `json:"attribute_key"`
+	SchemaName            string `json:"schema_name,omitempty"`
+	AttributeValue        string `json:"attribute_value,omitempty"`
+	AttributeValueComplex any    `json:"attribute_value_complex,omitempty"`
+}
+
+var ScimServerGroupsCustomColumnNames []string = []string{
+	"scim_server_group_uid",
+	"attribute_key",
+	"schema_name",
+	"attribute_value",
+	"attribute_value_complex",
+}
+
+var ScimServerGroupsCustomIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "scim_server_groups_custom"}
+
+func (ssgc *ScimServerGroupCustom) ToAnySlice() []any {
+	return []any{
+		ssgc.ScimServerGroupUID,
+		ssgc.AttributeKey,
+		ssgc.SchemaName,
+		ssgc.AttributeValue,
+		ssgc.AttributeValueComplex,
+	}
+}
+
+func (ssgc *ScimServerGroupCustom) ToAnyMap() map[string]any {
+	m := make(map[string]any)
+	anySlice := ssgc.ToAnySlice()
+	for i, col := range ssgc.GetColumnNames() {
+		m[col] = anySlice[i]
+	}
+	return m
+}
+
+func (ssgc *ScimServerGroupCustom) GetColumnNames() []string {
+	return ScimServerGroupsCustomColumnNames
+}
+
+func (ssgc *ScimServerGroupCustom) GetTableIdentifier() pgx.Identifier {
+	return ScimServerUsersCustomIdentifier
+}
+
+func (ssgc *ScimServerGroupCustom) GetInsertSQL() string {
+	return `
+		INSERT INTO platformdb.scim_server_groups_custom
+		(scim_server_group_uid, attribute_key, schema_name, attribute_value, attribute_value_complex)
+		VALUES (@scim_server_group_uid, @attribute_key, @schema_name, @attribute_value, @attribute_value_complex)
+		ON CONFLICT DO NOTHING RETURNING scim_server_group_uid;`
+}
+
+func (ssgc *ScimServerGroupCustom) GetArgs() pgx.NamedArgs {
+	args := pgx.NamedArgs{}
+	for k, v := range ssgc.ToAnyMap() {
+		args[k] = v
+	}
+	return args
+}
+
+type Group struct {
+	GroupID     string   `bson:"_id"`
+	DisplayName string   `bson:"displayName"`
+	Members     []Member `bson:"members"`
+}
+
+type Member struct {
+	Value   string `bson:"value"`
+	Display string `bson:"display"`
+}
+
+func (g *Group) GetArgs() pgx.NamedArgs {
+	return pgx.NamedArgs{
+		"groupId":     g.GroupID,
+		"displayName": g.DisplayName,
+		"realmId":     "defaultSP",
+	}
+}
+
+func (m *Member) GetArgs() pgx.NamedArgs {
+	return pgx.NamedArgs{
+		"userId":  m.Value,
+		"realmId": "defaultSP",
+		"type":    "SAML",
+	}
+}
+
+func (g *Group) GetInsertSQL() string {
+	return `
+		INSERT INTO platformdb.groups(group_id, display_name, realm_id)
+		VALUES (@groupId, @displayName, @realmId) ON CONFLICT DO NOTHING;`
+}
+
+type UserGroup struct {
+	UserUID  *uuid.UUID `json:"user_uid"`
+	GroupUID *uuid.UUID `json:"group_uid"`
+}
+
+func (ug *UserGroup) GetInsertSQL() string {
+	return `
+		INSERT INTO platformdb.users_groups(user_uid, group_uid)
+		VALUES (
+			(SELECT uid from platformdb.users WHERE user_id=@userId AND (realm_id=@realmId OR type=@type)),
+			(SELECT uid from platformdb.groups WHERE group_id=@groupId AND realm_id=@realmId)
+		) ON CONFLICT DO NOTHING;`
 }

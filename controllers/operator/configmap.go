@@ -264,6 +264,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 					newConfigMap = functionList[index](instance, r.Scheme)
 					currentConfigMap.Data["DB_CONNECT_TIMEOUT"] = newConfigMap.Data["DB_CONNECT_TIMEOUT"]
 					currentConfigMap.Data["DB_IDLE_TIMEOUT"] = newConfigMap.Data["DB_IDLE_TIMEOUT"]
+					currentConfigMap.Data["DB_CONNECT_MAX_RETRIES"] = newConfigMap.Data["DB_CONNECT_MAX_RETRIES"]
 					currentConfigMap.Data["DB_POOL_MIN_SIZE"] = newConfigMap.Data["DB_POOL_MIN_SIZE"]
 					currentConfigMap.Data["DB_POOL_MAX_SIZE"] = newConfigMap.Data["DB_POOL_MAX_SIZE"]
 					currentConfigMap.Data["SEQL_LOGGING"] = newConfigMap.Data["SEQL_LOGGING"]
@@ -565,6 +566,7 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 			"SAML_NAMEID_FORMAT":                 "unspecified",
 			"DB_CONNECT_TIMEOUT":                 "60000",
 			"DB_IDLE_TIMEOUT":                    "20000",
+			"DB_CONNECT_MAX_RETRIES":             "5",
 			"DB_POOL_MIN_SIZE":                   "5",
 			"DB_POOL_MAX_SIZE":                   "15",
 			"SEQL_LOGGING":                       "false",

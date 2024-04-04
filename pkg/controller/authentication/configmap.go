@@ -272,6 +272,15 @@ func (r *ReconcileAuthentication) handleConfigMap(instance *operatorv1alpha1.Aut
 					currentConfigMap.Data["MONGO_POOL_MAX_SIZE"] = newConfigMap.Data["MONGO_POOL_MAX_SIZE"]
 					cmUpdateRequired = true
 				}
+
+				if _, keyExists := currentConfigMap.Data["MONGODB_CONNECT_MAX_RETRIES"]; !keyExists {
+					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					newConfigMap = functionList[index](instance, r.scheme)
+					currentConfigMap.Data["MONGODB_CONNECT_MAX_RETRIES"] = newConfigMap.Data["MONGODB_CONNECT_MAX_RETRIES"]
+					currentConfigMap.Data["MONGODB_CONNECT_RETRY_INTERVAL"] = newConfigMap.Data["MONGODB_CONNECT_RETRY_INTERVAL"]
+					cmUpdateRequired = true
+				}
+
 				if _, keyExists := currentConfigMap.Data["OS_TOKEN_LENGTH"]; keyExists {
 					if currentConfigMap.Data["OS_TOKEN_LENGTH"] == "45" {
 						newConfigMap = functionList[index](instance, r.scheme)
@@ -574,6 +583,8 @@ func (r *ReconcileAuthentication) authIdpConfigMap(instance *operatorv1alpha1.Au
 			"MONGO_POOL_MIN_SIZE":                "5",
 			"MONGO_POOL_MAX_SIZE":                "15",
 			"MONGO_MAX_STALENESS":                "90",
+			"MONGODB_CONNECT_MAX_RETRIES":        "10",
+			"MONGODB_CONNECT_RETRY_INTERVAL":     "10000",
 			"SCIM_LDAP_SEARCH_SIZE_LIMIT":        "4500",
 			"SCIM_LDAP_SEARCH_TIME_LIMIT":        "10",
 			"SCIM_ASYNC_PARALLEL_LIMIT":          "100",

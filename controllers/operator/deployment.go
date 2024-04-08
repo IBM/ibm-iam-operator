@@ -307,11 +307,12 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 
 	metaLabels := common.MergeMap(map[string]string{"app": deployment}, instance.Spec.Labels)
 	podMetadataLabels := map[string]string{
-		"app":                        deployment,
-		"k8s-app":                    deployment,
-		"component":                  deployment,
-		"app.kubernetes.io/instance": "platform-auth-service",
-		"intent":                     "projected",
+		"app":                              deployment,
+		"k8s-app":                          deployment,
+		"component":                        deployment,
+		"app.kubernetes.io/instance":       "platform-auth-service",
+		"intent":                           "projected",
+		"operator.ibm.com/bindinfoRefresh": "enabled",
 	}
 	podLabels := common.MergeMap(podMetadataLabels, instance.Spec.Labels)
 
@@ -339,6 +340,8 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 						"productID":                          "068a62892a1e4db39641342e592daa25",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager",
+						"bindinfoRefresh/configmap":          ctrlCommon.DatastoreEDBCMName,
+						"bindinfoRefresh/secret":             ctrlCommon.DatastoreEDBSecretName,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -457,11 +460,12 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 
 	metaLabels := common.MergeMap(map[string]string{"app": deployment}, instance.Spec.Labels)
 	podMetadataLabels := map[string]string{
-		"app":                        deployment,
-		"k8s-app":                    deployment,
-		"component":                  deployment,
-		"app.kubernetes.io/instance": "platform-identity-provider",
-		"intent":                     "projected",
+		"app":                              deployment,
+		"k8s-app":                          deployment,
+		"component":                        deployment,
+		"app.kubernetes.io/instance":       "platform-identity-provider",
+		"intent":                           "projected",
+		"operator.ibm.com/bindinfoRefresh": "enabled",
 	}
 	podLabels := common.MergeMap(podMetadataLabels, instance.Spec.Labels)
 
@@ -489,6 +493,8 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 						"productID":                          "068a62892a1e4db39641342e592daa25",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager",
+						"bindinfoRefresh/configmap":          ctrlCommon.DatastoreEDBCMName,
+						"bindinfoRefresh/secret":             ctrlCommon.DatastoreEDBSecretName,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -607,11 +613,12 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 
 	metaLabels := common.MergeMap(map[string]string{"app": deployment}, instance.Spec.Labels)
 	podMetadataLabels := map[string]string{
-		"app":                        deployment,
-		"k8s-app":                    deployment,
-		"component":                  deployment,
-		"app.kubernetes.io/instance": "platform-identity-management",
-		"intent":                     "projected",
+		"app":                              deployment,
+		"k8s-app":                          deployment,
+		"component":                        deployment,
+		"app.kubernetes.io/instance":       "platform-identity-management",
+		"intent":                           "projected",
+		"operator.ibm.com/bindinfoRefresh": "enabled",
 	}
 	podLabels := common.MergeMap(podMetadataLabels, instance.Spec.Labels)
 
@@ -639,6 +646,8 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 						"productID":                          "068a62892a1e4db39641342e592daa25",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager",
+						"bindinfoRefresh/configmap":          ctrlCommon.DatastoreEDBCMName,
+						"bindinfoRefresh/secret":             ctrlCommon.DatastoreEDBSecretName,
 					},
 				},
 				Spec: corev1.PodSpec{

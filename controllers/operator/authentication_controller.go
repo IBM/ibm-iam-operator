@@ -273,6 +273,7 @@ func (r *AuthenticationReconciler) getPostgresDB(ctx context.Context, req ctrl.R
 
 	return migration.NewPostgresDB(
 		migration.Name(datastoreCertCM.Data["DATABASE_NAME"]),
+		migration.ID(req.Namespace),
 		migration.Port(datastoreCertCM.Data["DATABASE_PORT"]),
 		migration.User(datastoreCertCM.Data["DATABASE_USER"]),
 		migration.Host(datastoreCertCM.Data["DATABASE_RW_ENDPOINT"]),

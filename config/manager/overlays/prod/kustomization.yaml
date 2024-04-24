@@ -7,7 +7,7 @@ kind: Kustomization
 images:
   - name: controller
     newName: icr.io/cpopen/ibm-iam-operator
-    newTag: 4.5.0
+    newTag: 4.6.0
 patches:
   - path: ./image_env_vars_patch.yaml
     target:

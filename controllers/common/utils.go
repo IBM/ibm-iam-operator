@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
+	zenv1 "github.com/IBM/ibm-iam-operator/apis/zen.cpd.ibm.com/v1"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -141,6 +142,11 @@ func ClusterHasRouteGroupVersion() (found bool) {
 
 func ClusterHasOpenShiftConfigGroupVerison() (found bool) {
 	found, _ = clusterHasGroupVersion(osconfigv1.GroupVersion)
+	return
+}
+
+func ClusterHasZenExtensionGroupVersion() (found bool) {
+	found, _ = clusterHasGroupVersion(zenv1.GroupVersion)
 	return
 }
 

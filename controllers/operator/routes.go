@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/go-logr/logr"
 	routev1 "github.com/openshift/api/route/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -92,28 +93,9 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, instance *o
 
 	//Get the routehost from the ibmcloud-cluster-info configmap
 	routeHost := ""
-	clusterInfoConfigMap := &corev1.ConfigMap{}
-	err = r.Client.Get(ctx, types.NamespacedName{Name: ClusterInfoConfigmapName, Namespace: instance.Namespace}, clusterInfoConfigMap)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			*needToRequeue = true
-		}
-		reqLogger.Error(err, "Failed to get cluster info configmap "+ClusterInfoConfigmapName, "requeueNeeded", needToRequeue)
-		if errors.IsNotFound(err) {
-			err = nil
-		}
-		return
-	}
-
-	// Check if the ibmcloud-cluster-info created by IM-Operator
-	ownerRefs := clusterInfoConfigMap.OwnerReferences
-	var ownRef string
-	for _, ownRefs := range ownerRefs {
-		ownRef = ownRefs.Kind
-	}
-	if ownRef != "Authentication" {
-		reqLogger.Info("Reconcile Routes : Can't find ibmcloud-cluster-info Configmap created by IM operator , IM Route reconcilation may not proceed ", "Configmap.Namespace", clusterInfoConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
-		*needToRequeue = true
+	var clusterInfoConfigMap *corev1.ConfigMap
+	clusterInfoConfigMap, err = r.getClusterInfoConfigMap(ctx, instance, needToRequeue, reqLogger)
+	if err != nil || *needToRequeue {
 		return
 	}
 
@@ -121,24 +103,12 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, instance *o
 		err = fmt.Errorf("cluster_address is not set in configmap %s", ClusterInfoConfigmapName)
 		return
 	}
+	routeHost = clusterInfoConfigMap.Data["cluster_address"]
 
-	PlatformOIDCCredentialsSecretName := "platform-oidc-credentials"
-	secret := &corev1.Secret{}
-	err = r.Client.Get(ctx, types.NamespacedName{Name: PlatformOIDCCredentialsSecretName, Namespace: instance.Namespace}, secret)
-
-	if err != nil {
-		if errors.IsNotFound(err) {
-			*needToRequeue = true
-		}
-		reqLogger.Error(err, "Failed to get secret", "secretName", PlatformOIDCCredentialsSecretName, "requeueNeeded", *needToRequeue)
-		if errors.IsNotFound(err) {
-			err = nil
-		}
+	wlpClientID, err = r.getWlpClientID(ctx, instance, needToRequeue, reqLogger)
+	if err != nil || *needToRequeue {
 		return
 	}
-
-	routeHost = clusterInfoConfigMap.Data["cluster_address"]
-	wlpClientID := string(secret.Data["WLP_CLIENT_ID"][:])
 
 	var (
 		platformAuthCert               []byte
@@ -506,4 +476,57 @@ func (r *AuthenticationReconciler) newRoute(instance *operatorv1alpha1.Authentic
 	}
 
 	return route, nil
+}
+
+func (r *AuthenticationReconciler) getWlpClientID(ctx context.Context, instance *operatorv1alpha1.Authentication, needToRequeue *bool, reqLogger logr.Logger) (wlpClientID string, err error) {
+	wlpClientID = ""
+
+	PlatformOIDCCredentialsSecretName := "platform-oidc-credentials"
+	secret := &corev1.Secret{}
+	err = r.Client.Get(ctx, types.NamespacedName{Name: PlatformOIDCCredentialsSecretName, Namespace: instance.Namespace}, secret)
+
+	if err != nil {
+		if errors.IsNotFound(err) {
+			*needToRequeue = true
+		}
+		reqLogger.Error(err, "Failed to get secret", "secretName", PlatformOIDCCredentialsSecretName, "requeueNeeded", *needToRequeue)
+		if errors.IsNotFound(err) {
+			err = nil
+		}
+		return
+	}
+
+	wlpClientID = string(secret.Data["WLP_CLIENT_ID"][:])
+
+	return
+}
+
+func (r *AuthenticationReconciler) getClusterInfoConfigMap(ctx context.Context, instance *operatorv1alpha1.Authentication, needToRequeue *bool, reqLogger logr.Logger) (clusterInfoConfigMap *corev1.ConfigMap, err error) {
+
+	clusterInfoConfigMap = &corev1.ConfigMap{}
+	err = r.Client.Get(ctx, types.NamespacedName{Name: ClusterInfoConfigmapName, Namespace: instance.Namespace}, clusterInfoConfigMap)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			*needToRequeue = true
+		}
+		reqLogger.Error(err, "Failed to get cluster info configmap "+ClusterInfoConfigmapName, "requeueNeeded", needToRequeue)
+		if errors.IsNotFound(err) {
+			err = nil
+		}
+		return
+	}
+
+	// Check if the ibmcloud-cluster-info created by IM-Operator
+	ownerRefs := clusterInfoConfigMap.OwnerReferences
+	var ownRef string
+	for _, ownRefs := range ownerRefs {
+		ownRef = ownRefs.Kind
+	}
+	if ownRef != "Authentication" {
+		reqLogger.Info("Can't find ibmcloud-cluster-info Configmap created by IM operator , reconcilation may not proceed ", "Configmap.Namespace", clusterInfoConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
+		*needToRequeue = true
+		return
+	}
+
+	return
 }

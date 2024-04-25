@@ -600,6 +600,18 @@ spec:
                 - rolebindings
               verbs:
                 - create
+            - apiGroups:
+                - zen.cpd.ibm.com
+              resources:
+                - zenextensions
+              verbs:
+                - create
+                - delete
+                - get
+                - list
+                - patch
+                - update
+                - watch
           serviceAccountName: ibm-iam-operator
     strategy: deployment
   installModes:

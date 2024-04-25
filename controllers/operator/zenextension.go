@@ -210,7 +210,7 @@ func (r *AuthenticationReconciler) handleZenExtension(ctx context.Context, req c
 		} else {
 			//error getting zen extension, only report if its not a notfound error
 			if !k8sErrors.IsNotFound(zext_err) {
-				reqLogger.Error(zext_err, "Zen front door is disabled, but could not get iam zenextension for cleanup", "zenExtensionName")
+				reqLogger.Error(zext_err, "Zen front door is disabled, but could not get iam zenextension for cleanup")
 			}
 		}
 	}

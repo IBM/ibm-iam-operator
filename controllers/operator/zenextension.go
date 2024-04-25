@@ -48,7 +48,7 @@ var IamNginxConfig = `location /idmgmt/ {
   proxy_set_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
   proxy_pass https://platform-identity-management.%[1]s.svc:4500;
   proxy_read_timeout 180s;
-  rewrite /idmgmt/ / break;
+  rewrite /idmgmt/(.*) /$1 break;
 }
 location /v1/auth/ {
   proxy_set_header Host $host;

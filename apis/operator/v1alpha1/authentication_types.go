@@ -145,6 +145,7 @@ type ConfigSpec struct {
 	ScopeClaim                  string `json:"scopeClaim,omitempty"`
 	OIDCIssuerURL               string `json:"oidcIssuerURL"`
 	AttrMappingFromConfig       bool   `json:"attrMappingFromConfig,omitempty"`
+	ZenFrontDoor                bool   `json:"zenFrontDoor,omitempty"`
 }
 
 type ManagedResourceStatus struct {

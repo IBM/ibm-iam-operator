@@ -110,15 +110,13 @@ func convertToLibertyFormat(memory string) string {
 		memString := strings.TrimSuffix(memory, "Gi")
 		memVal, _ := strconv.Atoi(memString)
 		memVal *= 1024 // Converting to MB
-		memVal -= 150  // Reducing the memory consumed by node process
 		memVal /= 2    // Allocate 50% of the remaning memory for java heap
 		libertyMemory = strconv.Itoa(memVal) + "m"
 
 	} else if strings.HasSuffix(memory, "Mi") {
 		memString := strings.TrimSuffix(memory, "Mi")
 		memVal, _ := strconv.Atoi(memString)
-		memVal -= 150 //Reducing the memory consumed by node process
-		memVal /= 2   // Allocate 50% of the remaning memory for jave heap
+		memVal /= 2 // Allocate 50% of the remaning memory for jave heap
 		libertyMemory = strconv.Itoa(memVal) + "m"
 	}
 

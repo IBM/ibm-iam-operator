@@ -43,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
+	zenv1 "github.com/IBM/ibm-iam-operator/apis/zen.cpd.ibm.com/v1"
 	"github.com/opdev/subreconciler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -842,6 +843,10 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
+	if result, err := r.handleZenExtension(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return subreconciler.Evaluate(result, err)
+	}
+
 	if subResult, err := r.ensureDatastoreSecretAndCM(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
 	}
@@ -873,21 +878,8 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if ctrlCommon.ClusterHasOpenShiftConfigGroupVerison() {
-		return ctrl.NewControllerManagedBy(mgr).
-			Owns(&corev1.ConfigMap{}).
-			Owns(&corev1.Secret{}).
-			Owns(&certmgr.Certificate{}).
-			Owns(&batchv1.Job{}).
-			Owns(&corev1.Service{}).
-			Owns(&net.Ingress{}).
-			Owns(&appsv1.Deployment{}).
-			Owns(&routev1.Route{}).
-			Owns(&operatorv1alpha1.OperandRequest{}).
-			For(&operatorv1alpha1.Authentication{}).
-			Complete(r)
-	}
-	return ctrl.NewControllerManagedBy(mgr).
+
+	builder := ctrl.NewControllerManagedBy(mgr).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.Secret{}).
 		Owns(&certmgr.Certificate{}).
@@ -895,8 +887,17 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Service{}).
 		Owns(&net.Ingress{}).
 		Owns(&appsv1.Deployment{}).
-		Owns(&operatorv1alpha1.OperandRequest{}).
-		For(&operatorv1alpha1.Authentication{}).
+		Owns(&operatorv1alpha1.OperandRequest{})
+
+	//Add routes
+	if ctrlCommon.ClusterHasOpenShiftConfigGroupVerison() {
+		builder.Owns(&routev1.Route{})
+	}
+	if ctrlCommon.ClusterHasZenExtensionGroupVersion() {
+		builder.Owns(&zenv1.ZenExtension{})
+	}
+
+	return builder.For(&operatorv1alpha1.Authentication{}).
 		Complete(r)
 }
 

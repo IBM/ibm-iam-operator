@@ -22,7 +22,7 @@ type DBOptions struct {
 
 // GetMigrationKey returns a key name used for writing back successful migration state to some other database
 func (o *DBOptions) GetMigrationKey() string {
-	return fmt.Sprintf("com.ibm.operator.authentication.migrations.%s", o.ID)
+	return fmt.Sprintf("migrated_to_%s", o.ID)
 }
 
 func (o *DBOptions) Configure(opts ...DBOption) (err error) {

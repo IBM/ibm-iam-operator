@@ -631,4 +631,6 @@ spec:
     - image: icr.io/cpopen/cpfs/icp-identity-manager:4.5.1
       name: ICP_IDENTITY_MANAGER_IMAGE
     - image: icr.io/cpopen/cpfs/im-initcontainer:4.5.1
+      name: IAM_CUSTOM_HOSTNAME_IMAGE
+    - image: icr.io/cpopen/cpfs/iam-custom-hostname:4.5.1
       name: IM_INITCONTAINER_IMAGE

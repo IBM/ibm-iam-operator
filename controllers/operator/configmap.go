@@ -575,7 +575,7 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 			"DB_CONNECT_MAX_RETRIES":             "5",
 			"DB_POOL_MIN_SIZE":                   "5",
 			"DB_POOL_MAX_SIZE":                   "15",
-			"DB_SSL_MODE":                        "require",
+			"DB_SSL_MODE":                        "verify-full",
 			"SEQL_LOGGING":                       "false",
 			"SCIM_LDAP_SEARCH_SIZE_LIMIT":        "4500",
 			"SCIM_LDAP_SEARCH_TIME_LIMIT":        "10",

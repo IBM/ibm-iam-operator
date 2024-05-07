@@ -1513,3 +1513,48 @@ func (ug *UserGroup) GetInsertSQL() string {
 			(SELECT uid from platformdb.groups WHERE group_id=@groupId AND realm_id=@realmId)
 		) ON CONFLICT DO NOTHING;`
 }
+
+type OauthToken struct {
+	LookupKey   string `bson:"LOOKUPKEY"`
+	UniqueID    string `bson:"UNIQUEID"`
+	ProviderID  string `bson:"PROVIDERID"`
+	Type        string `bson:"TYPE"`
+	SubType     string `bson:"SUBTYPE"`
+	CreateDate  int64  `bson:"CREATEDAT"`
+	Lifetime    int    `bson:"LIFETIME"`
+	Expires     int64  `bson:"EXPIRES"`
+	TokenString string `bson:"TOKENSTRING"`
+	ClientID    string `bson:"CLIENTID"`
+	UserName    string `bson:"USERNAME"`
+	Scope       string `bson:"SCOPE"`
+	RedirectUri string `bson:"REDIRECTURI"`
+	StateID     string `bson:"STATEID"`
+	Props       string `bson:"PROPS"`
+}
+
+func (ot *OauthToken) GetInsertSQL() string {
+	return `INSERT INTO oauthdbschema.oauthtoken
+			(LOOKUPKEY, UNIQUEID, PROVIDERID, TYPE, SUBTYPE, CREATEDAT, LIFETIME, EXPIRES, TOKENSTRING, CLIENTID, USERNAME, SCOPE, REDIRECTURI, STATEID, PROPS)
+			VALUES (@LOOKUPKEY, @UNIQUEID, @PROVIDERID, @TYPE, @SUBTYPE, @CREATEDAT, @LIFETIME, @EXPIRES, @TOKENSTRING, @CLIENTID, @USERNAME, @SCOPE, @REDIRECTURI, @STATEID, @PROPS)
+			ON CONFLICT DO NOTHING;`
+}
+
+func (ot *OauthToken) GetArgs() pgx.NamedArgs {
+	return pgx.NamedArgs{
+		"LOOKUPKEY":   ot.LookupKey,
+		"UNIQUEID":    ot.UniqueID,
+		"PROVIDERID":  ot.ProviderID,
+		"TYPE":        ot.Type,
+		"SUBTYPE":     ot.SubType,
+		"CREATEDAT":   ot.CreateDate,
+		"LIFETIME":    ot.Lifetime,
+		"EXPIRES":     ot.Expires,
+		"TOKENSTRING": ot.TokenString,
+		"CLIENTID":    ot.ClientID,
+		"USERNAME":    ot.UserName,
+		"SCOPE":       ot.Scope,
+		"REDIRECTURI": ot.RedirectUri,
+		"STATEID":     ot.StateID,
+		"PROPS":       ot.Props,
+	}
+}

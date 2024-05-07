@@ -661,7 +661,12 @@ func insertUser(ctx context.Context, postgres *PostgresDB, user *v1schema.User) 
 	err = postgres.Conn.QueryRow(ctx, query, args).Scan(uid)
 	if errors.Is(err, pgx.ErrNoRows) {
 		reqLogger.Info("Row already exists in EDB")
-		return nil, nil
+		queryIfRowExists := "SELECT uid from platformdb.users WHERE user_id = @user_id;"
+		args = pgx.NamedArgs{"user_id": user.UserID}
+		if err := postgres.Conn.QueryRow(ctx, queryIfRowExists, args).Scan(uid); err != nil {
+			return nil, errors.New(fmt.Sprint("failed to get uid for userId:", user.UserID))
+		}
+		return uid, nil
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.users")
 		return nil, err

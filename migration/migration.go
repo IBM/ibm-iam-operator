@@ -313,6 +313,7 @@ func MongoToV1(ctx context.Context, to, from DBConn) (err error) {
 
 	copyFuncs := []copyFunc{
 		insertOIDCClients,
+		insertOauthTokens,
 		insertIdpConfigs,
 		insertDirectoriesAsIdpConfigs,
 		insertV2SamlAsIdpConfig,
@@ -399,6 +400,65 @@ func insertOIDCClients(ctx context.Context, mongodb *MongoDB, postgres *Postgres
 		return
 	}
 	reqLogger.Info("Successfully copied over OIDC clients to EDB", "rowsInserted", migrateCount)
+	return
+}
+
+func insertOauthTokens(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	dbName := "OAuthDBSchema"
+	collectionName := "OauthToken"
+	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
+	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
+	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get cursor from MongoDB")
+		return
+	}
+	errCount := 0
+	migrateCount := 0
+	for cursor.Next(ctx) {
+		var token v1schema.OauthToken
+		if err = cursor.Decode(&token); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document")
+			errCount++
+			err = nil
+			continue
+		}
+
+		query := token.GetInsertSQL()
+		args := token.GetArgs()
+		_, err = postgres.Conn.Exec(ctx, query, args)
+		if errors.Is(err, pgx.ErrNoRows) {
+			reqLogger.Info("Row already exists in EDB")
+		} else if err != nil {
+			reqLogger.Error(err, "Failed to INSERT into table", "table", "oauthdbschema.oauthtoken")
+			errCount++
+			continue
+		}
+		updateFilter := bson.D{{Key: "LOOKUPKEY", Value: token.LookupKey}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
+		if err != nil {
+			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
+			errCount++
+			continue
+		}
+		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
+		migrateCount++
+	}
+	if errCount > 0 {
+		err = fmt.Errorf("encountered errors that prevented the migration of documents")
+		reqLogger.Error(err, "Migration of oauthdbschema.oauthtoken not successful", "failedCount", errCount, "successCount", migrateCount)
+		return
+	} else if errCount == 0 && migrateCount == 0 {
+		reqLogger.Info("No documents needed to be migrated; continuing")
+		return
+	}
+
+	if err = cursor.Err(); err != nil {
+		reqLogger.Error(err, "MongoDB cursor encountered an error")
+		return
+	}
+	reqLogger.Info("Successfully copied over OAuth tokens to EDB", "rowsInserted", migrateCount)
 	return
 }
 

@@ -99,6 +99,10 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 			Spec:       desiredOperandSpec,
 		}
 
+		if err = controllerutil.SetOwnerReference(authCR, desiredOpReq, r.Scheme); err != nil {
+			reqLogger.Error(err, "Failed to set owner reference on OperandRequest")
+			return subreconciler.RequeueWithError(err)
+		}
 		if err = r.Create(ctx, desiredOpReq); k8sErrors.IsAlreadyExists(err) {
 			reqLogger.Info("OperandRequest already exists; continuing")
 			return subreconciler.ContinueReconciling()

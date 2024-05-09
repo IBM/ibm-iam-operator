@@ -711,7 +711,6 @@ func (r *AuthenticationReconciler) ibmcloudClusterInfoConfigMap(client client.Cl
 		reqLogger.Info("Env type is CNCF")
 
 		ClusterAddress := strings.Join([]string{strings.Join([]string{"cp-console", instance.Namespace}, "-"), domainName}, ".")
-		// to be checked for CNCF
 		ep := "https://" + ClusterAddress
 
 		newConfigMap := &corev1.ConfigMap{

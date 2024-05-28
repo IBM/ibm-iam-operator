@@ -481,19 +481,28 @@ func (r *ClientReconciler) processZenRegistration(ctx context.Context, req ctrl.
 		return subreconciler.RequeueWithError(err)
 	}
 
-	if zenReg != nil {
-		//Zen registration exists - currently updates to the zen registration are not supported
-		reqLogger.Info("Zen registration already exists for oidc client - the zen instance will not be updated",
-			"clientId", clientCR.Spec.ClientId, "zenInstanceId", clientCR.Spec.ZenInstanceId)
-		return subreconciler.ContinueReconciling()
-	}
-
 	clientCreds, err := r.GetClientCreds(ctx, clientCR)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get client credentials from Secret", "secretName", clientCR.Spec.Secret)
 		r.Recorder.Event(clientCR, corev1.EventTypeWarning, ReasonCreateZenRegistrationFailed, err.Error())
 		reqLogger.Info("Updating status")
 		return subreconciler.RequeueWithError(err)
+	}
+
+	//Zen registration exist, update
+	if zenReg != nil {
+		//Zen registration exists - going to update zen instance registration
+		reqLogger.Info("Zen registration already exists for oidc client - the zen instance will be updated",
+			"clientId", clientCR.Spec.ClientId, "zenInstanceId", clientCR.Spec.ZenInstanceId)
+		if err = r.registerZenInstance(ctx, clientCR, clientCreds, config); err != nil {
+			reqLogger.Error(err, "Failed to update Zen registration")
+			if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, http.MethodPost); err != nil {
+				reqLogger.Error(err, "Failed ot update Client status")
+				return subreconciler.RequeueWithError(err)
+			}
+			return subreconciler.RequeueWithError(err)
+		}
+		return subreconciler.ContinueReconciling()
 	}
 
 	//Zen registration does not exist, create

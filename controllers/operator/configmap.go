@@ -270,6 +270,12 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 					currentConfigMap.Data["SEQL_LOGGING"] = newConfigMap.Data["SEQL_LOGGING"]
 					cmUpdateRequired = true
 				}
+				if _, keyExists := currentConfigMap.Data["DB_SSL_MODE"]; !keyExists {
+					reqLogger.Info("Updating an existing Configmap with db ssl mode information", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					newConfigMap = functionList[index](instance, r.Scheme)
+					currentConfigMap.Data["DB_SSL_MODE"] = newConfigMap.Data["DB_SSL_MODE"]
+					cmUpdateRequired = true
+				}
 				if _, keyExists := currentConfigMap.Data["OS_TOKEN_LENGTH"]; keyExists {
 					if currentConfigMap.Data["OS_TOKEN_LENGTH"] == "45" {
 						newConfigMap = functionList[index](instance, r.Scheme)
@@ -569,6 +575,7 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 			"DB_CONNECT_MAX_RETRIES":             "5",
 			"DB_POOL_MIN_SIZE":                   "5",
 			"DB_POOL_MAX_SIZE":                   "15",
+			"DB_SSL_MODE":                        "verify-full",
 			"SEQL_LOGGING":                       "false",
 			"SCIM_LDAP_SEARCH_SIZE_LIMIT":        "4500",
 			"SCIM_LDAP_SEARCH_TIME_LIMIT":        "10",

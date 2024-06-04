@@ -866,6 +866,10 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			Value: "https://platform-identity-provider",
 		},
 		{
+			Name:  "AUTHSVC_KUBEDNS_NAME",
+			Value: "https://platform-auth-service",
+		},
+		{
 			Name:  "IAM_TOKEN_SERVICE_URL",
 			Value: "https://platform-auth-service:9443",
 		},

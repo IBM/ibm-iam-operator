@@ -543,7 +543,9 @@ func (r *AuthenticationReconciler) hasMongoDBService(ctx context.Context, authCR
 // needToMigrateFromMongo attempts to determine whether a migration from MongoDB is needed. Returns an error when an
 // unexpected error occurs while trying to get resources from the cluster.
 func (r *AuthenticationReconciler) needToMigrateFromMongo(ctx context.Context, authCR *operatorv1alpha1.Authentication, req ctrl.Request) (need bool, err error) {
+	reqLogger := logf.FromContext(ctx)
 	if authCR.HasBeenMigrated() {
+		reqLogger.Info("migration-complete annotation seen, hence migration is already done. shutdown mongo if it is running")
 		// cleanup mongo here also
 		r.shutdownMongo(ctx, req)
 		return false, nil

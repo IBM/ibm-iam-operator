@@ -25,6 +25,12 @@ const DatastoreEDBCMName string = "im-datastore-edb-cm"
 // Name of Secret containing certificates for connecting to EDB
 const DatastoreEDBSecretName string = "im-datastore-edb-secret"
 
+// Name of the mongodb operator deployment name
+const MongoOprDeploymentName string = "ibm-mongodb-operator"
+
+// Name of the mongodb statefulset name
+const MongoStatefulsetName string = "icp-mongodb"
+
 // Name of CommonService created by IM Operator to provision EDB share
 const DatastoreEDBCSName string = "im-common-service"
 

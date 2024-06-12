@@ -633,9 +633,6 @@ func (r *AuthenticationReconciler) shutdownMongo(ctx context.Context, req ctrl.R
 			reqLogger.Info("Mongo operator deployement is scaled down to 0")
 			mongoSts := &appsv1.StatefulSet{}
 			// scaledown the replicas to 0
-			if mongoSts.Spec.Replicas == &desiredReplicas {
-				return nil
-			}
 			mongoSts.Spec.Replicas = &desiredReplicas
 			if err = r.Update(ctx, mongoSts); err != nil {
 				reqLogger.Error(err, "Error updating the mongodb statefulset")

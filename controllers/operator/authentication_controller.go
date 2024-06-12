@@ -633,7 +633,6 @@ func (r *AuthenticationReconciler) shutdownMongo(ctx context.Context, req ctrl.R
 			reqLogger.Info("Mongo operator deployement is scaled down to 0")
 			mongoSts := &appsv1.StatefulSet{}
 			// scaledown the replicas to 0
-			desiredReplicas := int32(0)
 			if mongoSts.Spec.Replicas == &desiredReplicas {
 				return nil
 			}

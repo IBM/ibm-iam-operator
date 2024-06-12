@@ -351,7 +351,9 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	// Terminating condition for handleMigration subreconciler
 	if authCR.HasBeenMigrated() {
 		reqLogger.Info("Mongo to EDB data migration is complete, cleaning up mongo")
-		r.shutdownMongo(ctx, req)
+		if err := r.shutdownMongo(ctx, req); err != nil {
+			reqLogger.Error(err, "Failed to scale down MongoDB")
+		}
 		return
 	}
 
@@ -615,9 +617,12 @@ func (r *AuthenticationReconciler) shutdownMongo(ctx context.Context, req ctrl.R
 	if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.MongoOprDeploymentName, Namespace: operatorNamespace}, mongoOprDeployment); err != nil {
 		return err
 	} else {
-		// scaledown the replicas to 0
-		replicas := int32(0)
-		mongoOprDeployment.Spec.Replicas = &replicas
+		// scaledown the desiredReplicas to 0
+		desiredReplicas := int32(0)
+		if mongoOprDeployment.Spec.Replicas == &desiredReplicas {
+			return nil
+		}
+		mongoOprDeployment.Spec.Replicas = &desiredReplicas
 		if err = r.Update(ctx, mongoOprDeployment); err != nil {
 			reqLogger.Info("Error updating the mongodb operator deployment")
 			return err
@@ -627,8 +632,11 @@ func (r *AuthenticationReconciler) shutdownMongo(ctx context.Context, req ctrl.R
 				return err
 			} else {
 				// scaledown the replicas to 0
-				replicas := int32(0)
-				mongoSts.Spec.Replicas = &replicas
+				desiredReplicas := int32(0)
+				if mongoSts.Spec.Replicas == &desiredReplicas {
+					return nil
+				}
+				mongoSts.Spec.Replicas = &desiredReplicas
 				if err = r.Update(ctx, mongoSts); err != nil {
 					reqLogger.Info("Error updating the mongodb statefulset")
 					return err

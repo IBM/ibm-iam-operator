@@ -148,7 +148,7 @@ func (r *AuthenticationReconciler) addMigrationFinalizers(ctx context.Context, r
 		return
 	}
 
-	if needToMigrate, err := r.needToMigrateFromMongo(ctx, authCR, req); !needToMigrate && err == nil {
+	if needToMigrate, err := r.needToMigrateFromMongo(ctx, authCR); !needToMigrate && err == nil {
 		reqLogger.Info("No MongoDB migration required, so no need for finalizers; continuing")
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {
@@ -348,6 +348,13 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		return
 	}
 
+	// Terminating condition for handleMigration subreconciler
+	if authCR.HasBeenMigrated() {
+		reqLogger.Info("Mongo to EDB data migration is complete, cleaning up mongo")
+		r.shutdownMongo(ctx, req)
+		return
+	}
+
 	var postgres *migration.PostgresDB
 	if postgres, err = r.getPostgresDB(ctx, req); k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Could not find all resources for configuring EDB connection; requeueing")
@@ -370,7 +377,7 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		migrations = append(migrations, initEDB)
 	}
 
-	if needToMigrate, err := r.needToMigrateFromMongo(ctx, authCR, req); err != nil {
+	if needToMigrate, err := r.needToMigrateFromMongo(ctx, authCR); err != nil {
 		reqLogger.Error(err, "Failed to determine whether migration from MongoDB is needed")
 		return subreconciler.RequeueWithError(err)
 	} else if needToMigrate {
@@ -456,18 +463,11 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 			reqLogger.Info("Setting updated migration annotations on Authentication before requeue")
 			if err = r.Update(ctx, authCR); err != nil {
 				reqLogger.Error(err, "Failed to set migration annotations on Authentication")
-				subreconciler.RequeueWithError(err)
+				return subreconciler.RequeueWithError(err)
 			}
 		}
 		if migrationResult.Error != nil {
-			subreconciler.RequeueWithDelayAndError(defaultLowerWait, migrationResult.Error)
-		}
-		// clean-up mongo here
-		for _, c := range migrationResult.Complete {
-			if c.Name == "MongoToV1" {
-				reqLogger.Info("Mongo to EDB data migration is complete, cleaning up mongo")
-				r.shutdownMongo(ctx, req)
-			}
+			return subreconciler.RequeueWithDelayAndError(defaultLowerWait, migrationResult.Error)
 		}
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	default:
@@ -542,15 +542,7 @@ func (r *AuthenticationReconciler) hasMongoDBService(ctx context.Context, authCR
 
 // needToMigrateFromMongo attempts to determine whether a migration from MongoDB is needed. Returns an error when an
 // unexpected error occurs while trying to get resources from the cluster.
-func (r *AuthenticationReconciler) needToMigrateFromMongo(ctx context.Context, authCR *operatorv1alpha1.Authentication, req ctrl.Request) (need bool, err error) {
-	reqLogger := logf.FromContext(ctx)
-	if authCR.HasBeenMigrated() {
-		reqLogger.Info("migration-complete annotation seen, hence migration is already done. shutdown mongo if it is running")
-		// cleanup mongo here also
-		r.shutdownMongo(ctx, req)
-		return false, nil
-	}
-
+func (r *AuthenticationReconciler) needToMigrateFromMongo(ctx context.Context, authCR *operatorv1alpha1.Authentication) (need bool, err error) {
 	var hasResource bool
 	if hasResource, err = r.hasPreloadMongoDBConfigMap(ctx, authCR.Namespace); hasResource {
 		return true, nil

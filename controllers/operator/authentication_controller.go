@@ -626,6 +626,8 @@ func (r *AuthenticationReconciler) shutdownMongo(ctx context.Context, req ctrl.R
 				return err
 			}
 			reqLogger.Info("Mongo operator deployment is scaled down to 0")
+		} else {
+			reqLogger.Info("Mongo operator deployment has already been scaled down to 0")
 		}
 		mongoSts := &appsv1.StatefulSet{}
 		if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.MongoStatefulsetName, Namespace: req.Namespace}, mongoSts); err != nil {
@@ -639,6 +641,8 @@ func (r *AuthenticationReconciler) shutdownMongo(ctx context.Context, req ctrl.R
 					return err
 				}
 				reqLogger.Info("Mongo statefulset is scaled down to 0")
+			} else {
+				reqLogger.Info("Mongo statefulset has already been scaled down to 0")
 			}
 		}
 	}

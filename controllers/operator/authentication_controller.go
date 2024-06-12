@@ -609,35 +609,35 @@ func (r *AuthenticationReconciler) ensureDatastoreSecretAndCM(ctx context.Contex
 // cleans up the mongo pod by scaling down the mongodb operator as well as mongo statefulset
 func (r *AuthenticationReconciler) shutdownMongo(ctx context.Context, req ctrl.Request) (err error) {
 	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "shutdownMongoDB")
-	mongoOprDeployment := &appsv1.Deployment{}
-	mongoSts := &appsv1.StatefulSet{}
 	operatorNamespace, exists := os.LookupEnv("POD_NAMESPACE")
 	if !exists {
 		operatorNamespace = req.Namespace
 	}
+	desiredReplicas := int32(0)
+	mongoOprDeployment := &appsv1.Deployment{}
 	if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.MongoOprDeploymentName, Namespace: operatorNamespace}, mongoOprDeployment); err != nil {
 		return err
-	} else if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.MongoStatefulsetName, Namespace: req.Namespace}, mongoSts); err != nil {
-		return err
 	} else {
-		// scaledown the desiredReplicas to 0
-		desiredReplicas := int32(0)
-		if mongoOprDeployment.Spec.Replicas == &desiredReplicas && mongoSts.Spec.Replicas == &desiredReplicas {
-			return nil
+		// scaledown the replicas to 0
+		if mongoOprDeployment.Spec.Replicas != &desiredReplicas {
+			mongoOprDeployment.Spec.Replicas = &desiredReplicas
+			if err = r.Update(ctx, mongoOprDeployment); err != nil {
+				reqLogger.Error(err, "Error updating the mongodb operator deployment")
+				return err
+			}
+			reqLogger.Info("Mongo operator deployment is scaled down to 0")
 		}
-		mongoOprDeployment.Spec.Replicas = &desiredReplicas
-		if err = r.Update(ctx, mongoOprDeployment); err != nil {
-			reqLogger.Error(err, "Error updating the mongodb operator deployment")
+		mongoSts := &appsv1.StatefulSet{}
+		if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.MongoStatefulsetName, Namespace: req.Namespace}, mongoSts); err != nil {
 			return err
 		} else {
-			reqLogger.Info("Mongo operator deployement is scaled down to 0")
-			mongoSts := &appsv1.StatefulSet{}
 			// scaledown the replicas to 0
-			mongoSts.Spec.Replicas = &desiredReplicas
-			if err = r.Update(ctx, mongoSts); err != nil {
-				reqLogger.Error(err, "Error updating the mongodb statefulset")
-				return err
-			} else {
+			if mongoSts.Spec.Replicas != &desiredReplicas {
+				mongoSts.Spec.Replicas = &desiredReplicas
+				if err = r.Update(ctx, mongoSts); err != nil {
+					reqLogger.Error(err, "Error updating the mongodb statefulset")
+					return err
+				}
 				reqLogger.Info("Mongo statefulset is scaled down to 0")
 			}
 		}

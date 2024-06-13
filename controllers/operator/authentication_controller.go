@@ -149,7 +149,7 @@ func (r *AuthenticationReconciler) addMigrationFinalizers(ctx context.Context, r
 		return
 	}
 
-	if needToMigrate, err := r.needToMigrateFromMongo(ctx, authCR, req); !needToMigrate && err == nil {
+	if needToMigrate, err := r.needToMigrateFromMongo(ctx, authCR); !needToMigrate && err == nil {
 		reqLogger.Info("No MongoDB migration required, so no need for finalizers; continuing")
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {
@@ -349,6 +349,15 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		return
 	}
 
+	// Terminating condition for handleMigration subreconciler
+	if authCR.HasBeenMigrated() {
+		reqLogger.Info("Mongo to EDB data migration is complete, cleaning up mongo")
+		if err := r.shutdownMongo(ctx, req); err != nil {
+			reqLogger.Error(err, "Failed to scale down MongoDB")
+		}
+		return
+	}
+
 	var postgres *migration.PostgresDB
 	if postgres, err = r.getPostgresDB(ctx, req); k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Could not find all resources for configuring EDB connection; requeueing")
@@ -371,7 +380,7 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		migrations = append(migrations, initEDB)
 	}
 
-	if needToMigrate, err := r.needToMigrateFromMongo(ctx, authCR, req); err != nil {
+	if needToMigrate, err := r.needToMigrateFromMongo(ctx, authCR); err != nil {
 		reqLogger.Error(err, "Failed to determine whether migration from MongoDB is needed")
 		return subreconciler.RequeueWithError(err)
 	} else if needToMigrate {
@@ -457,18 +466,11 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 			reqLogger.Info("Setting updated migration annotations on Authentication before requeue")
 			if err = r.Update(ctx, authCR); err != nil {
 				reqLogger.Error(err, "Failed to set migration annotations on Authentication")
-				subreconciler.RequeueWithError(err)
+				return subreconciler.RequeueWithError(err)
 			}
 		}
 		if migrationResult.Error != nil {
-			subreconciler.RequeueWithDelayAndError(defaultLowerWait, migrationResult.Error)
-		}
-		// clean-up mongo here
-		for _, c := range migrationResult.Complete {
-			if c.Name == "MongoToV1" {
-				reqLogger.Info("Mongo to EDB data migration is complete, cleaning up mongo")
-				r.shutdownMongo(ctx, req)
-			}
+			return subreconciler.RequeueWithDelayAndError(defaultLowerWait, migrationResult.Error)
 		}
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	default:
@@ -543,15 +545,7 @@ func (r *AuthenticationReconciler) hasMongoDBService(ctx context.Context, authCR
 
 // needToMigrateFromMongo attempts to determine whether a migration from MongoDB is needed. Returns an error when an
 // unexpected error occurs while trying to get resources from the cluster.
-func (r *AuthenticationReconciler) needToMigrateFromMongo(ctx context.Context, authCR *operatorv1alpha1.Authentication, req ctrl.Request) (need bool, err error) {
-	reqLogger := logf.FromContext(ctx)
-	if authCR.HasBeenMigrated() {
-		reqLogger.Info("migration-complete annotation seen, hence migration is already done. shutdown mongo if it is running")
-		// cleanup mongo here also
-		r.shutdownMongo(ctx, req)
-		return false, nil
-	}
-
+func (r *AuthenticationReconciler) needToMigrateFromMongo(ctx context.Context, authCR *operatorv1alpha1.Authentication) (need bool, err error) {
 	var hasResource bool
 	if hasResource, err = r.hasPreloadMongoDBConfigMap(ctx, authCR.Namespace); hasResource {
 		return true, nil
@@ -616,34 +610,40 @@ func (r *AuthenticationReconciler) ensureDatastoreSecretAndCM(ctx context.Contex
 // cleans up the mongo pod by scaling down the mongodb operator as well as mongo statefulset
 func (r *AuthenticationReconciler) shutdownMongo(ctx context.Context, req ctrl.Request) (err error) {
 	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "shutdownMongoDB")
-	mongoOprDeployment := &appsv1.Deployment{}
 	operatorNamespace, exists := os.LookupEnv("POD_NAMESPACE")
 	if !exists {
 		operatorNamespace = req.Namespace
 	}
+	desiredReplicas := int32(0)
+	mongoOprDeployment := &appsv1.Deployment{}
 	if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.MongoOprDeploymentName, Namespace: operatorNamespace}, mongoOprDeployment); err != nil {
 		return err
 	} else {
 		// scaledown the replicas to 0
-		replicas := int32(0)
-		mongoOprDeployment.Spec.Replicas = &replicas
-		if err = r.Update(ctx, mongoOprDeployment); err != nil {
-			reqLogger.Info("Error updating the mongodb operator deployment")
+		if mongoOprDeployment.Spec.Replicas != &desiredReplicas {
+			mongoOprDeployment.Spec.Replicas = &desiredReplicas
+			if err = r.Update(ctx, mongoOprDeployment); err != nil {
+				reqLogger.Error(err, "Error updating the mongodb operator deployment")
+				return err
+			}
+			reqLogger.Info("Mongo operator deployment is scaled down to 0")
+		} else {
+			reqLogger.Info("Mongo operator deployment has already been scaled down to 0")
+		}
+		mongoSts := &appsv1.StatefulSet{}
+		if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.MongoStatefulsetName, Namespace: req.Namespace}, mongoSts); err != nil {
 			return err
 		} else {
-			mongoSts := &appsv1.StatefulSet{}
-			if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.MongoStatefulsetName, Namespace: req.Namespace}, mongoSts); err != nil {
-				return err
-			} else {
-				// scaledown the replicas to 0
-				replicas := int32(0)
-				mongoSts.Spec.Replicas = &replicas
+			// scaledown the replicas to 0
+			if mongoSts.Spec.Replicas != &desiredReplicas {
+				mongoSts.Spec.Replicas = &desiredReplicas
 				if err = r.Update(ctx, mongoSts); err != nil {
-					reqLogger.Info("Error updating the mongodb statefulset")
+					reqLogger.Error(err, "Error updating the mongodb statefulset")
 					return err
-				} else {
-					reqLogger.Info("Mongo statefulset is scaled down to 0")
 				}
+				reqLogger.Info("Mongo statefulset is scaled down to 0")
+			} else {
+				reqLogger.Info("Mongo statefulset has already been scaled down to 0")
 			}
 		}
 	}

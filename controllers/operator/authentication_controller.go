@@ -616,35 +616,36 @@ func (r *AuthenticationReconciler) shutdownMongo(ctx context.Context, req ctrl.R
 	}
 	desiredReplicas := int32(0)
 	mongoOprDeployment := &appsv1.Deployment{}
-	if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.MongoOprDeploymentName, Namespace: operatorNamespace}, mongoOprDeployment); err != nil {
+	if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.MongoOprDeploymentName, Namespace: operatorNamespace}, mongoOprDeployment); err != nil && k8sErrors.IsNotFound(err) {
+		if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.MongoOprDeploymentName, Namespace: req.Namespace}, mongoOprDeployment); err != nil {
+			return err
+		}
+	}
+	// scaledown the replicas to 0
+	if mongoOprDeployment.Spec.Replicas != &desiredReplicas {
+		mongoOprDeployment.Spec.Replicas = &desiredReplicas
+		if err = r.Update(ctx, mongoOprDeployment); err != nil {
+			reqLogger.Error(err, "Error updating the mongodb operator deployment")
+			return err
+		}
+		reqLogger.Info("Mongo operator deployment is scaled down to 0")
+	} else {
+		reqLogger.Info("Mongo operator deployment has already been scaled down to 0")
+	}
+	mongoSts := &appsv1.StatefulSet{}
+	if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.MongoStatefulsetName, Namespace: req.Namespace}, mongoSts); err != nil {
 		return err
 	} else {
 		// scaledown the replicas to 0
-		if mongoOprDeployment.Spec.Replicas != &desiredReplicas {
-			mongoOprDeployment.Spec.Replicas = &desiredReplicas
-			if err = r.Update(ctx, mongoOprDeployment); err != nil {
-				reqLogger.Error(err, "Error updating the mongodb operator deployment")
+		if mongoSts.Spec.Replicas != &desiredReplicas {
+			mongoSts.Spec.Replicas = &desiredReplicas
+			if err = r.Update(ctx, mongoSts); err != nil {
+				reqLogger.Error(err, "Error updating the mongodb statefulset")
 				return err
 			}
-			reqLogger.Info("Mongo operator deployment is scaled down to 0")
+			reqLogger.Info("Mongo statefulset is scaled down to 0")
 		} else {
-			reqLogger.Info("Mongo operator deployment has already been scaled down to 0")
-		}
-		mongoSts := &appsv1.StatefulSet{}
-		if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.MongoStatefulsetName, Namespace: req.Namespace}, mongoSts); err != nil {
-			return err
-		} else {
-			// scaledown the replicas to 0
-			if mongoSts.Spec.Replicas != &desiredReplicas {
-				mongoSts.Spec.Replicas = &desiredReplicas
-				if err = r.Update(ctx, mongoSts); err != nil {
-					reqLogger.Error(err, "Error updating the mongodb statefulset")
-					return err
-				}
-				reqLogger.Info("Mongo statefulset is scaled down to 0")
-			} else {
-				reqLogger.Info("Mongo statefulset has already been scaled down to 0")
-			}
+			reqLogger.Info("Mongo statefulset has already been scaled down to 0")
 		}
 	}
 	return nil

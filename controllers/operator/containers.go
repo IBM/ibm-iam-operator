@@ -110,15 +110,13 @@ func convertToLibertyFormat(memory string) string {
 		memString := strings.TrimSuffix(memory, "Gi")
 		memVal, _ := strconv.Atoi(memString)
 		memVal *= 1024 // Converting to MB
-		memVal -= 150  // Reducing the memory consumed by node process
 		memVal /= 2    // Allocate 50% of the remaning memory for java heap
 		libertyMemory = strconv.Itoa(memVal) + "m"
 
 	} else if strings.HasSuffix(memory, "Mi") {
 		memString := strings.TrimSuffix(memory, "Mi")
 		memVal, _ := strconv.Atoi(memString)
-		memVal -= 150 //Reducing the memory consumed by node process
-		memVal /= 2   // Allocate 50% of the remaning memory for jave heap
+		memVal /= 2 // Allocate 50% of the remaning memory for jave heap
 		libertyMemory = strconv.Itoa(memVal) + "m"
 	}
 
@@ -276,7 +274,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 	idpEnvVarList := []string{"NODE_ENV", "MASTER_HOST", "IDENTITY_PROVIDER_URL", "HTTP_ONLY", "SESSION_TIMEOUT", "LDAP_RECURSIVE_SEARCH", "LDAP_ATTR_CACHE_SIZE", "LDAP_ATTR_CACHE_TIMEOUT", "LDAP_ATTR_CACHE_ENABLED", "LDAP_ATTR_CACHE_SIZELIMIT",
 		"LDAP_SEARCH_CACHE_SIZE", "LDAP_SEARCH_CACHE_TIMEOUT", "LDAP_CTX_POOL_INITSIZE", "LDAP_CTX_POOL_MAXSIZE", "LDAP_CTX_POOL_TIMEOUT", "LDAP_CTX_POOL_WAITTIME", "LDAP_CTX_POOL_PREFERREDSIZE", "IDENTITY_PROVIDER_URL", "IDENTITY_MGMT_URL", "LDAP_SEARCH_CACHE_ENABLED", "LDAP_SEARCH_CACHE_SIZELIMIT", "IDTOKEN_LIFETIME", "IBMID_CLIENT_ID", "IBMID_CLIENT_ISSUER",
 		"SAML_NAMEID_FORMAT", "FIPS_ENABLED", "LOGJAM_DHKEYSIZE_2048_BITS_ENABLED", "LOG_LEVEL_AUTHSVC", "LIBERTY_DEBUG_ENABLED", "NONCE_ENABLED", "CLAIMS_SUPPORTED", "CLAIMS_MAP", "SCOPE_CLAIM", "OIDC_ISSUER_URL",
-		"DB_CONNECT_TIMEOUT", "DB_IDLE_TIMEOUT", "DB_CONNECT_MAX_RETRIES", "DB_POOL_MIN_SIZE", "DB_POOL_MAX_SIZE"}
+		"DB_CONNECT_TIMEOUT", "DB_IDLE_TIMEOUT", "DB_CONNECT_MAX_RETRIES", "DB_POOL_MIN_SIZE", "DB_POOL_MAX_SIZE", "DB_SSL_MODE"}
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
 
 	envVars = append(envVars, idpEnvVars...)
@@ -607,7 +605,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		"LDAP_CTX_POOL_TIMEOUT", "LDAP_CTX_POOL_WAITTIME", "LDAP_CTX_POOL_PREFERREDSIZE", "LDAP_SEARCH_CACHE_ENABLED",
 		"LDAP_SEARCH_CACHE_SIZELIMIT", "LDAP_SEARCH_EXCLUDE_WILDCARD_CHARS", "LDAP_SEARCH_SIZE_LIMIT",
 		"LDAP_SEARCH_TIME_LIMIT", "LDAP_SEARCH_CN_ATTR_ONLY", "LDAP_SEARCH_ID_ATTR_ONLY",
-		"DB_CONNECT_TIMEOUT", "DB_IDLE_TIMEOUT", "DB_CONNECT_MAX_RETRIES", "DB_POOL_MIN_SIZE", "DB_POOL_MAX_SIZE", "SEQL_LOGGING"}
+		"DB_CONNECT_TIMEOUT", "DB_IDLE_TIMEOUT", "DB_CONNECT_MAX_RETRIES", "DB_POOL_MIN_SIZE", "DB_POOL_MAX_SIZE", "DB_SSL_MODE", "SEQL_LOGGING"}
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
 
 	envVars = append(envVars, idpEnvVars...)
@@ -936,7 +934,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		"ROKS_ENABLED", "ROKS_USER_PREFIX", "IDENTITY_AUTH_DIRECTORY_URL", "OIDC_ISSUER_URL", "BOOTSTRAP_USERID", "CLUSTER_NAME", "HTTP_ONLY", "LDAP_SEARCH_SIZE_LIMIT", "LDAP_SEARCH_TIME_LIMIT",
 		"LDAP_SEARCH_CN_ATTR_ONLY", "LDAP_SEARCH_ID_ATTR_ONLY", "LDAP_SEARCH_EXCLUDE_WILDCARD_CHARS", "IGNORE_LDAP_FILTERS_VALIDATION", "AUTH_SVC_LDAP_CONFIG_TIMEOUT",
 		"SCIM_LDAP_SEARCH_SIZE_LIMIT", "SCIM_LDAP_SEARCH_TIME_LIMIT", "SCIM_ASYNC_PARALLEL_LIMIT", "SCIM_GET_DISPLAY_FOR_GROUP_USERS", "ATTR_MAPPING_FROM_CONFIG", "SCIM_AUTH_CACHE_MAX_SIZE", "SCIM_AUTH_CACHE_TTL_VALUE",
-		"DB_CONNECT_TIMEOUT", "DB_IDLE_TIMEOUT", "DB_CONNECT_MAX_RETRIES", "DB_POOL_MIN_SIZE", "DB_POOL_MAX_SIZE", "SEQL_LOGGING"}
+		"DB_CONNECT_TIMEOUT", "DB_IDLE_TIMEOUT", "DB_CONNECT_MAX_RETRIES", "DB_POOL_MIN_SIZE", "DB_POOL_MAX_SIZE", "DB_SSL_MODE", "SEQL_LOGGING"}
 
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
 

@@ -85,6 +85,10 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 	}
 
 	icpConsoleURL := consoleConfigMap.Data["cluster_address"]
+	samlConsoleURL, ok := consoleConfigMap.Data["cluster_address_auth"]
+	if !ok {
+		samlConsoleURL = icpConsoleURL
+	}
 
 	// Check for the presence of dependencies, for SAAS
 	reqLogger.Info("Is SAAS enabled?", "Instance spec config value", instance.Spec.Config.IBMCloudSaas)
@@ -224,7 +228,7 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 			reqLogger.Info("Creating a new Manager Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", providerDeployment)
 			reqLogger.Info("SAAS tenant configmap was found", "Creating manager deployment with value from configmap", saasTenantConfigMapName)
 			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", providerDeployment)
-			newProviderDeployment := generateProviderDeploymentObject(instance, r.Scheme, providerDeployment, icpConsoleURL, saasServiceIdCrn)
+			newProviderDeployment := generateProviderDeploymentObject(instance, r.Scheme, providerDeployment, samlConsoleURL, saasServiceIdCrn)
 			err = r.Client.Create(context.TODO(), newProviderDeployment)
 			if err != nil {
 				return err
@@ -237,7 +241,7 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 	} else {
 		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentManagerDeployment.Namespace, "Deployment.Name", currentManagerDeployment.Name)
 		reqLogger.Info("SAAS tenant configmap was found", "Updating deployment with value from configmap", saasTenantConfigMapName)
-		provDep := generateProviderDeploymentObject(instance, r.Scheme, providerDeployment, icpConsoleURL, saasServiceIdCrn)
+		provDep := generateProviderDeploymentObject(instance, r.Scheme, providerDeployment, samlConsoleURL, saasServiceIdCrn)
 		certmanagerLabel := "certmanager.k8s.io/time-restarted"
 		if val, ok := currentManagerDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
 			provDep.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val

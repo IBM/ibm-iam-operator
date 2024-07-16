@@ -35,6 +35,7 @@ import (
 
 	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/apis/oidc.security/v1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
+	zenv1 "github.com/IBM/ibm-iam-operator/apis/zen.cpd.ibm.com/v1"
 	controllercommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	oidcsecuritycontrollers "github.com/IBM/ibm-iam-operator/controllers/oidc.security"
 	operatorcontrollers "github.com/IBM/ibm-iam-operator/controllers/operator"
@@ -53,6 +54,7 @@ func init() {
 	utilruntime.Must(oidcsecurityv1.AddToScheme(scheme))
 	utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(certmgrv1.AddToScheme(scheme))
+	utilruntime.Must(zenv1.AddToScheme(scheme))
 	// Add the Route scheme if found on the cluster
 	if controllercommon.ClusterHasRouteGroupVersion() {
 		utilruntime.Must(routev1.AddToScheme(scheme))

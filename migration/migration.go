@@ -313,6 +313,7 @@ func MongoToV1(ctx context.Context, to, from DBConn) (err error) {
 
 	copyFuncs := []copyFunc{
 		insertOIDCClients,
+		insertOauthTokens,
 		insertIdpConfigs,
 		insertDirectoriesAsIdpConfigs,
 		insertV2SamlAsIdpConfig,
@@ -339,7 +340,13 @@ func insertOIDCClients(ctx context.Context, mongodb *MongoDB, postgres *Postgres
 	dbName := "OAuthDBSchema"
 	collectionName := "OauthClient"
 	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
-	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
+	migrationKey := postgres.GetMigrationKey()
+	filter := bson.M{
+		"$or": bson.A{
+			bson.M{"migrated": bson.M{"$ne": true}},
+			bson.M{migrationKey: bson.M{"$ne": true}},
+		},
+	}
 	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
@@ -375,7 +382,7 @@ func insertOIDCClients(ctx context.Context, mongodb *MongoDB, postgres *Postgres
 			continue
 		}
 		updateFilter := bson.D{{Key: "CLIENTID", Value: oc.ClientID}}
-		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: migrationKey, Value: true}}}}
 		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
@@ -402,11 +409,77 @@ func insertOIDCClients(ctx context.Context, mongodb *MongoDB, postgres *Postgres
 	return
 }
 
+func insertOauthTokens(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+	dbName := "OAuthDBSchema"
+	collectionName := "OauthToken"
+	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
+	migrationKey := postgres.GetMigrationKey()
+	filter := bson.D{{Key: migrationKey, Value: bson.D{{Key: "$ne", Value: true}}}}
+	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get cursor from MongoDB")
+		return
+	}
+	errCount := 0
+	migrateCount := 0
+	for cursor.Next(ctx) {
+		var token v1schema.OauthToken
+		if err = cursor.Decode(&token); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document")
+			errCount++
+			err = nil
+			continue
+		}
+
+		query := token.GetInsertSQL()
+		args := token.GetArgs()
+		_, err = postgres.Conn.Exec(ctx, query, args)
+		if errors.Is(err, pgx.ErrNoRows) {
+			reqLogger.Info("Row already exists in EDB")
+		} else if err != nil {
+			reqLogger.Error(err, "Failed to INSERT into table", "table", "oauthdbschema.oauthtoken")
+			errCount++
+			continue
+		}
+		updateFilter := bson.D{{Key: "LOOKUPKEY", Value: token.LookupKey}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: migrationKey, Value: true}}}}
+		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
+		if err != nil {
+			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
+			errCount++
+			continue
+		}
+		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
+		migrateCount++
+	}
+	if errCount > 0 {
+		err = fmt.Errorf("encountered errors that prevented the migration of documents")
+		reqLogger.Error(err, "Migration of oauthdbschema.oauthtoken not successful", "failedCount", errCount, "successCount", migrateCount)
+		return
+	} else if errCount == 0 && migrateCount == 0 {
+		reqLogger.Info("No documents needed to be migrated; continuing")
+		return
+	}
+
+	if err = cursor.Err(); err != nil {
+		reqLogger.Error(err, "MongoDB cursor encountered an error")
+		return
+	}
+	reqLogger.Info("Successfully copied over OAuth tokens to EDB", "rowsInserted", migrateCount)
+	return
+}
+
 func insertIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
 	dbName := "platform-db"
 	collectionName := "cloudpak_ibmid_v3"
 	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
-	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
+	migrationKey := postgres.GetMigrationKey()
+	filter := bson.M{
+		"$or": bson.A{
+			bson.M{"migrated": bson.M{"$ne": true}},
+			bson.M{migrationKey: bson.M{"$ne": true}},
+		},
+	}
 	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
@@ -440,15 +513,6 @@ func insertIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresD
 			errCount++
 			continue
 		}
-		updateFilter := bson.D{{Key: "uid", Value: idpConfig.UID}}
-		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
-		updateResult, err := mongodb.Client.Database("platform-db").Collection("cloudpak_ibmid_v3").UpdateOne(ctx, updateFilter, update)
-		if err != nil {
-			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
-			errCount++
-			continue
-		}
-		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
 		migrateCount++
 	}
 	if errCount > 0 {
@@ -472,9 +536,10 @@ func insertDirectoriesAsIdpConfigs(ctx context.Context, mongodb *MongoDB, postgr
 	dbName := "platform-db"
 	collectionName := "Directory"
 	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
+	migrationKey := postgres.GetMigrationKey()
 	filter := bson.M{
 		"$and": bson.A{
-			bson.M{"migrated": bson.M{"$ne": true}},
+			bson.M{migrationKey: bson.M{"$ne": true}},
 			bson.M{"CP3MIGRATED": bson.M{"$ne": "true"}},
 		},
 	}
@@ -512,7 +577,7 @@ func insertDirectoriesAsIdpConfigs(ctx context.Context, mongodb *MongoDB, postgr
 			continue
 		}
 		updateFilter := bson.D{{Key: "_id", Value: idpConfig.UID}}
-		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: migrationKey, Value: true}}}}
 		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
@@ -556,7 +621,14 @@ func insertV2SamlAsIdpConfig(ctx context.Context, mongodb *MongoDB, postgres *Po
 			"MongoDB.Collection", "cloudpak_ibmid_v3")
 		return
 	}
-	filter := bson.M{"migrated": bson.M{"$ne": true}}
+	migrationKey := postgres.GetMigrationKey()
+	// filter := bson.M{migrationKey: bson.M{"$ne": true}}
+	filter := bson.M{
+		"$or": bson.A{
+			bson.M{"migrated": bson.M{"$ne": true}},
+			bson.M{migrationKey: bson.M{"$ne": true}},
+		},
+	}
 	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB", "MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
@@ -604,7 +676,7 @@ func insertV2SamlAsIdpConfig(ctx context.Context, mongodb *MongoDB, postgres *Po
 			continue
 		}
 		updateFilter := bson.D{{Key: "protocol", Value: "saml"}}
-		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: migrationKey, Value: true}}}}
 		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo", "MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
@@ -614,7 +686,7 @@ func insertV2SamlAsIdpConfig(ctx context.Context, mongodb *MongoDB, postgres *Po
 		reqLogger.Info("Wrote back document migration", "updateResult", updateResult, "MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
 
 		samlDBUpdateFilter := bson.D{{Key: "name", Value: "saml"}}
-		samlDBUpdate := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		samlDBUpdate := bson.D{{Key: "$set", Value: bson.D{{Key: migrationKey, Value: true}}}}
 		samlUpdateResult, err := mongodb.Client.Database("samlDB").Collection("saml").UpdateOne(ctx, samlDBUpdateFilter, samlDBUpdate)
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo", "MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
@@ -650,7 +722,12 @@ func insertUser(ctx context.Context, postgres *PostgresDB, user *v1schema.User) 
 	err = postgres.Conn.QueryRow(ctx, query, args).Scan(uid)
 	if errors.Is(err, pgx.ErrNoRows) {
 		reqLogger.Info("Row already exists in EDB")
-		return nil, nil
+		queryIfRowExists := "SELECT uid from platformdb.users WHERE user_id = @user_id;"
+		args = pgx.NamedArgs{"user_id": user.UserID}
+		if err := postgres.Conn.QueryRow(ctx, queryIfRowExists, args).Scan(uid); err != nil {
+			return nil, errors.New(fmt.Sprint("failed to get uid for userId:", user.UserID))
+		}
+		return uid, nil
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.users")
 		return nil, err
@@ -677,7 +754,14 @@ func insertUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *Post
 	dbName := "platform-db"
 	collectionName := "Users"
 	reqLogger := logf.FromContext(ctx)
-	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
+	migrationKey := postgres.GetMigrationKey()
+	// filter := bson.D{{Key: migrationKey, Value: bson.D{{Key: "$ne", Value: true}}}}
+	filter := bson.M{
+		"$or": bson.A{
+			bson.M{"migrated": bson.M{"$ne": true}},
+			bson.M{migrationKey: bson.M{"$ne": true}},
+		},
+	}
 	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
@@ -707,7 +791,7 @@ func insertUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *Post
 		}
 		user.UID = uid
 		updateFilter := bson.D{{Key: "_id", Value: user.UserID}}
-		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: migrationKey, Value: true}}}}
 		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
@@ -754,9 +838,10 @@ func insertUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *Post
 func migrateUserPreferencesRowForUser(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB, user *v1schema.User) (err error) {
 	reqLogger := logf.FromContext(ctx)
 	preferenceId := strings.Join([]string{"preferenceId", user.UserID}, "_")
+	migrationKey := postgres.GetMigrationKey()
 	filter := bson.M{
 		"$and": bson.A{
-			bson.M{"migrated": bson.M{"$ne": true}},
+			bson.M{migrationKey: bson.M{"$ne": true}},
 			bson.M{"_id": preferenceId},
 		},
 	}
@@ -791,7 +876,7 @@ func migrateUserPreferencesRowForUser(ctx context.Context, mongodb *MongoDB, pos
 			return err
 		}
 		updateFilter := bson.D{{Key: "_id", Value: preferenceId}}
-		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: migrationKey, Value: true}}}}
 		var updateResult *mongo.UpdateResult
 		updateResult, err = mongodb.Client.Database("platform-db").Collection("UserPreferences").UpdateOne(ctx, updateFilter, update)
 		if err != nil {
@@ -900,7 +985,14 @@ func insertZenInstances(ctx context.Context, mongodb *MongoDB, postgres *Postgre
 	dbName := "platform-db"
 	collectionName := "ZenInstance"
 	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
-	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
+	migrationKey := postgres.GetMigrationKey()
+	// filter := bson.D{{Key: migrationKey, Value: bson.D{{Key: "$ne", Value: true}}}}
+	filter := bson.M{
+		"$or": bson.A{
+			bson.M{"migrated": bson.M{"$ne": true}},
+			bson.M{migrationKey: bson.M{"$ne": true}},
+		},
+	}
 	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
@@ -944,7 +1036,7 @@ func insertZenInstances(ctx context.Context, mongodb *MongoDB, postgres *Postgre
 		}
 
 		updateFilter := bson.D{{Key: "_id", Value: result["_id"]}}
-		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: migrationKey, Value: true}}}}
 		updateResult, err := mongodb.Client.Database("platform-db").Collection("ZenInstance").UpdateOne(ctx, updateFilter, update)
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
@@ -975,9 +1067,10 @@ func migrateZenInstanceUserRowForUser(ctx context.Context, mongodb *MongoDB, pos
 	dbName := "platform-db"
 	collectionName := "ZenInstanceUsers"
 	reqLogger := logf.FromContext(ctx).WithValues()
+	migrationKey := postgres.GetMigrationKey()
 	filter := bson.M{
 		"$and": bson.A{
-			bson.M{"migrated": bson.M{"$ne": true}},
+			bson.M{migrationKey: bson.M{"$ne": true}},
 			bson.M{"usersId": user.UserID},
 		},
 	}
@@ -1010,7 +1103,7 @@ func migrateZenInstanceUserRowForUser(ctx context.Context, mongodb *MongoDB, pos
 			return
 		}
 		updateFilter := bson.D{{Key: "_id", Value: result["_id"]}}
-		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: migrationKey, Value: true}}}}
 		var updateResult *mongo.UpdateResult
 		updateResult, err = mongodb.Client.Database("platform-db").Collection("ZenInstanceUsers").UpdateOne(ctx, updateFilter, update)
 		if err != nil {
@@ -1037,7 +1130,14 @@ func insertSCIMAttributes(ctx context.Context, mongodb *MongoDB, postgres *Postg
 	dbName := "platform-db"
 	collectionName := "ScimAttributes"
 	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
-	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
+	migrationKey := postgres.GetMigrationKey()
+	// filter := bson.D{{Key: migrationKey, Value: bson.D{{Key: "$ne", Value: true}}}}
+	filter := bson.M{
+		"$or": bson.A{
+			bson.M{"migrated": bson.M{"$ne": true}},
+			bson.M{migrationKey: bson.M{"$ne": true}},
+		},
+	}
 	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
@@ -1080,7 +1180,7 @@ func insertSCIMAttributes(ctx context.Context, mongodb *MongoDB, postgres *Postg
 			continue
 		}
 		updateFilter := bson.D{{Key: "_id", Value: result["_id"]}}
-		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: migrationKey, Value: true}}}}
 		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
@@ -1111,7 +1211,14 @@ func insertSCIMAttributeMappings(ctx context.Context, mongodb *MongoDB, postgres
 	dbName := "platform-db"
 	collectionName := "ScimAttributeMapping"
 	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
-	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
+	migrationKey := postgres.GetMigrationKey()
+	// filter := bson.D{{Key: migrationKey, Value: bson.D{{Key: "$ne", Value: true}}}}
+	filter := bson.M{
+		"$or": bson.A{
+			bson.M{"migrated": bson.M{"$ne": true}},
+			bson.M{migrationKey: bson.M{"$ne": true}},
+		},
+	}
 	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
@@ -1155,7 +1262,7 @@ func insertSCIMAttributeMappings(ctx context.Context, mongodb *MongoDB, postgres
 			continue
 		}
 		updateFilter := bson.D{{Key: "_id", Value: scimAttrMapping.IdpID}}
-		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: migrationKey, Value: true}}}}
 		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
@@ -1237,7 +1344,14 @@ func insertSSUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *Po
 	dbName := "platform-db"
 	collectionName := "ScimServerUsers"
 	reqLogger := logf.FromContext(ctx)
-	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
+	migrationKey := postgres.GetMigrationKey()
+	// filter := bson.D{{Key: migrationKey, Value: bson.D{{Key: "$ne", Value: true}}}}
+	filter := bson.M{
+		"$or": bson.A{
+			bson.M{"migrated": bson.M{"$ne": true}},
+			bson.M{migrationKey: bson.M{"$ne": true}},
+		},
+	}
 	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
@@ -1335,15 +1449,6 @@ func insertSSUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *Po
 				}
 			}
 		}
-		updateFilter := bson.D{{Key: "id", Value: id}}
-		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
-		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
-		if err != nil {
-			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
-			errCount++
-			continue
-		}
-		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
 		migrateCount++
 
 	}
@@ -1410,7 +1515,14 @@ func insertSSGroupRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *P
 	dbName := "platform-db"
 	collectionName := "ScimServerGroups"
 	reqLogger := logf.FromContext(ctx)
-	filter := bson.D{{Key: "migrated", Value: bson.D{{Key: "$ne", Value: true}}}}
+	migrationKey := postgres.GetMigrationKey()
+	// filter := bson.D{{Key: migrationKey, Value: bson.D{{Key: "$ne", Value: true}}}}
+	filter := bson.M{
+		"$or": bson.A{
+			bson.M{"migrated": bson.M{"$ne": true}},
+			bson.M{migrationKey: bson.M{"$ne": true}},
+		},
+	}
 	cursor, err := mongodb.Client.Database(dbName).Collection(collectionName).Find(ctx, filter)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get cursor from MongoDB")
@@ -1508,15 +1620,6 @@ func insertSSGroupRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *P
 				}
 			}
 		}
-		updateFilter := bson.D{{Key: "id", Value: id}}
-		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
-		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
-		if err != nil {
-			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
-			errCount++
-			continue
-		}
-		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
 		migrateCount++
 
 	}
@@ -1612,9 +1715,10 @@ func insertGroupsAndMemberRefs(ctx context.Context, mongodb *MongoDB, postgres *
 	dbName := "platform-db"
 	collectionName := "Groups"
 	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
+	migrationKey := postgres.GetMigrationKey()
 	filter := bson.M{
 		"$and": bson.A{
-			bson.M{"migrated": bson.M{"$ne": true}},
+			bson.M{migrationKey: bson.M{"$ne": true}},
 			bson.M{"type": bson.M{"$eq": "SAML"}},
 		},
 	}
@@ -1675,7 +1779,7 @@ func insertGroupsAndMemberRefs(ctx context.Context, mongodb *MongoDB, postgres *
 			continue
 		}
 		updateFilter := bson.D{{Key: "_id", Value: group.GroupID}}
-		update := bson.D{{Key: "$set", Value: bson.D{{Key: "migrated", Value: true}}}}
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: migrationKey, Value: true}}}}
 		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo")

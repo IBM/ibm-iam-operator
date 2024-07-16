@@ -8,14 +8,21 @@ import (
 
 type DBOption func(*DBOptions) error
 
+// DBOptions repesent a series of details about a given database instance
 type DBOptions struct {
-	Name      string
-	Port      string
-	User      string
-	Password  string
-	Host      string
-	TLSConfig *tls.Config
-	Schemas   []string
+	Name      string      // the name of the database used in a DSN
+	ID        string      // the identifier used for logs, recording migration activity, etc.
+	Port      string      // the port used to connect to
+	User      string      // the user to authenticate as
+	Password  string      // the password to authenticate with
+	Host      string      // the database hostname/URL
+	TLSConfig *tls.Config // the certificates used to authenticate with
+	Schemas   []string    // a list of schema names
+}
+
+// GetMigrationKey returns a key name used for writing back successful migration state to some other database
+func (o *DBOptions) GetMigrationKey() string {
+	return fmt.Sprintf("migrated_to_%s", o.ID)
 }
 
 func (o *DBOptions) Configure(opts ...DBOption) (err error) {
@@ -54,6 +61,15 @@ func Name(name string) DBOption {
 	return func(c *DBOptions) (err error) {
 		if c != nil {
 			c.Name = name
+		}
+		return
+	}
+}
+
+func ID(id string) DBOption {
+	return func(c *DBOptions) (err error) {
+		if c != nil {
+			c.ID = id
 		}
 		return
 	}

@@ -237,6 +237,8 @@ spec:
                     type: string
                   xframeDomain:
                     type: string
+                  zenFrontDoor:
+                    type: boolean
                 required:
                 - authUniqueHosts
                 - clusterCADomain

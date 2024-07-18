@@ -374,6 +374,14 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 					currentConfigMap.Data["IDENTITY_PROVIDER_URL"] = "https://platform-identity-provider:4300"
 					cmUpdateRequired = true
 				}
+				roksUrl, keyExists := currentConfigMap.Data["ROKS_URL"]
+				if keyExists {
+					desiredRoksUrl, err := readROKSURL(instance)
+					if err == nil && len(desiredRoksUrl) != 0 && roksUrl != desiredRoksUrl {
+						currentConfigMap.Data["ROKS_URL"] = desiredRoksUrl
+						cmUpdateRequired = true
+					}
+				}
 
 				cmUpdateRequired = true
 

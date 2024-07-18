@@ -74,7 +74,7 @@ metadata:
               "installType": "fresh",
               "isOpenshiftEnv": true,
               "nonceEnabled": true,
-              "oidcIssuerURL": "https://127.0.0.1:443/oidc/endpoint/OP",
+              "oidcIssuerURL": "https://127.0.0.1:443/idauth/oidc/endpoint/OP",
               "openshiftPort": 443,
               "preferredLogin": "",
               "providerIssuerURL": "",

@@ -92,7 +92,7 @@ var registrationJson string = `{
   "introspect_tokens": true,
   "functional_user_groupIds": ["Administrator"],
   "trusted_uri_prefixes": ["https://{{.ICPConsoleURL}}"],
-  "redirect_uris": [{{ range $_, $url := .ICPRegistrationConsoleURIs}}{{printf "%q" $url}}{{", "}}{{end}}"https://127.0.0.1:443/oidc/endpoint/OP"]
+  "redirect_uris": [{{ range $_, $url := .ICPRegistrationConsoleURIs}}{{printf "%q" $url}}{{", "}}{{end}}"https://127.0.0.1:443/idauth/oidc/endpoint/OP"]
 }`
 
 var scimLdapAttributesMapping string = `{

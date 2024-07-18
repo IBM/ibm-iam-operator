@@ -158,6 +158,8 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, instance *o
 			Annotations: map[string]string{
 				"haproxy.router.openshift.io/balance":        "source",
 				"haproxy.router.openshift.io/rewrite-target": "/",
+				"haproxy.router.openshift.io/configuration-snippet": `http-response set-header Content-Security-Policy "default-src 'self'"`,
+
 			},
 			Name:              "platform-id-auth",
 			RouteHost:         routeHost,

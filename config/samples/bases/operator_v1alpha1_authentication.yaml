@@ -57,6 +57,7 @@ spec:
     isOpenshiftEnv: true
     nonceEnabled: true
     xframeDomain: ''
+    zenFrontDoor: false
     preferredLogin: ''
     bootstrapUserId: kubeadmin
     providerIssuerURL: ''

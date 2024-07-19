@@ -800,6 +800,10 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume
 					SecretName: "identity-provider-secret",
 					Items: []corev1.KeyToPath{
 						{
+							Key:  "ca.crt",
+							Path: "ca.crt",
+						},
+						{
 							Key:  "tls.key",
 							Path: "tls.key",
 						},

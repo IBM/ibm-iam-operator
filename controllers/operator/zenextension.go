@@ -59,6 +59,7 @@ location /v1/auth/ {
 location /idauth {
   proxy_set_header Host $host;
   proxy_set_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
+  proxy_set_header Content-Security-Policy "default-src 'self';";
   proxy_pass https://platform-auth-service.%[1]s.svc:9443;
   proxy_read_timeout 180s;
   rewrite /idauth/(.*) /$1 break;

@@ -362,6 +362,7 @@ func platformIdAuthBlockIngress(instance *operatorv1alpha1.Authentication, schem
 				"icp.management.ibm.com/location-modifier": "=",
 				"icp.management.ibm.com/configuration-snippet": `
 					add_header 'X-XSS-Protection' '1' always;
+					add_header 'Content-Security-Policy' "default-src 'self';";
 					`,
 			},
 		},
@@ -416,6 +417,7 @@ func platformIdAuthIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 				"icp.management.ibm.com/configuration-snippet": `
 					add_header 'X-Frame-Options' 'SAMEORIGIN' always;
 					add_header 'X-Content-Type-Options' 'nosniff';
+					add_header 'Content-Security-Policy' "default-src 'self';";
 					`,
 			},
 		},

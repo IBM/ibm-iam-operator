@@ -40,7 +40,9 @@ import (
 	oidcsecuritycontrollers "github.com/IBM/ibm-iam-operator/controllers/oidc.security"
 	operatorcontrollers "github.com/IBM/ibm-iam-operator/controllers/operator"
 	certmgrv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	mux "github.com/gorilla/mux"
 	routev1 "github.com/openshift/api/route/v1"
+	"net/http"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -157,4 +159,20 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+
+	r := mux.NewRouter()
+	// Middleware to set the Content-Security-Policy header for /idauth route
+	cspMiddleware := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/idauth" || len(r.URL.Path) > 8 && r.URL.Path[:8] == "/idauth/" {
+				w.Header().Set("Content-Security-Policy", "default-src 'self';")
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	// Serve files from the "idauth" directory for requests starting with /idauth
+	idauthHandler := http.StripPrefix("/idauth/", http.FileServer(http.Dir("idauth/")))
+	r.PathPrefix("/idauth/").Handler(cspMiddleware(idauthHandler))
+
 }

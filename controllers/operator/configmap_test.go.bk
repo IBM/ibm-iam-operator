@@ -1,0 +1,20 @@
+package operator
+
+import (
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+)
+
+//var _ = Describe("handleConfigMaps", func() {
+//	Describe("creates ConfigMaps", func() {
+//		Expect(true).To(BeTrue())
+//		By("Getting the cluster type and domain name from ibm-cpp-config ConfigMap for CS")
+//		By("Creating the ibmcloud-cluster-info ConfigMap if it does not already exist")
+//		By("Requeuing when the ConfigMap is owned by a ManagementIngress")
+//		By("Asserting control of the ConfigMap when it is owned by anything other than the Authentication or a ManagementIngress")
+//		By("Requeuing with an error when control cannot be asserted")
+//		By("Adding the \"app=auth-idp\" label to the ConfigMap")
+//		By("Updating the ConfigMap and requeuing when changes are made to it")
+//
+//	})
+//})

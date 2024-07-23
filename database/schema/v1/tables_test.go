@@ -1,17 +1,25 @@
+//
+// Copyright 2024 IBM Corporation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package v1
 
 import (
-	"testing"
-
+	"github.com/jackc/pgx/v5/pgtype"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
-
-func TestAPIs(t *testing.T) {
-	RegisterFailHandler(Fail)
-
-	RunSpecs(t, "Migration Suite")
-}
 
 var _ = Describe("IdpConfig", func() {
 	Describe("ToAnySlice", func() {
@@ -50,7 +58,7 @@ var _ = Describe("IdpConfig", func() {
 				}
 			})
 			It("produces a map[string]any containing field values", func() {
-				idpConfigMap = idpConfig.ToAnyMap()
+				idpConfigMap = RowDataToAnyMap(idpConfig)
 				Expect(idpConfigMap["uid"]).To(Equal(idpConfig.UID))
 				Expect(idpConfigMap["ldap_id"]).To(Equal(idpConfig.LDAPId))
 				Expect(idpConfigMap["description"]).To(Equal(idpConfig.Description))
@@ -500,3 +508,56 @@ var _ = DescribeTable("Role.ToString", func(r Role, expected string) {
 	Entry("\"\"", Authenticated, ""),
 	Entry("\"\"", Role(8), ""),
 )
+
+var _ = DescribeTable("RowDataToAnyMap", func(r RowData, expected map[string]any) {
+	actual := RowDataToAnyMap(r)
+	Expect(actual).To(Equal(expected))
+},
+	Entry("on Changelog",
+		&Changelog{
+			ID:          5,
+			Name:        "TestChange",
+			IMVersion:   "4.9.0",
+			InstallTime: &pgtype.Timestamptz{},
+		},
+		map[string]any{
+			"id":           5,
+			"name":         "TestChange",
+			"im_version":   "4.9.0",
+			"install_time": &pgtype.Timestamptz{},
+		}),
+	Entry("on OauthToken",
+		&OauthToken{
+			LookupKey:   "lookupkey",
+			UniqueID:    "uniqueid",
+			ProviderID:  "providerid",
+			Type:        "type",
+			SubType:     "subtype",
+			CreatedAt:   int64(0),
+			Lifetime:    int(1),
+			Expires:     int64(2),
+			TokenString: "tokenstring",
+			ClientID:    "clientid",
+			UserName:    "username",
+			Scope:       "scope",
+			RedirectUri: "redirecturi",
+			StateID:     "stateid",
+			Props:       "props",
+		},
+		map[string]any{
+			"LOOKUPKEY":   "lookupkey",
+			"UNIQUEID":    "uniqueid",
+			"PROVIDERID":  "providerid",
+			"TYPE":        "type",
+			"SUBTYPE":     "subtype",
+			"CREATEDAT":   int64(0),
+			"LIFETIME":    int(1),
+			"EXPIRES":     int64(2),
+			"TOKENSTRING": "tokenstring",
+			"CLIENTID":    "clientid",
+			"USERNAME":    "username",
+			"SCOPE":       "scope",
+			"REDIRECTURI": "redirecturi",
+			"STATEID":     "stateid",
+			"PROPS":       "props",
+		}))

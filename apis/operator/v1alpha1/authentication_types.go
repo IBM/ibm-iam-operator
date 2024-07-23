@@ -298,3 +298,11 @@ func (a *Authentication) HasDBSchemaVersion() bool {
 func (a *Authentication) HasNoDBSchemaVersion() bool {
 	return !a.HasDBSchemaVersion()
 }
+
+func (a *Authentication) GetDBSchemaVersion() string {
+	annotations := a.GetAnnotations()
+	if version, ok := annotations[AnnotationAuthDBSchemaVersion]; ok {
+		return version
+	}
+	return ""
+}

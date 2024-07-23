@@ -3,7 +3,8 @@ package operator
 import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 
-	"github.com/IBM/ibm-iam-operator/migration"
+	"github.com/IBM/ibm-iam-operator/database/migration"
+	v1schema "github.com/IBM/ibm-iam-operator/database/schema/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +48,7 @@ var _ = Describe("Authentication Controller", func() {
 
 	//})
 
-	Describe("setMigrationAnnotations", func() {
+	Describe("setMongoMigrationAnnotations", func() {
 		var authCR *operatorv1alpha1.Authentication
 		var result *migration.Result
 		var previousAnnotations, currentAnnotations map[string]string
@@ -68,7 +69,7 @@ var _ = Describe("Authentication Controller", func() {
 			It("makes no changes", func() {
 				By("skipping processing of nil migration results")
 				previousAnnotations = authCR.DeepCopy().GetAnnotations()
-				changed := setMigrationAnnotations(authCR, result)
+				changed := setMongoMigrationAnnotations(authCR, result)
 				currentAnnotations = authCR.GetAnnotations()
 				Expect(changed).To(BeFalse())
 				Expect(currentAnnotations).To(Equal(previousAnnotations))
@@ -77,7 +78,7 @@ var _ = Describe("Authentication Controller", func() {
 				By("leaving nil annotations as nil")
 				result = &migration.Result{}
 				previousAnnotations = authCR.DeepCopy().GetAnnotations()
-				changed = setMigrationAnnotations(authCR, result)
+				changed = setMongoMigrationAnnotations(authCR, result)
 				currentAnnotations = authCR.GetAnnotations()
 				Expect(changed).To(BeFalse())
 				Expect(currentAnnotations).To(Equal(previousAnnotations))
@@ -90,7 +91,7 @@ var _ = Describe("Authentication Controller", func() {
 					operatorv1alpha1.AnnotationAuthRetainMigrationArtifacts: "true",
 				}
 				authCR.SetAnnotations(previousAnnotations)
-				changed = setMigrationAnnotations(authCR, result)
+				changed = setMongoMigrationAnnotations(authCR, result)
 				currentAnnotations = authCR.GetAnnotations()
 				Expect(changed).To(BeFalse())
 				Expect(currentAnnotations).To(Equal(previousAnnotations))
@@ -112,33 +113,13 @@ var _ = Describe("Authentication Controller", func() {
 				}
 			})
 			BeforeEach(func() {
+				m := migration.NewMigration().Name("initEDB").Build()
 				result = &migration.Result{
 					Complete: []*migration.Migration{
-						{Name: "initEDB"},
+						m,
 					},
 				}
 
-			})
-			It("adds the DB schema annotation to the Authentication CR", func() {
-				By("replacing nil annotations with the DB schema annotation")
-				previousAnnotations = authCR.DeepCopy().GetAnnotations()
-				changed := setMigrationAnnotations(authCR, result)
-				currentAnnotations = authCR.GetAnnotations()
-				Expect(changed).To(BeTrue())
-				Expect(currentAnnotations).ToNot(Equal(previousAnnotations))
-				Expect(currentAnnotations[operatorv1alpha1.AnnotationAuthDBSchemaVersion]).To(Equal("1.0.0"))
-			})
-			It("adds the DB schema annotation to the Authentication CR", func() {
-				By("replacing the existing value with the new DB schema annotation")
-				previousAnnotations = map[string]string{
-					operatorv1alpha1.AnnotationAuthDBSchemaVersion: "0.1.0",
-				}
-				authCR.SetAnnotations(previousAnnotations)
-				changed := setMigrationAnnotations(authCR, result)
-				currentAnnotations = authCR.GetAnnotations()
-				Expect(changed).To(BeTrue())
-				Expect(currentAnnotations).ToNot(Equal(previousAnnotations))
-				Expect(currentAnnotations[operatorv1alpha1.AnnotationAuthDBSchemaVersion]).To(Equal("1.0.0"))
 			})
 		})
 
@@ -155,9 +136,10 @@ var _ = Describe("Authentication Controller", func() {
 						ResourceVersion: trackerAddResourceVersion,
 					},
 				}
+				m := migration.NewMigration().Name("MongoToV1").Build()
 				result = &migration.Result{
 					Complete: []*migration.Migration{
-						{Name: "MongoToV1"},
+						m,
 					},
 				}
 			})
@@ -165,7 +147,7 @@ var _ = Describe("Authentication Controller", func() {
 			It("sets the Mongo migration annotations to the Authentication CR", func() {
 				By("creating a new annotations map if one is not set")
 				authCR.SetAnnotations(nil)
-				changed := setMigrationAnnotations(authCR, result)
+				changed := setMongoMigrationAnnotations(authCR, result)
 				currentAnnotations = authCR.GetAnnotations()
 				Expect(changed).To(BeTrue())
 				Expect(currentAnnotations).ToNot(Equal(previousAnnotations))
@@ -177,7 +159,7 @@ var _ = Describe("Authentication Controller", func() {
 					operatorv1alpha1.AnnotationAuthDBSchemaVersion: "1.0.0",
 				}
 				authCR.SetAnnotations(previousAnnotations)
-				changed = setMigrationAnnotations(authCR, result)
+				changed = setMongoMigrationAnnotations(authCR, result)
 				currentAnnotations = authCR.GetAnnotations()
 				Expect(changed).To(BeTrue())
 				Expect(currentAnnotations).ToNot(Equal(previousAnnotations))
@@ -192,7 +174,7 @@ var _ = Describe("Authentication Controller", func() {
 					operatorv1alpha1.AnnotationAuthRetainMigrationArtifacts: "true",
 				}
 				authCR.SetAnnotations(previousAnnotations)
-				changed = setMigrationAnnotations(authCR, result)
+				changed = setMongoMigrationAnnotations(authCR, result)
 				currentAnnotations = authCR.GetAnnotations()
 				Expect(changed).To(BeTrue())
 				Expect(currentAnnotations).ToNot(Equal(previousAnnotations))
@@ -214,9 +196,10 @@ var _ = Describe("Authentication Controller", func() {
 						ResourceVersion: trackerAddResourceVersion,
 					},
 				}
+				m := migration.NewMigration().Name("MongoToV1").Build()
 				result = &migration.Result{
 					Incomplete: []*migration.Migration{
-						{Name: "MongoToV1"},
+						m,
 					},
 				}
 			})
@@ -224,7 +207,7 @@ var _ = Describe("Authentication Controller", func() {
 			It("sets the Mongo migration annotations to the Authentication CR", func() {
 				By("creating a new annotations map if one is not set")
 				authCR.SetAnnotations(nil)
-				changed := setMigrationAnnotations(authCR, result)
+				changed := setMongoMigrationAnnotations(authCR, result)
 				currentAnnotations = authCR.GetAnnotations()
 				Expect(changed).To(BeTrue())
 				Expect(currentAnnotations).ToNot(Equal(previousAnnotations))
@@ -235,7 +218,7 @@ var _ = Describe("Authentication Controller", func() {
 					operatorv1alpha1.AnnotationAuthDBSchemaVersion: "1.0.0",
 				}
 				authCR.SetAnnotations(previousAnnotations)
-				changed = setMigrationAnnotations(authCR, result)
+				changed = setMongoMigrationAnnotations(authCR, result)
 				currentAnnotations = authCR.GetAnnotations()
 				Expect(changed).To(BeTrue())
 				Expect(currentAnnotations).ToNot(Equal(previousAnnotations))
@@ -249,7 +232,7 @@ var _ = Describe("Authentication Controller", func() {
 					operatorv1alpha1.AnnotationAuthRetainMigrationArtifacts: "true",
 				}
 				authCR.SetAnnotations(previousAnnotations)
-				changed = setMigrationAnnotations(authCR, result)
+				changed = setMongoMigrationAnnotations(authCR, result)
 				currentAnnotations = authCR.GetAnnotations()
 				Expect(changed).To(BeTrue())
 				Expect(currentAnnotations).ToNot(Equal(previousAnnotations))
@@ -258,4 +241,40 @@ var _ = Describe("Authentication Controller", func() {
 			})
 		})
 	})
+
+	var _ = DescribeTable("setDBSchemaVersionAnnotation",
+		func(authCR *operatorv1alpha1.Authentication, expected bool) {
+			changed := setDBSchemaVersionAnnotation(authCR)
+			Expect(changed).To(Equal(expected))
+			Expect(authCR.GetAnnotations()).
+				To(HaveKeyWithValue(operatorv1alpha1.AnnotationAuthDBSchemaVersion, v1schema.SchemaVersion))
+		},
+		Entry("Returns true if the map has been changed",
+			&operatorv1alpha1.Authentication{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "operator.ibm.com/v1alpha1",
+					Kind:       "Authentication",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "example-authentication",
+					Namespace:       "data-ns",
+					ResourceVersion: trackerAddResourceVersion,
+				},
+			}, true),
+		Entry("Returns false if the map has been changed",
+			&operatorv1alpha1.Authentication{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "operator.ibm.com/v1alpha1",
+					Kind:       "Authentication",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "example-authentication",
+					Namespace:       "data-ns",
+					ResourceVersion: trackerAddResourceVersion,
+					Annotations: map[string]string{
+						operatorv1alpha1.AnnotationAuthDBSchemaVersion: v1schema.SchemaVersion,
+					},
+				},
+			}, false),
+	)
 })

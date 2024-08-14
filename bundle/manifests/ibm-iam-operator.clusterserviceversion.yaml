@@ -24,7 +24,7 @@ metadata:
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.5.4",
+              "imageTag": "4.5.5",
               "ldapsCACert": "platform-auth-ldaps-ca-cert",
               "resources": {
                 "limits": {
@@ -43,7 +43,7 @@ metadata:
             "clientRegistration": {
               "imageName": "im-initcontainer",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.5.4",
+              "imageTag": "4.5.5",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -93,7 +93,7 @@ metadata:
             "identityManager": {
               "imageName": "icp-identity-manager",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.5.4",
+              "imageTag": "4.5.5",
               "masterNodesList": "10.0.0.1",
               "resources": {
                 "limits": {
@@ -111,7 +111,7 @@ metadata:
             "identityProvider": {
               "imageName": "icp-identity-provider",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.5.4",
+              "imageTag": "4.5.5",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -128,7 +128,7 @@ metadata:
             "initMongodb": {
               "imageName": "im-initcontainer",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.5.4",
+              "imageTag": "4.5.5",
               "resources": {
                 "limits": {
                   "cpu": "100m",
@@ -190,10 +190,10 @@ metadata:
     capabilities: Basic Install
     categories: Security
     certified: "false"
-    containerImage: icr.io/cpopen/ibm-iam-operator:4.5.4
+    containerImage: icr.io/cpopen/ibm-iam-operator:4.5.5
     createdAt: "2024-03-29T06:13:00Z"
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage the lifecycle of IAM services. With this operator, you can simply deploy and upgrade the IAM services
-    olm.skipRange: <4.5.4
+    olm.skipRange: <4.5.5
     operators.operatorframework.io/builder: operator-sdk-v1.33.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/IBM/ibm-iam-operator
@@ -203,7 +203,7 @@ metadata:
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
     operatorframework.io/os.linux: supported
-  name: ibm-iam-operator.v4.5.4
+  name: ibm-iam-operator.v4.5.5
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -352,14 +352,14 @@ spec:
                       - name: ROUTE_HTTPS_PORT
                       - name: cluster_name
                       - name: ICP_PLATFORM_AUTH_IMAGE
-                        value: icr.io/cpopen/cpfs/icp-platform-auth:4.5.4
+                        value: icr.io/cpopen/cpfs/icp-platform-auth:4.5.5
                       - name: ICP_IDENTITY_PROVIDER_IMAGE
-                        value: icr.io/cpopen/cpfs/icp-identity-provider:4.5.4
+                        value: icr.io/cpopen/cpfs/icp-identity-provider:4.5.5
                       - name: ICP_IDENTITY_MANAGER_IMAGE
-                        value: icr.io/cpopen/cpfs/icp-identity-manager:4.5.4
+                        value: icr.io/cpopen/cpfs/icp-identity-manager:4.5.5
                       - name: IM_INITCONTAINER_IMAGE
-                        value: icr.io/cpopen/cpfs/im-initcontainer:4.5.4
-                    image: icr.io/cpopen/ibm-iam-operator:4.5.4
+                        value: icr.io/cpopen/cpfs/im-initcontainer:4.5.5
+                    image: icr.io/cpopen/ibm-iam-operator:4.5.5
                     imagePullPolicy: IfNotPresent
                     name: ibm-iam-operator
                     resources:
@@ -624,17 +624,17 @@ spec:
   maturity: stable
   provider:
     name: IBM
-  version: 4.5.4
+  version: 4.5.5
   relatedImages:
-    - image: icr.io/cpopen/ibm-iam-operator:4.5.4
+    - image: icr.io/cpopen/ibm-iam-operator:4.5.5
       name: IBM_IAM_OPERATOR_IMAGE
-    - image: icr.io/cpopen/cpfs/icp-platform-auth:4.5.4
+    - image: icr.io/cpopen/cpfs/icp-platform-auth:4.5.5
       name: ICP_PLATFORM_AUTH_IMAGE
-    - image: icr.io/cpopen/cpfs/icp-identity-provider:4.5.4
+    - image: icr.io/cpopen/cpfs/icp-identity-provider:4.5.5
       name: ICP_IDENTITY_PROVIDER_IMAGE
-    - image: icr.io/cpopen/cpfs/icp-identity-manager:4.5.4
+    - image: icr.io/cpopen/cpfs/icp-identity-manager:4.5.5
       name: ICP_IDENTITY_MANAGER_IMAGE
-    - image: icr.io/cpopen/cpfs/im-initcontainer:4.5.4
+    - image: icr.io/cpopen/cpfs/im-initcontainer:4.5.5
       name: IAM_CUSTOM_HOSTNAME_IMAGE
-    - image: icr.io/cpopen/cpfs/iam-custom-hostname:4.5.4
+    - image: icr.io/cpopen/cpfs/iam-custom-hostname:4.5.5
       name: IM_INITCONTAINER_IMAGE

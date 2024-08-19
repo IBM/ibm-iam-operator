@@ -18,7 +18,7 @@ FROM alpine as qemu-builder
 
 RUN wget -O /qemu-s390x-static https://github.com/multiarch/qemu-user-static/releases/download/v5.2.0-2/qemu-s390x-static && chmod +x /qemu-s390x-static
 
-FROM docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-edge-docker-local/build-images/ubi8-minimal:latest-s390x
+FROM docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-edge-docker-local/build-images/ubi9-minimal:latest-s390x
 
 ARG VCS_REF
 ARG VCS_URL

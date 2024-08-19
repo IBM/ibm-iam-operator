@@ -18,8 +18,8 @@ FROM alpine as qemu-builder
 
 RUN wget -O /qemu-ppc64le-static https://github.com/multiarch/qemu-user-static/releases/download/v5.2.0-2/qemu-ppc64le-static && chmod +x /qemu-ppc64le-static
 
-# Swap default image for ubi8-minimal
-FROM docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-edge-docker-local/build-images/ubi8-minimal:latest-ppc64le
+# Swap default image for ubi9-minimal
+FROM docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-edge-docker-local/build-images/ubi9-minimal:latest-ppc64le
 
 ARG VCS_REF
 ARG VCS_URL

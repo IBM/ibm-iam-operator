@@ -35,8 +35,8 @@ COPY controllers/ controllers/
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN CGO_ENABLED=0 GOOS=linux go build -a -o manager main.go
 
-# Swap default image for ubi8-minimal
-FROM docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-edge-docker-local/build-images/ubi8-minimal:latest
+# Swap default image for ubi9-minimal
+FROM docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-edge-docker-local/build-images/ubi9-minimal:latest
 
 ARG VCS_REF
 ARG VCS_URL

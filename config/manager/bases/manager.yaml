@@ -34,6 +34,9 @@ spec:
         productMetric: FREE
     spec:
       serviceAccountName: ibm-iam-operator
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

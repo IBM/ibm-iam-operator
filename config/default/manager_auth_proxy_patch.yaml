@@ -27,8 +27,6 @@ spec:
       containers:
       - name: kube-rbac-proxy
         securityContext:
-          seccompProfile:
-            type: RuntimeDefault
           allowPrivilegeEscalation: false
           capabilities:
             drop:

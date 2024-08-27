@@ -3,8 +3,8 @@ module github.com/IBM/ibm-iam-operator
 go 1.21
 
 require (
-	github.com/cert-manager/cert-manager v1.13.1
 	github.com/google/uuid v1.6.0
+	github.com/ibm/ibm-cert-manager-operator v0.0.0-20240404195125-8a3981d0d6eb
 	github.com/jackc/pgx/v5 v5.5.4
 	github.com/onsi/ginkgo/v2 v2.12.0
 	github.com/onsi/gomega v1.27.10
@@ -87,7 +87,7 @@ require (
 	k8s.io/component-base v0.28.1 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20230905202853-d090da108d2f // indirect
-	sigs.k8s.io/gateway-api v0.8.0 // indirect
+	sigs.k8s.io/gateway-api v0.8.1 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.3.0 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect

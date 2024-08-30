@@ -19,8 +19,8 @@ package operator
 import (
 	"context"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
-	certmgrv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
-	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
+	certmgrv1 "github.com/ibm/ibm-cert-manager-operator/apis/cert-manager/v1"
+	cmmeta "github.com/ibm/ibm-cert-manager-operator/apis/meta.cert-manager/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

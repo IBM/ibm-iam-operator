@@ -28,7 +28,7 @@ import (
 
 	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	"github.com/IBM/ibm-iam-operator/migration"
-	certmgr "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	certmgr "github.com/ibm/ibm-cert-manager-operator/apis/cert-manager/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"

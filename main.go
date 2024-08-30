@@ -39,7 +39,7 @@ import (
 	controllercommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	oidcsecuritycontrollers "github.com/IBM/ibm-iam-operator/controllers/oidc.security"
 	operatorcontrollers "github.com/IBM/ibm-iam-operator/controllers/operator"
-	certmgrv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	certmgrv1 "github.com/ibm/ibm-cert-manager-operator/apis/cert-manager/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	//+kubebuilder:scaffold:imports
 )

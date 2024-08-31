@@ -128,6 +128,7 @@ func main() {
 	clientReconciler := &oidcsecuritycontrollers.ClientReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
+		Logger:   zap.New(zap.UseFlagOptions(&opts)).WithName(clientControllerName),
 		Recorder: mgr.GetEventRecorderFor(clientControllerName),
 	}
 	if err = (clientReconciler).SetupWithManager(mgr); err != nil {
@@ -136,6 +137,7 @@ func main() {
 	}
 	if err = (&operatorcontrollers.AuthenticationReconciler{
 		Client: mgr.GetClient(),
+		Logger: zap.New(zap.UseFlagOptions(&opts)).WithName("controller_authentication"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Authentication")

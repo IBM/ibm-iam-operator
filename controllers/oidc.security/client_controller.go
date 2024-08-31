@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/IBM/ibm-iam-operator/controllers/common"
+	"github.com/go-logr/logr"
 
 	"fmt"
 
@@ -64,16 +65,15 @@ const (
 	CP2FinalizerName  string = "fynalyzer.client.oidc.security.ibm.com"
 	AdministratorRole string = "Administrator"
 )
-const controllerName = "controller_oidc_client"
 
 const baseDeploymentWaitTime time.Duration = time.Minute
 
 var Clock clock.Clock = clock.RealClock{}
-var log = logf.Log.WithName(controllerName)
 
 // ClientReconciler reconciles a Client object
 type ClientReconciler struct {
 	runtimeClient.Client
+	logr.Logger
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
@@ -81,7 +81,7 @@ type ClientReconciler struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
-	reqLogger := log.WithValues("Request.Namespace", req.Namespace, "Request.Name", req.Name)
+	reqLogger := r.WithValues("Request.Namespace", req.Namespace, "Request.Name", req.Name)
 
 	reqLogger.Info("Reconciling Client CR")
 
@@ -95,9 +95,8 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		r.updateStatus,
 	}
 
-	subreconcilerCtx := logf.IntoContext(ctx, reqLogger)
 	for _, f := range subreconcilersForClient {
-		if r, err := f(subreconcilerCtx, req); subreconciler.ShouldHaltOrRequeue(r, err) {
+		if r, err := f(ctx, req); subreconciler.ShouldHaltOrRequeue(r, err) {
 			return subreconciler.Evaluate(r, err)
 		}
 	}
@@ -112,7 +111,7 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 // addFinalizer first performs any required migration steps on the Client if it was created using
 // icp-oidcclient-watcher, then adds this controller's finalizer to it.
 func (r *ClientReconciler) addFinalizer(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "addFinalizer")
+	reqLogger := r.WithValues("subreconciler", "addFinalizer")
 	reqLogger.Info("Add finalizer to Client if not already present")
 
 	clientCR := &oidcsecurityv1.Client{}
@@ -121,7 +120,7 @@ func (r *ClientReconciler) addFinalizer(ctx context.Context, req ctrl.Request) (
 		return
 	}
 
-	migrated := migrateCP2Client(ctx, clientCR)
+	migrated := migrateCP2Client(clientCR)
 
 	added := controllerutil.AddFinalizer(clientCR, CP3FinalizerName)
 	if added {
@@ -143,7 +142,7 @@ func (r *ClientReconciler) addFinalizer(ctx context.Context, req ctrl.Request) (
 // handleDeletion performs finalizing tasks and removes any finalizers set by this Operator to allow for safe deletion
 // of a Client if it has been marked for deletion.
 func (r *ClientReconciler) handleDeletion(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleDeletion")
+	reqLogger := r.WithValues("subreconciler", "handleDeletion")
 	reqLogger.Info("Handle cleanup of Client if it has been marked for deletion")
 
 	clientCR := &oidcsecurityv1.Client{}
@@ -183,6 +182,8 @@ func (r *ClientReconciler) handleDeletion(ctx context.Context, req ctrl.Request)
 		return subreconciler.RequeueWithError(err)
 	}
 
+	reqLogger.Info("Client deleted")
+
 	reqLogger.Info("Updating status")
 	if err = r.writeErrorConditionsAndEvents(ctx, clientCR, err, requestMethod); err != nil {
 		reqLogger.Error(err, "Failed to update Client status")
@@ -210,7 +211,7 @@ func (r *ClientReconciler) handleDeletion(ctx context.Context, req ctrl.Request)
 // ensureSecretAndClientIdSet checks a Client CR to be sure that its corresponding Secret containing the client ID and
 // client secret has been created and that the ID on the CR itself has been set to match the value in the Secret.
 func (r *ClientReconciler) ensureSecretAndClientIdSet(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "ensureSecretAndClientIdSet")
+	reqLogger := r.WithValues("subreconciler", "ensureSecretAndClientIdSet")
 	reqLogger.Info("Ensuring Secret and Client ID are set")
 
 	clientCR := &oidcsecurityv1.Client{}
@@ -280,7 +281,7 @@ func (r *ClientReconciler) ensureSecretAndClientIdSet(ctx context.Context, req c
 // processOidcRegistration creates a new OIDC client or updates an existing one with whatever state is observed in the
 // Client CR.
 func (r *ClientReconciler) processOidcRegistration(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "processOidcRegistration")
+	reqLogger := r.WithValues("subreconciler", "processOidcRegistration")
 	reqLogger.Info("Processing OIDC client registration")
 
 	var requestMethod string
@@ -362,7 +363,7 @@ func (r *ClientReconciler) processOidcRegistration(ctx context.Context, req ctrl
 // annotateServiceAccount updates ibm-iam-operand-restricted SA with redirecturi's present in the Client CR for
 // updateClient Call
 func (r *ClientReconciler) annotateServiceAccount(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "annotateServiceAccount")
+	reqLogger := r.WithValues("subreconciler", "annotateServiceAccount")
 	reqLogger.Info("Add any missing Client annotations to ibm-iam-operand-restricted ServiceAccount")
 
 	clientCR := &oidcsecurityv1.Client{}
@@ -427,7 +428,7 @@ func (r *ClientReconciler) annotateServiceAccount(ctx context.Context, req ctrl.
 // processZenRegistration registers the OIDC client credentials for use with the Zen instance that has the same ID as
 // the one specified on the Client CR's .spec.ZenInstanceId.
 func (r *ClientReconciler) processZenRegistration(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "processZenRegistration")
+	reqLogger := r.WithValues("subreconciler", "processZenRegistration")
 	reqLogger.Info("Processing Zen instance registration for Client, if configured")
 	clientCR := &oidcsecurityv1.Client{}
 
@@ -522,7 +523,7 @@ func (r *ClientReconciler) processZenRegistration(ctx context.Context, req ctrl.
 
 // updateStatus sets success-related conditions in the Client CR's status.
 func (r *ClientReconciler) updateStatus(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "updateStatus")
+	reqLogger := r.WithValues("subreconciler", "updateStatus")
 	reqLogger.Info("Marking Client Ready condition as \"True\"")
 
 	clientCR := &oidcsecurityv1.Client{}
@@ -548,7 +549,7 @@ func (r *ClientReconciler) updateStatus(ctx context.Context, req ctrl.Request) (
 // End subreconcilers
 
 func (r *ClientReconciler) getLatestClient(ctx context.Context, req ctrl.Request, client *oidcsecurityv1.Client) (*ctrl.Result, error) {
-	reqLogger := logf.FromContext(ctx)
+	reqLogger := r.V(3).WithValues("func", "getLatestClient")
 
 	if err := r.Get(ctx, req.NamespacedName, client); err != nil {
 		if k8sErrors.IsNotFound(err) {
@@ -585,7 +586,7 @@ func createPostfixedName(original, postfix string) (newName string) {
 
 // finalizeClient performs all clean up that needs to be performed before a Client CR can be deleted safely.
 func (r *ClientReconciler) finalizeClient(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
+	reqLogger := r.V(3).WithValues("func", "finalizeClient")
 	clientCR := &oidcsecurityv1.Client{}
 
 	if _, err = r.getLatestClient(ctx, req, clientCR); err != nil {
@@ -652,21 +653,15 @@ func (r *ClientReconciler) isDeploymentAvailable(ctx context.Context, deployment
 // migrateCP2Client updates an existing Client that has the finalizer from the icp-oidcclient-watcher Operator and
 // replaces it with this controller's. It also adds the Administrator role if the Client is not configured for use with
 // an instance of Zen and has no roles specified. Returns whether a change to the Client was made.
-func migrateCP2Client(ctx context.Context, clientCR *oidcsecurityv1.Client) (clientChanged bool) {
-	reqLogger := logf.FromContext(ctx)
-
+func migrateCP2Client(clientCR *oidcsecurityv1.Client) (clientChanged bool) {
 	if !controllerutil.ContainsFinalizer(clientCR, CP2FinalizerName) {
 		return false
 	}
-
 	if clientCR.Spec.ZenInstanceId == "" && len(clientCR.Spec.Roles) == 0 {
-		reqLogger.Info("Upgrade check : Non-ZEN cp2 Client CR Role would be updated : ", "Role", AdministratorRole)
 		clientCR.Spec.Roles = append(clientCR.Spec.Roles, AdministratorRole)
-		reqLogger.Info("Upgrade check : Non-ZEN CP2 Client CR Finalizers would be updated : ", "Finalizer", CP3FinalizerName)
 		controllerutil.RemoveFinalizer(clientCR, CP2FinalizerName)
 		return true
 	} else if clientCR.Spec.ZenInstanceId != "" {
-		reqLogger.Info("Upgrade check : ZEN cp2 Client CR Finalizers would be updated : ", "Finalizer", CP3FinalizerName)
 		controllerutil.RemoveFinalizer(clientCR, CP2FinalizerName)
 		return true
 	}

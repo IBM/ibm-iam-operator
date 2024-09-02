@@ -319,6 +319,9 @@ spec:
                   name: ibm-iam-operator
                   productName: IBM_Cloud_Platform_Common_Services
               spec:
+                securityContext:
+                  seccompProfile:
+                    type: RuntimeDefault
                 affinity:
                   nodeAffinity:
                     requiredDuringSchedulingIgnoredDuringExecution:
@@ -372,6 +375,8 @@ spec:
                         ephemeral-storage: 256Mi
                         memory: 80Mi
                     securityContext:
+                      seccompProfile:
+                        type: RuntimeDefault
                       allowPrivilegeEscalation: false
                       capabilities:
                         drop:

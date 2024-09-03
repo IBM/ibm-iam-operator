@@ -652,7 +652,6 @@ func (r *AuthenticationReconciler) shutdownMongo(ctx context.Context, req ctrl.R
 
 func (r *AuthenticationReconciler) getLatestAuthentication(ctx context.Context, req ctrl.Request, authentication *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx)
-
 	if err := r.Get(ctx, req.NamespacedName, authentication); err != nil {
 		if k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Authentication not found; skipping reconciliation")
@@ -887,9 +886,8 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	r.handleServiceAccount(instance, &needToRequeue)
 
 	if ctrlCommon.ClusterHasRouteGroupVersion() {
-		err = r.handleRoutes(ctx, instance, &needToRequeue)
-		if err != nil && !k8sErrors.IsNotFound(err) {
-			return
+		if subResult, err := r.handleRoutes(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+			return subreconciler.Evaluate(subResult, err)
 		}
 	}
 

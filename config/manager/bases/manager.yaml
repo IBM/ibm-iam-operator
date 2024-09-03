@@ -38,6 +38,9 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       affinity:
+        securityContext:
+          seccompProfile:
+            type: RuntimeDefault
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:

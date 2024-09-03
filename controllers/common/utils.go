@@ -18,6 +18,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	discovery "k8s.io/client-go/discovery"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
@@ -254,4 +256,31 @@ func MergeMap(in map[string]string, mergeMap map[string]string) map[string]strin
 		mergeMap[k] = v
 	}
 	return mergeMap
+}
+
+// ReduceSubreconcilerResultsAndErrors takes a slice of Result pointers and a slice of errors and reduces them to a
+// single Result pointer and error to be used in a subreconciler.Evaluate call.
+func ReduceSubreconcilerResultsAndErrors(results []*ctrl.Result, errs []error) (result *ctrl.Result, err error) {
+	err = errors.Join(errs...)
+	for _, r := range results {
+		if r == nil {
+			continue
+		}
+		if result == nil {
+			result = &ctrl.Result{}
+			*result = *r
+			continue
+		}
+		if r.Requeue {
+			result.Requeue = true
+		}
+		// Always use exponential back off for results that have errors
+		if err != nil {
+			result.RequeueAfter = 0
+		} else if r.RequeueAfter > result.RequeueAfter {
+			result.RequeueAfter = r.RequeueAfter
+		}
+	}
+
+	return
 }

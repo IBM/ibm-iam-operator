@@ -192,7 +192,7 @@ metadata:
     categories: Security
     certified: "false"
     containerImage: icr.io/cpopen/ibm-iam-operator:4.8.0
-    createdAt: "2024-08-31T09:39:23Z"
+    createdAt: "2024-09-03T14:43:05Z"
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage the lifecycle of IAM services. With this operator, you can simply deploy and upgrade the IAM services
     olm.skipRange: <4.8.0
     operators.operatorframework.io/builder: operator-sdk-v1.35.0
@@ -204,7 +204,7 @@ metadata:
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
     operatorframework.io/os.linux: supported
-  name: ibm-iam-operator.v4.7.0
+  name: ibm-iam-operator.v4.8.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -319,9 +319,6 @@ spec:
                   name: ibm-iam-operator
                   productName: IBM_Cloud_Platform_Common_Services
               spec:
-                securityContext:
-                  seccompProfile:
-                    type: RuntimeDefault
                 affinity:
                   nodeAffinity:
                     requiredDuringSchedulingIgnoredDuringExecution:
@@ -375,14 +372,17 @@ spec:
                         ephemeral-storage: 256Mi
                         memory: 80Mi
                     securityContext:
-                      seccompProfile:
-                        type: RuntimeDefault
                       allowPrivilegeEscalation: false
                       capabilities:
                         drop:
                           - ALL
                       privileged: false
                       readOnlyRootFilesystem: true
+                      seccompProfile:
+                        type: RuntimeDefault
+                securityContext:
+                  seccompProfile:
+                    type: RuntimeDefault
                 serviceAccountName: ibm-iam-operator
       permissions:
         - rules:
@@ -642,7 +642,7 @@ spec:
   maturity: stable
   provider:
     name: IBM
-  version: 4.7.0
+  version: 4.8.0
   relatedImages:
     - image: icr.io/cpopen/ibm-iam-operator:4.8.0
       name: IBM_IAM_OPERATOR_IMAGE

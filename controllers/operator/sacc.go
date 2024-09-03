@@ -31,7 +31,7 @@ import (
 
 func (r *AuthenticationReconciler) createSA(instance *operatorv1alpha1.Authentication, currentSA *corev1.ServiceAccount, needToRequeue *bool) (err error) {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := r.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	operandSAName := "ibm-iam-operand-restricted"
 
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: operandSAName, Namespace: instance.Namespace}, currentSA)
@@ -57,7 +57,7 @@ func (r *AuthenticationReconciler) createSA(instance *operatorv1alpha1.Authentic
 
 func (r *AuthenticationReconciler) handleServiceAccount(instance *operatorv1alpha1.Authentication, needToRequeue *bool) {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := r.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	// step 1. Get console url to form redirecturi
 	consoleURL := r.getConsoleURL(instance, needToRequeue)
 	var redirectURI string
@@ -93,7 +93,7 @@ func (r *AuthenticationReconciler) handleServiceAccount(instance *operatorv1alph
 }
 
 func generateSAObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, operndSAName string) *corev1.ServiceAccount {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	metaLabels := map[string]string{
 		"app.kubernetes.io/instance":   "ibm-iam-operator",
 		"app.kubernetes.io/managed-by": "ibm-iam-operator",
@@ -111,7 +111,7 @@ func generateSAObject(instance *operatorv1alpha1.Authentication, scheme *runtime
 	// Set Authentication instance as the owner and controller of the operand serviceaccount
 	err := controllerutil.SetControllerReference(instance, operandSA, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for serviceaccount")
+		//reqLogger.Error(err, "Failed to set owner for serviceaccount")
 		return nil
 	}
 	return operandSA
@@ -120,7 +120,7 @@ func generateSAObject(instance *operatorv1alpha1.Authentication, scheme *runtime
 // getConsoleURL retrives the cp-console host
 func (r *AuthenticationReconciler) getConsoleURL(instance *operatorv1alpha1.Authentication, needToRequeue *bool) (icpConsoleURL string) {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := r.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	proxyConfigMapName := "ibmcloud-cluster-info"
 	proxyConfigMap := &corev1.ConfigMap{}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: proxyConfigMapName, Namespace: instance.Namespace}, proxyConfigMap)

@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	certmgrv1alpha1 "github.com/IBM/ibm-iam-operator/apis/cert-manager/v1alpha1"
 	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/apis/oidc.security/v1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	zenv1 "github.com/IBM/ibm-iam-operator/apis/zen.cpd.ibm.com/v1"
@@ -41,6 +42,8 @@ import (
 	operatorcontrollers "github.com/IBM/ibm-iam-operator/controllers/operator"
 	certmgrv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	routev1 "github.com/openshift/api/route/v1"
+	discovery "k8s.io/client-go/discovery"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -55,8 +58,18 @@ func init() {
 	utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(certmgrv1.AddToScheme(scheme))
 	utilruntime.Must(zenv1.AddToScheme(scheme))
+	utilruntime.Must(certmgrv1alpha1.AddToScheme(scheme))
 	// Add the Route scheme if found on the cluster
-	if controllercommon.ClusterHasRouteGroupVersion() {
+	cfg, err := config.GetConfig()
+	if err != nil {
+		return
+	}
+
+	dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return
+	}
+	if controllercommon.ClusterHasRouteGroupVersion(dc) {
 		utilruntime.Must(routev1.AddToScheme(scheme))
 	}
 	//+kubebuilder:scaffold:scheme
@@ -125,6 +138,7 @@ func main() {
 	}
 	const clientControllerName = "controller_oidc_client"
 
+	mgr.GetConfig()
 	clientReconciler := &oidcsecuritycontrollers.ClientReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
@@ -135,10 +149,18 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Client")
 		os.Exit(1)
 	}
+	var dc *discovery.DiscoveryClient
+	dc, err = discovery.NewDiscoveryClientForConfig(mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "failed to get discovery client", "controller", "Authentication")
+		os.Exit(1)
+	}
+
 	if err = (&operatorcontrollers.AuthenticationReconciler{
-		Client: mgr.GetClient(),
-		Logger: zap.New(zap.UseFlagOptions(&opts)).WithName("controller_authentication"),
-		Scheme: mgr.GetScheme(),
+		Client:          mgr.GetClient(),
+		DiscoveryClient: *dc,
+		Logger:          zap.New(zap.UseFlagOptions(&opts)).WithName("controller_authentication"),
+		Scheme:          mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Authentication")
 		os.Exit(1)

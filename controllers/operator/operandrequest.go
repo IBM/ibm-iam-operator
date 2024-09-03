@@ -264,7 +264,7 @@ func hasMongoDBOperandFromOperands(operands []operatorv1alpha1.Operand) bool {
 
 // createEDBShareClaim requests a share of the embedded EDB Common Service via the creation of a CommonService object.
 func (r *AuthenticationReconciler) createEDBShareClaim(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := log.WithValues("Instance.Namespace", req.Namespace, "Instance.Name", req.Name)
+	reqLogger := r.WithValues("Instance.Namespace", req.Namespace, "Instance.Name", req.Name)
 	reqLogger.Info("Create a CommonService CR for shared EDB claim")
 
 	authCR := &operatorv1alpha1.Authentication{}

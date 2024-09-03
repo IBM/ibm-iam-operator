@@ -17,8 +17,10 @@
 package common
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"regexp"
+
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -47,10 +49,7 @@ func IsCsConfigAnnotationExists(annotations map[string]string) bool {
 			break
 		}
 	}
-	if csAnnotationFound {
-		return true
-	}
-	return false
+	return csAnnotationFound
 }
 
 func isOwnerOf(owner client.Object, ownerRef v1.OwnerReference) (isOwner bool) {
@@ -68,12 +67,14 @@ func isControllerOf(controller client.Object, ownerRef v1.OwnerReference) (isCon
 	return
 }
 
-// IsOwnerOf determines whether one object is listed in another object's OwnerReferences.
-func IsOwnerOf(owner, owned client.Object) (isOwner bool) {
+// IsOwnerOf determines whether one object is listed in another object's OwnerReferences. Requires GVK due to
+// https://github.com/kubernetes/kubernetes/issues/80609.
+func IsOwnerOf(gvk schema.GroupVersionKind, owner, owned client.Object) (isOwner bool) {
 	ownerRefs := owned.GetOwnerReferences()
 	if len(ownerRefs) == 0 {
 		return
 	}
+	owner.GetObjectKind().SetGroupVersionKind(gvk)
 	for _, ownerRef := range ownerRefs {
 		if isOwnerOf(owner, ownerRef) {
 			return true
@@ -83,12 +84,13 @@ func IsOwnerOf(owner, owned client.Object) (isOwner bool) {
 }
 
 // IsControllerOf determines whether one object is listed as the controller of another object within its
-// OwnerReferences.
-func IsControllerOf(controller, controlled client.Object) (isController bool) {
+// OwnerReferences.  Requires GVK due to https://github.com/kubernetes/kubernetes/issues/80609.
+func IsControllerOf(gvk schema.GroupVersionKind, controller, controlled client.Object) (isController bool) {
 	ownerRefs := controlled.GetOwnerReferences()
 	if len(ownerRefs) == 0 {
 		return
 	}
+	controller.GetObjectKind().SetGroupVersionKind(gvk)
 	for _, ownerRef := range ownerRefs {
 		if isControllerOf(controller, ownerRef) {
 			return true

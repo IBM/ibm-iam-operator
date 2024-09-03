@@ -46,7 +46,7 @@ var ingressList []string = []string{
 }
 
 func (r *AuthenticationReconciler) ReconcileRemoveIngresses(ctx context.Context, instance *operatorv1alpha1.Authentication, needToRequeue *bool) {
-	reqLogger := log.WithValues("func", "ReconcileRemoveIngresses")
+	reqLogger := r.WithValues("func", "ReconcileRemoveIngresses")
 
 	//No error checking as we will just make a best attempt to remove the legacy ingresses
 	//Do not fail based on inability to delete the ingresses
@@ -60,7 +60,7 @@ func (r *AuthenticationReconciler) ReconcileRemoveIngresses(ctx context.Context,
 }
 
 func (r *AuthenticationReconciler) DeleteIngress(ctx context.Context, ingressName string, ingressNS string, needToRequeue *bool) error {
-	reqLogger := log.WithValues("func", "deleteIngress", "Name", ingressName, "Namespace", ingressNS)
+	reqLogger := r.WithValues("func", "deleteIngress", "Name", ingressName, "Namespace", ingressNS)
 
 	ingress := &netv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -107,7 +107,7 @@ func (r *AuthenticationReconciler) handleIngress(instance *operatorv1alpha1.Auth
 		socialLoginCallbackIngress,
 	}
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := r.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 
 	for index, ingress := range ingressList {
@@ -135,7 +135,7 @@ func (r *AuthenticationReconciler) handleIngress(instance *operatorv1alpha1.Auth
 
 func ibmidUiCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *netv1.Ingress {
 	pathType := netv1.PathType("ImplementationSpecific")
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &netv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "ibmid-ui-callback",
@@ -176,7 +176,7 @@ func ibmidUiCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *r
 	// Set Authentication instance as the owner and controller of the Ingress
 	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Ingress")
+		//reqLogger.Error(err, "Failed to set owner for Ingress")
 		return nil
 	}
 	return newIngress
@@ -185,7 +185,7 @@ func ibmidUiCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *r
 
 func idMgmtIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *netv1.Ingress {
 	pathType := netv1.PathType("ImplementationSpecific")
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &netv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "id-mgmt",
@@ -231,7 +231,7 @@ func idMgmtIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Sc
 	// Set Authentication instance as the owner and controller of the Ingress
 	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Ingress")
+		//reqLogger.Error(err, "Failed to set owner for Ingress")
 		return nil
 	}
 	return newIngress
@@ -240,7 +240,7 @@ func idMgmtIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Sc
 
 func idmgmtV2ApiIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *netv1.Ingress {
 	pathType := netv1.PathType("ImplementationSpecific")
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &netv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "idmgmt-v2-api",
@@ -282,7 +282,7 @@ func idmgmtV2ApiIngress(instance *operatorv1alpha1.Authentication, scheme *runti
 	// Set Authentication instance as the owner and controller of the Ingress
 	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Ingress")
+		//reqLogger.Error(err, "Failed to set owner for Ingress")
 		return nil
 	}
 	return newIngress
@@ -291,7 +291,7 @@ func idmgmtV2ApiIngress(instance *operatorv1alpha1.Authentication, scheme *runti
 
 func platformAuthIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *netv1.Ingress {
 	pathType := netv1.PathType("ImplementationSpecific")
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &netv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-auth",
@@ -342,7 +342,7 @@ func platformAuthIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 	// Set Authentication instance as the owner and controller of the Ingress
 	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Ingress")
+		//reqLogger.Error(err, "Failed to set owner for Ingress")
 		return nil
 	}
 	return newIngress
@@ -351,7 +351,7 @@ func platformAuthIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 
 func platformIdAuthBlockIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *netv1.Ingress {
 	pathType := netv1.PathType("ImplementationSpecific")
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &netv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-id-auth-block",
@@ -394,7 +394,7 @@ func platformIdAuthBlockIngress(instance *operatorv1alpha1.Authentication, schem
 	// Set Authentication instance as the owner and controller of the Ingress
 	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Ingress")
+		//reqLogger.Error(err, "Failed to set owner for Ingress")
 		return nil
 	}
 	return newIngress
@@ -403,7 +403,7 @@ func platformIdAuthBlockIngress(instance *operatorv1alpha1.Authentication, schem
 
 func platformIdAuthIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *netv1.Ingress {
 	pathType := netv1.PathType("ImplementationSpecific")
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &netv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-id-auth",
@@ -448,7 +448,7 @@ func platformIdAuthIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 	// Set Authentication instance as the owner and controller of the Ingress
 	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Ingress")
+		//reqLogger.Error(err, "Failed to set owner for Ingress")
 		return nil
 	}
 	return newIngress
@@ -457,7 +457,7 @@ func platformIdAuthIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 
 func platformIdProviderIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *netv1.Ingress {
 	pathType := netv1.PathType("ImplementationSpecific")
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &netv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-id-provider",
@@ -500,7 +500,7 @@ func platformIdProviderIngress(instance *operatorv1alpha1.Authentication, scheme
 	// Set Authentication instance as the owner and controller of the Ingress
 	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Ingress")
+		//reqLogger.Error(err, "Failed to set owner for Ingress")
 		return nil
 	}
 	return newIngress
@@ -509,7 +509,7 @@ func platformIdProviderIngress(instance *operatorv1alpha1.Authentication, scheme
 
 func platformLoginIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *netv1.Ingress {
 	pathType := netv1.PathType("ImplementationSpecific")
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &netv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-login",
@@ -557,7 +557,7 @@ func platformLoginIngress(instance *operatorv1alpha1.Authentication, scheme *run
 	// Set Authentication instance as the owner and controller of the Ingress
 	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Ingress")
+		//reqLogger.Error(err, "Failed to set owner for Ingress")
 		return nil
 	}
 	return newIngress
@@ -566,7 +566,7 @@ func platformLoginIngress(instance *operatorv1alpha1.Authentication, scheme *run
 
 func platformOidcBlockIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *netv1.Ingress {
 	pathType := netv1.PathType("ImplementationSpecific")
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &netv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-oidc-block",
@@ -610,7 +610,7 @@ func platformOidcBlockIngress(instance *operatorv1alpha1.Authentication, scheme 
 	// Set Authentication instance as the owner and controller of the Ingress
 	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Ingress")
+		//reqLogger.Error(err, "Failed to set owner for Ingress")
 		return nil
 	}
 	return newIngress
@@ -618,7 +618,7 @@ func platformOidcBlockIngress(instance *operatorv1alpha1.Authentication, scheme 
 }
 
 func platformOidcIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *netv1.Ingress {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var xframeDomain string
 	if instance.Spec.Config.XFrameDomain != "" {
 		xframeDomain = strings.Join([]string{"'ALLOW-FROM ", instance.Spec.Config.XFrameDomain, "'"}, "")
@@ -679,7 +679,7 @@ func platformOidcIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 	// Set Authentication instance as the owner and controller of the Ingress
 	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Ingress")
+		//reqLogger.Error(err, "Failed to set owner for Ingress")
 		return nil
 	}
 	return newIngress
@@ -688,7 +688,7 @@ func platformOidcIngress(instance *operatorv1alpha1.Authentication, scheme *runt
 
 func samlUiCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *netv1.Ingress {
 	pathType := netv1.PathType("ImplementationSpecific")
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &netv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "saml-ui-callback",
@@ -729,7 +729,7 @@ func samlUiCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 	// Set Authentication instance as the owner and controller of the Ingress
 	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Ingress")
+		//reqLogger.Error(err, "Failed to set owner for Ingress")
 		return nil
 	}
 	return newIngress
@@ -738,7 +738,7 @@ func samlUiCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *ru
 
 func versionIdmgmtIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *netv1.Ingress {
 	pathType := netv1.PathType("ImplementationSpecific")
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &netv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "version-idmgmt",
@@ -780,7 +780,7 @@ func versionIdmgmtIngress(instance *operatorv1alpha1.Authentication, scheme *run
 	// Set Authentication instance as the owner and controller of the Ingress
 	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Ingress")
+		//reqLogger.Error(err, "Failed to set owner for Ingress")
 		return nil
 	}
 	return newIngress
@@ -789,7 +789,7 @@ func versionIdmgmtIngress(instance *operatorv1alpha1.Authentication, scheme *run
 
 func socialLoginCallbackIngress(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *netv1.Ingress {
 	pathType := netv1.PathType("ImplementationSpecific")
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newIngress := &netv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "social-login-callback",
@@ -830,7 +830,7 @@ func socialLoginCallbackIngress(instance *operatorv1alpha1.Authentication, schem
 	// Set Authentication instance as the owner and controller of the Ingress
 	err := controllerutil.SetControllerReference(instance, newIngress, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Ingress")
+		//reqLogger.Error(err, "Failed to set owner for Ingress")
 		return nil
 	}
 	return newIngress

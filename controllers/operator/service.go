@@ -31,7 +31,7 @@ import (
 
 func (r *AuthenticationReconciler) handleService(instance *operatorv1alpha1.Authentication, currentService *corev1.Service, needToRequeue *bool) error {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := r.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: "platform-auth-service", Namespace: instance.Namespace}, currentService)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new service
@@ -101,7 +101,7 @@ func (r *AuthenticationReconciler) validateCP3PodSelectorAndLabel(currentService
 		return fmt.Errorf("received invalid Service")
 	}
 
-	reqLogger := log.WithValues("Instance.Namespace", currentService.Namespace, "Instance.Name", currentService.Name)
+	reqLogger := r.WithValues("Instance.Namespace", currentService.Namespace, "Instance.Name", currentService.Name)
 
 	var cp2podselector bool = false
 	var cp2podlabel bool = false
@@ -133,7 +133,7 @@ func (r *AuthenticationReconciler) validateCP3PodSelectorAndLabel(currentService
 
 func (r *AuthenticationReconciler) platformAuthService(instance *operatorv1alpha1.Authentication) *corev1.Service {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := r.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var authPort int32 = 9443
 	var dirPort int32 = 3100
 	platformAuthService := &corev1.Service{
@@ -173,7 +173,7 @@ func (r *AuthenticationReconciler) platformAuthService(instance *operatorv1alpha
 
 func (r *AuthenticationReconciler) identityManagementService(instance *operatorv1alpha1.Authentication) *corev1.Service {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := r.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var idmgmtPort int32 = 4500
 	var redirectPort int32 = 443
 	identityManagementService := &corev1.Service{
@@ -217,7 +217,7 @@ func (r *AuthenticationReconciler) identityManagementService(instance *operatorv
 
 func (r *AuthenticationReconciler) identityProviderService(instance *operatorv1alpha1.Authentication) *corev1.Service {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := r.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var idproviderPort int32 = 4300
 	identityProviderService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{

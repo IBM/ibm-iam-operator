@@ -42,44 +42,62 @@ func TestIsIBMMongoDBOperator(t *testing.T) {
 // Internal constant from fake library
 const trackerAddResourceVersion = "999"
 
-type fakeTimeoutClient struct {
+type fakeErrorClient interface {
 	client.Client
-	goodCalls int
+	Error() error
 }
 
-func (f *fakeTimeoutClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-	if f.goodCalls > 0 {
-		f.goodCalls--
+type FakeErrorClient struct {
+	client.Client
+	ErrFunc       func() error
+	GetAllowed    bool
+	UpdateAllowed bool
+	CreateAllowed bool
+	DeleteAllowed bool
+}
+
+var _ fakeErrorClient = &FakeErrorClient{}
+
+func (f *FakeErrorClient) Error() error {
+	return f.ErrFunc()
+}
+
+func (f *FakeErrorClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if f.GetAllowed {
 		return f.Client.Get(ctx, key, obj, opts...)
 	}
-	return k8sErrors.NewTimeoutError("dummy error", 500)
+	return f.ErrFunc()
 }
 
-func (f *fakeTimeoutClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
-	if f.goodCalls > 0 {
-		f.goodCalls--
+func (f *FakeErrorClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+	if f.UpdateAllowed {
 		return f.Client.Update(ctx, obj, opts...)
 	}
-	return k8sErrors.NewTimeoutError("dummy error", 500)
+	return f.ErrFunc()
 }
 
-func (f *fakeTimeoutClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
-	if f.goodCalls > 0 {
-		f.goodCalls--
+func (f *FakeErrorClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	if f.CreateAllowed {
 		return f.Client.Create(ctx, obj, opts...)
 	}
-	return k8sErrors.NewTimeoutError("dummy error", 500)
+	return f.ErrFunc()
 }
 
-func (f *fakeTimeoutClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
-	if f.goodCalls > 0 {
-		f.goodCalls--
+func (f *FakeErrorClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
+	if f.DeleteAllowed {
 		return f.Client.Delete(ctx, obj, opts...)
 	}
-	return k8sErrors.NewTimeoutError("dummy error", 500)
+	return f.ErrFunc()
 }
 
-var _ client.Client = &fakeTimeoutClient{}
+func NewFakeTimeoutClient(cl client.Client) *FakeErrorClient {
+	return &FakeErrorClient{
+		Client: cl,
+		ErrFunc: func() error {
+			return k8sErrors.NewTimeoutError("dummy error", 500)
+		},
+	}
+}
 
 var _ = Describe("OperandRequest handling", func() {
 	var r *AuthenticationReconciler
@@ -140,9 +158,7 @@ var _ = Describe("OperandRequest handling", func() {
 			err := r.Delete(context.Background(), mongoDBService)
 			Expect(err).ToNot(HaveOccurred())
 			rFailing := &AuthenticationReconciler{
-				Client: &fakeTimeoutClient{
-					Client: cl,
-				},
+				Client: NewFakeTimeoutClient(cl),
 			}
 			hasService := rFailing.servicesNamespaceHasMongoDBService(context.Background(), authCR)
 			Expect(hasService).To(BeFalse())
@@ -206,9 +222,7 @@ var _ = Describe("OperandRequest handling", func() {
 			err := r.Update(context.Background(), authCR)
 			Expect(err).ToNot(HaveOccurred())
 			rFailing := &AuthenticationReconciler{
-				Client: &fakeTimeoutClient{
-					Client: cl,
-				},
+				Client: NewFakeTimeoutClient(cl),
 			}
 			needsToMigrate := rFailing.needToMigrateMongoDB(context.Background(), authCR)
 			Expect(needsToMigrate).To(BeFalse())
@@ -314,9 +328,7 @@ var _ = Describe("OperandRequest handling", func() {
 
 			It("should NOT add the embedded EDB entry to the list of Operands", func() {
 				rFailing := &AuthenticationReconciler{
-					Client: &fakeTimeoutClient{
-						Client: cl,
-					},
+					Client: NewFakeTimeoutClient(cl),
 				}
 				By("failing to get the ConfigMap for some reason")
 				err := rFailing.addEmbeddedEDBIfNeeded(context.Background(), authCR, operands)
@@ -502,9 +514,7 @@ var _ = Describe("OperandRequest handling", func() {
 		})
 		It("returns an error when an unexpected error is encountered", func() {
 			rFailing := &AuthenticationReconciler{
-				Client: &fakeTimeoutClient{
-					Client: cl,
-				},
+				Client: NewFakeTimeoutClient(cl),
 			}
 			isExternal, err := rFailing.isConfiguredForExternalEDB(context.Background(), authCR)
 			Expect(isExternal).To(BeFalse())

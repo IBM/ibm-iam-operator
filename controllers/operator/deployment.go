@@ -35,7 +35,7 @@ import (
 
 func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.Authentication, currentDeployment *appsv1.Deployment, currentProviderDeployment *appsv1.Deployment, currentManagerDeployment *appsv1.Deployment, needToRequeue *bool) error {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := r.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
 	// We need to cleanup existing CP2 deployment before the CP3 installation
 	cp2deployment := [6]string{"auth-idp", "auth-pdp", "auth-pap", "secret-watcher", "oidcclient-watcher", "iam-policy-controller"}
@@ -291,18 +291,18 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 }
 
 func getPodNames(pods []corev1.Pod) []string {
-	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
+	//reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
 	var podNames []string
 	for _, pod := range pods {
 		podNames = append(podNames, pod.Name)
-		reqLogger.Info("CS??? pod name=" + pod.Name)
+		//	reqLogger.Info("CS??? pod name=" + pod.Name)
 	}
 	return podNames
 }
 
 func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string, saasCrnId string) *appsv1.Deployment {
 
-	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
+	//reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	authServiceImage := common.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
 	initContainerImage := common.GetImageRef("IM_INITCONTAINER_IMAGE")
 	replicas := instance.Spec.Replicas
@@ -452,7 +452,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 	// Set SecretWatcher instance as the owner and controller
 	err := controllerutil.SetControllerReference(instance, idpDeployment, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Deployment")
+		//reqLogger.Error(err, "Failed to set owner for Deployment")
 		return nil
 	}
 	return idpDeployment
@@ -460,7 +460,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 
 func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string, saasCrnId string) *appsv1.Deployment {
 
-	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
+	//reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	identityProviderImage := common.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
 	initContainerImage := common.GetImageRef("IM_INITCONTAINER_IMAGE")
 	replicas := instance.Spec.Replicas
@@ -610,7 +610,7 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 	// Set SecretWatcher instance as the owner and controller
 	err := controllerutil.SetControllerReference(instance, idpDeployment, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Deployment")
+		//reqLogger.Error(err, "Failed to set owner for Deployment")
 		return nil
 	}
 	return idpDeployment
@@ -618,7 +618,7 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 
 func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string, saasCrnId string) *appsv1.Deployment {
 
-	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
+	//reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	identityManagerImage := common.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
 	initContainerImage := common.GetImageRef("IM_INITCONTAINER_IMAGE")
 	replicas := instance.Spec.Replicas
@@ -768,7 +768,7 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 	// Set SecretWatcher instance as the owner and controller
 	err := controllerutil.SetControllerReference(instance, idpDeployment, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Deployment")
+		//reqLogger.Error(err, "Failed to set owner for Deployment")
 		return nil
 	}
 	return idpDeployment

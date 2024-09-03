@@ -669,15 +669,6 @@ func migrateCP2Client(clientCR *oidcsecurityv1.Client) (clientChanged bool) {
 	return false
 }
 
-func containsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
-}
-
 // getSecretFromClient attempts to read the secret named in the provided Client resource and returns its contents if
 // found. Returns an error if the attempt to read the Secret off of the cluster fails for any reason.
 func (r *ClientReconciler) getSecretFromClient(ctx context.Context, client *oidcsecurityv1.Client) (secret *corev1.Secret, err error) {
@@ -715,7 +706,7 @@ func getClientCredsFromSecret(secret *corev1.Secret) (clientCreds *ClientCredent
 }
 
 func (r *ClientReconciler) createNewSecretForClient(ctx context.Context, client *oidcsecurityv1.Client) (*corev1.Secret, error) {
-	reqLogger := logf.FromContext(ctx, "Request.Namespace", client.Namespace, "client.Name", client.Name)
+	reqLogger := r.Logger
 	labels := map[string]string{
 		"app.kubernetes.io/managed-by":          "OIDCClientRegistration.oidc.security.ibm.com",
 		"client.oidc.security.ibm.com/owned-by": client.Name,

@@ -33,7 +33,7 @@ import (
 
 func (r *AuthenticationReconciler) handleJob(instance *operatorv1alpha1.Authentication, currentJob *batchv1.Job, needToRequeue *bool) (err error) {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := r.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
 	job := "oidc-client-registration"
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: job, Namespace: instance.Namespace}, currentJob)
@@ -88,7 +88,7 @@ func (r *AuthenticationReconciler) handleJob(instance *operatorv1alpha1.Authenti
 }
 
 func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, jobName string) *batchv1.Job {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	image := common.GetImageRef("IM_INITCONTAINER_IMAGE")
 	resources := instance.Spec.ClientRegistration.Resources
 
@@ -217,7 +217,7 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 	// Set Authentication instance as the owner and controller of the Job
 	err := controllerutil.SetControllerReference(instance, newJob, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Job")
+		//reqLogger.Error(err, "Failed to set owner for Job")
 		return nil
 	}
 	return newJob

@@ -113,9 +113,7 @@ var _ = Describe("Route handling", func() {
 		})
 		It("will produce a function that signals to requeue with an error when an unexpected error occurs", func() {
 			rFailing := &AuthenticationReconciler{
-				Client: &fakeTimeoutClient{
-					Client: cl,
-				},
+				Client: NewFakeTimeoutClient(cl),
 			}
 			fn := rFailing.getClusterInfoConfigMap(authCR, cm)
 			result, err := fn(ctx)
@@ -307,9 +305,7 @@ var _ = Describe("Route handling", func() {
 				"an_extra_field":       "an_extra_value",
 			}
 			rFailing := &AuthenticationReconciler{
-				Client: &fakeTimeoutClient{
-					Client: cl,
-				},
+				Client: NewFakeTimeoutClient(cl),
 			}
 			fn := rFailing.ensureConfigMapHasEqualFields(authCR, fields, cm)
 			result, err := fn(ctx)
@@ -373,9 +369,7 @@ var _ = Describe("Route handling", func() {
 		})
 		It("will produce a function that signals to requeue with an error when the ConfigMap is not changed successfully", func() {
 			rFailing := &AuthenticationReconciler{
-				Client: &fakeTimeoutClient{
-					Client: cl,
-				},
+				Client: NewFakeTimeoutClient(cl),
 			}
 			fn := rFailing.getWlpClientID(authCR, &wlpClientID)
 			result, err := fn(ctx)
@@ -467,9 +461,7 @@ var _ = Describe("Route handling", func() {
 		testFailedCertRetrieval := func(serviceName string) {
 			certificate := []byte{}
 			rFailing := &AuthenticationReconciler{
-				Client: &fakeTimeoutClient{
-					Client: cl,
-				},
+				Client: NewFakeTimeoutClient(cl),
 			}
 			fn := rFailing.getCertificateForService(serviceName, authCR, &certificate)
 			result, err := fn(ctx)
@@ -570,9 +562,7 @@ var _ = Describe("Route handling", func() {
 			err := r.Delete(ctx, clusterInfoConfigMap)
 			Expect(err).ToNot(HaveOccurred())
 			rFailing := &AuthenticationReconciler{
-				Client: &fakeTimeoutClient{
-					Client: cl,
-				},
+				Client: NewFakeTimeoutClient(cl),
 			}
 			fn := rFailing.getClusterAddress(authCR, &clusterAddress)
 			result, err := fn(ctx)

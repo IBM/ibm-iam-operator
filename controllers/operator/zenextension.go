@@ -128,7 +128,7 @@ func (r *AuthenticationReconciler) handleZenExtension(ctx context.Context, req c
 	if authCR.Spec.Config.ZenFrontDoor {
 		reqLogger.Info("Zen front door requested - Ensure that ZenExtension is updated with correct front door config")
 
-		if ctrlCommon.ClusterHasZenExtensionGroupVersion() {
+		if ctrlCommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
 			commonWebUIZenExt := &zenv1.ZenExtension{}
 			err = r.Get(ctx, types.NamespacedName{Name: uiZenExtName, Namespace: authCR.Namespace}, commonWebUIZenExt)
 			if err != nil {
@@ -235,7 +235,7 @@ func (r *AuthenticationReconciler) handleZenExtension(ctx context.Context, req c
 		}
 	}
 
-	if authCR.Spec.Config.ZenFrontDoor && ctrlCommon.ClusterHasZenExtensionGroupVersion() {
+	if authCR.Spec.Config.ZenFrontDoor && ctrlCommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
 		//authHost must be set to the zen front door
 		//is should be set from above
 		authHost = zenHost

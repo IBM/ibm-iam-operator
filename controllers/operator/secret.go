@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -88,7 +89,7 @@ func (r *AuthenticationReconciler) handleSecret(instance *operatorv1alpha1.Authe
 
 	secretData := generateSecretData(instance, wlpClientID, wlpClientSecret)
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := r.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 
 	for secret := range secretData {
@@ -153,7 +154,7 @@ func (r *AuthenticationReconciler) handleSecret(instance *operatorv1alpha1.Authe
 }
 
 func generateSecretObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, secretName string, secretData map[string][]byte) *corev1.Secret {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name, "Secret.Name", secretName)
+	//reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name, "Secret.Name", secretName)
 	newSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
@@ -166,14 +167,14 @@ func generateSecretObject(instance *operatorv1alpha1.Authentication, scheme *run
 	// Set Authentication instance as the owner and controller of the Secret
 	err := controllerutil.SetControllerReference(instance, newSecret, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for Secret")
+		//reqLogger.Error(err, "Failed to set owner for Secret")
 		return nil
 	}
 	return newSecret
 }
 
 func (r *AuthenticationReconciler) waitForSecret(instance *operatorv1alpha1.Authentication, name string, stopCh <-chan struct{}) (*corev1.Secret, error) {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := r.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
 	reqLogger.Info("Waiting for secret", "Certificate.Namespace", instance.Namespace, "Secret.Name", name)
 
@@ -192,7 +193,7 @@ func (r *AuthenticationReconciler) waitForSecret(instance *operatorv1alpha1.Auth
 // create ibmcloud-cluster-ca-cert
 func (r *AuthenticationReconciler) createClusterCACert(i *operatorv1alpha1.Authentication, scheme *runtime.Scheme, secretName, ns string, caCert []byte, needToRequeue *bool) (err error) {
 
-	reqLogger := log.WithValues("Instance.Namespace", i.Namespace, "Instance.Name", i.Name, "Secret.Name", secretName)
+	reqLogger := r.WithValues("Instance.Namespace", i.Namespace, "Instance.Name", i.Name, "Secret.Name", secretName)
 
 	// create ibmcloud-cluster-ca-cert
 	labels := map[string]string{
@@ -245,7 +246,13 @@ func (r *AuthenticationReconciler) createClusterCACert(i *operatorv1alpha1.Authe
 		return
 	}
 
-	if !ctrlCommon.IsControllerOf(i, current) {
+	// Workaround for https://github.com/kubernetes/kubernetes/issues/80609
+	gvk := schema.GroupVersionKind{
+		Kind:    "Authentication",
+		Group:   "operator.ibm.com",
+		Version: "v1alpha1",
+	}
+	if !ctrlCommon.IsControllerOf(gvk, i, current) {
 		reqLogger.Info("The secret is already controlled by another object; deleting it and recreating in another loop")
 		err = r.Client.Delete(context.TODO(), current)
 		if err != nil {

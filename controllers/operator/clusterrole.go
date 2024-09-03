@@ -26,7 +26,7 @@ import (
 
 func (r *AuthenticationReconciler) createClusterRole(instance *operatorv1alpha1.Authentication) {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := r.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	// Define a new ClusterRole
 	operandClusterRole := r.iamOperandClusterRole(instance)
 	reqLogger.Info("Creating ibm-iam-operand-restricted clusterrole")

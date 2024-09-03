@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	discovery "k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -665,12 +666,12 @@ func (r *AuthenticationReconciler) getLatestAuthentication(ctx context.Context, 
 
 // RunningOnOpenShiftCluster returns whether the Operator is running on an OpenShift cluster
 func (r *AuthenticationReconciler) RunningOnOpenShiftCluster() bool {
-	return ctrlCommon.ClusterHasOpenShiftConfigGroupVerison() && ctrlCommon.ClusterHasRouteGroupVersion()
+	return ctrlCommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) && ctrlCommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient)
 }
 
 // RunningOnCNCFCluster returns whether the Operator is running on a CNCF cluster
 func (r *AuthenticationReconciler) RunningOnCNCFCluster() bool {
-	return !ctrlCommon.ClusterHasOpenShiftConfigGroupVerison() || !ctrlCommon.ClusterHasRouteGroupVersion()
+	return !ctrlCommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) || !ctrlCommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient)
 
 }
 
@@ -682,7 +683,7 @@ func (r *AuthenticationReconciler) RunningOnUnknownCluster() bool {
 func (r *AuthenticationReconciler) addFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
 	r.Mutex.Lock()
 	defer r.Mutex.Unlock()
-	if !containsString(instance.Finalizers, finalizerName) {
+	if !ctrlCommon.ContainsItem(instance.Finalizers, finalizerName) {
 		instance.Finalizers = append(instance.Finalizers, finalizerName)
 		err = r.Client.Update(ctx, instance)
 	}
@@ -693,8 +694,8 @@ func (r *AuthenticationReconciler) addFinalizer(ctx context.Context, finalizerNa
 func (r *AuthenticationReconciler) removeFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
 	r.Mutex.Lock()
 	defer r.Mutex.Unlock()
-	if containsString(instance.Finalizers, finalizerName) {
-		instance.Finalizers = removeString(instance.Finalizers, finalizerName)
+	if ctrlCommon.ContainsItem(instance.Finalizers, finalizerName) {
+		instance.Finalizers = ctrlCommon.RemoveItem(instance.Finalizers, finalizerName)
 		err = r.Client.Update(ctx, instance)
 		if err != nil {
 			return fmt.Errorf("error updating the CR to remove the finalizer: %w", err)
@@ -716,6 +717,7 @@ func needsAuditServiceDummyDataReset(a *operatorv1alpha1.Authentication) bool {
 // AuthenticationReconciler reconciles a Authentication object
 type AuthenticationReconciler struct {
 	client.Client
+	discovery.DiscoveryClient
 	logr.Logger
 	Scheme      *runtime.Scheme
 	Mutex       sync.Mutex
@@ -841,11 +843,9 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	r.createRole(instance)
 	r.createRoleBinding(instance)
 
-	// Check if this Certificate already exists and create it if it doesn't
-	currentCertificate := &certmgr.Certificate{}
-	err = r.handleCertificate(instance, currentCertificate, &needToRequeue)
-	if err != nil {
-		return
+	// Check if this Certificates already exist and create them if they don't
+	if subResult, err := r.handleCertificates(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
 	}
 
 	// Check if this Service already exists and create it if it doesn't
@@ -886,7 +886,7 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// updates redirecturi annotations to serviceaccount
 	r.handleServiceAccount(instance, &needToRequeue)
 
-	if ctrlCommon.ClusterHasRouteGroupVersion() {
+	if ctrlCommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient) {
 		if subResult, err := r.handleRoutes(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 			return subreconciler.Evaluate(subResult, err)
 		}
@@ -939,33 +939,13 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&operatorv1alpha1.OperandRequest{})
 
 	//Add routes
-	if ctrlCommon.ClusterHasOpenShiftConfigGroupVerison() {
+	if ctrlCommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
 		builder.Owns(&routev1.Route{})
 	}
-	if ctrlCommon.ClusterHasZenExtensionGroupVersion() {
+	if ctrlCommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
 		builder.Owns(&zenv1.ZenExtension{})
 	}
 
 	return builder.For(&operatorv1alpha1.Authentication{}).
 		Complete(r)
-}
-
-// Helper functions to check and remove string from a slice of strings.
-func containsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
-}
-
-func removeString(slice []string, s string) (result []string) {
-	for _, item := range slice {
-		if item == s {
-			continue
-		}
-		result = append(result, item)
-	}
-	return
 }

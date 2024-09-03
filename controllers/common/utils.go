@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"strings"
 
 	osconfigv1 "github.com/openshift/api/config/v1"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	discovery "k8s.io/client-go/discovery"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -117,19 +119,21 @@ func GetClusterType(ctx context.Context, k8sClient *client.Client, cmName string
 	return
 }
 
-func clusterHasGroupVersion(gv schema.GroupVersion) (apiPresent bool, err error) {
-	cfg, err := config.GetConfig()
-	if err != nil {
-		return
-	}
+func clusterHasGroupVersion(dc *discovery.DiscoveryClient, gv schema.GroupVersion) (apiPresent bool, err error) {
 
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
-	if err != nil {
-		return
+	if dc == nil {
+		var cfg *rest.Config
+		if cfg, err = config.GetConfig(); err != nil {
+			return
+		}
+
+		if dc, err = discovery.NewDiscoveryClientForConfig(cfg); err != nil {
+			return
+		}
 	}
 
 	groupVersion := strings.Join([]string{gv.Group, gv.Version}, "/")
-	resources, err := discoveryClient.ServerResourcesForGroupVersion(groupVersion)
+	resources, err := dc.ServerResourcesForGroupVersion(groupVersion)
 	if err != nil || resources == nil {
 		return false, err
 	}
@@ -137,18 +141,26 @@ func clusterHasGroupVersion(gv schema.GroupVersion) (apiPresent bool, err error)
 	return true, nil
 }
 
-func ClusterHasRouteGroupVersion() (found bool) {
-	found, _ = clusterHasGroupVersion(routev1.GroupVersion)
+func ClusterHasRouteGroupVersion(dc *discovery.DiscoveryClient) (found bool) {
+	found, _ = clusterHasGroupVersion(dc, routev1.GroupVersion)
 	return
 }
 
-func ClusterHasOpenShiftConfigGroupVerison() (found bool) {
-	found, _ = clusterHasGroupVersion(osconfigv1.GroupVersion)
+func ClusterHasOpenShiftConfigGroupVerison(dc *discovery.DiscoveryClient) (found bool) {
+	found, _ = clusterHasGroupVersion(dc, osconfigv1.GroupVersion)
 	return
 }
 
-func ClusterHasZenExtensionGroupVersion() (found bool) {
-	found, _ = clusterHasGroupVersion(zenv1.GroupVersion)
+func ClusterHasZenExtensionGroupVersion(dc *discovery.DiscoveryClient) (found bool) {
+	found, _ = clusterHasGroupVersion(dc, zenv1.GroupVersion)
+	return
+}
+
+func ClusterHasCertificateV1Alpha1(dc *discovery.DiscoveryClient) (found bool) {
+	found, _ = clusterHasGroupVersion(dc, schema.GroupVersion{
+		Group:   "certmanager.k8s.io",
+		Version: "v1alpha1",
+	})
 	return
 }
 
@@ -283,4 +295,27 @@ func ReduceSubreconcilerResultsAndErrors(results []*ctrl.Result, errs []error) (
 	}
 
 	return
+}
+
+// ContainsItem returns whether the provided element exists in the slice.
+func ContainsItem[T any](slice []T, s T) bool {
+	for _, item := range slice {
+		if reflect.DeepEqual(item, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// RemoveItem returns a new slice that is a copy of the provided one less the element to be removed.
+func RemoveItem[T any](slice []T, s T) (result []T) {
+	for i, item := range slice {
+		if reflect.DeepEqual(item, s) {
+			result = make([]T, 0)
+			result = append(result, slice[:i]...)
+			result = append(result, slice[i+1:]...)
+			return
+		}
+	}
+	return slice
 }

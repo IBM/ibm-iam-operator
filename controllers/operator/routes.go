@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -64,7 +65,7 @@ type reconcileRouteFields struct {
 }
 
 func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := log.WithValues("func", "ReconcileRoutes", "namespace", req.Namespace)
+	reqLogger := r.WithValues("subreconciler", "handleRoutes")
 	handleRouteCtx := logf.IntoContext(ctx, reqLogger)
 
 	authCR := &operatorv1alpha1.Authentication{}
@@ -226,7 +227,7 @@ func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.A
 func (r *AuthenticationReconciler) reconcileRoute(authCR *operatorv1alpha1.Authentication, fields *reconcileRouteFields) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		namespace := authCR.Namespace
-		reqLogger := log.WithValues("name", fields.Name, "namespace", namespace)
+		reqLogger := r.WithValues("name", fields.Name, "namespace", namespace)
 
 		reqLogger.Info("Reconciling route", "annotations", fields.Annotations, "routeHost", fields.RouteHost, "routePath", fields.RoutePath)
 
@@ -353,77 +354,77 @@ func shouldNotHaveRoutes(authCR *operatorv1alpha1.Authentication) bool {
 // Check annotations and Spec.
 // If there are any differences, return false. Otherwise, return true.
 func IsRouteEqual(oldRoute, newRoute *routev1.Route) bool {
-	logger := log.WithValues("name", oldRoute.Name, "namespace", oldRoute.Namespace)
+	//logger := log.WithValues("name", oldRoute.Name, "namespace", oldRoute.Namespace)
 
 	if !reflect.DeepEqual(oldRoute.Name, newRoute.Name) {
-		logger.Info("Names not equal", "old", oldRoute.Name, "new", newRoute.Name)
+		//logger.Info("Names not equal", "old", oldRoute.Name, "new", newRoute.Name)
 		return false
 	}
 
 	if !reflect.DeepEqual(oldRoute.Annotations, newRoute.Annotations) {
-		logger.Info("Annotations not equal",
-			"old", fmt.Sprintf("%v", oldRoute.Annotations),
-			"new", fmt.Sprintf("%v", newRoute.Annotations))
+		//logger.Info("Annotations not equal",
+		//	"old", fmt.Sprintf("%v", oldRoute.Annotations),
+		//	"new", fmt.Sprintf("%v", newRoute.Annotations))
 		return false
 	}
 
 	if !reflect.DeepEqual(oldRoute.Spec, newRoute.Spec) {
-		//ugly, but don't print the CA to the log
-		var loggedValues []interface{}
+		//	//ugly, but don't print the CA to the log
+		//	var loggedValues []interface{}
 
-		loggedValues = append(loggedValues, "oldHost", oldRoute.Spec.Host, "newHost", newRoute.Spec.Host)
+		//	loggedValues = append(loggedValues, "oldHost", oldRoute.Spec.Host, "newHost", newRoute.Spec.Host)
 
-		loggedValues = append(loggedValues, "oldPath", oldRoute.Spec.Path, "newHost", newRoute.Spec.Path)
+		//	loggedValues = append(loggedValues, "oldPath", oldRoute.Spec.Path, "newHost", newRoute.Spec.Path)
 
-		loggedValues = append(loggedValues, "oldWildcardPolicy", oldRoute.Spec.WildcardPolicy, "newWildcardPolicy", newRoute.Spec.WildcardPolicy)
+		//	loggedValues = append(loggedValues, "oldWildcardPolicy", oldRoute.Spec.WildcardPolicy, "newWildcardPolicy", newRoute.Spec.WildcardPolicy)
 
-		loggedValues = append(loggedValues, "oldPort")
-		if oldRoute.Spec.Port != nil {
-			loggedValues = append(loggedValues, fmt.Sprintf("%v", oldRoute.Spec.Port))
-		} else {
-			loggedValues = append(loggedValues, "unset")
-		}
-		loggedValues = append(loggedValues, "newPort")
-		if oldRoute.Spec.Port != nil {
-			loggedValues = append(loggedValues, fmt.Sprintf("%v", newRoute.Spec.Port))
-		} else {
-			loggedValues = append(loggedValues, "unset")
-		}
+		//	loggedValues = append(loggedValues, "oldPort")
+		//	if oldRoute.Spec.Port != nil {
+		//		loggedValues = append(loggedValues, fmt.Sprintf("%v", oldRoute.Spec.Port))
+		//	} else {
+		//		loggedValues = append(loggedValues, "unset")
+		//	}
+		//	loggedValues = append(loggedValues, "newPort")
+		//	if oldRoute.Spec.Port != nil {
+		//		loggedValues = append(loggedValues, fmt.Sprintf("%v", newRoute.Spec.Port))
+		//	} else {
+		//		loggedValues = append(loggedValues, "unset")
+		//	}
 
-		loggedValues = append(loggedValues, "oldToService", fmt.Sprintf("%v", oldRoute.Spec.To))
-		loggedValues = append(loggedValues, "newToService", fmt.Sprintf("%v", newRoute.Spec.To))
+		//	loggedValues = append(loggedValues, "oldToService", fmt.Sprintf("%v", oldRoute.Spec.To))
+		//	loggedValues = append(loggedValues, "newToService", fmt.Sprintf("%v", newRoute.Spec.To))
 
-		loggedValues = append(loggedValues, "old.tls.termination")
-		if oldRoute.Spec.TLS != nil {
-			loggedValues = append(loggedValues, oldRoute.Spec.TLS.Termination)
-		} else {
-			loggedValues = append(loggedValues, "unset")
-		}
-		loggedValues = append(loggedValues, "new.tls.termination")
-		if newRoute.Spec.TLS != nil {
-			loggedValues = append(loggedValues, newRoute.Spec.TLS.Termination)
-		} else {
-			loggedValues = append(loggedValues, "unset")
-		}
+		//	loggedValues = append(loggedValues, "old.tls.termination")
+		//	if oldRoute.Spec.TLS != nil {
+		//		loggedValues = append(loggedValues, oldRoute.Spec.TLS.Termination)
+		//	} else {
+		//		loggedValues = append(loggedValues, "unset")
+		//	}
+		//	loggedValues = append(loggedValues, "new.tls.termination")
+		//	if newRoute.Spec.TLS != nil {
+		//		loggedValues = append(loggedValues, newRoute.Spec.TLS.Termination)
+		//	} else {
+		//		loggedValues = append(loggedValues, "unset")
+		//	}
 
-		loggedValues = append(loggedValues, "old.tls.insecureEdgeTerminationPolicy")
-		if oldRoute.Spec.TLS != nil {
-			loggedValues = append(loggedValues, oldRoute.Spec.TLS.InsecureEdgeTerminationPolicy)
-		} else {
-			loggedValues = append(loggedValues, "unset")
-		}
-		loggedValues = append(loggedValues, "new.tls.insecureEdgeTerminationPolicy")
-		if newRoute.Spec.TLS != nil {
-			loggedValues = append(loggedValues, newRoute.Spec.TLS.InsecureEdgeTerminationPolicy)
-		} else {
-			loggedValues = append(loggedValues, "unset")
-		}
+		//	loggedValues = append(loggedValues, "old.tls.insecureEdgeTerminationPolicy")
+		//	if oldRoute.Spec.TLS != nil {
+		//		loggedValues = append(loggedValues, oldRoute.Spec.TLS.InsecureEdgeTerminationPolicy)
+		//	} else {
+		//		loggedValues = append(loggedValues, "unset")
+		//	}
+		//	loggedValues = append(loggedValues, "new.tls.insecureEdgeTerminationPolicy")
+		//	if newRoute.Spec.TLS != nil {
+		//		loggedValues = append(loggedValues, newRoute.Spec.TLS.InsecureEdgeTerminationPolicy)
+		//	} else {
+		//		loggedValues = append(loggedValues, "unset")
+		//	}
 
-		logger.Info("Specs not equal", loggedValues...)
+		//	logger.Info("Specs not equal", loggedValues...)
 		return false
 	}
 
-	logger.Info("Routes are equal")
+	//logger.Info("Routes are equal")
 
 	return true
 }
@@ -431,7 +432,7 @@ func IsRouteEqual(oldRoute, newRoute *routev1.Route) bool {
 func (r *AuthenticationReconciler) newRoute(authCR *operatorv1alpha1.Authentication, fields *reconcileRouteFields) (*routev1.Route, error) {
 	namespace := authCR.Namespace
 
-	reqLogger := log.WithValues("name", fields.Name, "namespace", namespace)
+	reqLogger := r.WithValues("name", fields.Name, "namespace", namespace)
 
 	weight := int32(100)
 
@@ -534,7 +535,12 @@ func (r *AuthenticationReconciler) getClusterInfoConfigMap(authCR *operatorv1alp
 func (r *AuthenticationReconciler) verifyConfigMapHasCorrectOwnership(authCR *operatorv1alpha1.Authentication, cm *corev1.ConfigMap) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		reqLogger := logf.FromContext(ctx)
-		if !ctrlcommon.IsOwnerOf(authCR, cm) {
+		gvk := schema.GroupVersionKind{
+			Group:   "operator.ibm.com",
+			Version: "v1alpha1",
+			Kind:    "Authentication",
+		}
+		if !ctrlcommon.IsOwnerOf(gvk, authCR, cm) {
 			reqLogger.Info("ConfigMap is not owned by this Authentication",
 				"ConfigMap.Name", cm.Name,
 				"ConfigMap.Namespace", cm.Namespace)
@@ -616,7 +622,7 @@ func (r *AuthenticationReconciler) getWlpClientID(authCR *operatorv1alpha1.Authe
 // data and returns it.
 func (r *AuthenticationReconciler) getCertificateForService(serviceName string, authCR *operatorv1alpha1.Authentication, certificate *[]byte) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		reqLogger := log.WithValues("func", "getCertificateForService", "namespace", authCR.Namespace)
+		reqLogger := r.WithValues("func", "getCertificateForService", "namespace", authCR.Namespace)
 		secret := &corev1.Secret{}
 		var secretName string
 		switch serviceName {

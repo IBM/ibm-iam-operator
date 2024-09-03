@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -57,7 +58,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 	configMapList := []string{"platform-auth-idp", "registration-script", "oauth-client-map", "registration-json"}
 	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{r.authIdpConfigMap, registrationScriptConfigMap}
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := r.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
 	// Check cluster type if CNCF or OCP
 	globalConfigMapName := ctrlCommon.GlobalConfigMapName
@@ -75,7 +76,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 
 	ctrlCommon.GetClusterType(context.Background(), &r.Client, ctrlCommon.GlobalConfigMapName)
 
-	if !ctrlCommon.ClusterHasRouteGroupVersion() && !ctrlCommon.ClusterHasOpenShiftConfigGroupVerison() {
+	if !ctrlCommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient) && !ctrlCommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
 		isOSEnv = false
 		reqLogger.Info("Checked cluster type", "Configmap.Namespace", instance.Namespace, "ConfigMap.Name", globalConfigMapName, "clusterType", r.clusterType)
 		domainName = globalConfigMap.Data["domain_name"]
@@ -104,7 +105,12 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 
 		if labels != nil {
 			value, ok := labels["app"]
-			if ok && value == "auth-idp" && ctrlCommon.IsControllerOf(instance, currentConfigMap) {
+			gvk := schema.GroupVersionKind{
+				Kind:    "Authentication",
+				Group:   "operator.ibm.com",
+				Version: "v1alpha1",
+			}
+			if ok && value == "auth-idp" && ctrlCommon.IsControllerOf(gvk, instance, currentConfigMap) {
 				reqLogger.Info("ibmcloud-cluster-info Configmap is already created by IM operator", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
 			} else if ok && value == "management-ingress" && ctrlCommon.GetControllerKind(currentConfigMap) == "ManagementIngress" {
 				reqLogger.Info("Configmap is already created by managementingress , IM installation may not proceed further until the configmap is removed", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
@@ -496,7 +502,7 @@ type registrationJSONData struct {
 }
 
 func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := r.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	isPublicCloud := isPublicCloud(r.Client, instance.Namespace, "ibmcloud-cluster-info")
 	bootStrapUserId := instance.Spec.Config.BootstrapUserId
 	roksUserPrefix := instance.Spec.Config.ROKSUserPrefix
@@ -605,7 +611,7 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 }
 
 func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, icpConsoleURL string, scheme *runtime.Scheme) *corev1.ConfigMap {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := r.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
 	// Calculate the ICP Registration Console URI(s)
 	icpRegistrationConsoleURIs := []string{}
@@ -631,7 +637,7 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 	registrationJsonTpl := template.Must(template.New("registrationJson").Parse(registrationJson))
 	var registrationJsonBytes bytes.Buffer
 	if err := registrationJsonTpl.Execute(&registrationJsonBytes, vals); err != nil {
-		reqLogger.Error(err, "Failed to execute registrationJson template")
+		//reqLogger.Error(err, "Failed to execute registrationJson template")
 		return nil
 	}
 
@@ -649,7 +655,7 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 	// Set Authentication instance as the owner and controller of the ConfigMap
 	err := controllerutil.SetControllerReference(instance, newConfigMap, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for ConfigMap")
+		//reqLogger.Error(err, "Failed to set owner for ConfigMap")
 		return nil
 	}
 	return newConfigMap
@@ -657,7 +663,7 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 
 func registrationScriptConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := r.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "registration-script",
@@ -672,7 +678,7 @@ func registrationScriptConfigMap(instance *operatorv1alpha1.Authentication, sche
 	// Set Authentication instance as the owner and controller of the ConfigMap
 	err := controllerutil.SetControllerReference(instance, newConfigMap, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for ConfigMap")
+		//reqLogger.Error(err, "Failed to set owner for ConfigMap")
 		return nil
 	}
 	return newConfigMap
@@ -681,7 +687,7 @@ func registrationScriptConfigMap(instance *operatorv1alpha1.Authentication, sche
 
 func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, icpConsoleURL string, icpProxyURL string, scheme *runtime.Scheme) *corev1.ConfigMap {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	//reqLogger := r.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "oauth-client-map",
@@ -699,7 +705,7 @@ func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, icpConsoleU
 	// Set Authentication instance as the owner and controller of the ConfigMap
 	err := controllerutil.SetControllerReference(instance, newConfigMap, scheme)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for ConfigMap")
+		//reqLogger.Error(err, "Failed to set owner for ConfigMap")
 		return nil
 	}
 	return newConfigMap
@@ -707,7 +713,7 @@ func oauthClientConfigMap(instance *operatorv1alpha1.Authentication, icpConsoleU
 }
 func (r *AuthenticationReconciler) ibmcloudClusterInfoConfigMap(client client.Client, instance *operatorv1alpha1.Authentication, isOSEnv bool, domainName string, scheme *runtime.Scheme) *corev1.ConfigMap {
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	reqLogger := r.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
 	rhttpPort := os.Getenv("ROUTE_HTTP_PORT")
 	if rhttpPort == "" {
@@ -762,7 +768,7 @@ func (r *AuthenticationReconciler) ibmcloudClusterInfoConfigMap(client client.Cl
 		var ProxyDomainName string
 		ingressConfigName := "cluster"
 		ingressConfig := &osconfigv1.Ingress{}
-		clusterClient, err := createOrGetClusterClient()
+		clusterClient, err := createOrGetClusterClient(&r.DiscoveryClient)
 
 		if err != nil {
 			reqLogger.Error(err, "Failure creating or getting cluster client")
@@ -880,7 +886,7 @@ var (
 	ConfigSchemeGroupVersion    = schema.GroupVersion{Group: "config.openshift.io", Version: "v1"}
 )
 
-func createOrGetClusterClient() (client.Client, error) {
+func createOrGetClusterClient(dc *discovery.DiscoveryClient) (client.Client, error) {
 	// return if cluster client already exists
 	if clusterClient != nil {
 		return clusterClient, nil
@@ -891,7 +897,7 @@ func createOrGetClusterClient() (client.Client, error) {
 		return nil, err
 	}
 
-	if ctrlCommon.ClusterHasRouteGroupVersion() {
+	if ctrlCommon.ClusterHasRouteGroupVersion(dc) {
 		utilruntime.Must(osconfigv1.AddToScheme(OpenShiftConfigScheme))
 	}
 	utilruntime.Must(corev1.AddToScheme(OpenShiftConfigScheme))
@@ -909,36 +915,33 @@ func isPublicCloud(client client.Client, namespace string, configMap string) boo
 	currentConfigMap := &corev1.ConfigMap{}
 	err := client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: namespace}, currentConfigMap)
 	if err != nil {
-		log.Info("Error getting configmap", configMap)
+		err = fmt.Errorf("error getting configmap: %w", err)
 		return false
-	} else if err == nil {
-		host := currentConfigMap.Data["cluster_kube_apiserver_host"]
-		return strings.HasSuffix(host, "cloud.ibm.com")
 	}
-	return false
+	host := currentConfigMap.Data["cluster_kube_apiserver_host"]
+	return strings.HasSuffix(host, "cloud.ibm.com")
 }
 
 func readROKSURL(instance *operatorv1alpha1.Authentication) (string, error) {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	wellknownURL := "https://kubernetes.default:443/.well-known/oauth-authorization-server"
 	tokenFile := "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	caCert, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
 	if err != nil {
-		reqLogger.Error(err, "Failed to read ca cert", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+		err = fmt.Errorf("failed to read ca cert: %w", err)
 		return "", err
 	}
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCert)
 	content, err := ioutil.ReadFile(tokenFile)
 	if err != nil {
-		reqLogger.Error(err, "Failed to read default token", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+		err = fmt.Errorf("failed to read default token: %w", err)
 		return "", err
 	}
 	token := string(content)
 	transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: caCertPool}}
 	req, err := http.NewRequest("GET", wellknownURL, nil)
 	if err != nil {
-		reqLogger.Error(err, "Failed to get well known URL", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+		err = fmt.Errorf("failed to get well known URL: %w", err)
 		return "", err
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
@@ -946,7 +949,7 @@ func readROKSURL(instance *operatorv1alpha1.Authentication) (string, error) {
 	response, err := client.Do(req)
 
 	if err != nil {
-		reqLogger.Error(err, "Failed to get OpenShift server URL", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+		err = fmt.Errorf("failed to get OpenShift server URL: %w", err)
 		return "", err
 	}
 	var issuer string
@@ -954,18 +957,18 @@ func readROKSURL(instance *operatorv1alpha1.Authentication) (string, error) {
 		defer response.Body.Close()
 		body, err1 := ioutil.ReadAll(response.Body)
 		if err1 != nil {
-			reqLogger.Error(err, "Failed to readAll", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+			err1 = fmt.Errorf("failed to readAll: %w", err1)
 			return "", err1
 		}
 		var result map[string]interface{}
 		err = json.Unmarshal(body, &result)
 		if err != nil {
-			reqLogger.Error(err, "Failed to unmarshal", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+			err = fmt.Errorf("failed to unmarshal: %w", err)
 			return "", err
 		}
 		issuer = result["issuer"].(string)
 	} else {
-		reqLogger.Error(err, "Response status is not ok:"+response.Status, "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name")
+		err = fmt.Errorf("response status is %s and not OK", response.Status)
 		return "", err
 	}
 	return issuer, nil

@@ -66,28 +66,28 @@ func (f *FakeErrorClient) Get(ctx context.Context, key client.ObjectKey, obj cli
 	if f.GetAllowed {
 		return f.Client.Get(ctx, key, obj, opts...)
 	}
-	return f.ErrFunc()
+	return f.Error()
 }
 
 func (f *FakeErrorClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
 	if f.UpdateAllowed {
 		return f.Client.Update(ctx, obj, opts...)
 	}
-	return f.ErrFunc()
+	return f.Error()
 }
 
 func (f *FakeErrorClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 	if f.CreateAllowed {
 		return f.Client.Create(ctx, obj, opts...)
 	}
-	return f.ErrFunc()
+	return f.Error()
 }
 
 func (f *FakeErrorClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
 	if f.DeleteAllowed {
 		return f.Client.Delete(ctx, obj, opts...)
 	}
-	return f.ErrFunc()
+	return f.Error()
 }
 
 func NewFakeTimeoutClient(cl client.Client) *FakeErrorClient {
@@ -98,6 +98,12 @@ func NewFakeTimeoutClient(cl client.Client) *FakeErrorClient {
 		},
 	}
 }
+
+//func NewFakeIsNotFoundClient(cl client.Client, gvk) *FakeErrorClient {
+//	return &FakeErrorClient{
+//		Client: cl,
+//		ErrFunc: func() error {
+//			return k8sErrors.newNotFound(
 
 var _ = Describe("OperandRequest handling", func() {
 	var r *AuthenticationReconciler

@@ -38,6 +38,29 @@ import (
 const DefaultClusterIssuer = "cs-ca-issuer"
 const Certv1alpha1APIVersion = "certmanager.k8s.io/v1alpha1"
 
+func (r *AuthenticationReconciler) handleCertificates(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	authCR := &operatorv1alpha1.Authentication{}
+	reqLogger := r.WithValues("subreconciler", "handleCertificates")
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+
+	certificateFieldsList := generateCertificateFieldsList(authCR)
+	certificateSubreconcilers := []subreconciler.Fn{
+		r.removeV1Alpha1Certs(authCR, certificateFieldsList),
+		r.createV1CertificatesIfNotPresent(authCR, certificateFieldsList),
+	}
+	reqLogger.Info("Reconciling Certificates")
+	fnCtx := ctrl.LoggerInto(ctx, reqLogger)
+	for _, fn := range certificateSubreconcilers {
+		if result, err = fn(fnCtx); subreconciler.ShouldHaltOrRequeue(result, err) {
+			return
+		}
+	}
+
+	return
+}
+
 type reconcileCertificateFields struct {
 	types.NamespacedName
 	SecretName  string
@@ -86,29 +109,6 @@ func generateCertificateFieldsList(authCR *operatorv1alpha1.Authentication) []*r
 			DNSNames:   []string{},
 		},
 	}
-}
-
-func (r *AuthenticationReconciler) handleCertificates(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	authCR := &operatorv1alpha1.Authentication{}
-	reqLogger := r.WithValues("subreconciler", "handleCertificates")
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return
-	}
-
-	certificateFieldsList := generateCertificateFieldsList(authCR)
-	certificateSubreconcilers := []subreconciler.Fn{
-		r.removeV1Alpha1Certs(authCR, certificateFieldsList),
-		r.createV1CertificatesIfNotPresent(authCR, certificateFieldsList),
-	}
-	reqLogger.Info("Reconciling Certificates")
-	fnCtx := ctrl.LoggerInto(ctx, reqLogger)
-	for _, fn := range certificateSubreconcilers {
-		if result, err = fn(fnCtx); subreconciler.ShouldHaltOrRequeue(result, err) {
-			return
-		}
-	}
-
-	return
 }
 
 func (r *AuthenticationReconciler) removeV1Alpha1Certs(authCR *operatorv1alpha1.Authentication, fieldsList []*reconcileCertificateFields) (fn subreconciler.Fn) {
@@ -230,7 +230,10 @@ func (r *AuthenticationReconciler) createV1CertificateIfNotPresent(authCR *opera
 			}
 			reqLogger.Info("Creating a new Certificate")
 			err = r.Create(ctx, newCertificate)
-			if err != nil {
+			if k8sErrors.IsAlreadyExists(err) {
+				reqLogger.Info("Certificate already exists; continuing")
+				return subreconciler.ContinueReconciling()
+			} else if err != nil {
 				reqLogger.Error(err, "Failed to create new Certificate")
 				return subreconciler.RequeueWithError(err)
 			}

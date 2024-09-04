@@ -235,6 +235,8 @@ spec:
                     type: string
                   xframeDomain:
                     type: string
+                  zenFrontDoor:
+                    type: boolean
                   attrMappingFromConfig:
                     type: boolean
                 required:

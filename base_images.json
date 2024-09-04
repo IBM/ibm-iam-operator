@@ -2,34 +2,12 @@
   {
     "imageType": "external",
     "sourceRepo": "registry.access.redhat.com",
-    "sourceNamespace": "ubi8",
-    "sourceImage": "ubi",
-    "destStage": "edge",
-    "destNamespace": "build-images",
-    "destImage": "ubi8",
-    "tag": "8.10-1020",
-    "updatePackages": []
-  },
-  {
-    "imageType": "external",
-    "sourceRepo": "registry.access.redhat.com",
-    "sourceNamespace": "ubi8",
-    "sourceImage": "ubi-minimal",
-    "destStage": "edge",
-    "destNamespace": "build-images",
-    "destImage": "ubi8-minimal",
-    "tag": "8.10-1018",
-    "updatePackages": []
-  },
-  {
-    "imageType": "external",
-    "sourceRepo": "registry.access.redhat.com",
     "sourceNamespace": "ubi9",
     "sourceImage": "ubi-micro",
     "destStage": "edge",
     "destNamespace": "build-images",
     "destImage": "ubi9-micro",
-    "tag": "9.4-9",
+    "tag": "9.4-15",
     "updatePackages": []
   },
   {
@@ -40,7 +18,7 @@
     "destStage": "edge",
     "destNamespace": "build-images",
     "destImage": "ubi9",
-    "tag": "9.4-1123.1719560047",
+    "tag": "9.4-1214",
     "updatePackages": []
   },
   {
@@ -51,35 +29,21 @@
     "destStage": "edge",
     "destNamespace": "build-images",
     "destImage": "ubi9-minimal",
-    "tag": "9.4-1134",
+    "tag": "9.4-1227",
     "updatePackages": []
   },
   {
     "imageType": "node",
-    "sourceImage": "ubi8-minimal",
-    "sourceTag": "8.10-1018",
-    "destImage": "node-v18-ubi8-minimal",
-    "nodeVersion": "18.20.4"
-  },
-  {
-    "imageType": "node",
-    "sourceImage": "ubi8-minimal",
-    "sourceTag": "8.10-1018",
-    "destImage": "node-v20-ubi8-minimal",
-    "nodeVersion": "20.15.1"
-  },
-  {
-    "imageType": "node",
     "sourceImage": "ubi9-minimal",
-    "sourceTag": "9.4-1134",
+    "sourceTag": "9.4-1227",
     "destImage": "node-v18-ubi9-minimal",
     "nodeVersion": "18.20.4"
   },
   {
     "imageType": "node",
     "sourceImage": "ubi9-minimal",
-    "sourceTag": "9.4-1134",
+    "sourceTag": "9.4-1227",
     "destImage": "node-v20-ubi9-minimal",
-    "nodeVersion": "20.15.1"
+    "nodeVersion": "20.17.0"
   }
 ]

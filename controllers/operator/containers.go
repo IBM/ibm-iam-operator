@@ -41,6 +41,9 @@ func buildInitContainers(initImage string) []corev1.Container {
 			},
 			Env: envVars,
 			SecurityContext: &corev1.SecurityContext{
+				SeccompProfile: &corev1.SeccompProfile{
+					Type: corev1.SeccompProfileTypeRuntimeDefault,
+				},
 				Privileged:               &falseVar,
 				RunAsNonRoot:             &trueVar,
 				ReadOnlyRootFilesystem:   &trueVar,
@@ -78,6 +81,9 @@ func buildInitForMngrAndProvider(initImage string) []corev1.Container {
 			},
 			Env: envVars,
 			SecurityContext: &corev1.SecurityContext{
+				SeccompProfile: &corev1.SeccompProfile{
+					Type: corev1.SeccompProfileTypeRuntimeDefault,
+				},
 				Privileged:               &falseVar,
 				RunAsNonRoot:             &trueVar,
 				ReadOnlyRootFilesystem:   &trueVar,
@@ -304,6 +310,9 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 		Image:           authServiceImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: &corev1.SecurityContext{
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeRuntimeDefault,
+			},
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
 			ReadOnlyRootFilesystem:   &falseVar,
@@ -635,6 +644,9 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		Image:           identityProviderImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: &corev1.SecurityContext{
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeRuntimeDefault,
+			},
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
 			ReadOnlyRootFilesystem:   &falseVar,
@@ -971,6 +983,9 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		Image:           identityManagerImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: &corev1.SecurityContext{
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeRuntimeDefault,
+			},
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
 			ReadOnlyRootFilesystem:   &falseVar,

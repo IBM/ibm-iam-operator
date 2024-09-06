@@ -669,7 +669,7 @@ var _ = Describe("Route handling", func() {
 		})
 
 		hasAllValidRoutes := func(routes *routev1.RouteList) {
-			Expect(routes.Items).To(HaveLen(8))
+			Expect(routes.Items).To(HaveLen(7))
 			for _, route := range routes.Items {
 				Expect(route.Spec.Host).To(Equal(clusterInfoConfigMap.Data["cluster_address"]))
 				for k, v := range commonRouteAnnotations {
@@ -688,13 +688,6 @@ var _ = Describe("Route handling", func() {
 					Expect(route.Spec.To.Name).To(Equal(PlatformIdentityProviderServiceName))
 					Expect(route.Spec.TLS.DestinationCACertificate).To(Equal(string(identityProviderSecretSecret.Data["ca.crt"])))
 					Expect(route.Annotations).To(HaveKeyWithValue("haproxy.router.openshift.io/rewrite-target", "/v1/auth/"))
-				case "platform-id-auth":
-					Expect(route.Spec.Path).To(Equal("/idauth"))
-					Expect(route.Spec.Port).To(Equal(&routev1.RoutePort{TargetPort: intstr.FromInt(9443)}))
-					Expect(route.Spec.To.Name).To(Equal(PlatformAuthServiceName))
-					Expect(route.Spec.TLS.DestinationCACertificate).To(Equal(string(platformAuthSecretSecret.Data["ca.crt"])))
-					Expect(route.Annotations).To(HaveKeyWithValue("haproxy.router.openshift.io/balance", "source"))
-					Expect(route.Annotations).To(HaveKeyWithValue("haproxy.router.openshift.io/rewrite-target", "/"))
 				case "platform-id-provider":
 					Expect(route.Spec.Path).To(Equal("/idprovider/"))
 					Expect(route.Spec.Port).To(Equal(&routev1.RoutePort{TargetPort: intstr.FromInt(4300)}))
@@ -735,7 +728,6 @@ var _ = Describe("Route handling", func() {
 			names := []string{
 				"id-mgmt",
 				"platform-auth",
-				"platform-id-auth",
 				"platform-id-provider",
 				"platform-login",
 				"platform-oidc",

@@ -751,7 +751,7 @@ var _ = Describe("Route handling", func() {
 			}
 			err := r.List(ctx, routes, listOpts...)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(routes.Items).To(HaveLen(8))
+			Expect(routes.Items).To(HaveLen(7))
 		}
 
 		It("creates all Routes when zenFrontDoor is not enabled", func() {

@@ -353,6 +353,11 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 					ServiceAccountName:            serviceAccountName,
 					HostIPC:                       falseVar,
 					HostPID:                       falseVar,
+					SecurityContext: &corev1.PodSecurityContext{
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
 					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 						{
 							MaxSkew:           1,
@@ -506,6 +511,11 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 					ServiceAccountName:            serviceAccountName,
 					HostIPC:                       falseVar,
 					HostPID:                       falseVar,
+					SecurityContext: &corev1.PodSecurityContext{
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
 					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 						{
 							MaxSkew:           1,
@@ -659,6 +669,11 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 					ServiceAccountName:            serviceAccountName,
 					HostIPC:                       falseVar,
 					HostPID:                       falseVar,
+					SecurityContext: &corev1.PodSecurityContext{
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
 					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 						{
 							MaxSkew:           1,

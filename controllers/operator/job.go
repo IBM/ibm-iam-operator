@@ -131,6 +131,11 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 				Spec: corev1.PodSpec{
 					HostIPC: false,
 					HostPID: false,
+					SecurityContext: &corev1.PodSecurityContext{
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
 					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 						{
 							MaxSkew:           1,
@@ -253,6 +258,9 @@ func buildContainer(jobName string, image string, resources *corev1.ResourceRequ
 			Image:           image,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			SecurityContext: &corev1.SecurityContext{
+				SeccompProfile: &corev1.SeccompProfile{
+					Type: corev1.SeccompProfileTypeRuntimeDefault,
+				},
 				Privileged:               &falseVar,
 				RunAsNonRoot:             &trueVar,
 				ReadOnlyRootFilesystem:   &falseVar,

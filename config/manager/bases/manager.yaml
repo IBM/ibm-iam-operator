@@ -34,7 +34,13 @@ spec:
         productMetric: FREE
     spec:
       serviceAccountName: ibm-iam-operator
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       affinity:
+        securityContext:
+          seccompProfile:
+            type: RuntimeDefault
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
@@ -82,6 +88,8 @@ spec:
               memory: 80Mi
               ephemeral-storage: 256Mi
           securityContext:
+            seccompProfile:
+              type: RuntimeDefault
             allowPrivilegeEscalation: false
             capabilities:
               drop:

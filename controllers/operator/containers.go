@@ -37,7 +37,7 @@ func buildInitContainers(initImage string) []corev1.Container {
 			Command: []string{
 				"bash",
 				"-c",
-				"until </dev/tcp/$DATABASE_RW_ENDPOINT/$DATABASE_PORT ; do sleep 5; done; sleep 30;",
+				"until </dev/tcp/$DATABASE_RW_ENDPOINT/$DATABASE_PORT ; do sleep 5; done;",
 			},
 			Env: envVars,
 			SecurityContext: &corev1.SecurityContext{

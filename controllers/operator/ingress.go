@@ -34,8 +34,6 @@ var ingressList []string = []string{
 	"id-mgmt",
 	"idmgmt-v2-api",
 	"platform-auth",
-	"platform-id-auth-block",
-	"platform-id-auth",
 	"platform-id-provider",
 	"platform-login",
 	"platform-oidc-block",

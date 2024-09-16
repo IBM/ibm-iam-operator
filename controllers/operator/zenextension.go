@@ -56,14 +56,6 @@ location /v1/auth/ {
   proxy_pass https://platform-identity-provider.%[1]s.svc:4300;
   proxy_read_timeout 180s;
 }
-location /idauth {
-  proxy_set_header Host $host;
-  proxy_set_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
-  proxy_pass https://platform-auth-service.%[1]s.svc:9443;
-  proxy_read_timeout 180s;
-  rewrite /idauth/(.*) /$1 break;
-  rewrite /idauth / break;
-}
 location /idprovider/ {
   proxy_set_header Host $host;
   proxy_set_header Strict-Transport-Security "max-age=31536000; includeSubDomains";

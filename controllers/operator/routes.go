@@ -81,6 +81,8 @@ func (r *AuthenticationReconciler) reconcileAllRoutes(ctx context.Context, authC
 		return
 	}
 
+	result, err = r.removeIdauth(ctx, authCR)
+
 	allRouteReconcilers := make([]subreconciler.Fn, 0)
 	for _, routeFields := range *allRoutesFields {
 		allRouteReconcilers = append(allRouteReconcilers, r.reconcileRoute(authCR, routeFields))
@@ -94,6 +96,26 @@ func (r *AuthenticationReconciler) reconcileAllRoutes(ctx context.Context, authC
 		errs = append(errs, err)
 	}
 	return ctrlcommon.ReduceSubreconcilerResultsAndErrors(results, errs)
+}
+
+func (r *AuthenticationReconciler) removeIdauth(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx)
+	reqLogger.Info("Determined platform-id-auth Route should not exist; removing if present")
+	observedRoute := &routev1.Route{}
+	err = r.Get(ctx, types.NamespacedName{Name: "platform-id-auth", Namespace: authCR.Namespace}, observedRoute)
+	if k8sErrors.IsNotFound(err) {
+		return subreconciler.ContinueReconciling()
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to get existing platform-id-auth route for reconciliation")
+		return subreconciler.RequeueWithError(err)
+	}
+	err = r.Delete(ctx, observedRoute)
+	if err != nil {
+		reqLogger.Error(err, "Failed to delete platform-id-auth Route")
+		return subreconciler.RequeueWithError(err)
+	}
+	reqLogger.Info("Successfully deleted platform-id-auth Route")
+	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
 func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.Authentication, allRoutesFields *map[string]*reconcileRouteFields) (fn subreconciler.Fn) {
@@ -142,18 +164,6 @@ func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.A
 				RoutePort:         4300,
 				DestinationCAcert: platformIdentityProviderCert,
 				ServiceName:       PlatformIdentityProviderServiceName,
-			},
-			"platform-id-auth": {
-				Annotations: map[string]string{
-					"haproxy.router.openshift.io/balance":        "source",
-					"haproxy.router.openshift.io/rewrite-target": "/",
-				},
-				Name:              "platform-id-auth",
-				RouteHost:         routeHost,
-				RoutePath:         "/idauth",
-				RoutePort:         9443,
-				DestinationCAcert: platformAuthCert,
-				ServiceName:       PlatformAuthServiceName,
 			},
 			"platform-id-provider": {
 				Annotations: map[string]string{

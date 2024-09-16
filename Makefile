@@ -163,7 +163,7 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 KUSTOMIZE_VERSION ?= v3.8.9
 CONTROLLER_TOOLS_VERSION ?= v0.11.4
 YQ_VERSION ?= v4.40.5
-GO_VERSION ?= 1.21.8
+GO_VERSION ?= 1.21.9
 
 # This pinned version of go has its version pinned to its name, so order of operations is inverted here.
 GO ?= $(LOCALBIN)/go$(GO_VERSION)

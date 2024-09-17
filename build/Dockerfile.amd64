@@ -14,7 +14,7 @@
 #
 
 # Swap default image for ubi9-minimal
-FROM docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-edge-docker-local/build-images/ubi9-minimal:latest-amd64
+FROM registry.access.redhat.com/ubi9-minimal
 
 ARG VCS_REF
 ARG VCS_URL

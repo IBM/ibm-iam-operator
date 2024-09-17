@@ -28,7 +28,6 @@ import (
 	"github.com/opdev/subreconciler"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -120,7 +119,7 @@ func (r *AuthenticationReconciler) handleZenExtension(ctx context.Context, req c
 	if authCR.Spec.Config.ZenFrontDoor {
 		reqLogger.Info("Zen front door requested - Ensure that ZenExtension is updated with correct front door config")
 
-		if ctrlCommon.ClusterHasZenExtensionGroupVersion() {
+		if ctrlCommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
 			commonWebUIZenExt := &zenv1.ZenExtension{}
 			err = r.Get(ctx, types.NamespacedName{Name: uiZenExtName, Namespace: authCR.Namespace}, commonWebUIZenExt)
 			if err != nil {
@@ -227,7 +226,7 @@ func (r *AuthenticationReconciler) handleZenExtension(ctx context.Context, req c
 		}
 	}
 
-	if authCR.Spec.Config.ZenFrontDoor && ctrlCommon.ClusterHasZenExtensionGroupVersion() {
+	if authCR.Spec.Config.ZenFrontDoor && ctrlCommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
 		//authHost must be set to the zen front door
 		//is should be set from above
 		authHost = zenHost
@@ -275,7 +274,7 @@ func (r *AuthenticationReconciler) getZenHost(ctx context.Context, authCR *opera
 	productConfigMap := &corev1.ConfigMap{}
 	err = r.Client.Get(ctx, types.NamespacedName{Name: ZenProductConfigmapName, Namespace: authCR.Namespace}, productConfigMap)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Zen product configmap doesnot exist - requeuing until it does")
 			*needToRequeue = true
 			err = nil

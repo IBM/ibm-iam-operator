@@ -50,7 +50,7 @@ func TLSConfig(caCert, clientCert, clientKey []byte) DBOption {
 		tlsConfig := &tls.Config{
 			RootCAs:            caCertPool,
 			Certificates:       []tls.Certificate{clientCertificate},
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: false,
 		}
 		c.TLSConfig = tlsConfig
 		return

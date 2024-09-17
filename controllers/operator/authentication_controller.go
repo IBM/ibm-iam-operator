@@ -26,7 +26,6 @@ import (
 	"sync"
 	"time"
 
-	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	"github.com/IBM/ibm-iam-operator/migration"
 	certmgr "github.com/ibm/ibm-cert-manager-operator/apis/cert-manager/v1"
@@ -667,12 +666,12 @@ func (r *AuthenticationReconciler) getLatestAuthentication(ctx context.Context, 
 
 // RunningOnOpenShiftCluster returns whether the Operator is running on an OpenShift cluster
 func (r *AuthenticationReconciler) RunningOnOpenShiftCluster() bool {
-	return ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) && ctrlCommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient)
+	return ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) && ctrlcommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient)
 }
 
 // RunningOnCNCFCluster returns whether the Operator is running on a CNCF cluster
 func (r *AuthenticationReconciler) RunningOnCNCFCluster() bool {
-	return !ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) || !ctrlCommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient)
+	return !ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) || !ctrlcommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient)
 
 }
 

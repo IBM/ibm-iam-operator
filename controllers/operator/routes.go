@@ -68,7 +68,7 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Re
 	reqLogger := log.WithValues("func", "ReconcileRoutes", "namespace", req.Namespace)
 	handleRouteCtx := logf.IntoContext(ctx, reqLogger)
 
-	if !ctrlcommon.ClusterHasRouteGroupVersion() {
+	if !ctrlcommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient) {
 		return subreconciler.ContinueReconciling()
 	}
 

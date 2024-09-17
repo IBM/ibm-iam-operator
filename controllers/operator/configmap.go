@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -75,7 +76,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 
 	ctrlCommon.GetClusterType(context.Background(), &r.Client, ctrlCommon.GlobalConfigMapName)
 
-	if !ctrlCommon.ClusterHasRouteGroupVersion() && !ctrlCommon.ClusterHasOpenShiftConfigGroupVerison() {
+	if !ctrlCommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient) && !ctrlCommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
 		isOSEnv = false
 		reqLogger.Info("Checked cluster type", "Configmap.Namespace", instance.Namespace, "ConfigMap.Name", globalConfigMapName, "clusterType", r.clusterType)
 		domainName = globalConfigMap.Data["domain_name"]
@@ -762,7 +763,7 @@ func (r *AuthenticationReconciler) ibmcloudClusterInfoConfigMap(client client.Cl
 		var ProxyDomainName string
 		ingressConfigName := "cluster"
 		ingressConfig := &osconfigv1.Ingress{}
-		clusterClient, err := createOrGetClusterClient()
+		clusterClient, err := createOrGetClusterClient(&r.DiscoveryClient)
 
 		if err != nil {
 			reqLogger.Error(err, "Failure creating or getting cluster client")
@@ -880,7 +881,7 @@ var (
 	ConfigSchemeGroupVersion    = schema.GroupVersion{Group: "config.openshift.io", Version: "v1"}
 )
 
-func createOrGetClusterClient() (client.Client, error) {
+func createOrGetClusterClient(dc *discovery.DiscoveryClient) (client.Client, error) {
 	// return if cluster client already exists
 	if clusterClient != nil {
 		return clusterClient, nil
@@ -891,7 +892,7 @@ func createOrGetClusterClient() (client.Client, error) {
 		return nil, err
 	}
 
-	if ctrlCommon.ClusterHasRouteGroupVersion() {
+	if ctrlCommon.ClusterHasRouteGroupVersion(dc) {
 		utilruntime.Must(osconfigv1.AddToScheme(OpenShiftConfigScheme))
 	}
 	utilruntime.Must(corev1.AddToScheme(OpenShiftConfigScheme))

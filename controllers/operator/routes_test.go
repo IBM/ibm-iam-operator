@@ -2,10 +2,11 @@ package operator
 
 import (
 	"context"
-
+	"path/filepath"
 	"time"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
+	zenv1 "github.com/IBM/ibm-iam-operator/apis/zen.cpd.ibm.com/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/opdev/subreconciler"
@@ -15,10 +16,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
 func confirmThatItRequeuesWithError(result *ctrl.Result, err error) {
@@ -89,12 +92,17 @@ var _ = Describe("Route handling", func() {
 			scheme = runtime.NewScheme()
 			Expect(corev1.AddToScheme(scheme)).To(Succeed())
 			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
+			Expect(routev1.AddToScheme(scheme)).To(Succeed())
 			cb = *fakeclient.NewClientBuilder().
 				WithScheme(scheme).
 				WithObjects(clusterInfoConfigMap, authCR)
 			cl = cb.Build()
+			dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+			Expect(err).NotTo(HaveOccurred())
+
 			r = &AuthenticationReconciler{
-				Client: cl,
+				Client:          cl,
+				DiscoveryClient: *dc,
 			}
 			ctx = context.Background()
 			cm = &corev1.ConfigMap{}
@@ -514,6 +522,16 @@ var _ = Describe("Route handling", func() {
 	Describe("getClusterAddress", func() {
 		var clusterAddress string
 		BeforeEach(func() {
+			crds, err := envtest.InstallCRDs(cfg, envtest.CRDInstallOptions{
+				Paths: []string{filepath.Join(".", "testdata", "crds", "routes")},
+			})
+			Expect(crds).To(HaveLen(1))
+			Expect(err).ToNot(HaveOccurred())
+			scheme = runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).To(Succeed())
+			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
+			Expect(routev1.AddToScheme(scheme)).To(Succeed())
+
 			authCR = &operatorv1alpha1.Authentication{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "operator.ibm.com/v1alpha1",
@@ -536,9 +554,7 @@ var _ = Describe("Route handling", func() {
 				},
 			}
 			controllerutil.SetOwnerReference(authCR, clusterInfoConfigMap, scheme)
-			scheme = runtime.NewScheme()
-			Expect(corev1.AddToScheme(scheme)).To(Succeed())
-			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
+			ctx = context.Background()
 			cb = *fakeclient.NewClientBuilder().
 				WithScheme(scheme).
 				WithObjects(clusterInfoConfigMap, authCR)
@@ -546,7 +562,6 @@ var _ = Describe("Route handling", func() {
 			r = &AuthenticationReconciler{
 				Client: cl,
 			}
-			ctx = context.Background()
 			clusterAddress = ""
 		})
 
@@ -583,6 +598,20 @@ var _ = Describe("Route handling", func() {
 
 	Describe("handleRoutes", func() {
 		BeforeEach(func() {
+			crds, err := envtest.InstallCRDs(cfg, envtest.CRDInstallOptions{
+				Paths: []string{
+					filepath.Join(".", "testdata", "crds", "routes"),
+					filepath.Join(".", "testdata", "crds", "zen"),
+				},
+			})
+			Expect(crds).To(HaveLen(2))
+			Expect(err).ToNot(HaveOccurred())
+
+			scheme = runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).To(Succeed())
+			Expect(routev1.AddToScheme(scheme)).To(Succeed())
+			Expect(zenv1.AddToScheme(scheme)).To(Succeed())
+			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
 			authCR = &operatorv1alpha1.Authentication{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "operator.ibm.com/v1alpha1",
@@ -647,10 +676,33 @@ var _ = Describe("Route handling", func() {
 				},
 			}
 			controllerutil.SetOwnerReference(authCR, clusterInfoConfigMap, scheme)
-			scheme = runtime.NewScheme()
-			Expect(corev1.AddToScheme(scheme)).To(Succeed())
-			Expect(routev1.AddToScheme(scheme)).To(Succeed())
-			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
+			frontdoor := &zenv1.ZenExtension{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      ImZenExtName,
+					Namespace: "data-ns",
+				},
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "ZenExtension",
+					APIVersion: "zen.cpd.ibm.com/v1",
+				},
+			}
+			frontdoor.Status.Conditions = []metav1.Condition{
+				{
+					Type:   zenv1.ConditionTypeSuccessful,
+					Status: metav1.ConditionTrue,
+				},
+				{
+					Type:   zenv1.ConditionTypeRunning,
+					Status: metav1.ConditionTrue,
+				},
+				{
+					Type:   zenv1.ConditionTypeFailure,
+					Status: metav1.ConditionFalse,
+				},
+			}
+			frontdoor.Status.Status = zenv1.ZenExtensionStatusCompleted
+
+			ctx = context.Background()
 			cb = *fakeclient.NewClientBuilder().
 				WithScheme(scheme).
 				WithObjects(
@@ -660,12 +712,16 @@ var _ = Describe("Route handling", func() {
 					identityProviderSecretSecret,
 					platformOIDCCredentialsSecret,
 					authCR,
+					frontdoor,
 				)
 			cl = cb.Build()
+			dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+			Expect(err).NotTo(HaveOccurred())
+
 			r = &AuthenticationReconciler{
-				Client: cl,
+				Client:          cl,
+				DiscoveryClient: *dc,
 			}
-			ctx = context.Background()
 		})
 
 		hasAllValidRoutes := func(routes *routev1.RouteList) {

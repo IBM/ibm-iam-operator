@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -666,12 +667,12 @@ func (r *AuthenticationReconciler) getLatestAuthentication(ctx context.Context, 
 
 // RunningOnOpenShiftCluster returns whether the Operator is running on an OpenShift cluster
 func (r *AuthenticationReconciler) RunningOnOpenShiftCluster() bool {
-	return ctrlcommon.ClusterHasOpenShiftConfigGroupVerison() && ctrlCommon.ClusterHasRouteGroupVersion()
+	return ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) && ctrlCommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient)
 }
 
 // RunningOnCNCFCluster returns whether the Operator is running on a CNCF cluster
 func (r *AuthenticationReconciler) RunningOnCNCFCluster() bool {
-	return !ctrlcommon.ClusterHasOpenShiftConfigGroupVerison() || !ctrlCommon.ClusterHasRouteGroupVersion()
+	return !ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) || !ctrlCommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient)
 
 }
 
@@ -717,10 +718,11 @@ func needsAuditServiceDummyDataReset(a *operatorv1alpha1.Authentication) bool {
 // AuthenticationReconciler reconciles a Authentication object
 type AuthenticationReconciler struct {
 	client.Client
-	Scheme      *runtime.Scheme
-	Mutex       sync.Mutex
-	clusterType ctrlcommon.ClusterType
-	dbSetupChan chan *migration.Result
+	Scheme          *runtime.Scheme
+	DiscoveryClient discovery.DiscoveryClient
+	Mutex           sync.Mutex
+	clusterType     ctrlcommon.ClusterType
+	dbSetupChan     chan *migration.Result
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -937,10 +939,10 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&operatorv1alpha1.OperandRequest{})
 
 	//Add routes
-	if ctrlcommon.ClusterHasOpenShiftConfigGroupVerison() {
+	if ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
 		builder.Owns(&routev1.Route{})
 	}
-	if ctrlcommon.ClusterHasZenExtensionGroupVersion() {
+	if ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
 		builder.Owns(&zenv1.ZenExtension{})
 	}
 

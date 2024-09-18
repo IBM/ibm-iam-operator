@@ -39,6 +39,10 @@ func (z *ZenExtension) Ready() bool {
 	return z.Status.AllExtensionsProcessed()
 }
 
+func (z *ZenExtension) NotReady() bool {
+	return !z.Ready()
+}
+
 type ZenExtensionStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 	Message    string             `json:"message,omitempty"`

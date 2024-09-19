@@ -6,8 +6,8 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 
+	testutil "github.com/IBM/ibm-iam-operator/testing"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,45 +41,6 @@ func TestIsIBMMongoDBOperator(t *testing.T) {
 
 // Internal constant from fake library
 const trackerAddResourceVersion = "999"
-
-type fakeTimeoutClient struct {
-	client.Client
-	goodCalls int
-}
-
-func (f *fakeTimeoutClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-	if f.goodCalls > 0 {
-		f.goodCalls--
-		return f.Client.Get(ctx, key, obj, opts...)
-	}
-	return k8sErrors.NewTimeoutError("dummy error", 500)
-}
-
-func (f *fakeTimeoutClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
-	if f.goodCalls > 0 {
-		f.goodCalls--
-		return f.Client.Update(ctx, obj, opts...)
-	}
-	return k8sErrors.NewTimeoutError("dummy error", 500)
-}
-
-func (f *fakeTimeoutClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
-	if f.goodCalls > 0 {
-		f.goodCalls--
-		return f.Client.Create(ctx, obj, opts...)
-	}
-	return k8sErrors.NewTimeoutError("dummy error", 500)
-}
-
-func (f *fakeTimeoutClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
-	if f.goodCalls > 0 {
-		f.goodCalls--
-		return f.Client.Delete(ctx, obj, opts...)
-	}
-	return k8sErrors.NewTimeoutError("dummy error", 500)
-}
-
-var _ client.Client = &fakeTimeoutClient{}
 
 var _ = Describe("OperandRequest handling", func() {
 	var r *AuthenticationReconciler
@@ -140,7 +101,7 @@ var _ = Describe("OperandRequest handling", func() {
 			err := r.Delete(context.Background(), mongoDBService)
 			Expect(err).ToNot(HaveOccurred())
 			rFailing := &AuthenticationReconciler{
-				Client: &fakeTimeoutClient{
+				Client: &testutil.FakeTimeoutClient{
 					Client: cl,
 				},
 			}
@@ -206,7 +167,7 @@ var _ = Describe("OperandRequest handling", func() {
 			err := r.Update(context.Background(), authCR)
 			Expect(err).ToNot(HaveOccurred())
 			rFailing := &AuthenticationReconciler{
-				Client: &fakeTimeoutClient{
+				Client: &testutil.FakeTimeoutClient{
 					Client: cl,
 				},
 			}
@@ -314,7 +275,7 @@ var _ = Describe("OperandRequest handling", func() {
 
 			It("should NOT add the embedded EDB entry to the list of Operands", func() {
 				rFailing := &AuthenticationReconciler{
-					Client: &fakeTimeoutClient{
+					Client: &testutil.FakeTimeoutClient{
 						Client: cl,
 					},
 				}
@@ -502,7 +463,7 @@ var _ = Describe("OperandRequest handling", func() {
 		})
 		It("returns an error when an unexpected error is encountered", func() {
 			rFailing := &AuthenticationReconciler{
-				Client: &fakeTimeoutClient{
+				Client: &testutil.FakeTimeoutClient{
 					Client: cl,
 				},
 			}

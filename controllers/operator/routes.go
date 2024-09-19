@@ -21,17 +21,13 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/opdev/subreconciler"
 	routev1 "github.com/openshift/api/route/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/controllers/common"
@@ -269,25 +265,25 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, instance *o
 	return
 }
 
-
-func (r *AuthenticationReconciler) removeIdauth(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
+func (r *AuthenticationReconciler) removeIdauth(ctx context.Context, instance *operatorv1alpha1.Authentication) (err error) {
+	namespace := instance.Namespace
+	reqLogger := log.WithValues("func", "ReconcileRoute", "namespace", namespace)
 	reqLogger.Info("Determined platform-id-auth Route should not exist; removing if present")
 	observedRoute := &routev1.Route{}
-	err = r.Get(ctx, types.NamespacedName{Name: "platform-id-auth", Namespace: authCR.Namespace}, observedRoute)
-	if k8sErrors.IsNotFound(err) {
-		return subreconciler.ContinueReconciling()
+	err = r.Get(ctx, types.NamespacedName{Name: "platform-id-auth", Namespace: namespace}, observedRoute)
+	if errors.IsNotFound(err) {
+		return
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get existing platform-id-auth route for reconciliation")
-		return subreconciler.RequeueWithError(err)
+		return 
 	}
 	err = r.Delete(ctx, observedRoute)
 	if err != nil {
 		reqLogger.Error(err, "Failed to delete platform-id-auth Route")
-		return subreconciler.RequeueWithError(err)
+		return
 	}
 	reqLogger.Info("Successfully deleted platform-id-auth Route")
-	return subreconciler.RequeueWithDelay(defaultLowerWait)
+	return 
 }
 
 func (r *AuthenticationReconciler) reconcileRoute(ctx context.Context, instance *operatorv1alpha1.Authentication, fields *reconcileRouteFields, needToRequeue *bool) (err error) {
@@ -297,7 +293,7 @@ func (r *AuthenticationReconciler) reconcileRoute(ctx context.Context, instance 
 
 	reqLogger.Info("Reconciling route", "annotations", fields.Annotations, "routeHost", fields.RouteHost, "routePath", fields.RoutePath)
 
-	result, err := r.removeIdauth(ctx, instance)
+	err = r.removeIdauth(ctx, instance)
 
 	calculatedRoute, err := r.newRoute(instance, fields)
 	if err != nil {

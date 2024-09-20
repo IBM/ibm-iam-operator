@@ -160,10 +160,10 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v3.8.9
-CONTROLLER_TOOLS_VERSION ?= v0.11.4
+KUSTOMIZE_VERSION ?= 5.4.3
+CONTROLLER_TOOLS_VERSION ?= v0.16.3
 YQ_VERSION ?= v4.40.5
-GO_VERSION ?= 1.21.9
+GO_VERSION ?= 1.23.1
 
 # This pinned version of go has its version pinned to its name, so order of operations is inverted here.
 GO ?= $(LOCALBIN)/go$(GO_VERSION)

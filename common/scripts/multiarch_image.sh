@@ -49,12 +49,12 @@ done
 if [[ -n "$($CONTAINER_CLI images -f reference="${IMAGE_REPO}/${IMAGE_NAME}:${RELEASE_VERSION}" --format='{{.ID}}')" ]]
 then
   echo "Remove local image with conflicting reference ${IMAGE_REPO}/${IMAGE_NAME}:${RELEASE_VERSION}"
-  podman rmi "${IMAGE_REPO}/${IMAGE_NAME}:${RELEASE_VERSION}"
+  ${CONTAINER_CLI} rmi "${IMAGE_REPO}/${IMAGE_NAME}:${RELEASE_VERSION}"
 fi
 if [[ -n "$($CONTAINER_CLI images -f reference="${IMAGE_REPO}/${IMAGE_NAME}:latest" --format='{{.ID}}')" ]]
 then
   echo "Remove local image with conflicting reference ${IMAGE_REPO}/${IMAGE_NAME}:latest"
-  podman rmi "${IMAGE_REPO}/${IMAGE_NAME}:latest"
+  ${CONTAINER_CLI} rmi "${IMAGE_REPO}/${IMAGE_NAME}:latest"
 fi
 
 # create multi-arch manifest

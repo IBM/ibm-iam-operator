@@ -2,52 +2,31 @@ package operator
 
 import (
 	"context"
-
-	"time"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"strings"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
+	zenv1 "github.com/IBM/ibm-iam-operator/apis/zen.cpd.ibm.com/v1"
+	testutil "github.com/IBM/ibm-iam-operator/testing"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/opdev/subreconciler"
 	routev1 "github.com/openshift/api/route/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/discovery"
+	restclient "k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
-
-func confirmThatItRequeuesWithError(result *ctrl.Result, err error) {
-	Expect(result).ToNot(BeNil())
-	Expect(result.Requeue).To(BeTrue())
-	Expect(result.RequeueAfter).To(BeZero())
-	Expect(err).To(HaveOccurred())
-	Expect(subreconciler.ShouldContinue(result, err)).To(BeFalse())
-	Expect(subreconciler.ShouldRequeue(result, err)).To(BeTrue())
-	Expect(subreconciler.ShouldHaltOrRequeue(result, err)).To(BeTrue())
-}
-
-func confirmThatItRequeuesWithDelay(result *ctrl.Result, err error, expectedDelay time.Duration) {
-	Expect(result).ToNot(BeNil())
-	Expect(result.Requeue).To(BeTrue())
-	Expect(result.RequeueAfter).To(Equal(expectedDelay))
-	Expect(err).ToNot(HaveOccurred())
-	Expect(subreconciler.ShouldContinue(result, err)).To(BeFalse())
-	Expect(subreconciler.ShouldRequeue(result, err)).To(BeTrue())
-	Expect(subreconciler.ShouldHaltOrRequeue(result, err)).To(BeTrue())
-}
-
-func confirmThatItContinuesReconciling(result *ctrl.Result, err error) {
-	Expect(result).To(BeNil())
-	Expect(err).ToNot(HaveOccurred())
-	Expect(subreconciler.ShouldContinue(result, err)).To(BeTrue())
-	Expect(subreconciler.ShouldRequeue(result, err)).To(BeFalse())
-	Expect(subreconciler.ShouldHaltOrRequeue(result, err)).To(BeFalse())
-}
 
 var _ = Describe("Route handling", func() {
 	var r *AuthenticationReconciler
@@ -61,6 +40,7 @@ var _ = Describe("Route handling", func() {
 	var cl client.WithWatch
 	var scheme *runtime.Scheme
 	var ctx context.Context
+	var frontdoor *zenv1.ZenExtension
 
 	Describe("getClusterInfoConfigMap", func() {
 		var cm *corev1.ConfigMap
@@ -89,12 +69,17 @@ var _ = Describe("Route handling", func() {
 			scheme = runtime.NewScheme()
 			Expect(corev1.AddToScheme(scheme)).To(Succeed())
 			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
+			Expect(routev1.AddToScheme(scheme)).To(Succeed())
 			cb = *fakeclient.NewClientBuilder().
 				WithScheme(scheme).
 				WithObjects(clusterInfoConfigMap, authCR)
 			cl = cb.Build()
+			dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+			Expect(err).NotTo(HaveOccurred())
+
 			r = &AuthenticationReconciler{
-				Client: cl,
+				Client:          cl,
+				DiscoveryClient: *dc,
 			}
 			ctx = context.Background()
 			cm = &corev1.ConfigMap{}
@@ -102,24 +87,24 @@ var _ = Describe("Route handling", func() {
 		It("will produce a function that signals to continue reconciling when the ConfigMap is found", func() {
 			fn := r.getClusterInfoConfigMap(authCR, cm)
 			result, err := fn(ctx)
-			confirmThatItContinuesReconciling(result, err)
+			testutil.ConfirmThatItContinuesReconciling(result, err)
 		})
 		It("will produce a function that signals to requeue with a delay when the ConfigMap is not found", func() {
 			err := r.Delete(ctx, clusterInfoConfigMap)
 			Expect(err).ToNot(HaveOccurred())
 			fn := r.getClusterInfoConfigMap(authCR, cm)
 			result, err := fn(ctx)
-			confirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
+			testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
 		})
 		It("will produce a function that signals to requeue with an error when an unexpected error occurs", func() {
 			rFailing := &AuthenticationReconciler{
-				Client: &fakeTimeoutClient{
+				Client: &testutil.FakeTimeoutClient{
 					Client: cl,
 				},
 			}
 			fn := rFailing.getClusterInfoConfigMap(authCR, cm)
 			result, err := fn(ctx)
-			confirmThatItRequeuesWithError(result, err)
+			testutil.ConfirmThatItRequeuesWithError(result, err)
 		})
 	})
 
@@ -165,7 +150,7 @@ var _ = Describe("Route handling", func() {
 			controllerutil.SetOwnerReference(authCR, cm, scheme)
 			fn := r.verifyConfigMapHasCorrectOwnership(authCR, cm)
 			result, err := fn(ctx)
-			confirmThatItContinuesReconciling(result, err)
+			testutil.ConfirmThatItContinuesReconciling(result, err)
 		})
 		It("will produce a function that signals to requeue with a delay when the ConfigMap is not owned by the Authentication", func() {
 			cm := &corev1.ConfigMap{}
@@ -173,7 +158,7 @@ var _ = Describe("Route handling", func() {
 			Expect(err).ToNot(HaveOccurred())
 			fn := r.verifyConfigMapHasCorrectOwnership(authCR, cm)
 			result, err := fn(ctx)
-			confirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
+			testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
 		})
 	})
 
@@ -218,7 +203,7 @@ var _ = Describe("Route handling", func() {
 			Expect(err).ToNot(HaveOccurred())
 			fn := r.verifyConfigMapHasField(authCR, "cluster_address", cm)
 			result, err := fn(ctx)
-			confirmThatItContinuesReconciling(result, err)
+			testutil.ConfirmThatItContinuesReconciling(result, err)
 		})
 		It("will produce a function that signals to requeue with an error when the ConfigMap does not have the field", func() {
 			cm := &corev1.ConfigMap{}
@@ -226,13 +211,13 @@ var _ = Describe("Route handling", func() {
 			Expect(err).ToNot(HaveOccurred())
 			fn := r.verifyConfigMapHasField(authCR, "some-other-field", cm)
 			result, err := fn(ctx)
-			confirmThatItRequeuesWithError(result, err)
+			testutil.ConfirmThatItRequeuesWithError(result, err)
 		})
 		It("will produce a function that signals to requeue with an error when the ConfigMap's Data is empty", func() {
 			cm := &corev1.ConfigMap{}
 			fn := r.verifyConfigMapHasField(authCR, "some-other-field", cm)
 			result, err := fn(ctx)
-			confirmThatItRequeuesWithError(result, err)
+			testutil.ConfirmThatItRequeuesWithError(result, err)
 		})
 	})
 
@@ -280,7 +265,7 @@ var _ = Describe("Route handling", func() {
 			}
 			fn := r.ensureConfigMapHasEqualFields(authCR, fields, cm)
 			result, err := fn(ctx)
-			confirmThatItContinuesReconciling(result, err)
+			testutil.ConfirmThatItContinuesReconciling(result, err)
 		})
 		It("will produce a function that signals to requeue with a delay when the ConfigMap is changed successfully", func() {
 			cm := &corev1.ConfigMap{}
@@ -292,7 +277,7 @@ var _ = Describe("Route handling", func() {
 			}
 			fn := r.ensureConfigMapHasEqualFields(authCR, fields, cm)
 			result, err := fn(ctx)
-			confirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
+			testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
 			err = r.Get(ctx, types.NamespacedName{Name: "ibmcloud-cluster-info", Namespace: "data-ns"}, cm)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cm.Data).To(HaveKeyWithValue("cluster_address_auth", "cp-console-different-example.apps.cluster.ibm.com"))
@@ -307,13 +292,13 @@ var _ = Describe("Route handling", func() {
 				"an_extra_field":       "an_extra_value",
 			}
 			rFailing := &AuthenticationReconciler{
-				Client: &fakeTimeoutClient{
+				Client: &testutil.FakeTimeoutClient{
 					Client: cl,
 				},
 			}
 			fn := rFailing.ensureConfigMapHasEqualFields(authCR, fields, cm)
 			result, err := fn(ctx)
-			confirmThatItRequeuesWithError(result, err)
+			testutil.ConfirmThatItRequeuesWithError(result, err)
 			err = r.Get(ctx, types.NamespacedName{Name: "ibmcloud-cluster-info", Namespace: "data-ns"}, cm)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cm.Data).ToNot(HaveKeyWithValue("cluster_address_auth", "cp-console-different-example.apps.cluster.ibm.com"))
@@ -361,7 +346,7 @@ var _ = Describe("Route handling", func() {
 			fn := r.getWlpClientID(authCR, &wlpClientID)
 			result, err := fn(ctx)
 			Expect(wlpClientID).To(Equal("test-id"))
-			confirmThatItContinuesReconciling(result, err)
+			testutil.ConfirmThatItContinuesReconciling(result, err)
 		})
 		It("will produce a function that signals to requeue with a delay when the Secret is not found", func() {
 			err := r.Delete(ctx, platformOIDCCredentialsSecret)
@@ -369,18 +354,18 @@ var _ = Describe("Route handling", func() {
 			fn := r.getWlpClientID(authCR, &wlpClientID)
 			result, err := fn(ctx)
 			Expect(wlpClientID).To(Equal(""))
-			confirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
+			testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
 		})
 		It("will produce a function that signals to requeue with an error when the ConfigMap is not changed successfully", func() {
 			rFailing := &AuthenticationReconciler{
-				Client: &fakeTimeoutClient{
+				Client: &testutil.FakeTimeoutClient{
 					Client: cl,
 				},
 			}
 			fn := rFailing.getWlpClientID(authCR, &wlpClientID)
 			result, err := fn(ctx)
 			Expect(wlpClientID).To(Equal(""))
-			confirmThatItRequeuesWithError(result, err)
+			testutil.ConfirmThatItRequeuesWithError(result, err)
 		})
 	})
 	Describe("getCertificateForService", func() {
@@ -453,7 +438,7 @@ var _ = Describe("Route handling", func() {
 			fn := r.getCertificateForService(serviceName, authCR, &certificate)
 			result, err := fn(ctx)
 			Expect(certificate).To(Equal(secret.Data["ca.crt"]))
-			confirmThatItContinuesReconciling(result, err)
+			testutil.ConfirmThatItContinuesReconciling(result, err)
 		}
 		testCertNotFound := func(serviceName string, secret *corev1.Secret) {
 			certificate := []byte{}
@@ -462,19 +447,19 @@ var _ = Describe("Route handling", func() {
 			fn := r.getCertificateForService(serviceName, authCR, &certificate)
 			result, err := fn(ctx)
 			Expect(certificate).To(Equal([]byte{}))
-			confirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
+			testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
 		}
 		testFailedCertRetrieval := func(serviceName string) {
 			certificate := []byte{}
 			rFailing := &AuthenticationReconciler{
-				Client: &fakeTimeoutClient{
+				Client: &testutil.FakeTimeoutClient{
 					Client: cl,
 				},
 			}
 			fn := rFailing.getCertificateForService(serviceName, authCR, &certificate)
 			result, err := fn(ctx)
 			Expect(certificate).To(Equal([]byte{}))
-			confirmThatItRequeuesWithError(result, err)
+			testutil.ConfirmThatItRequeuesWithError(result, err)
 		}
 
 		It("produces a function that signals to continue reconciling when certificate retrieved", func() {
@@ -497,7 +482,7 @@ var _ = Describe("Route handling", func() {
 			fn := r.getCertificateForService("some-other-name", authCR, &certificate)
 			result, err := fn(ctx)
 			Expect(certificate).To(Equal([]byte{}))
-			confirmThatItRequeuesWithError(result, err)
+			testutil.ConfirmThatItRequeuesWithError(result, err)
 		})
 		It("produces a function that signals to requeue with an error when Secret does not have \"ca.crt\" field set", func() {
 			certificate := []byte{}
@@ -507,13 +492,23 @@ var _ = Describe("Route handling", func() {
 			fn := r.getCertificateForService(PlatformAuthServiceName, authCR, &certificate)
 			result, err := fn(ctx)
 			Expect(certificate).To(Equal([]byte{}))
-			confirmThatItRequeuesWithError(result, err)
+			testutil.ConfirmThatItRequeuesWithError(result, err)
 		})
 	})
 
 	Describe("getClusterAddress", func() {
 		var clusterAddress string
 		BeforeEach(func() {
+			crds, err := envtest.InstallCRDs(cfg, envtest.CRDInstallOptions{
+				Paths: []string{filepath.Join(".", "testdata", "crds", "routes")},
+			})
+			Expect(crds).To(HaveLen(1))
+			Expect(err).ToNot(HaveOccurred())
+			scheme = runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).To(Succeed())
+			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
+			Expect(routev1.AddToScheme(scheme)).To(Succeed())
+
 			authCR = &operatorv1alpha1.Authentication{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "operator.ibm.com/v1alpha1",
@@ -536,9 +531,7 @@ var _ = Describe("Route handling", func() {
 				},
 			}
 			controllerutil.SetOwnerReference(authCR, clusterInfoConfigMap, scheme)
-			scheme = runtime.NewScheme()
-			Expect(corev1.AddToScheme(scheme)).To(Succeed())
-			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
+			ctx = context.Background()
 			cb = *fakeclient.NewClientBuilder().
 				WithScheme(scheme).
 				WithObjects(clusterInfoConfigMap, authCR)
@@ -546,7 +539,6 @@ var _ = Describe("Route handling", func() {
 			r = &AuthenticationReconciler{
 				Client: cl,
 			}
-			ctx = context.Background()
 			clusterAddress = ""
 		})
 
@@ -554,7 +546,7 @@ var _ = Describe("Route handling", func() {
 			fn := r.getClusterAddress(authCR, &clusterAddress)
 			result, err := fn(ctx)
 			Expect(clusterAddress).To(Equal(clusterInfoConfigMap.Data["cluster_address"]))
-			confirmThatItContinuesReconciling(result, err)
+			testutil.ConfirmThatItContinuesReconciling(result, err)
 		})
 
 		It("returns a function that signals to requeue with a delay when ConfigMap is not present", func() {
@@ -563,26 +555,40 @@ var _ = Describe("Route handling", func() {
 			fn := r.getClusterAddress(authCR, &clusterAddress)
 			result, err := fn(ctx)
 			Expect(clusterAddress).To(BeZero())
-			confirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
+			testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
 		})
 
 		It("returns a function that signals to requeue with an error when ConfigMap cannot be retrieved for some other reason", func() {
 			err := r.Delete(ctx, clusterInfoConfigMap)
 			Expect(err).ToNot(HaveOccurred())
 			rFailing := &AuthenticationReconciler{
-				Client: &fakeTimeoutClient{
+				Client: &testutil.FakeTimeoutClient{
 					Client: cl,
 				},
 			}
 			fn := rFailing.getClusterAddress(authCR, &clusterAddress)
 			result, err := fn(ctx)
 			Expect(clusterAddress).To(BeZero())
-			confirmThatItRequeuesWithError(result, err)
+			testutil.ConfirmThatItRequeuesWithError(result, err)
 		})
 	})
 
 	Describe("handleRoutes", func() {
 		BeforeEach(func() {
+			crds, err := envtest.InstallCRDs(cfg, envtest.CRDInstallOptions{
+				Paths: []string{
+					filepath.Join(".", "testdata", "crds", "routes"),
+					filepath.Join(".", "testdata", "crds", "zen"),
+				},
+			})
+			Expect(crds).To(HaveLen(2))
+			Expect(err).ToNot(HaveOccurred())
+
+			scheme = runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).To(Succeed())
+			Expect(routev1.AddToScheme(scheme)).To(Succeed())
+			Expect(zenv1.AddToScheme(scheme)).To(Succeed())
+			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
 			authCR = &operatorv1alpha1.Authentication{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "operator.ibm.com/v1alpha1",
@@ -647,10 +653,33 @@ var _ = Describe("Route handling", func() {
 				},
 			}
 			controllerutil.SetOwnerReference(authCR, clusterInfoConfigMap, scheme)
-			scheme = runtime.NewScheme()
-			Expect(corev1.AddToScheme(scheme)).To(Succeed())
-			Expect(routev1.AddToScheme(scheme)).To(Succeed())
-			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
+			frontdoor = &zenv1.ZenExtension{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      ImZenExtName,
+					Namespace: "data-ns",
+				},
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "ZenExtension",
+					APIVersion: "zen.cpd.ibm.com/v1",
+				},
+			}
+			frontdoor.Status.Conditions = []metav1.Condition{
+				{
+					Type:   zenv1.ConditionTypeSuccessful,
+					Status: metav1.ConditionTrue,
+				},
+				{
+					Type:   zenv1.ConditionTypeRunning,
+					Status: metav1.ConditionTrue,
+				},
+				{
+					Type:   zenv1.ConditionTypeFailure,
+					Status: metav1.ConditionFalse,
+				},
+			}
+			frontdoor.Status.Status = zenv1.ZenExtensionStatusCompleted
+
+			ctx = context.Background()
 			cb = *fakeclient.NewClientBuilder().
 				WithScheme(scheme).
 				WithObjects(
@@ -660,12 +689,16 @@ var _ = Describe("Route handling", func() {
 					identityProviderSecretSecret,
 					platformOIDCCredentialsSecret,
 					authCR,
+					frontdoor,
 				)
 			cl = cb.Build()
+			dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+			Expect(err).NotTo(HaveOccurred())
+
 			r = &AuthenticationReconciler{
-				Client: cl,
+				Client:          cl,
+				DiscoveryClient: *dc,
 			}
-			ctx = context.Background()
 		})
 
 		hasAllValidRoutes := func(routes *routev1.RouteList) {
@@ -763,7 +796,7 @@ var _ = Describe("Route handling", func() {
 					},
 				},
 			)
-			confirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
+			testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
 			routes := &routev1.RouteList{}
 			listOpts := []client.ListOption{
 				client.InNamespace("data-ns"),
@@ -786,7 +819,7 @@ var _ = Describe("Route handling", func() {
 					},
 				},
 			)
-			confirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
+			testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
 			routes := &routev1.RouteList{}
 			listOpts := []client.ListOption{
 				client.InNamespace("data-ns"),
@@ -806,7 +839,7 @@ var _ = Describe("Route handling", func() {
 					},
 				},
 			)
-			confirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
+			testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
 			routes := &routev1.RouteList{}
 			listOpts := []client.ListOption{
 				client.InNamespace("data-ns"),
@@ -825,7 +858,7 @@ var _ = Describe("Route handling", func() {
 					},
 				},
 			)
-			confirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
+			testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
 			routes := &routev1.RouteList{}
 			listOpts := []client.ListOption{
 				client.InNamespace("data-ns"),
@@ -841,8 +874,154 @@ var _ = Describe("Route handling", func() {
 					},
 				},
 			)
-			confirmThatItContinuesReconciling(result, err)
+			testutil.ConfirmThatItContinuesReconciling(result, err)
 			hasAllValidRoutes(routes)
 		})
+
+		It("skips deleting Routes when ZenExtension Successful Condition is false", func() {
+			createDummyRoutes()
+			By("setting Successful Condition to false")
+			meta.SetStatusCondition(&frontdoor.Status.Conditions, metav1.Condition{
+				Type:   zenv1.ConditionTypeSuccessful,
+				Status: metav1.ConditionFalse,
+			})
+			result, err := r.handleRoutes(ctx,
+				ctrl.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      "example-authentication",
+						Namespace: "data-ns",
+					},
+				},
+			)
+			testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
+			routes := &routev1.RouteList{}
+			listOpts := []client.ListOption{
+				client.InNamespace("data-ns"),
+			}
+			err = r.List(ctx, routes, listOpts...)
+			Expect(err).ToNot(HaveOccurred())
+			hasAllValidRoutes(routes)
+		})
+
+		It("skips deleting Routes when ZenExtension Running Condition is false", func() {
+			createDummyRoutes()
+			By("setting Running Condition to false")
+			meta.SetStatusCondition(&frontdoor.Status.Conditions, metav1.Condition{
+				Type:   zenv1.ConditionTypeRunning,
+				Status: metav1.ConditionFalse,
+			})
+			result, err := r.handleRoutes(ctx,
+				ctrl.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      "example-authentication",
+						Namespace: "data-ns",
+					},
+				},
+			)
+			testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
+			routes := &routev1.RouteList{}
+			listOpts := []client.ListOption{
+				client.InNamespace("data-ns"),
+			}
+			err = r.List(ctx, routes, listOpts...)
+			Expect(err).ToNot(HaveOccurred())
+			hasAllValidRoutes(routes)
+		})
+
+		It("skips deleting Routes when ZenExtension Failure Condition is true", func() {
+			createDummyRoutes()
+			By("setting Failure Condition to false")
+			meta.SetStatusCondition(&frontdoor.Status.Conditions, metav1.Condition{
+				Type:   zenv1.ConditionTypeFailure,
+				Status: metav1.ConditionTrue,
+			})
+			result, err := r.handleRoutes(ctx,
+				ctrl.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      "example-authentication",
+						Namespace: "data-ns",
+					},
+				},
+			)
+			testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
+			routes := &routev1.RouteList{}
+			listOpts := []client.ListOption{
+				client.InNamespace("data-ns"),
+			}
+			err = r.List(ctx, routes, listOpts...)
+			Expect(err).ToNot(HaveOccurred())
+			hasAllValidRoutes(routes)
+		})
+
+		It("skips deleting Routes when ZenExtension Status is not completed", func() {
+			createDummyRoutes()
+			By("setting Successful Condition to false")
+			frontdoor.Status.Status = "In Progress"
+			result, err := r.handleRoutes(ctx,
+				ctrl.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      "example-authentication",
+						Namespace: "data-ns",
+					},
+				},
+			)
+			testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
+			routes := &routev1.RouteList{}
+			listOpts := []client.ListOption{
+				client.InNamespace("data-ns"),
+			}
+			err = r.List(ctx, routes, listOpts...)
+			Expect(err).ToNot(HaveOccurred())
+			hasAllValidRoutes(routes)
+		})
+
+		It("continues reconciling when Routes API not available", func() {
+			scheme = runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).To(Succeed())
+			Expect(routev1.AddToScheme(scheme)).To(Succeed())
+			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
+			cb = *fakeclient.NewClientBuilder().
+				WithScheme(scheme)
+			cl = cb.Build()
+			ctx = context.Background()
+			By("ensuring Routes API is not available")
+			err := envtest.UninstallCRDs(cfg, envtest.CRDInstallOptions{
+				Paths: []string{filepath.Join(".", "testdata", "crds", "routes")},
+			})
+			Expect(err).ToNot(HaveOccurred())
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusNotFound)
+				_, err = w.Write([]byte{})
+				Expect(err).ToNot(HaveOccurred())
+			}))
+			defer server.Close()
+			dc := discovery.NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+			resources, err := dc.ServerResourcesForGroupVersion(strings.Join([]string{routev1.GroupVersion.Group, routev1.GroupVersion.Version}, "/"))
+			Expect(err).To(HaveOccurred())
+			Expect(resources).To(BeNil())
+			r = &AuthenticationReconciler{
+				Client:          cl,
+				DiscoveryClient: *dc,
+			}
+			result, err := r.handleRoutes(ctx,
+				ctrl.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      "example-authentication",
+						Namespace: "data-ns",
+					},
+				},
+			)
+			testutil.ConfirmThatItContinuesReconciling(result, err)
+			routes := &routev1.RouteList{}
+			listOpts := []client.ListOption{
+				client.InNamespace("data-ns"),
+			}
+			err = r.List(ctx, routes, listOpts...)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(routes.Items).To(HaveLen(0))
+		})
+
 	})
 })

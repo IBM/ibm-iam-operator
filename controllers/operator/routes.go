@@ -33,6 +33,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
+	zenv1 "github.com/IBM/ibm-iam-operator/apis/zen.cpd.ibm.com/v1"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/controllers/common"
 )
 
@@ -67,12 +68,51 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Re
 	reqLogger := log.WithValues("func", "ReconcileRoutes", "namespace", req.Namespace)
 	handleRouteCtx := logf.IntoContext(ctx, reqLogger)
 
+	if !ctrlcommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient) {
+		return subreconciler.ContinueReconciling()
+	}
+
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 
+	if result, err = r.checkForZenFrontDoor(handleRouteCtx, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+
 	return r.reconcileAllRoutes(handleRouteCtx, authCR)
+}
+
+// checkForZenFrontDoor confirms whether traffic should or should not be consolidated through the cpd Route. When it
+// should, it looks for the ZenExtension containing the nginx configuration needed to properly route ingress traffic to
+// the IM microservices, and confirms that the ZenExtension has been fully processed, meaning nginx is ready for
+// traffic.
+func (r *AuthenticationReconciler) checkForZenFrontDoor(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx)
+	if shouldHaveRoutes(authCR) {
+		reqLogger.Info("Zen front door has not been enabled, so IM Routes will be created")
+		return subreconciler.ContinueReconciling()
+	}
+	reqLogger.Info("Zen front door has been enabled, so IM Routes will be removed if they are present")
+	frontDoor := &zenv1.ZenExtension{}
+	err = r.Get(ctx, types.NamespacedName{Name: ImZenExtName, Namespace: authCR.Namespace}, frontDoor)
+	if k8sErrors.IsNotFound(err) {
+		reqLogger.Info("ZenExtension was not found; requeuing", "ZenExtension.Name", ImZenExtName, "ZenExtension.Namespace", authCR.Namespace)
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	} else if err != nil {
+		reqLogger.Info("ZenExtension could not be retrieved due to an unexpected error", "error", err.Error())
+		return subreconciler.Requeue()
+	}
+	reqLogger.Info("Front door ZenExtension retrieved", "ZenExtension.Name", ImZenExtName, "ZenExtension.Namespace", authCR.Namespace)
+
+	if frontDoor.Ready() {
+		reqLogger.Info("Front door is ready to accept traffic, continuing")
+		return subreconciler.ContinueReconciling()
+	}
+
+	reqLogger.Info("Front door ZenExtension is not done setting up; requeuing", "ZenExtension.Name", ImZenExtName, "ZenExtension.Namespace", authCR.Namespace)
+	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
 func (r *AuthenticationReconciler) reconcileAllRoutes(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
@@ -357,6 +397,10 @@ func (r *AuthenticationReconciler) ensureRouteExists(ctx context.Context, authCR
 
 func shouldNotHaveRoutes(authCR *operatorv1alpha1.Authentication) bool {
 	return authCR.Spec.Config.ZenFrontDoor
+}
+
+func shouldHaveRoutes(authCR *operatorv1alpha1.Authentication) bool {
+	return !shouldNotHaveRoutes(authCR)
 }
 
 // Use DeepEqual to determine if 2 routes are equal.

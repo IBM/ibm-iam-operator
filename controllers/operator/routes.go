@@ -294,6 +294,10 @@ func (r *AuthenticationReconciler) reconcileRoute(ctx context.Context, instance 
 	reqLogger.Info("Reconciling route", "annotations", fields.Annotations, "routeHost", fields.RouteHost, "routePath", fields.RoutePath)
 
 	err = r.removeIdauth(ctx, instance)
+	if err != nil {
+		reqLogger.Error(err, "Error deleting platform-id-auth Route")
+		return
+	}
 
 	calculatedRoute, err := r.newRoute(instance, fields)
 	if err != nil {

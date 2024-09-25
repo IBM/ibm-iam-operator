@@ -43,6 +43,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/apis/oidc.security/v1"
+	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	"github.com/opdev/subreconciler"
 )
 
@@ -66,7 +67,7 @@ const (
 )
 const controllerName = "controller_oidc_client"
 
-const baseDeploymentWaitTime time.Duration = time.Minute
+const baseAuthenticationWaitTime time.Duration = time.Minute
 
 var Clock clock.Clock = clock.RealClock{}
 var log = logf.Log.WithName(controllerName)
@@ -86,6 +87,7 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 	reqLogger.Info("Reconciling Client CR")
 
 	subreconcilersForClient := []subreconciler.FnWithRequest{
+		r.confirmAuthenticationIsReady,
 		r.addFinalizer,
 		r.handleDeletion,
 		r.ensureSecretAndClientIdSet,
@@ -109,6 +111,25 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 
 // Begin subreconcilers
 
+func (r *ClientReconciler) confirmAuthenticationIsReady(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "confirmAuthenticationIsReady")
+	reqLogger.Info("Confirm that Authentication CR for IM is ready before reconciling Client")
+
+	var authCR *operatorv1alpha1.Authentication
+	if authCR, err = common.GetAuthentication(ctx, &r.Client); err != nil {
+		reqLogger.Info("Failed to get the Authentication for this install of IM", "reason", err.Error())
+		return subreconciler.RequeueWithDelay(wait.Jitter(baseAuthenticationWaitTime, 1.0))
+	}
+
+	if authCR.IsReady() {
+		reqLogger.Info("Authentication CR is ready; proceding with Client reconciliation")
+		return subreconciler.ContinueReconciling()
+	}
+
+	reqLogger.Info("Authentication CR is not ready yet; delaying Client reconciliation")
+	return subreconciler.RequeueWithDelay(wait.Jitter(baseAuthenticationWaitTime, 1.0))
+}
+
 // addFinalizer first performs any required migration steps on the Client if it was created using
 // icp-oidcclient-watcher, then adds this controller's finalizer to it.
 func (r *ClientReconciler) addFinalizer(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
@@ -119,6 +140,12 @@ func (r *ClientReconciler) addFinalizer(ctx context.Context, req ctrl.Request) (
 
 	if result, err = r.getLatestClient(ctx, req, clientCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
+	}
+
+	// Skip the rest of this subreconciler if the Client is marked for deletion
+	if isMarkedForDeletion(clientCR) {
+		reqLogger.Info("Client is marked for deletion; moving to Client deletion handler")
+		return subreconciler.ContinueReconciling()
 	}
 
 	migrated := migrateCP2Client(ctx, clientCR)
@@ -308,12 +335,12 @@ func (r *ClientReconciler) processOidcRegistration(ctx context.Context, req ctrl
 		reqLogger.Error(err, "Deployment needed for OIDC registration could not be retrieved",
 			"Deployment.Name", common.PlatformIdentityProvider,
 			"Deployment.Namespace", authenticationNamespace)
-		return subreconciler.RequeueWithDelayAndError(wait.Jitter(baseDeploymentWaitTime, 1.0), err)
+		return subreconciler.RequeueWithDelayAndError(wait.Jitter(baseAuthenticationWaitTime, 1.0), err)
 	} else if !available {
 		reqLogger.Info("Deployment is not available yet; requeueing",
 			"Deployment.Name", common.PlatformIdentityProvider,
 			"Deployment.Namespace", authenticationNamespace)
-		return subreconciler.RequeueWithDelay(wait.Jitter(baseDeploymentWaitTime, 1.0))
+		return subreconciler.RequeueWithDelay(wait.Jitter(baseAuthenticationWaitTime, 1.0))
 	}
 
 	reqLogger.Info("Deployment is available",
@@ -458,12 +485,12 @@ func (r *ClientReconciler) processZenRegistration(ctx context.Context, req ctrl.
 		reqLogger.Error(err, "Deployment needed for OIDC registration could not be retrieved",
 			"Deployment.Name", common.PlatformIdentityManagement,
 			"Deployment.Namespace", authenticationNamespace)
-		return subreconciler.RequeueWithDelayAndError(wait.Jitter(baseDeploymentWaitTime, 1.0), err)
+		return subreconciler.RequeueWithDelayAndError(wait.Jitter(baseAuthenticationWaitTime, 1.0), err)
 	} else if !available {
 		reqLogger.Info("Deployment is not available yet; requeueing",
 			"Deployment.Name", common.PlatformIdentityManagement,
 			"Deployment.Namespace", authenticationNamespace)
-		return subreconciler.RequeueWithDelay(wait.Jitter(baseDeploymentWaitTime, 1.0))
+		return subreconciler.RequeueWithDelay(wait.Jitter(baseAuthenticationWaitTime, 1.0))
 	}
 
 	reqLogger.Info("Deployment is available",

@@ -986,7 +986,6 @@ func insertZenInstances(ctx context.Context, mongodb *MongoDB, postgres *Postgre
 	collectionName := "ZenInstance"
 	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
 	migrationKey := postgres.GetMigrationKey()
-	// filter := bson.D{{Key: migrationKey, Value: bson.D{{Key: "$ne", Value: true}}}}
 	filter := bson.M{
 		"$or": bson.A{
 			bson.M{"migrated": bson.M{"$ne": true}},
@@ -1000,6 +999,7 @@ func insertZenInstances(ctx context.Context, mongodb *MongoDB, postgres *Postgre
 	}
 	errCount := 0
 	migrateCount := 0
+	skipped := []string{}
 	for cursor.Next(ctx) {
 		var result map[string]interface{}
 		if err = cursor.Decode(&result); err != nil {
@@ -1018,8 +1018,8 @@ func insertZenInstances(ctx context.Context, mongodb *MongoDB, postgres *Postgre
 		}
 
 		if _, err = setClientSecretIfEmpty(ctx, mongodb, zenInstance); err != nil {
-			reqLogger.Error(err, "Failed to set client_secret on ZenInstance")
-			errCount++
+			reqLogger.Info("Failed to set client_secret on ZenInstance; skipping it as it is potentially invalid", "reason", err.Error())
+			skipped = append(skipped, zenInstance.InstanceID)
 			err = nil
 			continue
 		}
@@ -1050,6 +1050,8 @@ func insertZenInstances(ctx context.Context, mongodb *MongoDB, postgres *Postgre
 		err = fmt.Errorf("encountered errors that prevented the migration of documents")
 		reqLogger.Error(err, "Migration of platform-db.ZenInstances not successful", "failedCount", errCount, "successCount", migrateCount)
 		return
+	} else if len(skipped) > 0 {
+		reqLogger.Info("The migration of the following documents was skipped", "skippedIDs", skipped)
 	} else if errCount == 0 && migrateCount == 0 {
 		reqLogger.Info("No documents needed to be migrated; continuing")
 		return
@@ -1080,6 +1082,7 @@ func migrateZenInstanceUserRowForUser(ctx context.Context, mongodb *MongoDB, pos
 		return
 	}
 	migrateCount := 0
+	skipped := false
 	for cursor.Next(ctx) {
 		var result map[string]interface{}
 		if err = cursor.Decode(&result); err != nil {
@@ -1090,6 +1093,34 @@ func migrateZenInstanceUserRowForUser(ctx context.Context, mongodb *MongoDB, pos
 		zenInstanceUser := &v1schema.ZenInstanceUser{}
 		if err = v1schema.ConvertToZenInstanceUser(result, zenInstanceUser); err != nil {
 			reqLogger.Error(err, "Failed to unmarshal ZenInstanceUser")
+			return
+		}
+		hasMigratedFilter := bson.M{
+			"$or": bson.A{
+				bson.M{"migrated": bson.M{"$eq": true}},
+				bson.M{migrationKey: bson.M{"$eq": true}},
+			},
+		}
+
+		hasMatchingZenInstanceIDFilter := bson.M{"_id": bson.M{"$eq": zenInstanceUser.ZenInstanceID}}
+
+		matchingZenInstanceIDAndHasMigratedFilter := bson.M{
+			"$and": bson.A{
+				hasMigratedFilter,
+				hasMatchingZenInstanceIDFilter,
+			},
+		}
+		zenInstanceQueryResult := mongodb.
+			Client.
+			Database(dbName).
+			Collection("ZenInstance").
+			FindOne(ctx, matchingZenInstanceIDAndHasMigratedFilter)
+		if errors.Is(zenInstanceQueryResult.Err(), mongo.ErrNoDocuments) {
+			reqLogger.Info("The ZenInstance this ZenInstanceUser is associated with was not migrated; skipping this document")
+			skipped = true
+			continue
+		} else if zenInstanceQueryResult.Err() != nil {
+			reqLogger.Error(err, "Failed to determine migration status of ZenInstance referred to by this ZenInstanceUser")
 			return
 		}
 		args := zenInstanceUser.GetArgs()
@@ -1113,7 +1144,10 @@ func migrateZenInstanceUserRowForUser(ctx context.Context, mongodb *MongoDB, pos
 		reqLogger.Info("Wrote back document migration", "updateResult", updateResult)
 		migrateCount++
 	}
-	if migrateCount == 0 {
+	if skipped {
+		reqLogger.Info("The migration of the following document was skipped", "uid", user.UserID)
+		return
+	} else if migrateCount == 0 {
 		reqLogger.Info("No documents needed to be migrated; continuing")
 		return
 	}

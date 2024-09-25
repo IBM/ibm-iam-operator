@@ -275,7 +275,7 @@ func (r *AuthenticationReconciler) removeIdauth(ctx context.Context, instance *o
 		return
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get existing platform-id-auth route for reconciliation")
-		return 
+		return
 	}
 	err = r.Delete(ctx, observedRoute)
 	if err != nil {
@@ -283,7 +283,7 @@ func (r *AuthenticationReconciler) removeIdauth(ctx context.Context, instance *o
 		return
 	}
 	reqLogger.Info("Successfully deleted platform-id-auth Route")
-	return 
+	return
 }
 
 func (r *AuthenticationReconciler) reconcileRoute(ctx context.Context, instance *operatorv1alpha1.Authentication, fields *reconcileRouteFields, needToRequeue *bool) (err error) {

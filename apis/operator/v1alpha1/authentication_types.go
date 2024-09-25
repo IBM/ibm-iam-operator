@@ -296,3 +296,7 @@ func (a *Authentication) HasDBSchemaVersion() bool {
 func (a *Authentication) HasNoDBSchemaVersion() bool {
 	return !a.HasDBSchemaVersion()
 }
+
+func (a *Authentication) IsReady() bool {
+	return a.Status.Service.Status == "Ready"
+}

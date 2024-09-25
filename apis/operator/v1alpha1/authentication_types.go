@@ -306,3 +306,7 @@ func (a *Authentication) GetDBSchemaVersion() string {
 	}
 	return ""
 }
+
+func (a *Authentication) IsReady() bool {
+	return a.Status.Service.Status == "Ready"
+}

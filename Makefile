@@ -57,6 +57,7 @@ else
     $(error "This system's OS $(LOCAL_OS) isn't recognized/supported")
 endif
 
+
 include common/Makefile.common.mk
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -327,24 +328,27 @@ bundle-build: ## Build the bundle image.
 
 build-image-amd64: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator for Linux on amd64.
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -a -o build/_output/bin/manager main.go
-	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} --platform linux/amd64 -t $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID) -f ./Dockerfile .
+	DOCKER_BUILDKIT=1 DOCKER_DEFAULT_PLATFORM=linux/amd64 $(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID) -f ./Dockerfile .
+	$(CONTAINER_CLI) inspect $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID)
 	@rm -f build/_output/bin/manager
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID); fi
 
 build-image-ppc64le: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator for Linux on ppc64le.
 	CGO_ENABLED=0 GOOS=linux GOARCH=ppc64le $(GO) build -a -o build/_output/bin/manager main.go
-	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} --platform linux/ppc64le -t $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID) -f ./Dockerfile .
+	DOCKER_BUILDKIT=1 DOCKER_DEFAULT_PLATFORM=linux/ppc64le $(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID) -f ./Dockerfile .
+	$(CONTAINER_CLI) inspect $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID)
 	@\rm -f build/_output/bin/manager
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID); fi
 
 build-image-s390x: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator for Linux on s390x.
 	CGO_ENABLED=0 GOOS=linux GOARCH=s390x $(GO) build -a -o build/_output/bin/manager main.go
-	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} --platform linux/s390x -t $(REGISTRY)/$(IMG)-s390x:$(GIT_COMMIT_ID) -f ./Dockerfile .
+	DOCKER_BUILDKIT=1 DOCKER_DEFAULT_PLATFORM=linux/s390x $(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-s390x:$(GIT_COMMIT_ID) -f ./Dockerfile .
+	$(CONTAINER_CLI) inspect $(REGISTRY)/$(IMG)-s390x:$(GIT_COMMIT_ID)
 	@rm -f build/_output/bin/manager
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-s390x:$(GIT_COMMIT_ID); fi
 
 images: $(CONFIG_DOCKER_TARGET) build-image-amd64 build-image-ppc64le build-image-s390x ## Build the multi-arch manifest.
-	@MAX_PULLING_RETRY=20 RETRY_INTERVAL=30 common/scripts/multiarch_image.sh $(REGISTRY) $(IMG) $(GIT_COMMIT_ID) $(VERSION)
+	@DOCKER_BUILDKIT=1 MAX_PULLING_RETRY=20 RETRY_INTERVAL=30 common/scripts/multiarch_image.sh $(REGISTRY) $(IMG) $(GIT_COMMIT_ID) $(VERSION)
 
 ##@ Deployment
 

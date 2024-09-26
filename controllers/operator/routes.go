@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -65,7 +66,7 @@ type reconcileRouteFields struct {
 }
 
 func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := log.WithValues("func", "ReconcileRoutes", "namespace", req.Namespace)
+	reqLogger := log.WithValues("subreconciler", "handleRoutes", "Namespace", req.Namespace)
 	handleRouteCtx := logf.IntoContext(ctx, reqLogger)
 
 	if !ctrlcommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient) {
@@ -121,12 +122,12 @@ func (r *AuthenticationReconciler) reconcileAllRoutes(ctx context.Context, authC
 		return
 	}
 
-	result, err = r.removeIdauth(ctx, authCR)
-
 	allRouteReconcilers := make([]subreconciler.Fn, 0)
 	for _, routeFields := range *allRoutesFields {
 		allRouteReconcilers = append(allRouteReconcilers, r.reconcileRoute(authCR, routeFields))
 	}
+
+	allRouteReconcilers = append(allRouteReconcilers, r.removeExtraRoutes(authCR, allRoutesFields))
 
 	results := []*ctrl.Result{}
 	errs := []error{}
@@ -136,6 +137,45 @@ func (r *AuthenticationReconciler) reconcileAllRoutes(ctx context.Context, authC
 		errs = append(errs, err)
 	}
 	return ctrlcommon.ReduceSubreconcilerResultsAndErrors(results, errs)
+}
+
+// removeExtraRoutes produces a subreconciler that deletes any Route that is labeled as IM's and is not in the list of
+// Routes that the Operator wants to exist.
+func (r *AuthenticationReconciler) removeExtraRoutes(authCR *operatorv1alpha1.Authentication, allRoutesFields *map[string]*reconcileRouteFields) (fn subreconciler.Fn) {
+	return func(ctx context.Context) (result *ctrl.Result, err error) {
+		reqLogger := logf.FromContext(ctx)
+		routesList := &routev1.RouteList{}
+		desiredRoutesNames := func(rrf *map[string]*reconcileRouteFields) []string {
+			n := []string{}
+			for _, fields := range *rrf {
+				n = append(n, fields.Name)
+			}
+			return n
+		}(allRoutesFields)
+
+		err = r.List(ctx, routesList, client.InNamespace(authCR.Namespace), client.MatchingLabels{"app": "im"})
+		changed := false
+		for _, item := range routesList.Items {
+			if !containsString(desiredRoutesNames, item.Name) {
+				reqLogger.Info("Removing extra Route", "Name", item.Name)
+				if err = r.Delete(ctx, &item); k8sErrors.IsNotFound(err) {
+					reqLogger.Info("Route was not found; continuing", "Name", item.Name)
+					err = nil
+				} else if err != nil {
+					reqLogger.Info("Failed to delete extra Route for unexpected reason", "reason", err.Error(), "Name", item.Name)
+					return subreconciler.RequeueWithDelay(defaultLowerWait)
+				}
+				reqLogger.Info("Successfully deleted extra Route", "Name", item.Name)
+				changed = true
+			}
+		}
+		if changed {
+			reqLogger.Info("Deleted all extra Routes; requeuing")
+			return subreconciler.RequeueWithDelay(defaultLowerWait)
+		}
+
+		return
+	}
 }
 
 func (r *AuthenticationReconciler) removeIdauth(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {

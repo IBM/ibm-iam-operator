@@ -305,6 +305,21 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 
 	}
 
+	if instance.Spec.EnableInstanaMetricCollection {
+		instanaAgentVars := []corev1.EnvVar{
+			{
+				Name: "INSTANA_AGENT_HOST",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.hostIP",
+					},
+				},
+			},
+		}
+		envVars = append(envVars, instanaAgentVars...)
+	}
+
 	return corev1.Container{
 		Name:            "platform-auth-service",
 		Image:           authServiceImage,
@@ -637,6 +652,20 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 
 		envVars = append(envVars, impersonationVars...)
 
+	}
+	if instance.Spec.EnableInstanaMetricCollection {
+		instanaAgentVars := []corev1.EnvVar{
+			{
+				Name: "INSTANA_AGENT_HOST",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.hostIP",
+					},
+				},
+			},
+		}
+		envVars = append(envVars, instanaAgentVars...)
 	}
 
 	return corev1.Container{
@@ -976,6 +1005,20 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			Value: "kubernetes.default",
 		}
 		envVars = append(envVars, newVar)
+	}
+	if instance.Spec.EnableInstanaMetricCollection {
+		instanaAgentVars := []corev1.EnvVar{
+			{
+				Name: "INSTANA_AGENT_HOST",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.hostIP",
+					},
+				},
+			},
+		}
+		envVars = append(envVars, instanaAgentVars...)
 	}
 
 	return corev1.Container{

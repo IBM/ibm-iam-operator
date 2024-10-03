@@ -157,3 +157,44 @@ to be written. This can be done by running the following target:
 ```sh
 make clean
 ```
+
+## Creating an FBC Catalog
+
+To create a custom FBC catalog for testing your changes, perform the following steps:
+
+1. Set and export the following environment variables:
+    * `CATALOG_BASE_IMG` should be set to the catalog image reference you wish
+      to update bundles in or add bundles to.
+    * `MODE` should be set to `"dev"` if creating a catalog image for
+      development and testing purposes. Otherwise, this can be left unset.
+    * `REGISTRY` should be set to the registry and namespace that you use for
+      development images. If the registry is not globally readable, you will
+      need to be sure to create a new pull secret or update an existing one to
+      include the credentials for pulling this secret on your test cluster.
+    * `IMAGE_TAG_BASE` should be set to `${REGISTRY}/ibm-iam-operator` so that
+      the development images are all placed in a common namespace.
+    * `VERSION` should be set to an identifier that will help distinguish
+      development images from one another; for example, you could set `VERSION`
+      to the branch name or commit SHA.
+1. Log into the registries where images will be pushed to and pulled from so
+  that future attempts to do this will succeed.
+1. Run `make dev-overlays` if the dev kustomize overlays are not already present
+  in the `config` directory.
+1. Run `make catalog-render` - this will pull the catalog image referred to by
+  `CATALOG_BASE_IMG` and render the index as a yaml file in the `catalog`
+  directory.
+1. Make any edits to the kustomize overlays that are necessary, e.g.
+  [Operand image reference updates for the prod bundle build](./config/manager/overlays/prod/image_env_vars_patch.yaml). 
+1. If changes to the Operator are being made, run `make images` so that the
+  Operator images have been built and pushed to the location set in `REGISTRY`
+  using the `VERSION` value for the tag.
+1. Run `make bundle bundle-build bundle-push` to build the OLM bundle, build the
+  image containing that bundle, and push that image to `REGISTRY`.
+1. Optionally, run `make channel-render` to create an OLM channel manifest and
+  include it in the FBC index. This is needed when the bundle is being added to a channel that does not exist yet.
+1. Run `make bundle-render` to add the OLM bundle to the FBC.
+1. Run `make catalog-build catalog-push` to build and push the OLM catalog image
+  to `REGISTRY`. The default name for this image is `ibm-iam-operator-catalog`,
+  but, if another name is desired, e.g. `ibm-common-service-catalog`, that can be
+  achieved by setting the `IMG` variable, e.g. 
+  `IMG=ibm-common-service make catalog-build catalog-push`.

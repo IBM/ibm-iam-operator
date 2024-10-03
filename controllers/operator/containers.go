@@ -316,8 +316,20 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 					},
 				},
 			},
+			{
+				Name:  "INSTANA_AGENT_ENABLED",
+				Value: "true",
+			},
 		}
 		envVars = append(envVars, instanaAgentVars...)
+	} else {
+		instanaAgentEnabledVar := []corev1.EnvVar{
+			{
+				Name:  "INSTANA_AGENT_ENABLED",
+				Value: "false",
+			},
+		}
+		envVars = append(envVars, instanaAgentEnabledVar...)
 	}
 
 	return corev1.Container{
@@ -664,8 +676,20 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 					},
 				},
 			},
+			{
+				Name:  "INSTANA_AGENT_ENABLED",
+				Value: "true",
+			},
 		}
 		envVars = append(envVars, instanaAgentVars...)
+	} else {
+		instanaAgentEnabledVar := []corev1.EnvVar{
+			{
+				Name:  "INSTANA_AGENT_ENABLED",
+				Value: "false",
+			},
+		}
+		envVars = append(envVars, instanaAgentEnabledVar...)
 	}
 
 	return corev1.Container{
@@ -1017,8 +1041,20 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 					},
 				},
 			},
+			{
+				Name:  "INSTANA_AGENT_ENABLED",
+				Value: "true",
+			},
 		}
 		envVars = append(envVars, instanaAgentVars...)
+	} else {
+		instanaAgentEnabledVar := []corev1.EnvVar{
+			{
+				Name:  "INSTANA_AGENT_ENABLED",
+				Value: "false",
+			},
+		}
+		envVars = append(envVars, instanaAgentEnabledVar...)
 	}
 
 	return corev1.Container{

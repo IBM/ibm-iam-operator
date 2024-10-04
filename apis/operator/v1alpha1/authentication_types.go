@@ -34,16 +34,17 @@ type AuthenticationSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of Authentication. Edit authentication_types.go to remove/update
-	OperatorVersion    string                 `json:"operatorVersion"`
-	Replicas           int32                  `json:"replicas"`
-	Labels             map[string]string      `json:"labels,omitempty"`
-	AuditService       AuditServiceSpec       `json:"auditService"`
-	AuthService        AuthServiceSpec        `json:"authService"`
-	IdentityProvider   IdentityProviderSpec   `json:"identityProvider"`
-	IdentityManager    IdentityManagerSpec    `json:"identityManager"`
-	InitMongodb        InitMongodbSpec        `json:"initMongodb"`
-	ClientRegistration ClientRegistrationSpec `json:"clientRegistration"`
-	Config             ConfigSpec             `json:"config"`
+	OperatorVersion               string                 `json:"operatorVersion"`
+	Replicas                      int32                  `json:"replicas"`
+	Labels                        map[string]string      `json:"labels,omitempty"`
+	AuditService                  AuditServiceSpec       `json:"auditService"`
+	AuthService                   AuthServiceSpec        `json:"authService"`
+	IdentityProvider              IdentityProviderSpec   `json:"identityProvider"`
+	IdentityManager               IdentityManagerSpec    `json:"identityManager"`
+	InitMongodb                   InitMongodbSpec        `json:"initMongodb"`
+	ClientRegistration            ClientRegistrationSpec `json:"clientRegistration"`
+	Config                        ConfigSpec             `json:"config"`
+	EnableInstanaMetricCollection bool                   `json:"enableInstanaMetricCollection,omitempty"`
 }
 
 type AuditServiceSpec struct {

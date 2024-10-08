@@ -18,6 +18,7 @@ package operator
 
 import (
 	"context"
+	"os"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	zenv1 "github.com/IBM/ibm-iam-operator/apis/zen.cpd.ibm.com/v1"
@@ -286,10 +287,12 @@ func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, 
 		f: getAllRouteStatus,
 	}
 
+	routesDisabledSetting, ok := os.LookupEnv("ROUTES_DISABLED")
+	routesEnabled := !ok || routesDisabledSetting != "true"
 	if authentication.Spec.Config.ZenFrontDoor {
 		reqLogger.Info("Zen Front Door is enabled; will check ZenExtension status and skip checking Route status")
 		statusRetrievals = append(statusRetrievals, zenExtensionStatusRetrieval)
-	} else if r.RunningOnOpenShiftCluster() {
+	} else if routesEnabled && r.RunningOnOpenShiftCluster() {
 		reqLogger.Info("Is running on OpenShift; will check Route status")
 		statusRetrievals = append(statusRetrievals, routeStatusRetrieval)
 	} else {

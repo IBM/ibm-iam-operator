@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
+	ctrlcommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	"github.com/opdev/subreconciler"
 	rbacv1 "k8s.io/api/rbac/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -29,32 +30,31 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// handleClusterRoleBinding creates a ClusterRoleBinding that binds the ibm-iam-operand-restricted ClusterRole to the
+// handleClusterRoleBindings creates a ClusterRoleBinding that binds the ibm-iam-operand-restricted ClusterRole to the
 // ibm-iam-operand-restricted ServiceAccount in the services namespace for this Authentication instance.
-func (r *AuthenticationReconciler) handleClusterRoleBinding(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleClusterRoleBinding")
+func (r *AuthenticationReconciler) handleClusterRoleBindings(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleClusterRoleBindings")
 	reqLogger.Info("Ensure that the ClusterRoleBinding is created")
+
+	canCreateCRB, err := r.hasAPIAccess(ctx, "", rbacv1.SchemeGroupVersion, "clusterrolebindings", []string{"create"})
+	if !canCreateCRB {
+		reqLogger.Info("The Operator's ServiceAccount does not have the necessary accesses to create the ClusterRoleBinding; skipping")
+		return subreconciler.ContinueReconciling()
+	} else if err != nil {
+		return subreconciler.RequeueWithError(err)
+	}
+
+	if !ctrlcommon.ClusterHasOpenShiftUserGroupVersion(&r.DiscoveryClient) {
+		reqLogger.Info("user.openshift.io/v1 was not found on the cluster; skipping")
+		return subreconciler.ContinueReconciling()
+	}
+
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 	name := fmt.Sprintf("ibm-iam-operand-restricted-%s", authCR.Namespace)
 
-	crb := iamOperandCRB(authCR, name)
-
-	reqLogger = reqLogger.WithValues("ClusterRoleBinding.Name", name)
-	if err = r.Create(ctx, crb); k8sErrors.IsAlreadyExists(err) {
-		reqLogger.Info("ClusterRoleBinding already exists, continuing")
-		return subreconciler.ContinueReconciling()
-	} else if err != nil {
-		reqLogger.Error(err, "Failed to create ClusterRoleBinding")
-		return subreconciler.RequeueWithError(err)
-	}
-	reqLogger.Info("Created ClusterRoleBinding successfully")
-	return subreconciler.RequeueWithDelay(defaultLowerWait)
-}
-
-func iamOperandCRB(instance *operatorv1alpha1.Authentication, name string) *rbacv1.ClusterRoleBinding {
 	operandCRB := &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -73,10 +73,19 @@ func iamOperandCRB(instance *operatorv1alpha1.Authentication, name string) *rbac
 			{
 				Kind:      "ServiceAccount",
 				Name:      "ibm-iam-operand-restricted",
-				Namespace: instance.Namespace,
+				Namespace: req.Namespace,
 			},
 		},
 	}
-	return operandCRB
 
+	reqLogger = reqLogger.WithValues("ClusterRoleBinding.Name", name)
+	if err = r.Create(ctx, operandCRB); k8sErrors.IsAlreadyExists(err) {
+		reqLogger.Info("ClusterRoleBinding already exists, continuing")
+		return subreconciler.ContinueReconciling()
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to create ClusterRoleBinding")
+		return subreconciler.RequeueWithError(err)
+	}
+	reqLogger.Info("Created ClusterRoleBinding successfully")
+	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }

@@ -271,5 +271,5 @@ type OperandRequestList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&OperandRequest{}, &OperandRequestList{})
+	ODLMEnabledSchemeBuilder.Register(&OperandRequest{}, &OperandRequestList{})
 }

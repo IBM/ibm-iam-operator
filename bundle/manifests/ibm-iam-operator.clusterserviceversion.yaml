@@ -192,7 +192,7 @@ metadata:
     categories: Security
     certified: "false"
     containerImage: icr.io/cpopen/ibm-iam-operator:4.9.0
-    createdAt: "2024-11-15T09:58:41Z"
+    createdAt: "2024-11-15T09:59:16Z"
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage the lifecycle of IAM services. With this operator, you can simply deploy and upgrade the IAM services
     olm.skipRange: <4.9.0
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
@@ -387,32 +387,6 @@ spec:
       permissions:
         - rules:
             - apiGroups:
-                - route.openshift.io
-              resources:
-                - routes
-              verbs:
-                - get
-                - list
-                - watch
-                - create
-                - delete
-                - update
-                - patch
-            - apiGroups:
-                - route.openshift.io
-              resources:
-                - routes/custom-host
-              verbs:
-                - create
-            - apiGroups:
-                - route.openshift.io
-              resources:
-                - routes/status
-              verbs:
-                - get
-                - list
-                - watch
-            - apiGroups:
                 - ""
               resources:
                 - pods
@@ -460,13 +434,6 @@ spec:
                 - patch
                 - update
                 - watch
-            - apiGroups:
-                - monitoring.coreos.com
-              resources:
-                - servicemonitors
-              verbs:
-                - get
-                - create
             - apiGroups:
                 - apps
               resourceNames:
@@ -523,26 +490,6 @@ spec:
                 - get
                 - list
                 - create
-            - apiGroups:
-                - operator.ibm.com
-              resources:
-                - operandrequests
-              verbs:
-                - create
-                - get
-                - list
-                - patch
-                - watch
-                - update
-                - delete
-            - apiGroups:
-                - operator.ibm.com
-              resources:
-                - operandrequests/status
-              verbs:
-                - watch
-                - get
-                - list
             - apiGroups:
                 - cert-manager.io
               resources:
@@ -622,6 +569,52 @@ spec:
                 - patch
                 - update
                 - watch
+            - apiGroups:
+                - route.openshift.io
+              resources:
+                - routes
+              verbs:
+                - get
+                - list
+                - watch
+                - create
+                - delete
+                - update
+                - patch
+            - apiGroups:
+                - route.openshift.io
+              resources:
+                - routes/custom-host
+              verbs:
+                - create
+            - apiGroups:
+                - route.openshift.io
+              resources:
+                - routes/status
+              verbs:
+                - get
+                - list
+                - watch
+            - apiGroups:
+                - operator.ibm.com
+              resources:
+                - operandrequests
+              verbs:
+                - create
+                - get
+                - list
+                - patch
+                - watch
+                - update
+                - delete
+            - apiGroups:
+                - operator.ibm.com
+              resources:
+                - operandrequests/status
+              verbs:
+                - watch
+                - get
+                - list
           serviceAccountName: ibm-iam-operator
     strategy: deployment
   installModes:

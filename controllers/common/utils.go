@@ -26,6 +26,7 @@ import (
 
 	osconfigv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
+	userv1 "github.com/openshift/api/user/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -139,8 +140,40 @@ func clusterHasGroupVersion(dc *discovery.DiscoveryClient, gv schema.GroupVersio
 	return true, nil
 }
 
+func clusterHasAPIResource(dc *discovery.DiscoveryClient, gv schema.GroupVersion, resourceName string) (resourcePresent bool, err error) {
+	if dc == nil {
+		var cfg *rest.Config
+		if cfg, err = config.GetConfig(); err != nil {
+			return
+		}
+
+		if dc, err = discovery.NewDiscoveryClientForConfig(cfg); err != nil {
+			return
+		}
+	}
+
+	groupVersion := strings.Join([]string{gv.Group, gv.Version}, "/")
+	resources, err := dc.ServerResourcesForGroupVersion(groupVersion)
+	if err != nil || resources == nil {
+		return
+	}
+
+	for _, resource := range resources.APIResources {
+		if resource.Name == resourceName {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func ClusterHasRouteGroupVersion(dc *discovery.DiscoveryClient) (found bool) {
 	found, _ = clusterHasGroupVersion(dc, routev1.GroupVersion)
+	return
+}
+
+func ClusterHasOpenShiftUserGroupVersion(dc *discovery.DiscoveryClient) (found bool) {
+	found, _ = clusterHasGroupVersion(dc, userv1.GroupVersion)
 	return
 }
 
@@ -151,6 +184,11 @@ func ClusterHasOpenShiftConfigGroupVerison(dc *discovery.DiscoveryClient) (found
 
 func ClusterHasZenExtensionGroupVersion(dc *discovery.DiscoveryClient) (found bool) {
 	found, _ = clusterHasGroupVersion(dc, zenv1.GroupVersion)
+	return
+}
+
+func ClusterHasOperandRequestAPIResource(dc *discovery.DiscoveryClient) (found bool) {
+	found, _ = clusterHasAPIResource(dc, operatorv1alpha1.GroupVersion, "operandrequests")
 	return
 }
 

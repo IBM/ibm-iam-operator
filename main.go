@@ -39,8 +39,10 @@ import (
 	controllercommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	oidcsecuritycontrollers "github.com/IBM/ibm-iam-operator/controllers/oidc.security"
 	operatorcontrollers "github.com/IBM/ibm-iam-operator/controllers/operator"
-	certmgrv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	certmgrv1 "github.com/ibm/ibm-cert-manager-operator/apis/cert-manager/v1"
 	routev1 "github.com/openshift/api/route/v1"
+	discovery "k8s.io/client-go/discovery"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -56,7 +58,16 @@ func init() {
 	utilruntime.Must(certmgrv1.AddToScheme(scheme))
 	utilruntime.Must(zenv1.AddToScheme(scheme))
 	// Add the Route scheme if found on the cluster
-	if controllercommon.ClusterHasRouteGroupVersion() {
+	cfg, err := config.GetConfig()
+	if err != nil {
+		return
+	}
+
+	dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return
+	}
+	if controllercommon.ClusterHasRouteGroupVersion(dc) {
 		utilruntime.Must(routev1.AddToScheme(scheme))
 	}
 	//+kubebuilder:scaffold:scheme
@@ -134,9 +145,17 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Client")
 		os.Exit(1)
 	}
+	var dc *discovery.DiscoveryClient
+	dc, err = discovery.NewDiscoveryClientForConfig(mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "failed to get discovery client", "controller", "Authentication")
+		os.Exit(1)
+	}
+
 	if err = (&operatorcontrollers.AuthenticationReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:          mgr.GetClient(),
+		DiscoveryClient: *dc,
+		Scheme:          mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Authentication")
 		os.Exit(1)

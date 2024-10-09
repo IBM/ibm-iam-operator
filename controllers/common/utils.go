@@ -18,6 +18,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -29,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	discovery "k8s.io/client-go/discovery"
+	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
@@ -115,19 +118,20 @@ func GetClusterType(ctx context.Context, k8sClient *client.Client, cmName string
 	return
 }
 
-func clusterHasGroupVersion(gv schema.GroupVersion) (apiPresent bool, err error) {
-	cfg, err := config.GetConfig()
-	if err != nil {
-		return
-	}
+func clusterHasGroupVersion(dc *discovery.DiscoveryClient, gv schema.GroupVersion) (apiPresent bool, err error) {
+	if dc == nil {
+		var cfg *rest.Config
+		if cfg, err = config.GetConfig(); err != nil {
+			return
+		}
 
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
-	if err != nil {
-		return
+		if dc, err = discovery.NewDiscoveryClientForConfig(cfg); err != nil {
+			return
+		}
 	}
 
 	groupVersion := strings.Join([]string{gv.Group, gv.Version}, "/")
-	resources, err := discoveryClient.ServerResourcesForGroupVersion(groupVersion)
+	resources, err := dc.ServerResourcesForGroupVersion(groupVersion)
 	if err != nil || resources == nil {
 		return false, err
 	}
@@ -135,18 +139,18 @@ func clusterHasGroupVersion(gv schema.GroupVersion) (apiPresent bool, err error)
 	return true, nil
 }
 
-func ClusterHasRouteGroupVersion() (found bool) {
-	found, _ = clusterHasGroupVersion(routev1.GroupVersion)
+func ClusterHasRouteGroupVersion(dc *discovery.DiscoveryClient) (found bool) {
+	found, _ = clusterHasGroupVersion(dc, routev1.GroupVersion)
 	return
 }
 
-func ClusterHasOpenShiftConfigGroupVerison() (found bool) {
-	found, _ = clusterHasGroupVersion(osconfigv1.GroupVersion)
+func ClusterHasOpenShiftConfigGroupVerison(dc *discovery.DiscoveryClient) (found bool) {
+	found, _ = clusterHasGroupVersion(dc, osconfigv1.GroupVersion)
 	return
 }
 
-func ClusterHasZenExtensionGroupVersion() (found bool) {
-	found, _ = clusterHasGroupVersion(zenv1.GroupVersion)
+func ClusterHasZenExtensionGroupVersion(dc *discovery.DiscoveryClient) (found bool) {
+	found, _ = clusterHasGroupVersion(dc, zenv1.GroupVersion)
 	return
 }
 
@@ -254,4 +258,31 @@ func MergeMap(in map[string]string, mergeMap map[string]string) map[string]strin
 		mergeMap[k] = v
 	}
 	return mergeMap
+}
+
+// ReduceSubreconcilerResultsAndErrors takes a slice of Result pointers and a slice of errors and reduces them to a
+// single Result pointer and error to be used in a subreconciler.Evaluate call.
+func ReduceSubreconcilerResultsAndErrors(results []*ctrl.Result, errs []error) (result *ctrl.Result, err error) {
+	err = errors.Join(errs...)
+	for _, r := range results {
+		if r == nil {
+			continue
+		}
+		if result == nil {
+			result = &ctrl.Result{}
+			*result = *r
+			continue
+		}
+		if r.Requeue {
+			result.Requeue = true
+		}
+		// Always use exponential back off for results that have errors
+		if err != nil {
+			result.RequeueAfter = 0
+		} else if r.RequeueAfter > result.RequeueAfter {
+			result.RequeueAfter = r.RequeueAfter
+		}
+	}
+
+	return
 }

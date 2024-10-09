@@ -34,7 +34,13 @@ spec:
         productMetric: FREE
     spec:
       serviceAccountName: ibm-iam-operator
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       affinity:
+        securityContext:
+          seccompProfile:
+            type: RuntimeDefault
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
@@ -61,6 +67,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
             - name: OPERATOR_NAME
               value: "ibm-iam-operator"
             - name: ROUTE_HTTP_PORT
@@ -78,6 +88,8 @@ spec:
               memory: 80Mi
               ephemeral-storage: 256Mi
           securityContext:
+            seccompProfile:
+              type: RuntimeDefault
             allowPrivilegeEscalation: false
             capabilities:
               drop:

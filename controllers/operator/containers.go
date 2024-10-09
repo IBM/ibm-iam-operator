@@ -41,6 +41,9 @@ func buildInitContainers(initImage string) []corev1.Container {
 			},
 			Env: envVars,
 			SecurityContext: &corev1.SecurityContext{
+				SeccompProfile: &corev1.SeccompProfile{
+					Type: corev1.SeccompProfileTypeRuntimeDefault,
+				},
 				Privileged:               &falseVar,
 				RunAsNonRoot:             &trueVar,
 				ReadOnlyRootFilesystem:   &trueVar,
@@ -78,6 +81,9 @@ func buildInitForMngrAndProvider(initImage string) []corev1.Container {
 			},
 			Env: envVars,
 			SecurityContext: &corev1.SecurityContext{
+				SeccompProfile: &corev1.SeccompProfile{
+					Type: corev1.SeccompProfileTypeRuntimeDefault,
+				},
 				Privileged:               &falseVar,
 				RunAsNonRoot:             &trueVar,
 				ReadOnlyRootFilesystem:   &trueVar,
@@ -299,11 +305,41 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 
 	}
 
+	if instance.Spec.EnableInstanaMetricCollection {
+		instanaAgentVars := []corev1.EnvVar{
+			{
+				Name: "INSTANA_AGENT_HOST",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.hostIP",
+					},
+				},
+			},
+			{
+				Name:  "INSTANA_AGENT_ENABLED",
+				Value: "true",
+			},
+		}
+		envVars = append(envVars, instanaAgentVars...)
+	} else {
+		instanaAgentEnabledVar := []corev1.EnvVar{
+			{
+				Name:  "INSTANA_AGENT_ENABLED",
+				Value: "false",
+			},
+		}
+		envVars = append(envVars, instanaAgentEnabledVar...)
+	}
+
 	return corev1.Container{
 		Name:            "platform-auth-service",
 		Image:           authServiceImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: &corev1.SecurityContext{
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeRuntimeDefault,
+			},
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
 			ReadOnlyRootFilesystem:   &falseVar,
@@ -629,12 +665,41 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		envVars = append(envVars, impersonationVars...)
 
 	}
+	if instance.Spec.EnableInstanaMetricCollection {
+		instanaAgentVars := []corev1.EnvVar{
+			{
+				Name: "INSTANA_AGENT_HOST",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.hostIP",
+					},
+				},
+			},
+			{
+				Name:  "INSTANA_AGENT_ENABLED",
+				Value: "true",
+			},
+		}
+		envVars = append(envVars, instanaAgentVars...)
+	} else {
+		instanaAgentEnabledVar := []corev1.EnvVar{
+			{
+				Name:  "INSTANA_AGENT_ENABLED",
+				Value: "false",
+			},
+		}
+		envVars = append(envVars, instanaAgentEnabledVar...)
+	}
 
 	return corev1.Container{
 		Name:            "platform-identity-provider",
 		Image:           identityProviderImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: &corev1.SecurityContext{
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeRuntimeDefault,
+			},
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
 			ReadOnlyRootFilesystem:   &falseVar,
@@ -965,12 +1030,41 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		}
 		envVars = append(envVars, newVar)
 	}
+	if instance.Spec.EnableInstanaMetricCollection {
+		instanaAgentVars := []corev1.EnvVar{
+			{
+				Name: "INSTANA_AGENT_HOST",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.hostIP",
+					},
+				},
+			},
+			{
+				Name:  "INSTANA_AGENT_ENABLED",
+				Value: "true",
+			},
+		}
+		envVars = append(envVars, instanaAgentVars...)
+	} else {
+		instanaAgentEnabledVar := []corev1.EnvVar{
+			{
+				Name:  "INSTANA_AGENT_ENABLED",
+				Value: "false",
+			},
+		}
+		envVars = append(envVars, instanaAgentEnabledVar...)
+	}
 
 	return corev1.Container{
 		Name:            "platform-identity-management",
 		Image:           identityManagerImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: &corev1.SecurityContext{
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeRuntimeDefault,
+			},
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
 			ReadOnlyRootFilesystem:   &falseVar,

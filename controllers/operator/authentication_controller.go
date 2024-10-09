@@ -21,13 +21,14 @@ import (
 
 	"fmt"
 	"maps"
+	"os"
 	"reflect"
 	"sync"
 	"time"
 
-	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
+	ctrlcommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	"github.com/IBM/ibm-iam-operator/migration"
-	certmgr "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	certmgr "github.com/ibm/ibm-cert-manager-operator/apis/cert-manager/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -84,8 +86,8 @@ var opreqWait time.Duration = 100 * time.Millisecond
 var defaultLowerWait time.Duration = 5 * time.Millisecond
 
 var rule = `^([a-z0-9]){32,}$`
-var wlpClientID = ctrlCommon.GenerateRandomString(rule)
-var wlpClientSecret = ctrlCommon.GenerateRandomString(rule)
+var wlpClientID = ctrlcommon.GenerateRandomString(rule)
+var wlpClientSecret = ctrlcommon.GenerateRandomString(rule)
 
 // finalizerName is the finalizer appended to the Authentication CR
 var finalizerName = "authentication.operator.ibm.com"
@@ -263,12 +265,12 @@ func (r *AuthenticationReconciler) handleRetainAnnotation(ctx context.Context, r
 
 func (r *AuthenticationReconciler) getPostgresDB(ctx context.Context, req ctrl.Request) (p *migration.PostgresDB, err error) {
 	datastoreCertSecret := &corev1.Secret{}
-	if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.DatastoreEDBSecretName, Namespace: req.Namespace}, datastoreCertSecret); err != nil {
+	if err = r.Get(ctx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBSecretName, Namespace: req.Namespace}, datastoreCertSecret); err != nil {
 		return nil, err
 	}
 
 	datastoreCertCM := &corev1.ConfigMap{}
-	if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.DatastoreEDBCMName, Namespace: req.Namespace}, datastoreCertCM); err != nil {
+	if err = r.Get(ctx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBCMName, Namespace: req.Namespace}, datastoreCertCM); err != nil {
 		return nil, err
 	}
 
@@ -345,6 +347,15 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	reqLogger.Info("Perform any pending migrations")
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+
+	// Terminating condition for handleMigration subreconciler
+	if authCR.HasBeenMigrated() {
+		reqLogger.Info("Mongo to EDB data migration is complete, cleaning up mongo")
+		if err := r.shutdownMongo(ctx, req); err != nil {
+			reqLogger.Error(err, "Failed to scale down MongoDB")
+		}
 		return
 	}
 
@@ -456,11 +467,11 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 			reqLogger.Info("Setting updated migration annotations on Authentication before requeue")
 			if err = r.Update(ctx, authCR); err != nil {
 				reqLogger.Error(err, "Failed to set migration annotations on Authentication")
-				subreconciler.RequeueWithError(err)
+				return subreconciler.RequeueWithError(err)
 			}
 		}
 		if migrationResult.Error != nil {
-			subreconciler.RequeueWithDelayAndError(defaultLowerWait, migrationResult.Error)
+			return subreconciler.RequeueWithDelayAndError(defaultLowerWait, migrationResult.Error)
 		}
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	default:
@@ -490,6 +501,7 @@ func setMigrationAnnotations(authCR *operatorv1alpha1.Authentication, result *mi
 		case "MongoToV1":
 			desiredAnnotations[operatorv1alpha1.AnnotationAuthMigrationComplete] = "true"
 			desiredAnnotations[operatorv1alpha1.AnnotationAuthRetainMigrationArtifacts] = "true"
+
 		}
 	}
 	for _, i := range result.Incomplete {
@@ -535,10 +547,6 @@ func (r *AuthenticationReconciler) hasMongoDBService(ctx context.Context, authCR
 // needToMigrateFromMongo attempts to determine whether a migration from MongoDB is needed. Returns an error when an
 // unexpected error occurs while trying to get resources from the cluster.
 func (r *AuthenticationReconciler) needToMigrateFromMongo(ctx context.Context, authCR *operatorv1alpha1.Authentication) (need bool, err error) {
-	if authCR.HasBeenMigrated() {
-		return false, nil
-	}
-
 	var hasResource bool
 	if hasResource, err = r.hasPreloadMongoDBConfigMap(ctx, authCR.Namespace); hasResource {
 		return true, nil
@@ -566,43 +574,85 @@ func (r *AuthenticationReconciler) ensureDatastoreSecretAndCM(ctx context.Contex
 	}
 
 	cm := &corev1.ConfigMap{}
-	if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.DatastoreEDBCMName, Namespace: authCR.Namespace}, cm); k8sErrors.IsNotFound(err) {
+	if err = r.Get(ctx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBCMName, Namespace: authCR.Namespace}, cm); k8sErrors.IsNotFound(err) {
 		reqLogger.Info("ConfigMap not available yet; requeueing",
-			"ConfigMap.Name", ctrlCommon.DatastoreEDBCMName,
+			"ConfigMap.Name", ctrlcommon.DatastoreEDBCMName,
 			"ConfigMap.Namespace", authCR.Namespace)
 		return subreconciler.RequeueWithDelay(opreqWait)
 	} else if err != nil {
 		reqLogger.Error(err, "Encountered an error when trying to get ConfigMap",
-			"ConfigMap.Name", ctrlCommon.DatastoreEDBCMName,
+			"ConfigMap.Name", ctrlcommon.DatastoreEDBCMName,
 			"ConfigMap.Namespace", authCR.Namespace)
 		return subreconciler.RequeueWithError(err)
 	}
 	reqLogger.Info("ConfigMap found",
-		"ConfigMap.Name", ctrlCommon.DatastoreEDBCMName,
+		"ConfigMap.Name", ctrlcommon.DatastoreEDBCMName,
 		"ConfigMap.Namespace", authCR.Namespace)
 
 	secret := &corev1.Secret{}
-	if err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.DatastoreEDBSecretName, Namespace: authCR.Namespace}, secret); k8sErrors.IsNotFound(err) {
+	if err = r.Get(ctx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBSecretName, Namespace: authCR.Namespace}, secret); k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Secret not available yet; requeueing",
-			"Secret.Name", ctrlCommon.DatastoreEDBSecretName,
+			"Secret.Name", ctrlcommon.DatastoreEDBSecretName,
 			"Secret.Namespace", authCR.Namespace)
 		return subreconciler.RequeueWithDelay(opreqWait)
 	} else if err != nil {
 		reqLogger.Error(err, "Encountered an error when trying to get Secret",
-			"Secret.Name", ctrlCommon.DatastoreEDBSecretName,
+			"Secret.Name", ctrlcommon.DatastoreEDBSecretName,
 			"Secret.Namespace", authCR.Namespace)
 		return subreconciler.RequeueWithError(err)
 	}
 	reqLogger.Info("Secret found",
-		"Secret.Name", ctrlCommon.DatastoreEDBSecretName,
+		"Secret.Name", ctrlcommon.DatastoreEDBSecretName,
 		"Secret.Namespace", authCR.Namespace)
 
 	return subreconciler.ContinueReconciling()
 }
 
+// cleans up the mongo pod by scaling down the mongodb operator as well as mongo statefulset
+func (r *AuthenticationReconciler) shutdownMongo(ctx context.Context, req ctrl.Request) (err error) {
+	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "shutdownMongoDB")
+	operatorNamespace, exists := os.LookupEnv("POD_NAMESPACE")
+	if !exists {
+		operatorNamespace = req.Namespace
+	}
+	desiredReplicas := int32(0)
+	mongoOprDeployment := &appsv1.Deployment{}
+	if err = r.Get(ctx, types.NamespacedName{Name: ctrlcommon.MongoOprDeploymentName, Namespace: operatorNamespace}, mongoOprDeployment); err != nil {
+		return err
+	} else {
+		// scaledown the replicas to 0
+		if mongoOprDeployment.Spec.Replicas != &desiredReplicas {
+			mongoOprDeployment.Spec.Replicas = &desiredReplicas
+			if err = r.Update(ctx, mongoOprDeployment); err != nil {
+				reqLogger.Error(err, "Error updating the mongodb operator deployment")
+				return err
+			}
+			reqLogger.Info("Mongo operator deployment is scaled down to 0")
+		} else {
+			reqLogger.Info("Mongo operator deployment has already been scaled down to 0")
+		}
+		mongoSts := &appsv1.StatefulSet{}
+		if err = r.Get(ctx, types.NamespacedName{Name: ctrlcommon.MongoStatefulsetName, Namespace: req.Namespace}, mongoSts); err != nil {
+			return err
+		} else {
+			// scaledown the replicas to 0
+			if mongoSts.Spec.Replicas != &desiredReplicas {
+				mongoSts.Spec.Replicas = &desiredReplicas
+				if err = r.Update(ctx, mongoSts); err != nil {
+					reqLogger.Error(err, "Error updating the mongodb statefulset")
+					return err
+				}
+				reqLogger.Info("Mongo statefulset is scaled down to 0")
+			} else {
+				reqLogger.Info("Mongo statefulset has already been scaled down to 0")
+			}
+		}
+	}
+	return nil
+}
+
 func (r *AuthenticationReconciler) getLatestAuthentication(ctx context.Context, req ctrl.Request, authentication *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx)
-
 	if err := r.Get(ctx, req.NamespacedName, authentication); err != nil {
 		if k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Authentication not found; skipping reconciliation")
@@ -616,18 +666,18 @@ func (r *AuthenticationReconciler) getLatestAuthentication(ctx context.Context, 
 
 // RunningOnOpenShiftCluster returns whether the Operator is running on an OpenShift cluster
 func (r *AuthenticationReconciler) RunningOnOpenShiftCluster() bool {
-	return ctrlCommon.ClusterHasOpenShiftConfigGroupVerison() && ctrlCommon.ClusterHasRouteGroupVersion()
+	return ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) && ctrlcommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient)
 }
 
 // RunningOnCNCFCluster returns whether the Operator is running on a CNCF cluster
 func (r *AuthenticationReconciler) RunningOnCNCFCluster() bool {
-	return !ctrlCommon.ClusterHasOpenShiftConfigGroupVerison() || !ctrlCommon.ClusterHasRouteGroupVersion()
+	return !ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) || !ctrlcommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient)
 
 }
 
 // RunningOnUnknownCluster returns whether the Operator is running on an unknown cluster type
 func (r *AuthenticationReconciler) RunningOnUnknownCluster() bool {
-	return r.clusterType == ctrlCommon.Unknown
+	return r.clusterType == ctrlcommon.Unknown
 }
 
 func (r *AuthenticationReconciler) addFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
@@ -667,10 +717,11 @@ func needsAuditServiceDummyDataReset(a *operatorv1alpha1.Authentication) bool {
 // AuthenticationReconciler reconciles a Authentication object
 type AuthenticationReconciler struct {
 	client.Client
-	Scheme      *runtime.Scheme
-	Mutex       sync.Mutex
-	clusterType ctrlCommon.ClusterType
-	dbSetupChan chan *migration.Result
+	Scheme          *runtime.Scheme
+	DiscoveryClient discovery.DiscoveryClient
+	Mutex           sync.Mutex
+	clusterType     ctrlcommon.ClusterType
+	dbSetupChan     chan *migration.Result
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -836,15 +887,12 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// updates redirecturi annotations to serviceaccount
 	r.handleServiceAccount(instance, &needToRequeue)
 
-	if ctrlCommon.ClusterHasRouteGroupVersion() {
-		err = r.handleRoutes(ctx, instance, &needToRequeue)
-		if err != nil && !k8sErrors.IsNotFound(err) {
-			return
-		}
-	}
-
 	if result, err := r.handleZenExtension(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return subreconciler.Evaluate(result, err)
+	}
+
+	if subResult, err := r.handleRoutes(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
 	}
 
 	if subResult, err := r.ensureDatastoreSecretAndCM(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
@@ -890,10 +938,10 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&operatorv1alpha1.OperandRequest{})
 
 	//Add routes
-	if ctrlCommon.ClusterHasOpenShiftConfigGroupVerison() {
+	if ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
 		builder.Owns(&routev1.Route{})
 	}
-	if ctrlCommon.ClusterHasZenExtensionGroupVersion() {
+	if ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
 		builder.Owns(&zenv1.ZenExtension{})
 	}
 

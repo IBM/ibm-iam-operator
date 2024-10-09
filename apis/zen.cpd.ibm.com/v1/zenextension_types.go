@@ -17,6 +17,7 @@ limitations under the License.
 package zenv1
 
 import (
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -30,12 +31,41 @@ type ZenExtension struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// +kubebuilder:pruning:PreserveUnknownFields
-	Spec map[string]string `json:"spec,omitempty"`
+	Spec   map[string]string  `json:"spec,omitempty"`
+	Status ZenExtensionStatus `json:"status,omitempty"`
+}
+
+func (z *ZenExtension) Ready() bool {
+	return z.Status.AllExtensionsProcessed()
+}
+
+func (z *ZenExtension) NotReady() bool {
+	return !z.Ready()
+}
+
+type ZenExtensionStatus struct {
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	Message    string             `json:"message,omitempty"`
+	Status     string             `json:"zenExtensionStatus,omitempty"`
+}
+
+type ConditionType string
+
+const ConditionTypeFailure string = "Failure"
+const ConditionTypeSuccessful string = "Successful"
+const ConditionTypeRunning string = "Running"
+const ZenExtensionStatusCompleted string = "Completed"
+
+func (z ZenExtensionStatus) AllExtensionsProcessed() bool {
+	return meta.IsStatusConditionTrue(z.Conditions, ConditionTypeSuccessful) &&
+		meta.IsStatusConditionFalse(z.Conditions, ConditionTypeFailure) &&
+		meta.IsStatusConditionTrue(z.Conditions, ConditionTypeRunning) &&
+		z.Status == ZenExtensionStatusCompleted
 }
 
 //+kubebuilder:object:root=true
 
-// AuthenticationList contains a list of Authentication
+// ZenExtensionList contains a list of ZenExtension
 type ZenExtensionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

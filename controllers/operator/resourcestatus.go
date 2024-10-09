@@ -20,6 +20,7 @@ import (
 	"context"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
+	zenv1 "github.com/IBM/ibm-iam-operator/apis/zen.cpd.ibm.com/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -196,6 +197,45 @@ func getAllRouteStatus(ctx context.Context, k8sClient client.Client, names []str
 	return
 }
 
+func getZenExtensionStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
+	reqLogger := logf.FromContext(ctx).WithName("getRouteStatus").V(3)
+	kind := "ZenExtension"
+	status = operatorv1alpha1.ManagedResourceStatus{
+		ObjectName: namespacedName.Name,
+		APIVersion: UnknownAPIVersion,
+		Namespace:  namespacedName.Namespace,
+		Kind:       kind,
+		Status:     ResourceNotReadyState,
+	}
+	zenExtension := &zenv1.ZenExtension{}
+	err := k8sClient.Get(ctx, namespacedName, zenExtension)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
+		} else {
+			reqLogger.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
+		}
+		return
+	}
+
+	status.APIVersion = zenExtension.APIVersion
+	if zenExtension.NotReady() {
+		return
+	}
+	status.Status = ResourceReadyState
+	return
+}
+
+func getAllZenExtensionStatus(ctx context.Context, k8sClient client.Client, names []string, namespace string) (statuses []operatorv1alpha1.ManagedResourceStatus) {
+	reqLogger := logf.FromContext(ctx).WithName("getAllZenExtensionStatus").V(3)
+	for _, name := range names {
+		nsn := types.NamespacedName{Name: name, Namespace: namespace}
+		statuses = append(statuses, getZenExtensionStatus(ctx, k8sClient, nsn))
+	}
+	reqLogger.Info("New statuses", "statuses", statuses)
+	return
+}
+
 func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, k8sClient client.Client, authentication *operatorv1alpha1.Authentication) (status operatorv1alpha1.ServiceStatus) {
 	reqLogger := logf.FromContext(ctx).WithName("getCurrentServiceStatus").V(3)
 	type statusRetrieval struct {
@@ -226,11 +266,17 @@ func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, 
 		},
 	}
 
+	zenExtensionStatusRetrieval := statusRetrieval{
+		names: []string{
+			ImZenExtName,
+		},
+		f: getAllZenExtensionStatus,
+	}
+
 	routeStatusRetrieval := statusRetrieval{
 		names: []string{
 			"id-mgmt",
 			"platform-auth",
-			"platform-id-auth",
 			"platform-id-provider",
 			"platform-login",
 			"platform-oidc",
@@ -240,7 +286,10 @@ func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, 
 		f: getAllRouteStatus,
 	}
 
-	if r.RunningOnOpenShiftCluster() {
+	if authentication.Spec.Config.ZenFrontDoor {
+		reqLogger.Info("Zen Front Door is enabled; will check ZenExtension status and skip checking Route status")
+		statusRetrievals = append(statusRetrievals, zenExtensionStatusRetrieval)
+	} else if r.RunningOnOpenShiftCluster() {
 		reqLogger.Info("Is running on OpenShift; will check Route status")
 		statusRetrievals = append(statusRetrievals, routeStatusRetrieval)
 	} else {

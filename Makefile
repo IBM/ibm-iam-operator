@@ -57,6 +57,7 @@ else
     $(error "This system's OS $(LOCAL_OS) isn't recognized/supported")
 endif
 
+
 include common/Makefile.common.mk
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -157,13 +158,15 @@ $(LOCALBIN):
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 YQ ?= $(LOCALBIN)/yq
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v3.8.9
-CONTROLLER_TOOLS_VERSION ?= v0.11.4
-YQ_VERSION ?= v4.40.5
-GO_VERSION ?= 1.21.8
+KUSTOMIZE_VERSION ?= v5.4.3
+CONTROLLER_TOOLS_VERSION ?= v0.16.3
+OPERATOR_SDK_VERSION ?= v1.37.0
+YQ_VERSION ?= v4.44.3
+GO_VERSION ?= 1.23.1
 
 # This pinned version of go has its version pinned to its name, so order of operations is inverted here.
 GO ?= $(LOCALBIN)/go$(GO_VERSION)
@@ -195,6 +198,21 @@ controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessar
 $(CONTROLLER_GEN): $(LOCALBIN) go
 	test -s $(LOCALBIN)/controller-gen && $(LOCALBIN)/controller-gen --version | grep -q $(CONTROLLER_TOOLS_VERSION) || \
 	GOSUMDB=sum.golang.org GOBIN=$(LOCALBIN) $(GO) install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
+
+.PHONY: operator-sdk
+operator-sdk: $(OPERATOR_SDK) ## Download operator-sdk locally if necessary. If wrong version is installed, it will be overwritten.
+$(OPERATOR_SDK): $(LOCALBIN) go
+	@if test -x $(LOCALBIN)/operator-sdk && ! $(LOCALBIN)/operator-sdk version 2>/dev/null | grep -q $(OPERATOR_SDK_VERSION); then \
+		echo "$(LOCALBIN)/operator-sdk version is not expected $(OPERATOR_SDK_VERSION). Removing it before installing."; \
+		rm -rf $(LOCALBIN)/operator-sdk; \
+	fi
+	@if [ -s $(LOCALBIN)/operator-sdk ]; then \
+		echo "operator-sdk already installed"; \
+	else \
+		echo "operator-sdk not found in $(LOCALBIN); downloading"; \
+		curl -sLo $(LOCALBIN)/operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$(LOCAL_OS)_$(LOCAL_ARCH); \
+		chmod +x $(LOCALBIN)/operator-sdk; \
+	fi
 
 .PHONY: yq
 yq: $(YQ)
@@ -243,21 +261,21 @@ dev-overlays: ## Generate the dev overlays for kustomize.
 	hack/create_dev_overlays
 
 .PHONY: bundle
-bundle: manifests kustomize yq ## Build the bundle manifests.
+bundle: manifests kustomize yq operator-sdk ## Build the bundle manifests.
 ifeq ($(MODE), dev)
 	hack/create_dev_overlays
 endif
-	operator-sdk generate kustomize manifests -q
+	$(OPERATOR_SDK) generate kustomize manifests -q
 ifeq ($(MODE), dev)
 	cd config/manager/overlays/dev && $(KUSTOMIZE) edit set image controller=$(IMAGE_TAG_BASE):$(VERSION)
 	cp bundle.Dockerfile bundle.Dockerfile.bk
-	$(KUSTOMIZE) build config/manifests/overlays/dev | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
+	$(KUSTOMIZE) build config/manifests/overlays/dev | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	cp bundle.Dockerfile bundle-dev.Dockerfile
 	mv bundle.Dockerfile.bk bundle.Dockerfile
 	hack/patch-built-bundle "dev"
 else
-	$(KUSTOMIZE) build config/manifests/overlays/prod | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
-	operator-sdk bundle validate ./bundle
+	$(KUSTOMIZE) build config/manifests/overlays/prod | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
+	$(OPERATOR_SDK) bundle validate ./bundle
 	hack/patch-built-bundle
 endif
 
@@ -292,6 +310,11 @@ build: go manifests generate fmt vet ## Build manager binary.
 run: go manifests generate fmt vet ## Run a controller from your host.
 	$(GO) run ./main.go
 
+.PHONY: licenses-dir
+licenses-dir:
+	@mkdir -p licenses
+	@cp LICENSE licenses/
+
 # Build a catalog image by adding bundle images to an empty catalog using the operator package manager tool, 'opm'.
 # This recipe invokes 'opm' in 'semver' bundle add mode. For more information on add modes, see:
 # https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
@@ -303,29 +326,29 @@ catalog-build: opm ## Build a catalog image.
 bundle-build: ## Build the bundle image.
 	docker build -f $(BUNDLE_DOCKERFILE) -t $(BUNDLE_IMG) .
 
-build-image-amd64: $(GO) $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on amd64.
+build-image-amd64: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator for Linux on amd64.
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -a -o build/_output/bin/manager main.go
-	$(CONTAINER_CLI) run --rm --privileged docker.io/multiarch/qemu-user-static:register --reset
-	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID) -f build/Dockerfile.amd64 .
-	@\rm -f build/_output/bin/manager
+	DOCKER_BUILDKIT=1 DOCKER_DEFAULT_PLATFORM=linux/amd64 $(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID) -f ./Dockerfile .
+	$(CONTAINER_CLI) inspect $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID)
+	@rm -f build/_output/bin/manager
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID); fi
 
-build-image-ppc64le: $(GO) $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on ppc64le.
+build-image-ppc64le: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator for Linux on ppc64le.
 	CGO_ENABLED=0 GOOS=linux GOARCH=ppc64le $(GO) build -a -o build/_output/bin/manager main.go
-	$(CONTAINER_CLI) run --rm --privileged docker.io/multiarch/qemu-user-static:register --reset
-	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID) -f build/Dockerfile.ppc64le .
+	DOCKER_BUILDKIT=1 DOCKER_DEFAULT_PLATFORM=linux/ppc64le $(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID) -f ./Dockerfile .
+	$(CONTAINER_CLI) inspect $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID)
 	@\rm -f build/_output/bin/manager
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID); fi
 
-build-image-s390x: $(GO) $(CONFIG_DOCKER_TARGET) ## Build the Operator for Linux on s390x.
+build-image-s390x: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator for Linux on s390x.
 	CGO_ENABLED=0 GOOS=linux GOARCH=s390x $(GO) build -a -o build/_output/bin/manager main.go
-	$(CONTAINER_CLI) run --rm --privileged docker.io/multiarch/qemu-user-static:register --reset
-	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-s390x:$(GIT_COMMIT_ID) -f build/Dockerfile.s390x .
-	@\rm -f build/_output/bin/manager
+	DOCKER_BUILDKIT=1 DOCKER_DEFAULT_PLATFORM=linux/s390x $(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-s390x:$(GIT_COMMIT_ID) -f ./Dockerfile .
+	$(CONTAINER_CLI) inspect $(REGISTRY)/$(IMG)-s390x:$(GIT_COMMIT_ID)
+	@rm -f build/_output/bin/manager
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-s390x:$(GIT_COMMIT_ID); fi
 
 images: $(CONFIG_DOCKER_TARGET) build-image-amd64 build-image-ppc64le build-image-s390x ## Build the multi-arch manifest.
-	@MAX_PULLING_RETRY=20 RETRY_INTERVAL=30 common/scripts/multiarch_image.sh $(REGISTRY) $(IMG) $(GIT_COMMIT_ID) $(VERSION)
+	@DOCKER_BUILDKIT=1 MAX_PULLING_RETRY=20 RETRY_INTERVAL=30 common/scripts/multiarch_image.sh $(REGISTRY) $(IMG) $(GIT_COMMIT_ID) $(VERSION)
 
 ##@ Deployment
 
@@ -352,7 +375,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 	- oc delete -f config/samples/bases/operator_v1alpha1_authentication.yaml -n ${NAMESPACE}
 	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
-build-dev-image: ## Build image using local architecture.
+build-image: build ## Build image using local architecture.
 	@echo "Building ibm-iam-operator dev image for $(LOCAL_ARCH)"
 	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-$(LOCAL_ARCH):$(VERSION) -f Dockerfile .
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-$(LOCAL_ARCH):$(GIT_COMMIT_ID); fi
@@ -382,10 +405,11 @@ catalog-push: ## Push a catalog image.
 all: check test coverage build images
 
 ##@ Cleanup
-clean: ## Clean build and bin directories.
-	rm -f build/_output/bin/*
+clean-bin: ## Remove bin directory where build tools are stored.
 	chmod -R +w bin/
 	rm -rf bin/*
+
+clean-dev: ## Remove dev overlays and dev bundle.
 	rm -rf config/default/overlays/dev
 	rm -rf config/manager/overlays/dev
 	rm -rf config/manifests/overlays/dev
@@ -393,4 +417,9 @@ clean: ## Clean build and bin directories.
 	rm -rf bundle-dev
 	rm bundle-dev.Dockerfile
 
-.PHONY: all build run check install uninstall code-dev test test-e2e coverage images csv clean help
+clean-licenses: ## Remove licenses directory used for manager image builds.
+	rm -rf licenses
+
+clean-all: clean-bin clean-dev-files clean-licenses ## Runs all cleanup targets.
+
+.PHONY: all build run check install uninstall code-dev test test-e2e coverage images csv clean-all clean-bin clean-dev clean-licenses help

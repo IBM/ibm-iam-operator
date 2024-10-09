@@ -28,7 +28,6 @@ import (
 	"github.com/opdev/subreconciler"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -55,14 +54,6 @@ location /v1/auth/ {
   proxy_set_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
   proxy_pass https://platform-identity-provider.%[1]s.svc:4300;
   proxy_read_timeout 180s;
-}
-location /idauth {
-  proxy_set_header Host $host;
-  proxy_set_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
-  proxy_pass https://platform-auth-service.%[1]s.svc:9443;
-  proxy_read_timeout 180s;
-  rewrite /idauth/(.*) /$1 break;
-  rewrite /idauth / break;
 }
 location /idprovider/ {
   proxy_set_header Host $host;
@@ -128,7 +119,7 @@ func (r *AuthenticationReconciler) handleZenExtension(ctx context.Context, req c
 	if authCR.Spec.Config.ZenFrontDoor {
 		reqLogger.Info("Zen front door requested - Ensure that ZenExtension is updated with correct front door config")
 
-		if ctrlCommon.ClusterHasZenExtensionGroupVersion() {
+		if ctrlCommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
 			commonWebUIZenExt := &zenv1.ZenExtension{}
 			err = r.Get(ctx, types.NamespacedName{Name: uiZenExtName, Namespace: authCR.Namespace}, commonWebUIZenExt)
 			if err != nil {
@@ -148,8 +139,8 @@ func (r *AuthenticationReconciler) handleZenExtension(ctx context.Context, req c
 				return subreconciler.RequeueWithDelay(opreqWait)
 			}
 
-			desiredZenExt, err := r.getDesiredZenExtension(ctx, authCR, &needToRequeue, reqLogger, zenHost)
-			if err != nil {
+			desiredZenExt := &zenv1.ZenExtension{}
+			if result, err := r.getDesiredZenExtension(ctx, authCR, zenHost, desiredZenExt); subreconciler.ShouldRequeue(result, err) {
 				return subreconciler.RequeueWithError(err)
 			}
 			if needToRequeue {
@@ -218,52 +209,45 @@ func (r *AuthenticationReconciler) handleZenExtension(ctx context.Context, req c
 	//In addition to reconciling the zen extension, we must set the proper value of
 	//cluster_address_auth in the ibmcloud-cluster-info configmap
 
-	//Load the ibmcloud-cluster-info configmap
-	var clusterInfoConfigMap *corev1.ConfigMap
-	clusterInfoConfigMap, err = r.getClusterInfoConfigMap(ctx, authCR, &needToRequeue, reqLogger)
-	if err != nil || needToRequeue {
-		return
-	}
-	if clusterInfoConfigMap.Data == nil || len(clusterInfoConfigMap.Data["cluster_address"]) == 0 {
-		err = fmt.Errorf("cluster_address is not set in configmap %s", ClusterInfoConfigmapName)
-		return
-	}
+	clusterInfoConfigMap := &corev1.ConfigMap{}
+	clusterAddressFieldName := "cluster_address"
+	clusterAddressAuthFieldName := "cluster_address_auth"
 
 	authHost := ""
-	if authCR.Spec.Config.ZenFrontDoor && ctrlCommon.ClusterHasZenExtensionGroupVersion() {
+	fns := []subreconciler.Fn{
+		r.getClusterInfoConfigMap(authCR, clusterInfoConfigMap),
+		r.verifyConfigMapHasCorrectOwnership(authCR, clusterInfoConfigMap),
+		r.verifyConfigMapHasField(authCR, clusterAddressFieldName, clusterInfoConfigMap),
+	}
+
+	for _, fn := range fns {
+		if result, err = fn(ctx); subreconciler.ShouldRequeue(result, err) {
+			return
+		}
+	}
+
+	if authCR.Spec.Config.ZenFrontDoor && ctrlCommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
 		//authHost must be set to the zen front door
 		//is should be set from above
 		authHost = zenHost
 	} else {
-		authHost = clusterInfoConfigMap.Data["cluster_address"]
+		authHost = clusterInfoConfigMap.Data[clusterAddressFieldName]
 	}
 
-	currentAuthAddress := clusterInfoConfigMap.Data["cluster_address_auth"]
-	if len(currentAuthAddress) == 0 || currentAuthAddress != authHost {
-		clusterInfoConfigMap.Data["cluster_address_auth"] = authHost
-		reqLogger.Info("cluster_address_auth needs updated in ibmcloud-cluster-info configmap", "cluster_address_auth", currentAuthAddress, "new cluster_address_auth", authHost)
-
-		//Update the configmap
-		if err = r.Update(ctx, clusterInfoConfigMap); err != nil {
-			reqLogger.Error(err, "Failed to update cluster-info-configmap")
-			return subreconciler.RequeueWithError(err)
-		}
-		reqLogger.Info("Updated cluster-info-configmap:cluster_address_auth successfully")
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	desiredFields := map[string]string{
+		clusterAddressAuthFieldName: authHost,
 	}
-	reqLogger.Info("No changes to cluster-info-configmap:cluster_address_auth; continue")
-
-	return subreconciler.ContinueReconciling()
+	return r.ensureConfigMapHasEqualFields(authCR, desiredFields, clusterInfoConfigMap)(ctx)
 }
 
-func (r *AuthenticationReconciler) getDesiredZenExtension(ctx context.Context, authCR *operatorv1alpha1.Authentication, needToRequeue *bool, reqLogger logr.Logger, zenHost string) (desiredZenExt *zenv1.ZenExtension, err error) {
-
-	wlpClientID, err := r.getWlpClientID(ctx, authCR, needToRequeue, reqLogger)
-	if err != nil || *needToRequeue {
+func (r *AuthenticationReconciler) getDesiredZenExtension(ctx context.Context, authCR *operatorv1alpha1.Authentication, zenHost string, desiredZenExt *zenv1.ZenExtension) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx)
+	wlpClientID := ""
+	if result, err = r.getWlpClientID(authCR, &wlpClientID)(ctx); subreconciler.ShouldRequeue(result, err) {
 		return
 	}
 
-	desiredZenExt = &zenv1.ZenExtension{
+	*desiredZenExt = zenv1.ZenExtension{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ImZenExtName,
 			Namespace: authCR.Namespace,
@@ -277,10 +261,10 @@ func (r *AuthenticationReconciler) getDesiredZenExtension(ctx context.Context, a
 	err = controllerutil.SetControllerReference(authCR, desiredZenExt, r.Client.Scheme())
 	if err != nil {
 		reqLogger.Error(err, "Failed to set owner for route")
-		return
+		return subreconciler.RequeueWithError(err)
 	}
 
-	return
+	return subreconciler.ContinueReconciling()
 }
 
 func (r *AuthenticationReconciler) getZenHost(ctx context.Context, authCR *operatorv1alpha1.Authentication, needToRequeue *bool, reqLogger logr.Logger) (zenHost string, err error) {
@@ -290,7 +274,7 @@ func (r *AuthenticationReconciler) getZenHost(ctx context.Context, authCR *opera
 	productConfigMap := &corev1.ConfigMap{}
 	err = r.Client.Get(ctx, types.NamespacedName{Name: ZenProductConfigmapName, Namespace: authCR.Namespace}, productConfigMap)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Zen product configmap doesnot exist - requeuing until it does")
 			*needToRequeue = true
 			err = nil

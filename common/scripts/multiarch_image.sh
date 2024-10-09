@@ -24,7 +24,7 @@ ALL_PLATFORMS="amd64 ppc64le s390x"
 IMAGE_REPO=${1}
 IMAGE_NAME=${2}
 VERSION=${3-"$(git describe --exact-match 2> /dev/null || git describe --match=$(git rev-parse --short=8 HEAD) --always --dirty --abbrev=8)"}
-RELEASE_VERSION=${4:-4.7.0}
+RELEASE_VERSION=${4:-4.9.0}
 MAX_PULLING_RETRY=${MAX_PULLING_RETRY-10}
 RETRY_INTERVAL=${RETRY_INTERVAL-10}
 # support other container tools, e.g. podman
@@ -49,12 +49,12 @@ done
 if [[ -n "$($CONTAINER_CLI images -f reference="${IMAGE_REPO}/${IMAGE_NAME}:${RELEASE_VERSION}" --format='{{.ID}}')" ]]
 then
   echo "Remove local image with conflicting reference ${IMAGE_REPO}/${IMAGE_NAME}:${RELEASE_VERSION}"
-  podman rmi "${IMAGE_REPO}/${IMAGE_NAME}:${RELEASE_VERSION}"
+  ${CONTAINER_CLI} rmi "${IMAGE_REPO}/${IMAGE_NAME}:${RELEASE_VERSION}"
 fi
 if [[ -n "$($CONTAINER_CLI images -f reference="${IMAGE_REPO}/${IMAGE_NAME}:latest" --format='{{.ID}}')" ]]
 then
   echo "Remove local image with conflicting reference ${IMAGE_REPO}/${IMAGE_NAME}:latest"
-  podman rmi "${IMAGE_REPO}/${IMAGE_NAME}:latest"
+  ${CONTAINER_CLI} rmi "${IMAGE_REPO}/${IMAGE_NAME}:latest"
 fi
 
 # create multi-arch manifest

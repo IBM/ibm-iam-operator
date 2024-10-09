@@ -1,0 +1,26 @@
+- op: add
+  path: "/rules/-"
+  value:
+    apiGroups:
+    - operator.ibm.com
+    resources:
+    - operandrequests
+    verbs:
+    - create
+    - get
+    - list
+    - patch
+    - watch
+    - update
+    - delete
+- op: add
+  path: "/rules/-"
+  value:
+    apiGroups:
+    - operator.ibm.com
+    resources:
+    - operandrequests/status
+    verbs:
+    - watch
+    - get
+    - list

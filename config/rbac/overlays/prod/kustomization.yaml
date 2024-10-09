@@ -1,2 +1,16 @@
 resources:
   - ../../bases
+
+patches:
+  - path: add_route_verbs.yaml
+    target:
+      group: rbac.authorization.k8s.io
+      version: v1
+      kind: Role
+      name: ibm-iam-operator
+  - path: add_operandrequest_verbs.yaml
+    target:
+      group: rbac.authorization.k8s.io
+      version: v1
+      kind: Role
+      name: ibm-iam-operator

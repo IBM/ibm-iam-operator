@@ -1,0 +1,36 @@
+- op: add
+  path: "/rules/-"
+  value:
+    apiGroups:
+    - route.openshift.io
+    resources:
+    - routes
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - delete
+    - update
+    - patch
+- op: add
+  path: "/rules/-"
+  value:
+    apiGroups:
+    - route.openshift.io
+    resources:
+    - routes/custom-host
+    verbs:
+    - create
+- op: add
+  path: "/rules/-"
+  value:
+    apiGroups:
+    - route.openshift.io
+    resources:
+    - routes/status
+    verbs:
+    - get
+    - list
+    - watch
+

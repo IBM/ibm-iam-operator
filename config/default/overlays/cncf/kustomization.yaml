@@ -1,0 +1,5 @@
+bases:
+- ../../../crd
+- ../../../rbac/overlays/cncf
+- ../../../manager/overlays/prod
+- ../../../samples/overlays/prod

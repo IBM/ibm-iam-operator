@@ -685,7 +685,7 @@ func (r *AuthenticationReconciler) addFinalizer(ctx context.Context, finalizerNa
 	defer r.Mutex.Unlock()
 	if !containsString(instance.Finalizers, finalizerName) {
 		instance.Finalizers = append(instance.Finalizers, finalizerName)
-		err = r.Client.Update(ctx, instance)
+		err = r.Update(ctx, instance)
 	}
 	return
 }
@@ -696,7 +696,7 @@ func (r *AuthenticationReconciler) removeFinalizer(ctx context.Context, finalize
 	defer r.Mutex.Unlock()
 	if containsString(instance.Finalizers, finalizerName) {
 		instance.Finalizers = removeString(instance.Finalizers, finalizerName)
-		err = r.Client.Update(ctx, instance)
+		err = r.Update(ctx, instance)
 		if err != nil {
 			return fmt.Errorf("error updating the CR to remove the finalizer: %w", err)
 		}
@@ -877,9 +877,11 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return
 	}
 	// create clusterrole and clusterrolebinding
-	r.createClusterRole(instance)
+	if subResult, err := r.handleClusterRoles(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
 
-	if subResult, err := r.handleClusterRoleBinding(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+	if subResult, err := r.handleClusterRoleBindings(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
 	}
 

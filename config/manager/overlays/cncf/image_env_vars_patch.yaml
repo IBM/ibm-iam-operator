@@ -25,7 +25,6 @@
   path: /spec/template/spec/containers/0/env/-
   value:
     name: WATCH_NAMESPACE
-    valueFrom: 
-      configMapKeyRef:
-        name: namespace-scope
-        key: namespaces
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.namespace

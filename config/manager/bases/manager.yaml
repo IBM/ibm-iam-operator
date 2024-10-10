@@ -31,9 +31,6 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       affinity:
-        securityContext:
-          seccompProfile:
-            type: RuntimeDefault
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
@@ -51,11 +48,6 @@ spec:
           - ibm-iam-operator
           imagePullPolicy: IfNotPresent
           env:
-            - name: WATCH_NAMESPACE
-              valueFrom:
-                configMapKeyRef:
-                  name: namespace-scope
-                  key: namespaces
             - name: POD_NAME
               valueFrom:
                 fieldRef:

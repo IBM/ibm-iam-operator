@@ -1,0 +1,4 @@
+resources:
+- ../../../default/overlays/cncf
+- ../../../samples/overlays/prod
+

@@ -3,4 +3,4 @@ kind: Kustomization
 resources:
 - ../../../crd
 - ../../../rbac/overlays/cncf
-- ../../../manager/overlays/prod
+- ../../../manager/overlays/cncf

@@ -21,7 +21,9 @@
 BUILD_LOCALLY ?= 1
 
 # The namespace that operator will be deployed in
-NAMESPACE=ibm-common-services
+CONTROL_NS ?= ibm-common-services
+DATA_NS ?= $(CONTROL_NS)
+
 GIT_COMMIT_ID=$(shell git rev-parse --short HEAD)
 GIT_REMOTE_URL=$(shell git config --get remote.origin.url)
 IMAGE_BUILD_OPTS=--build-arg "VCS_REF=$(GIT_COMMIT_ID)" --build-arg "VCS_URL=$(GIT_REMOTE_URL)"
@@ -326,34 +328,39 @@ catalog-build: opm ## Build a catalog image.
 bundle-build: ## Build the bundle image.
 	docker build -f $(BUNDLE_DOCKERFILE) -t $(BUNDLE_IMG) .
 
-build-image-amd64: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator for Linux on amd64.
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -a -o build/_output/bin/manager main.go
-	DOCKER_BUILDKIT=1 DOCKER_DEFAULT_PLATFORM=linux/amd64 $(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID) -f ./Dockerfile .
-	$(CONTAINER_CLI) inspect $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID)
-	@rm -f build/_output/bin/manager
-	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID); fi
+TARGET_ARCH=$(LOCAL_ARCH)
 
-build-image-ppc64le: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator for Linux on ppc64le.
-	CGO_ENABLED=0 GOOS=linux GOARCH=ppc64le $(GO) build -a -o build/_output/bin/manager main.go
-	DOCKER_BUILDKIT=1 DOCKER_DEFAULT_PLATFORM=linux/ppc64le $(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID) -f ./Dockerfile .
-	$(CONTAINER_CLI) inspect $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID)
-	@\rm -f build/_output/bin/manager
-	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID); fi
-
-build-image-s390x: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator for Linux on s390x.
-	CGO_ENABLED=0 GOOS=linux GOARCH=s390x $(GO) build -a -o build/_output/bin/manager main.go
-	DOCKER_BUILDKIT=1 DOCKER_DEFAULT_PLATFORM=linux/s390x $(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-s390x:$(GIT_COMMIT_ID) -f ./Dockerfile .
-	$(CONTAINER_CLI) inspect $(REGISTRY)/$(IMG)-s390x:$(GIT_COMMIT_ID)
+build-image: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator manager image
+	@echo "Building manager binary for linux/$(TARGET_ARCH)"
+	@CGO_ENABLED=0 GOOS=linux GOARCH=$(TARGET_ARCH) $(GO) build -a -o build/_output/bin/manager main.go
+	@echo "Building manager image for linux/$(TARGET_ARCH)"
+	@DOCKER_BUILDKIT=1 $(CONTAINER_CLI) build --platform=linux/$(TARGET_ARCH) ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-$(TARGET_ARCH):$(GIT_COMMIT_ID) -f ./Dockerfile .
+	@echo "Inspect built image $(REGISTRY)/$(IMG)-$(TARGET_ARCH):$(GIT_COMMIT_ID)"
+	$(CONTAINER_CLI) inspect $(REGISTRY)/$(IMG)-$(TARGET_ARCH):$(GIT_COMMIT_ID)
+	@echo "Clean up binary"
 	@rm -f build/_output/bin/manager
-	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-s390x:$(GIT_COMMIT_ID); fi
+	@if [ $(BUILD_LOCALLY) -ne 1 ]; then \
+		echo "Pushing $(REGISTRY)/$(IMG)-$(TARGET_ARCH):$(GIT_COMMIT_ID)"; \
+	  $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-$(TARGET_ARCH):$(GIT_COMMIT_ID); \
+		echo "Done"; \
+	fi
+
+build-image-amd64: TARGET_ARCH=amd64
+build-image-amd64: build-image
+
+build-image-ppc64le: TARGET_ARCH=ppc64le
+build-image-ppc64le: build-image
+
+build-image-s390x: TARGET_ARCH=s390x
+build-image-s390x: build-image
 
 images: $(CONFIG_DOCKER_TARGET) build-image-amd64 build-image-ppc64le build-image-s390x ## Build the multi-arch manifest.
 	@DOCKER_BUILDKIT=1 MAX_PULLING_RETRY=20 RETRY_INTERVAL=30 common/scripts/multiarch_image.sh $(REGISTRY) $(IMG) $(GIT_COMMIT_ID) $(VERSION)
 
 ##@ Deployment
 
-ifndef ignore-not-found
-  ignore-not-found = false
+ifndef IGNORE_NOT_FOUND
+  IGNORE_NOT_FOUND = false
 endif
 
 .PHONY: install
@@ -362,23 +369,25 @@ install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~
 
 .PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/crd | kubectl delete --ignore-not-found=$(IGNORE_NOT_FOUND) -f -
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager/overlays/$(MODE) && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default/overlays/$(MODE) | kubectl apply -f -
-	$(KUSTOMIZE) build config/samples/overlays/$(MODE) | kubectl apply -f -
+	kubectl get namespace $(CONTROL_NS) || kubectl create namespace $(CONTROL_NS)
+	kubectl get namespace $(DATA_NS) || kubectl create namespace $(DATA_NS)
+	cd config/manager/overlays/$(MODE) && $(KUSTOMIZE) edit set image controller=$(IMAGE_TAG_BASE):$(VERSION)
+	#@ 
+	DATA_NS=$(DATA_NS) $(YQ) -i 'with(.[] | select(.value.name == "WATCH_NAMESPACE") ; .value.value |= env(DATA_NS))' \
+		config/manager/overlays/$(MODE)/image_env_vars_patch.yaml
+	$(KUSTOMIZE) build config/default/overlays/$(MODE) | kubectl apply -n $(CONTROL_NS) -f -
+	$(KUSTOMIZE) build config/samples/overlays/$(MODE) | kubectl apply -n $(DATA_NS) -f -
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/samples/overlays/$(MODE) | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
-	$(KUSTOMIZE) build config/default/overlays/$(MODE) | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
-
-build-image: build ## Build image using local architecture.
-	@echo "Building ibm-iam-operator dev image for $(LOCAL_ARCH)"
-	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-$(LOCAL_ARCH):$(VERSION) -f Dockerfile .
-	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-$(LOCAL_ARCH):$(GIT_COMMIT_ID); fi
+	$(KUSTOMIZE) build config/samples/overlays/$(MODE) | kubectl delete --ignore-not-found=$(IGNORE_NOT_FOUND) -n $(DATA_NS) -f -
+	$(KUSTOMIZE) build config/default/overlays/$(MODE) | kubectl delete --ignore-not-found=$(IGNORE_NOT_FOUND) -n $(CONTROL_NS) -f -
+	kubectl delete namespace $(DATA_NS)
+	[[ $(CONTROL_NS) == $(DATA_NS) ]] || kubectl delete namespace $(CONTROL_NS)
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.

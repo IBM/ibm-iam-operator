@@ -159,6 +159,7 @@ func clusterHasAPIResource(dc *discovery.DiscoveryClient, gv schema.GroupVersion
 	}
 
 	for _, resource := range resources.APIResources {
+		fmt.Printf("%v\n", resource)
 		if resource.Name == resourceName {
 			return true, nil
 		}

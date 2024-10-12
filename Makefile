@@ -182,7 +182,7 @@ ifeq (,$(shell which go 2>/dev/null))
 		exit 1; \
 	}
 endif
-	test -s $(LOCALBIN)/go$(GO_VERSION) && $(LOCALBIN)/go$(GO_VERSION) version | grep -q $(GO_VERSION) || \
+	@test -s $(LOCALBIN)/go$(GO_VERSION) && $(LOCALBIN)/go$(GO_VERSION) version | grep -q $(GO_VERSION) || \
 	GOSUMDB=sum.golang.org GOBIN=$(LOCALBIN) go install golang.org/dl/go$(GO_VERSION)@latest && $(LOCALBIN)/go$(GO_VERSION) download
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
@@ -354,7 +354,10 @@ build-image-ppc64le: build-image
 build-image-s390x: TARGET_ARCH=s390x
 build-image-s390x: build-image
 
-images: $(CONFIG_DOCKER_TARGET) build-image-amd64 build-image-ppc64le build-image-s390x ## Build the multi-arch manifest.
+images: $(CONFIG_DOCKER_TARGET)  ## Build the multi-arch manifest.
+	${MAKE} build-image-amd64
+	${MAKE} build-image-ppc64le
+	${MAKE} build-image-s390x
 	@DOCKER_BUILDKIT=1 MAX_PULLING_RETRY=20 RETRY_INTERVAL=30 common/scripts/multiarch_image.sh $(REGISTRY) $(IMG) $(GIT_COMMIT_ID) $(VERSION)
 
 ##@ Deployment

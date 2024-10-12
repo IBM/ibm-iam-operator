@@ -14,4 +14,4 @@ patches:
 images:
 - name: controller
   newName: docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-scratch-docker-local/rwhundle/ibm-iam-operator
-  newTag: test-catalog-cd
+  newTag: latest

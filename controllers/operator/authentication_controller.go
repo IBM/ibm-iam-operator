@@ -884,8 +884,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{}).
 		Owns(&corev1.Service{}).
 		Owns(&net.Ingress{}).
-		Owns(&appsv1.Deployment{}).
-		Owns(&operatorv1alpha1.OperandRequest{})
+		Owns(&appsv1.Deployment{})
 
 	//Add routes
 	if ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
@@ -893,6 +892,9 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	if ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
 		builder.Owns(&zenv1.ZenExtension{})
+	}
+	if ctrlcommon.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
+		builder.Owns(&operatorv1alpha1.OperandRequest{})
 	}
 
 	return builder.For(&operatorv1alpha1.Authentication{}).

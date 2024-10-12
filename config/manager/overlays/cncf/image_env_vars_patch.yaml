@@ -20,11 +20,9 @@
     value: icr.io/cpopen/cpfs/im-initcontainer:4.9.0
 - op: replace
   path: /spec/template/spec/containers/0/imagePullPolicy
-  value: IfNotPresent
+  value: Always
 - op: add
   path: /spec/template/spec/containers/0/env/-
   value:
     name: WATCH_NAMESPACE
-    valueFrom:
-      fieldRef:
-        fieldPath: metadata.namespace
+    value: im-deploy-test

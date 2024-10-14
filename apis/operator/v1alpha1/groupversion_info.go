@@ -33,4 +33,9 @@ var (
 
 	// AddToScheme adds the types in this group-version to the given scheme.
 	AddToScheme = SchemeBuilder.AddToScheme
+
+	// The following is a dedicated scheme for when ODLM is available on the cluster; it shares the same
+	// GroupVersion as Authentication
+	ODLMEnabledSchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
+	AddODLMEnabledToScheme   = ODLMEnabledSchemeBuilder.AddToScheme
 )

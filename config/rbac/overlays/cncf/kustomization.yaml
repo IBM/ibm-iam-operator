@@ -1,0 +1,6 @@
+resources:
+  - ../../bases
+
+patches:
+  - path: delete_clusterrolebinding.yaml
+  - path: delete_clusterrole.yaml

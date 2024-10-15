@@ -29,4 +29,6 @@ config/**/overlays/dev
 bundle-dev
 bundle-dev.Dockerfile
 catalog_output
+catalog
+catalog.Dockerfile
 licenses

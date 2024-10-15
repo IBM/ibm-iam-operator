@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+set -e -u -o pipefail -x
+
+REPO_ROOT=""
+if command -v realpath &>/dev/null
+then
+  REPO_ROOT="$(realpath $(dirname $0)/..)"
+else
+  REPO_ROOT="$(dirname $0/..)"
+fi
+export LOCALBIN="${REPO_ROOT}/bin"
+YQ="${LOCALBIN}/yq"
+
+export channel_name="${1}"
+export package_name="${2}"
+export bundle_version="${3}"
+export bundle_skip_range="${4}"
+export bundle_name="${package_name}.v${bundle_version}"
+
+rc=0
+${YQ} -e '. | select(.schema == "olm.channel" and .name == env(channel_name) and .package == env(package_name))' ${REPO_ROOT}/catalog/index.yml &>/dev/null ||
+  rc=$?
+
+# If the channel definition lookup in the index isn't successful, append it
+if [[ $rc != 0  ]]; then
+  cat >>${REPO_ROOT}/catalog/index.yml <<EOF
+---
+entries:
+  - name: ${bundle_name}
+    skipRange: ${bundle_skip_range}
+name: ${channel_name}
+package: ${package_name}
+properties:
+  - type: ibm.curated-version
+    value:
+      version: ${bundle_version}
+schema: olm.channel
+EOF
+
+# Update the defaultChannel and curated-version values to match
+${YQ} -e -i \
+  'with(select(.schema == "olm.package" and .name == env(package_name)); .defaultChannel = env(channel_name) | .properties.[0].value.version = env(bundle_version))' \
+  ${REPO_ROOT}/catalog/index.yml ||
+  rc=$?
+fi
+

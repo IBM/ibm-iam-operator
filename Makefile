@@ -95,6 +95,8 @@ BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(BUNDLE_VERSION) $(BUNDLE_METADATA
 
 BUNDLE_DOCKERFILE ?= bundle.Dockerfile
 
+CHANNEL ?= v$(shell cut -f1,2 -d'.' <<<$(BUNDLE_VERSION))
+
 MODE ?= prod
 
 ifeq ($(MODE), dev)
@@ -237,7 +239,7 @@ ifeq (,$(shell which opm 2>/dev/null))
 	set -e ;\
 	mkdir -p $(dir $(OPM)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.23.0/$${OS}-$${ARCH}-opm ;\
+	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.47.0/$${OS}-$${ARCH}-opm ;\
 	chmod +x $(OPM) ;\
 	}
 else
@@ -279,7 +281,6 @@ else
 	hack/patch-built-bundle
 endif
 
-
 .PHONY: fmt
 fmt: go ## Run go fmt against code.
 	test -s $(LOCALBIN)/gofmt 2>&1 || $(GO) build -o $(LOCALBIN)/gofmt ${HOME}/sdk/go$(GO_VERSION)/src/cmd/gofmt
@@ -315,16 +316,50 @@ licenses-dir:
 	@mkdir -p licenses
 	@cp LICENSE licenses/
 
-# Build a catalog image by adding bundle images to an empty catalog using the operator package manager tool, 'opm'.
-# This recipe invokes 'opm' in 'semver' bundle add mode. For more information on add modes, see:
-# https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
+.PHONY: catalog-init
+catalog-init: opm ## Initialize an FBC from scratch.
+	mkdir -p catalog
+	$(OPM) init $(IMG) \
+		--default-channel=$(CHANNEL) \
+	  --description=./README.md \
+		--output yaml \
+		> catalog/index.yml
+
+.PHONY: catalog-render
+catalog-render: opm ## Render an FBC locally from CATALOG_BASE_IMG.
+	mkdir -p catalog
+	$(OPM) render $(CATALOG_BASE_IMG) -o yaml > catalog/index.yml
+
+.PHONY: catalog-validate
+catalog-validate: opm ## Validate the FBC.
+	$(OPM) validate catalog
+
 .PHONY: catalog-build
-catalog-build: opm ## Build a catalog image.
-	$(OPM) index add --container-tool docker --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
+catalog-build: opm catalog-validate ## Build a catalog image.
+	test -s catalog.Dockerfile || $(OPM) generate dockerfile catalog
+	$(CONTAINER_CLI) build . --platform linux/amd64 -f catalog.Dockerfile -t $(REGISTRY)/$(IMG)-catalog-amd64:$(GIT_COMMIT_ID)
+	$(CONTAINER_CLI) build . --platform linux/ppc64le -f catalog.Dockerfile -t $(REGISTRY)/$(IMG)-catalog-ppc64le:$(GIT_COMMIT_ID) 
+	$(CONTAINER_CLI) build . --platform linux/s390x -f catalog.Dockerfile -t $(REGISTRY)/$(IMG)-catalog-s390x:$(GIT_COMMIT_ID) 
+
+.PHONY: catalog-push
+catalog-push:  ## Push the catalog image to the registry.
+	@DOCKER_BUILDKIT=1 MAX_PULLING_RETRY=20 RETRY_INTERVAL=30 common/scripts/multiarch_image.sh $(REGISTRY) $(IMG)-catalog $(GIT_COMMIT_ID) $(VERSION)
+
+.PHONY: channel-render
+channel-render: yq ## Add a channel definition to the index if it doesn't already exist.
+	./hack/channel-render $(CHANNEL) $(IMG) $(BUNDLE_VERSION) "<$(BUNDLE_VERSION)"
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	docker build -f $(BUNDLE_DOCKERFILE) -t $(BUNDLE_IMG) .
+	$(CONTAINER_CLI) build -f $(BUNDLE_DOCKERFILE) -t $(BUNDLE_IMG) .
+
+.PHONY: bundle-push
+bundle-push:
+	$(CONTAINER_CLI) push $(BUNDLE_IMG)
+
+.PHONY: bundle-render
+bundle-render: ## Render the bundle contents into the local FBC index.
+	./hack/bundle-render $(IMG).v$(BUNDLE_VERSION) $(BUNDLE_IMG)
 
 TARGET_ARCH=$(LOCAL_ARCH)
 
@@ -387,18 +422,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 BUNDLE_IMGS ?= $(BUNDLE_IMG)
 
 # The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
-CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:v$(VERSION)
-
-# Set CATALOG_BASE_IMG to an existing catalog image tag to add $BUNDLE_IMGS to that image.
-ifneq ($(origin CATALOG_BASE_IMG), undefined)
-FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
-endif
-
-# Push the catalog image.
-.PHONY: catalog-push
-catalog-push: ## Push a catalog image.
-	$(MAKE) docker-push IMG=$(CATALOG_IMG)
-
+CATALOG_IMG ?= $(REGISTRY)/$(IMG)-catalog:$(VERSION)
 
 all: check test coverage build images
 
@@ -408,16 +432,19 @@ clean-bin: ## Remove bin directory where build tools are stored.
 	rm -rf bin/*
 
 clean-dev: ## Remove dev overlays and dev bundle.
-	rm -rf config/default/overlays/dev
-	rm -rf config/manager/overlays/dev
-	rm -rf config/manifests/overlays/dev
-	rm -rf config/samples/overlays/dev
-	rm -rf bundle-dev
-	rm bundle-dev.Dockerfile
+	rm -rf config/default/overlays/dev || true
+	rm -rf config/manager/overlays/dev || true
+	rm -rf config/manifests/overlays/dev || true
+	rm -rf config/samples/overlays/dev || true
+	rm -rf bundle-dev || true
+	rm bundle-dev.Dockerfile || true
+	rm -rf catalog || true
+	rm catalog.Dockerfile || true
 
 clean-licenses: ## Remove licenses directory used for manager image builds.
 	rm -rf licenses
 
 clean-all: clean-bin clean-dev-files clean-licenses ## Runs all cleanup targets.
+
 
 .PHONY: all build run check install uninstall code-dev test test-e2e coverage images csv clean-all clean-bin clean-dev clean-licenses help

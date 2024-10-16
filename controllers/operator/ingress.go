@@ -94,8 +94,6 @@ func (r *AuthenticationReconciler) handleIngress(instance *operatorv1alpha1.Auth
 		idMgmtIngress,
 		idmgmtV2ApiIngress,
 		platformAuthIngress,
-		platformIdAuthBlockIngress,
-		platformIdAuthIngress,
 		platformOidcBlockIngress,
 		platformOidcIngress,
 		samlUiCallbackIngress,

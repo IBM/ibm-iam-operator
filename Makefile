@@ -23,6 +23,7 @@ BUILD_LOCALLY ?= 1
 # The namespace that operator will be deployed in
 CONTROL_NS ?= ibm-common-services
 DATA_NS ?= $(CONTROL_NS)
+WATCH_NS ?= $(DATA_NS)
 
 GIT_COMMIT_ID=$(shell git rev-parse --short HEAD)
 GIT_REMOTE_URL=$(shell git config --get remote.origin.url)
@@ -413,10 +414,17 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 	kubectl get namespace $(DATA_NS) || kubectl create namespace $(DATA_NS)
 	cd config/manager/overlays/$(MODE) && $(KUSTOMIZE) edit set image controller=$(IMAGE_TAG_BASE):$(VERSION)
 	#@ 
-	DATA_NS=$(DATA_NS) $(YQ) -i 'with(.[] | select(.value.name == "WATCH_NAMESPACE") ; .value.value |= env(DATA_NS))' \
+	WATCH_NS=$(WATCH_NS) $(YQ) -i 'with(.[] | select(.value.name == "WATCH_NAMESPACE") ; .value.value |= env(WATCH_NS))' \
 		config/manager/overlays/$(MODE)/image_env_vars_patch.yaml
 	$(KUSTOMIZE) build config/default/overlays/$(MODE) | kubectl apply -n $(CONTROL_NS) -f -
 	$(KUSTOMIZE) build config/samples/overlays/$(MODE) | kubectl apply -n $(DATA_NS) -f -
+
+cncf: manifests kustomize ## Generate manifests for use on CNCF clusters.
+	cd config/manager/overlays/cncf && $(KUSTOMIZE) edit set image controller=$(IMAGE_TAG_BASE):$(VERSION)
+	WATCH_NS=$(WATCH_NS) $(YQ) -i 'with(.[] | select(.value.name == "WATCH_NAMESPACE") ; .value.value |= env(WATCH_NS))' \
+		config/manager/overlays/cncf/image_env_vars_patch.yaml
+	$(KUSTOMIZE) build config/default/overlays/cncf > default.yml
+	$(KUSTOMIZE) build config/samples/overlays/cncf > authentication.yml
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.

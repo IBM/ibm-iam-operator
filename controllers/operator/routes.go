@@ -272,7 +272,7 @@ func (r *AuthenticationReconciler) removeIdauth(ctx context.Context, instance *o
 	observedRoute := &routev1.Route{}
 	err = r.Get(ctx, types.NamespacedName{Name: "platform-id-auth", Namespace: namespace}, observedRoute)
 	if errors.IsNotFound(err) {
-		return
+		return nil
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get existing platform-id-auth route for reconciliation")
 		return 

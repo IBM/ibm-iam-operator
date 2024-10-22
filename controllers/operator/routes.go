@@ -278,9 +278,11 @@ func (r *AuthenticationReconciler) removeIdauth(ctx context.Context, instance *o
 		return 
 	}
 	err = r.Delete(ctx, observedRoute)
-	if err != nil {
+	if errors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
 		reqLogger.Error(err, "Failed to delete platform-id-auth Route")
-		return
+		return 
 	}
 	reqLogger.Info("Successfully deleted platform-id-auth Route")
 	return 

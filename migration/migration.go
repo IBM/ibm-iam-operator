@@ -272,7 +272,7 @@ func InitSchemas(ctx context.Context, to, from DBConn) (err error) {
 		return
 	}
 	defer postgres.Disconnect(ctx)
-
+	reqLogger.Info("This has InsecureSkipVerify changes")
 	var schemasPresent bool
 	schemasPresent, err = postgres.HasSchemas(ctx)
 	if err != nil {

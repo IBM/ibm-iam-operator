@@ -20,4 +20,4 @@
     value: icr.io/cpopen/cpfs/im-initcontainer:4.9.0
 - op: replace
   path: /spec/template/spec/containers/0/imagePullPolicy
-  value: IfNotPresent
+  value: Always

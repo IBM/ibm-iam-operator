@@ -363,19 +363,19 @@ bundle-render: ## Render the bundle contents into the local FBC index.
 
 build-image-amd64: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator for Linux on amd64.
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -a -o build/_output/bin/manager main.go
-	@DOCKER_BUILDKIT=1 DOCKER_DEFAULT_PLATFORM=linux/amd64 $(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID) -f ./Dockerfile .
+	@DOCKER_BUILDKIT=1 $(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} --platform linux/amd64 -t $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID) -f ./Dockerfile .
 	@rm -f build/_output/bin/manager
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID); fi
 
 build-image-ppc64le: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator for Linux on ppc64le.
 	CGO_ENABLED=0 GOOS=linux GOARCH=ppc64le $(GO) build -a -o build/_output/bin/manager main.go
-	@DOCKER_BUILDKIT=1 DOCKER_DEFAULT_PLATFORM=linux/ppc64le $(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID) -f ./Dockerfile .
+	@DOCKER_BUILDKIT=1 $(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} --platform linux/ppc64le -t $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID) -f ./Dockerfile .
 	@\rm -f build/_output/bin/manager
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID); fi
 
 build-image-s390x: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator for Linux on s390x.
 	CGO_ENABLED=0 GOOS=linux GOARCH=s390x $(GO) build -a -o build/_output/bin/manager main.go
-	@DOCKER_BUILDKIT=1 DOCKER_DEFAULT_PLATFORM=linux/s390x $(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-s390x:$(GIT_COMMIT_ID) -f ./Dockerfile .
+	@DOCKER_BUILDKIT=1 $(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} --platform linux/s390x -t $(REGISTRY)/$(IMG)-s390x:$(GIT_COMMIT_ID) -f ./Dockerfile .
 	@rm -f build/_output/bin/manager
 	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-s390x:$(GIT_COMMIT_ID); fi
 
@@ -439,7 +439,7 @@ clean-dev: ## Remove dev overlays and dev bundle.
 clean-licenses: ## Remove licenses directory used for manager image builds.
 	rm -rf licenses
 
-clean-all: clean-bin clean-dev-files clean-licenses ## Runs all cleanup targets.
+clean-all: clean-bin clean-dev clean-licenses ## Runs all cleanup targets.
 
 
 .PHONY: all build run check install uninstall code-dev test test-e2e coverage images csv clean-all clean-bin clean-dev clean-licenses help

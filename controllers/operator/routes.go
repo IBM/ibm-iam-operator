@@ -184,18 +184,6 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, instance *o
 			DestinationCAcert: platformIdentityProviderCert,
 			ServiceName:       PlatformIdentityProviderServiceName,
 		},
-		"platform-id-auth": {
-			Annotations: map[string]string{
-				"haproxy.router.openshift.io/balance":        "source",
-				"haproxy.router.openshift.io/rewrite-target": "/",
-			},
-			Name:              "platform-id-auth",
-			RouteHost:         routeHost,
-			RoutePath:         "/idauth",
-			RoutePort:         9443,
-			DestinationCAcert: platformAuthCert,
-			ServiceName:       PlatformAuthServiceName,
-		},
 		"platform-id-provider": {
 			Annotations: map[string]string{
 				"haproxy.router.openshift.io/rewrite-target": "/",
@@ -277,12 +265,42 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, instance *o
 	return
 }
 
+func (r *AuthenticationReconciler) removeIdauth(ctx context.Context, instance *operatorv1alpha1.Authentication) (err error) {
+	namespace := instance.Namespace
+	reqLogger := log.WithValues("func", "ReconcileRoute", "namespace", namespace)
+	reqLogger.Info("Determined platform-id-auth Route should not exist; removing if present")
+	observedRoute := &routev1.Route{}
+	err = r.Get(ctx, types.NamespacedName{Name: "platform-id-auth", Namespace: namespace}, observedRoute)
+	if errors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to get existing platform-id-auth route for reconciliation")
+		return 
+	}
+	err = r.Delete(ctx, observedRoute)
+	if errors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to delete platform-id-auth Route")
+		return 
+	}
+	reqLogger.Info("Successfully deleted platform-id-auth Route")
+	return 
+}
+
 func (r *AuthenticationReconciler) reconcileRoute(ctx context.Context, instance *operatorv1alpha1.Authentication, fields *reconcileRouteFields, needToRequeue *bool) (err error) {
 
 	namespace := instance.Namespace
 	reqLogger := log.WithValues("func", "ReconcileRoute", "name", fields.Name, "namespace", namespace)
 
 	reqLogger.Info("Reconciling route", "annotations", fields.Annotations, "routeHost", fields.RouteHost, "routePath", fields.RoutePath)
+
+	err = r.removeIdauth(ctx, instance)
+
+	if err != nil {
+		reqLogger.Error(err, "Error deleting platform-id-auth Route")
+		return
+	}
 
 	calculatedRoute, err := r.newRoute(instance, fields)
 	if err != nil {

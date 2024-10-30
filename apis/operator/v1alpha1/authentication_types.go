@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -264,11 +265,7 @@ const AnnotationAuthRetainMigrationArtifacts string = "authentication.operator.i
 const AnnotationAuthDBSchemaVersion string = "authentication.operator.ibm.com/db-schema-version"
 
 func (a *Authentication) HasBeenMigrated() bool {
-	annotations := a.GetAnnotations()
-	if value, ok := annotations[AnnotationAuthMigrationComplete]; ok && value == "true" {
-		return true
-	}
-	return false
+	return meta.IsStatusConditionPresentAndEqual(a.Status.Conditions, ConditionMigrated, metav1.ConditionTrue)
 }
 
 func (a *Authentication) HasNotBeenMigrated() bool {

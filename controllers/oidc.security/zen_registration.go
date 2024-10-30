@@ -27,6 +27,15 @@ import (
 	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/apis/oidc.security/v1"
 )
 
+// ZenInstance represents the zen instance model (response from post, get)
+type ZenInstance struct {
+	ClientID       string `json:"clientId"`
+	InstanceId     string `json:"instanceId"`
+	ProductNameUrl string `json:"productNameUrl"`
+	Namespace      string `json:"namespace"`
+	ZenAuditUrl    string `json:"zenAuditUrl"`
+}
+
 // getZenInstanceRegistration gets the requested Zen instance registration using the ID Management API.
 func (r *ClientReconciler) getZenInstanceRegistration(ctx context.Context, clientCR *oidcsecurityv1.Client, config *AuthenticationConfig) (zenInstance *ZenInstance, err error) {
 	//reqLogger := logf.FromContext(ctx).WithName("GetZenInstance")

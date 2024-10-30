@@ -853,5 +853,6 @@ func (r *ClientReconciler) removeAnnotationFromSA(ctx context.Context, req ctrl.
 func (r *ClientReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&oidcsecurityv1.Client{}).
+		Owns(&corev1.Secret{}).
 		Complete(r)
 }

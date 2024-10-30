@@ -63,15 +63,6 @@ type OidcClientResponse struct {
 	AllowRegexpRedirects    bool     `json:"allow_regexp_redirects"`
 }
 
-// ZenInstance represents the zen instance model (response from post, get)
-type ZenInstance struct {
-	ClientID       string `json:"clientId"`
-	InstanceId     string `json:"instanceId"`
-	ProductNameUrl string `json:"productNameUrl"`
-	Namespace      string `json:"namespace"`
-	ZenAuditUrl    string `json:"zenAuditUrl"`
-}
-
 // CreateClientRegistration registers a new OIDC Client on the OP using information provided in the provided Client CR;
 // it does so via a call to the IM Identity Provider service.
 func (r *ClientReconciler) createClientRegistration(ctx context.Context, client *oidcsecurityv1.Client, config *AuthenticationConfig) (response *http.Response, err error) {
@@ -203,7 +194,10 @@ func (r *ClientReconciler) invokeClientRegistrationAPI(ctx context.Context, clie
 		return
 	}
 
-	request, _ := http.NewRequest(requestType, requestURL, bytes.NewBuffer([]byte(payload)))
+	request, err := http.NewRequest(requestType, requestURL, bytes.NewBuffer([]byte(payload)))
+	if err != nil {
+		return
+	}
 	request.Header.Set("Content-Type", "application/json")
 	request.SetBasicAuth(oauthAdmin, clientRegistrationSecret)
 

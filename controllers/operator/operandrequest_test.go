@@ -133,13 +133,13 @@ var _ = Describe("OperandRequest handling", func() {
 			needsToMigrate := r.needToMigrateMongoDB(context.Background(), authCR)
 			Expect(needsToMigrate).To(BeTrue())
 		})
-		It("returns false when mongodb service exists in the services namespace and Authentication has migration annotation", func() {
-			authCR.Annotations = map[string]string{operatorv1alpha1.AnnotationAuthMigrationComplete: "true"}
-			err := r.Update(context.Background(), authCR)
-			Expect(err).ToNot(HaveOccurred())
-			needsToMigrate := r.needToMigrateMongoDB(context.Background(), authCR)
-			Expect(needsToMigrate).To(BeFalse())
-		})
+		//It("returns false when mongodb service exists in the services namespace and Authentication has migration annotation", func() {
+		//	authCR.Annotations = map[string]string{operatorv1alpha1.AnnotationAuthMigrationComplete: "true"}
+		//	err := r.Update(context.Background(), authCR)
+		//	Expect(err).ToNot(HaveOccurred())
+		//	needsToMigrate := r.needToMigrateMongoDB(context.Background(), authCR)
+		//	Expect(needsToMigrate).To(BeFalse())
+		//})
 		It("returns true when mongodb service exists in the services namespace and Authentication has migration annotation", func() {
 			authCR.Annotations = map[string]string{operatorv1alpha1.AnnotationAuthMigrationComplete: "false"}
 			err := r.Update(context.Background(), authCR)

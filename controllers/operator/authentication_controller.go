@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"fmt"
-	"maps"
 	"reflect"
 	"sync"
 	"time"
@@ -38,6 +37,7 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
@@ -47,9 +47,7 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	zenv1 "github.com/IBM/ibm-iam-operator/apis/zen.cpd.ibm.com/v1"
-	v1schema "github.com/IBM/ibm-iam-operator/database/schema/v1"
 	"github.com/opdev/subreconciler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -352,15 +350,11 @@ func (r *AuthenticationReconciler) setMigrationCompleteStatus(ctx context.Contex
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
-	if meta.IsStatusConditionPresentAndEqual(authCR.Status.Conditions, operatorv1alpha1.ConditionMigrated, metav1.ConditionTrue) {
-		reqLogger.Info("Migration success condition has already been set; continuing")
+	if authCR.HasBeenMigrated() {
+		reqLogger.Info("MigrationsPerformed condition has already been set; continuing")
 		return subreconciler.ContinueReconciling()
 	}
-	if authCR.HasNotBeenMigrated() {
-		reqLogger.Info("Authentication still has pending migrations; requeueing")
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
-	condition := operatorv1alpha1.NewMigrationSuccessCondition()
+	condition := operatorv1alpha1.NewMigrationCompleteCondition()
 	meta.SetStatusCondition(&authCR.Status.Conditions, *condition)
 	if err = r.Client.Status().Update(ctx, authCR); err != nil {
 		reqLogger.Info("Failed to set migration success condition on Authentication", "reason", err.Error())
@@ -449,45 +443,23 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	//   enqueueing migrations can begin anew.
 	select {
 	case migrationResult, ok := <-r.dbSetupChan:
-		if !ok {
-			reqLogger.Info("No more migrations to perform and worker closed; removing worker and continuing")
-			r.dbSetupChan = nil
-			return subreconciler.ContinueReconciling()
+		if ok {
+			reqLogger.Info("Received a migration result from the worker")
 		}
-		reqLogger.Info("Received a migration result from the worker")
+		var condition *metav1.Condition
 		if migrationResult != nil && migrationResult.Error != nil {
 			reqLogger.Error(migrationResult.Error, "Encountered an error while performing the current migration")
-			// Remove the failed channel now so that migration can repeat on next reconcile loop
-			r.dbSetupChan = nil
-			condition := operatorv1alpha1.NewMigrationFailureCondition(migrationResult.Incomplete[0].Name)
-			meta.SetStatusCondition(&authCR.Status.Conditions, *condition)
-			if err = r.Client.Status().Update(ctx, authCR); err != nil {
-				reqLogger.Error(err, "Failed to set condition on Authentication", "condition", operatorv1alpha1.ConditionMigrated)
-				return subreconciler.RequeueWithDelayAndError(defaultLowerWait, migrationResult.Error)
-			}
+			condition = operatorv1alpha1.NewMigrationFailureCondition(migrationResult.Incomplete[0].Name)
 		} else if migrationResult != nil {
 			reqLogger.Info("Completed all migrations successfully")
-			condition := operatorv1alpha1.NewMigrationSuccessCondition()
-			meta.SetStatusCondition(&authCR.Status.Conditions, *condition)
-			if err = r.Client.Status().Update(ctx, authCR); err != nil {
-				reqLogger.Error(err, "Failed to set condition on Authentication", "condition", operatorv1alpha1.ConditionMigrated)
-				return subreconciler.RequeueWithDelayAndError(defaultLowerWait, migrationResult.Error)
-			}
+			condition = operatorv1alpha1.NewMigrationCompleteCondition()
+		} else {
+			reqLogger.Info("No migrations needed to be performed by the worker")
+			condition = operatorv1alpha1.NewNoMigrationsRunCondition()
 		}
-		if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-			return subreconciler.RequeueWithDelay(defaultLowerWait)
-		}
-		annotationsChanged := setMongoMigrationAnnotations(authCR, migrationResult)
-		if annotationsChanged {
-			reqLogger.Info("Setting updated migration annotations on Authentication before requeue")
-			if err = r.Update(ctx, authCR); err != nil {
-				reqLogger.Error(err, "Failed to set migration annotations on Authentication")
-				return subreconciler.RequeueWithError(err)
-			}
-		}
-		if migrationResult.Error != nil {
-			return subreconciler.RequeueWithDelayAndError(defaultLowerWait, migrationResult.Error)
-		}
+		r.dbSetupChan = nil
+		loopCtx := logf.IntoContext(ctx, reqLogger)
+		r.loopUntilConditionSet(loopCtx, req, condition)
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	default:
 		reqLogger.Info("Migration still in progress; check again in 10s")
@@ -495,85 +467,22 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	}
 }
 
-func setDBSchemaVersionAnnotation(authCR *operatorv1alpha1.Authentication) (changed bool) {
-	var observedAnnotations, desiredAnnotations map[string]string
-
-	observedAnnotations = authCR.DeepCopy().GetAnnotations()
-	if observedAnnotations == nil {
-		desiredAnnotations = map[string]string{
-			operatorv1alpha1.AnnotationAuthDBSchemaVersion: v1schema.SchemaVersion,
+func (r *AuthenticationReconciler) loopUntilConditionSet(ctx context.Context, req ctrl.Request, condition *metav1.Condition) {
+	reqLogger := logf.FromContext(ctx)
+	conditionSet := false
+	for !conditionSet {
+		authCR := &operatorv1alpha1.Authentication{}
+		if result, err := r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+			reqLogger.Info("Failed to retrieve Authentication CR for status update; retrying")
+			continue
 		}
-		authCR.SetAnnotations(desiredAnnotations)
-		return true
-	}
-
-	desiredAnnotations = authCR.DeepCopy().GetAnnotations()
-	desiredAnnotations[operatorv1alpha1.AnnotationAuthDBSchemaVersion] = v1schema.SchemaVersion
-	if maps.Equal(observedAnnotations, desiredAnnotations) {
-		return false
-	}
-	authCR.SetAnnotations(desiredAnnotations)
-
-	return true
-}
-
-// handleDBSchemaVersionAnnotation ensures that the db-schema-version annotation is set to the current schema version.
-func (r *AuthenticationReconciler) handleDBSchemaVersionAnnotation(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleDBSchemaVersionAnnotation")
-	reqLogger.Info("Perform any pending migrations")
-	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return
-	}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
-	annotationsChanged := setDBSchemaVersionAnnotation(authCR)
-	if annotationsChanged {
-		reqLogger.Info("Setting db schema version annotation on Authentication before requeue")
-		if err = r.Update(ctx, authCR); err != nil {
-			reqLogger.Error(err, "Failed to set db schema version annotation on Authentication")
-			subreconciler.RequeueWithError(err)
+		meta.SetStatusCondition(&authCR.Status.Conditions, *condition)
+		if err := r.Client.Status().Update(ctx, authCR); err != nil {
+			reqLogger.Error(err, "Failed to set condition on Authentication; retrying", "condition.Type", condition.Type)
+			continue
 		}
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
+		conditionSet = true
 	}
-	return subreconciler.ContinueReconciling()
-}
-
-// setMongoMigrationAnnotations uses the values stored in a `migration.Result` to determine whether updates to the
-// Authentication CR's annotations need to be made. Returns `true` if new annotation values were set on the CR.
-func setMongoMigrationAnnotations(authCR *operatorv1alpha1.Authentication, result *migration.Result) (changed bool) {
-	if result == nil {
-		return false
-	}
-	var observedAnnotations, desiredAnnotations map[string]string
-	observedAnnotations = authCR.DeepCopy().GetAnnotations()
-	if observedAnnotations == nil {
-		observedAnnotations = make(map[string]string)
-		desiredAnnotations = make(map[string]string)
-	} else {
-		desiredAnnotations = authCR.DeepCopy().GetAnnotations()
-	}
-	for _, c := range result.Complete {
-		switch c.Name {
-		case v1schema.MongoToEDBv1.Name:
-			desiredAnnotations[operatorv1alpha1.AnnotationAuthMigrationComplete] = "true"
-			desiredAnnotations[operatorv1alpha1.AnnotationAuthRetainMigrationArtifacts] = "true"
-
-		}
-	}
-	for _, i := range result.Incomplete {
-		if i.Name == v1schema.MongoToEDBv1.Name {
-			desiredAnnotations[operatorv1alpha1.AnnotationAuthMigrationComplete] = "false"
-		}
-	}
-
-	if maps.Equal(observedAnnotations, desiredAnnotations) {
-		return false
-	}
-	authCR.SetAnnotations(desiredAnnotations)
-
-	return true
 }
 
 func (r *AuthenticationReconciler) getPreloadMongoDBConfigMap(ctx context.Context, namespace string) (cm *corev1.ConfigMap, err error) {

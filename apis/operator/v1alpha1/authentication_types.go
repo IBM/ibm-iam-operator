@@ -200,16 +200,26 @@ type AuthenticationStatus struct {
 const ConditionMigrated string = "MigrationsPerformed"
 const MessageMigrationSuccess string = "All migrations completed successfully"
 const MessageMigrationInProgress string = "Migrations are currently being performed; monitor progress in the IM Operator \"migration_worker\" logs"
-const ReasonMigrationSuccess string = "Complete"
+const MessageNoMigrationsToRun string = "No new migrations needed to be run"
+const ReasonMigrationComplete string = "Complete"
 const ReasonMigrationInProgress string = "InProgress"
 const ReasonMigrationFailure string = "Failed"
 
-func NewMigrationSuccessCondition() *metav1.Condition {
+func NewMigrationCompleteCondition() *metav1.Condition {
 	return &metav1.Condition{
 		Type:    ConditionMigrated,
 		Status:  metav1.ConditionTrue,
-		Reason:  ReasonMigrationSuccess,
+		Reason:  ReasonMigrationComplete,
 		Message: MessageMigrationSuccess,
+	}
+}
+
+func NewNoMigrationsRunCondition() *metav1.Condition {
+	return &metav1.Condition{
+		Type:    ConditionMigrated,
+		Status:  metav1.ConditionTrue,
+		Reason:  ReasonMigrationComplete,
+		Message: MessageNoMigrationsToRun,
 	}
 }
 
@@ -234,12 +244,12 @@ func NewMigrationFailureCondition(name string) *metav1.Condition {
 
 // TODO Add variant of condition that accounts for not having tried to make a plan yet
 const ConditionMigrationPlanFormed string = "MigrationPlanFormed"
-const MessageNoNewMigrations string = "No new migrations found, so no migrations will be run"
+const MessageNoNewMigrations string = "No new migrations found, so no migrations will be planned"
 const MessageMigrationsFound string = "Migrations were identified and will be run"
 const ReasonUpToDate string = "UpToDate"
 const ReasonMigrationsFound string = "MigrationsFound"
 
-func NewNoNewMigrationsCondition() *metav1.Condition {
+func NewNoNewMigrationsPlannedCondition() *metav1.Condition {
 	return &metav1.Condition{
 		Type:    ConditionMigrationPlanFormed,
 		Status:  metav1.ConditionTrue,

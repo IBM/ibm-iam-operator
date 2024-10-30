@@ -232,6 +232,31 @@ func NewMigrationFailureCondition(name string) *metav1.Condition {
 	}
 }
 
+// TODO Add variant of condition that accounts for not having tried to make a plan yet
+const ConditionMigrationPlanFormed string = "MigrationPlanFormed"
+const MessageNoNewMigrations string = "No new migrations found, so no migrations will be run"
+const MessageMigrationsFound string = "Migrations were identified and will be run"
+const ReasonUpToDate string = "UpToDate"
+const ReasonMigrationsFound string = "MigrationsFound"
+
+func NewNoNewMigrationsCondition() *metav1.Condition {
+	return &metav1.Condition{
+		Type:    ConditionMigrationPlanFormed,
+		Status:  metav1.ConditionTrue,
+		Reason:  ReasonUpToDate,
+		Message: MessageNoNewMigrations,
+	}
+}
+
+func NewMigrationsPlannedCondition() *metav1.Condition {
+	return &metav1.Condition{
+		Type:    ConditionMigrationPlanFormed,
+		Status:  metav1.ConditionTrue,
+		Reason:  ReasonMigrationsFound,
+		Message: MessageMigrationsFound,
+	}
+}
+
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:path=authentications,scope=Namespaced

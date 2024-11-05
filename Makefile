@@ -182,7 +182,7 @@ ifeq (,$(shell which go 2>/dev/null))
 		exit 1; \
 	}
 endif
-	test -s $(LOCALBIN)/go$(GO_VERSION) && $(LOCALBIN)/go$(GO_VERSION) version | grep -q $(GO_VERSION) || \
+	@test -s $(LOCALBIN)/go$(GO_VERSION) && $(LOCALBIN)/go$(GO_VERSION) version | grep -q $(GO_VERSION) || \
 	GOSUMDB=sum.golang.org GOBIN=$(LOCALBIN) go install golang.org/dl/go$(GO_VERSION)@latest && $(LOCALBIN)/go$(GO_VERSION) download
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
@@ -361,25 +361,35 @@ bundle-push:
 bundle-render: ## Render the bundle contents into the local FBC index.
 	./hack/bundle-render $(IMG).v$(BUNDLE_VERSION) $(BUNDLE_IMG)
 
-build-image-amd64: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator for Linux on amd64.
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -a -o build/_output/bin/manager main.go
-	@DOCKER_BUILDKIT=1 DOCKER_DEFAULT_PLATFORM=linux/amd64 $(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID) -f ./Dockerfile .
-	@rm -f build/_output/bin/manager
-	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-amd64:$(GIT_COMMIT_ID); fi
+TARGET_ARCH=$(LOCAL_ARCH)
 
-build-image-ppc64le: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator for Linux on ppc64le.
-	CGO_ENABLED=0 GOOS=linux GOARCH=ppc64le $(GO) build -a -o build/_output/bin/manager main.go
-	@DOCKER_BUILDKIT=1 DOCKER_DEFAULT_PLATFORM=linux/ppc64le $(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID) -f ./Dockerfile .
-	@\rm -f build/_output/bin/manager
-	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-ppc64le:$(GIT_COMMIT_ID); fi
+build-image: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator manager image
+	@echo "Building manager binary for linux/$(TARGET_ARCH)"
+	@CGO_ENABLED=0 GOOS=linux GOARCH=$(TARGET_ARCH) $(GO) build -a -o build/_output/bin/manager main.go
+	@echo "Building manager image for linux/$(TARGET_ARCH)"
+	@DOCKER_BUILDKIT=1 $(CONTAINER_CLI) build --platform=linux/$(TARGET_ARCH) ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-$(TARGET_ARCH):$(GIT_COMMIT_ID) -f ./Dockerfile .
+	@echo "Inspect built image $(REGISTRY)/$(IMG)-$(TARGET_ARCH):$(GIT_COMMIT_ID)"
+	$(CONTAINER_CLI) inspect $(REGISTRY)/$(IMG)-$(TARGET_ARCH):$(GIT_COMMIT_ID)
+	@echo "Clean up binary"
+	@if [ $(BUILD_LOCALLY) -ne 1 ]; then \
+		echo "Pushing $(REGISTRY)/$(IMG)-$(TARGET_ARCH):$(GIT_COMMIT_ID)"; \
+		$(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-$(TARGET_ARCH):$(GIT_COMMIT_ID); \
+		echo "Done"; \
+	fi
 
-build-image-s390x: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator for Linux on s390x.
-	CGO_ENABLED=0 GOOS=linux GOARCH=s390x $(GO) build -a -o build/_output/bin/manager main.go
-	@DOCKER_BUILDKIT=1 DOCKER_DEFAULT_PLATFORM=linux/s390x $(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-s390x:$(GIT_COMMIT_ID) -f ./Dockerfile .
-	@rm -f build/_output/bin/manager
-	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-s390x:$(GIT_COMMIT_ID); fi
+build-image-amd64: TARGET_ARCH=amd64
+build-image-amd64: build-image
 
-images: $(CONFIG_DOCKER_TARGET) build-image-amd64 build-image-ppc64le build-image-s390x ## Build the multi-arch manifest.
+build-image-ppc64le: TARGET_ARCH=ppc64le
+build-image-ppc64le: build-image
+
+build-image-s390x: TARGET_ARCH=s390x
+build-image-s390x: build-image
+
+images: $(CONFIG_DOCKER_TARGET)  ## Build the multi-arch manifest.
+	@${MAKE} build-image-amd64
+	@${MAKE} build-image-ppc64le
+	@${MAKE} build-image-s390x
 	@DOCKER_BUILDKIT=1 MAX_PULLING_RETRY=20 RETRY_INTERVAL=30 common/scripts/multiarch_image.sh $(REGISTRY) $(IMG) $(GIT_COMMIT_ID) $(VERSION)
 
 ##@ Deployment
@@ -406,11 +416,6 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	- oc delete -f config/samples/bases/operator_v1alpha1_authentication.yaml -n ${NAMESPACE}
 	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
-
-build-image: build ## Build image using local architecture.
-	@echo "Building ibm-iam-operator dev image for $(LOCAL_ARCH)"
-	$(CONTAINER_CLI) build ${IMAGE_BUILD_OPTS} -t $(REGISTRY)/$(IMG)-$(LOCAL_ARCH):$(VERSION) -f Dockerfile .
-	@if [ $(BUILD_LOCALLY) -ne 1 ]; then $(CONTAINER_CLI) push $(REGISTRY)/$(IMG)-$(LOCAL_ARCH):$(GIT_COMMIT_ID); fi
 
 # A comma-separated list of bundle images (e.g. make catalog-build BUNDLE_IMGS=example.com/operator-bundle:v0.1.0,example.com/operator-bundle:v0.2.0).
 # These images MUST exist in a registry and be pull-able.

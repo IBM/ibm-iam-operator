@@ -72,10 +72,21 @@ var initOperandSchemasFunc migration.MigrationFunc = func(ctx context.Context, t
 	}
 	defer postgres.Disconnect(ctx)
 
-	reqLogger.Info("Running DDL for initial schema")
-	if err = to.RunDDL(ctx, DBInitMigration); err != nil {
-		reqLogger.Error(err, "Failed to execute DDL")
+	var schemasPresent bool
+	schemasPresent, err = postgres.HasSchemas(ctx)
+	if err != nil {
+		reqLogger.Error(err, "Failed to determine whether schemas present")
+		return
 	}
+	if !schemasPresent {
+		reqLogger.Info("Running DDL for initial schema")
+		if err = to.RunDDL(ctx, DBInitMigration); err != nil {
+			reqLogger.Error(err, "Failed to execute DDL")
+			return
+		}
+	}
+	reqLogger.Info("Initial schema already exists; marking as complete")
+
 	return
 }
 

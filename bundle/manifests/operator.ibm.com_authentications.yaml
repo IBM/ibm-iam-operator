@@ -262,6 +262,8 @@ spec:
                 - wlpClientRegistrationSecret
                 - wlpClientSecret
                 type: object
+              enableInstanaMetricCollection:
+                type: boolean
               identityManager:
                 properties:
                   imageName:
@@ -385,8 +387,6 @@ spec:
                 - imageRegistry
                 - imageTag
                 type: object
-              enableInstanaMetricCollection:
-                type: boolean
               labels:
                 additionalProperties:
                   type: string

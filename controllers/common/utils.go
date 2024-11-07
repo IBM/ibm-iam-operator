@@ -223,12 +223,12 @@ func GetOperatorNamespace() (string, error) {
 
 // End k8sutil "ports"
 
-// GetServicesNamespace finds the namespace that contains the shared services by listing all Authentications in all
-// namespaces where the Operator has visibility. There should only ever be one Authentication CR for a given IM Operator
-// instance, so wherever that one Authentication CR is found is assumed to be where the other Operands are. If no or
-// more than one Authentication CR is found, an error is reported as this is an unsupported usage of the CR.
-func GetServicesNamespace(ctx context.Context, k8sClient *client.Client) (namespace string, err error) {
-	reqLogger := logf.FromContext(ctx)
+// GetAuthentication finds the Authentication for this install of the Cloud Pak Foundational Services. It does this by
+// listing all Authentications in all namespaces where the Operator has visibility. There should only ever be one
+// Authentication CR for a given IM Operator instance, so wherever that one Authentication CR is found is assumed to be
+// where the other Operands are. If no or more than one Authentication CR is found, an error is reported as this is an
+// unsupported usage of the CR.
+func GetAuthentication(ctx context.Context, k8sClient *client.Client) (authCR *operatorv1alpha1.Authentication, err error) {
 	authenticationList := &operatorv1alpha1.AuthenticationList{}
 	err = (*k8sClient).List(ctx, authenticationList)
 	if err != nil {
@@ -236,15 +236,19 @@ func GetServicesNamespace(ctx context.Context, k8sClient *client.Client) (namesp
 	}
 	if len(authenticationList.Items) != 1 {
 		err = fmt.Errorf("expected to find 1 Authentication but found %d", len(authenticationList.Items))
-		var namespacedNames []types.NamespacedName
-		for _, item := range authenticationList.Items {
-			nsn := types.NamespacedName{Name: item.Name, Namespace: item.Namespace}
-			namespacedNames = append(namespacedNames, nsn)
-		}
-		reqLogger.Error(err, "Error encountered while trying to determine shared services namespace", "AuthenticationList", namespacedNames)
 		return
 	}
-	return authenticationList.Items[0].Namespace, nil
+	return &authenticationList.Items[0], nil
+}
+
+// GetServicesNamespace finds the namespace that contains the shared services deriving from the Authentication CR for
+// this IM install. Returns an error when
+func GetServicesNamespace(ctx context.Context, k8sClient *client.Client) (namespace string, err error) {
+	authCR, err := GetAuthentication(ctx, k8sClient)
+	if err != nil {
+		return
+	}
+	return authCR.Namespace, nil
 }
 
 func MergeMap(in map[string]string, mergeMap map[string]string) map[string]string {

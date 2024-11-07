@@ -145,9 +145,9 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 		desiredOperands = append(desiredOperands, *observedMongoDBOperand)
 	}
 
-	reqLogger.V(3).Info("List Operands", "observedOperands", observedOperands, "desiredOperands", desiredOperands)
+	reqLogger.V(1).Info("List Operands", "observedOperands", observedOperands, "desiredOperands", desiredOperands)
 	if !operandsAreEqual(observedOperands, desiredOperands) {
-		reqLogger.V(3).Info("Operands are different, set to desired")
+		reqLogger.V(1).Info("Operands are different, set to desired")
 		observedOpReq.Spec.Requests[0].Operands = desiredOperands
 		changed = true
 	}

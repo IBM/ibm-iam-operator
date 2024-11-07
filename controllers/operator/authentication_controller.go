@@ -751,21 +751,21 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		} else {
 			reqLogger.Info("Updated status")
 		}
-		reqLogger.V(3).Info("Final result", "result", result, "err", err)
+		reqLogger.V(1).Info("Final result", "result", result, "err", err)
 	}()
 
 	if result, err := r.addMongoMigrationFinalizers(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
-		reqLogger.V(3).Info("Should halt or requeue after addMongoMigrationFinalizers", "result", result, "err", err)
+		reqLogger.V(1).Info("Should halt or requeue after addMongoMigrationFinalizers", "result", result, "err", err)
 		return subreconciler.Evaluate(result, err)
 	}
 
 	if result, err := r.handleOperandRequest(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
-		reqLogger.V(3).Info("Should halt or requeue after handleOperandRequest", "result", result, "err", err)
+		reqLogger.V(1).Info("Should halt or requeue after handleOperandRequest", "result", result, "err", err)
 		return subreconciler.Evaluate(result, err)
 	}
 
 	if result, err := r.createEDBShareClaim(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
-		reqLogger.V(3).Info("Should halt or requeue after createEDBShareClaim", "result", result, "err", err)
+		reqLogger.V(1).Info("Should halt or requeue after createEDBShareClaim", "result", result, "err", err)
 		return subreconciler.Evaluate(result, err)
 	}
 
@@ -847,7 +847,7 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	if result, err := r.handleMongoDBCleanup(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
-		reqLogger.V(3).Info("Should halt or requeue after handleMongoDBCleanup", "result", result, "err", err)
+		reqLogger.V(1).Info("Should halt or requeue after handleMongoDBCleanup", "result", result, "err", err)
 		return subreconciler.Evaluate(result, err)
 	}
 

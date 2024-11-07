@@ -205,20 +205,20 @@ func (r *AuthenticationReconciler) addMongoMigrationFinalizers(ctx context.Conte
 	return subreconciler.ContinueReconciling()
 }
 
-func (r *AuthenticationReconciler) handleRetainAnnotation(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleRetainAnnotation")
-	reqLogger.Info("Clean up MongoDB resources if no longer being retained")
+func (r *AuthenticationReconciler) handleMongoDBCleanup(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleMongoDBCleanup")
+	reqLogger.Info("Clean up MongoDB resources if no longer needed")
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 
 	// if retain annotation is unset or set to true - continue reconciling
-	if authCR.IsRetainingArtifacts() {
-		reqLogger.Info("Annotation does not signal a need to clean up resources; continuing")
+	if authCR.HasNotBeenMigrated() {
+		reqLogger.Info("Migrations have not completed yet; skipping")
 		return subreconciler.ContinueReconciling()
 	}
-	reqLogger.Info("Annotation signals a need to clean up resources")
+	reqLogger.Info("Condition indicates migrations have completed")
 
 	mongoDBServiceName := "mongodb"
 	mongoDBPreloadCMName := "mongodb-preload-endpoint"
@@ -233,6 +233,7 @@ func (r *AuthenticationReconciler) handleRetainAnnotation(ctx context.Context, r
 		types.NamespacedName{Name: mongoCACertName, Namespace: req.Namespace}:      &corev1.Secret{},
 	}
 
+	anyObjUpdated := false
 	for key, obj := range toFinalize {
 		var objUpdated bool
 		if objUpdated, err = r.finalizeMongoMigrationObject(ctx, key, obj); err != nil {
@@ -241,6 +242,7 @@ func (r *AuthenticationReconciler) handleRetainAnnotation(ctx context.Context, r
 				"Object.Namespace", key.Namespace)
 			return subreconciler.RequeueWithError(err)
 		} else if objUpdated {
+			anyObjUpdated = true
 			reqLogger.Info("Object was finalized",
 				"Object.Name", key.Name,
 				"Object.Namespace", key.Namespace)
@@ -251,17 +253,26 @@ func (r *AuthenticationReconciler) handleRetainAnnotation(ctx context.Context, r
 		}
 	}
 
+	prevAnnotationCount := len(authCR.Annotations)
 	delete(authCR.Annotations, operatorv1alpha1.AnnotationAuthMigrationComplete)
 	delete(authCR.Annotations, operatorv1alpha1.AnnotationAuthRetainMigrationArtifacts)
+	curAnnotationCount := len(authCR.Annotations)
 
-	if err = r.Update(ctx, authCR); err != nil {
-		reqLogger.Error(err, "Failed to remove annotations from Authentication")
-		return subreconciler.RequeueWithError(err)
+	if curAnnotationCount != prevAnnotationCount {
+		if err = r.Update(ctx, authCR); err != nil {
+			reqLogger.Error(err, "Failed to remove annotations from Authentication")
+			return subreconciler.RequeueWithError(err)
+		}
+		anyObjUpdated = true
 	}
 
-	reqLogger.Info("All migration objects finalized; requeueing")
+	if anyObjUpdated {
+		reqLogger.Info("One or more objects were cleaned up; requeueing")
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	}
 
-	return subreconciler.Requeue()
+	reqLogger.Info("No cleanup was necessary; continuing")
+	return subreconciler.ContinueReconciling()
 }
 
 func (r *AuthenticationReconciler) getPostgresDB(ctx context.Context, req ctrl.Request) (p *dbconn.PostgresDB, err error) {
@@ -740,21 +751,21 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		} else {
 			reqLogger.Info("Updated status")
 		}
+		reqLogger.V(3).Info("Final result", "result", result, "err", err)
 	}()
 
-	if subResult, err := r.addMongoMigrationFinalizers(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-		return subreconciler.Evaluate(subResult, err)
-	}
-
-	if result, err := r.handleOperandRequest(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err := r.addMongoMigrationFinalizers(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+		reqLogger.V(3).Info("Should halt or requeue after addMongoMigrationFinalizers", "result", result, "err", err)
 		return subreconciler.Evaluate(result, err)
 	}
 
-	if subResult, err := r.handleRetainAnnotation(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-		return subreconciler.Evaluate(subResult, err)
+	if result, err := r.handleOperandRequest(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+		reqLogger.V(3).Info("Should halt or requeue after handleOperandRequest", "result", result, "err", err)
+		return subreconciler.Evaluate(result, err)
 	}
 
 	if result, err := r.createEDBShareClaim(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+		reqLogger.V(3).Info("Should halt or requeue after createEDBShareClaim", "result", result, "err", err)
 		return subreconciler.Evaluate(result, err)
 	}
 
@@ -833,6 +844,11 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	if subResult, err := r.setMigrationCompleteStatus(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
+	}
+
+	if result, err := r.handleMongoDBCleanup(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+		reqLogger.V(3).Info("Should halt or requeue after handleMongoDBCleanup", "result", result, "err", err)
+		return subreconciler.Evaluate(result, err)
 	}
 
 	// Check if this Deployment already exists and create it if it doesn't

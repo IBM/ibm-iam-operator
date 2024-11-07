@@ -384,12 +384,6 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		return
 	}
 
-	// Terminating condition for handleMigration subreconciler
-	if authCR.HasBeenMigrated() {
-		reqLogger.Info("Migrations have already been performed; continuing")
-		return subreconciler.ContinueReconciling()
-	}
-
 	var migrations *migration.MigrationQueue
 	var postgres *dbconn.PostgresDB
 	var mongo *dbconn.MongoDB

@@ -1,16 +1,67 @@
+//
+// Copyright 2024 IBM Corporation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package v1
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
+
 	"reflect"
 	"strings"
+
+	dbconn "github.com/IBM/ibm-iam-operator/database/connectors"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// Row represents a row in a table, whether that be one directly retrieved from a database or one being used as part of
+// a write or other query to that database.
+type RowData interface {
+	ToAnySlice() []any        // converts the row into a slice where each index contains one column's data
+	GetColumnNames() []string // states the column names for the row; a column name must be in the same index as its corresponding data in the return from ToAnySlice.
+	GetInsertSQL() string     // produces the SQL used to perform an INSERT of this row
+}
+
+// RowDataToAnyMap produces a map of column names to column data for the provided RowData.
+func RowDataToAnyMap(r RowData) map[string]any {
+	m := make(map[string]any)
+	anySlice := r.ToAnySlice()
+	for i, col := range r.GetColumnNames() {
+		m[col] = anySlice[i]
+	}
+	return m
+}
+
+// GetNamedArgsFromRow generates a pgx.NamedArgs for use with the pgx's Conn functions.
+// e.g.
+//
+//	conn.Exec(ctx, rowData.GetInsertSQL(), GetNamedArgsFromRow(rowData))
+func GetNamedArgsFromRow(r RowData) pgx.NamedArgs {
+	args := pgx.NamedArgs{}
+	for k, v := range RowDataToAnyMap(r) {
+		args[k] = v
+	}
+	return args
+}
 
 //go:embed dbinit.sql
 var DBInitMigration string
@@ -39,7 +90,7 @@ type OIDCClient struct {
 	Metadata     string `json:"metadata"`
 }
 
-func ConvertToOIDCClient(clientMap map[string]interface{}, oc *OIDCClient) (err error) {
+func ConvertToOIDCClient(clientMap map[string]any, oc *OIDCClient) (err error) {
 	var jsonBytes []byte
 	if jsonBytes, err = json.Marshal(clientMap); err != nil {
 		return
@@ -52,7 +103,7 @@ func ConvertToOIDCClient(clientMap map[string]interface{}, oc *OIDCClient) (err 
 	return nil
 }
 
-func ConvertToOIDCClients(clientMaps []map[string]interface{}, ocRows []OIDCClient) (err error) {
+func ConvertToOIDCClients(clientMaps []map[string]any, ocRows []OIDCClient) (err error) {
 	for i, clientMap := range clientMaps {
 		oc := &OIDCClient{}
 		if err = ConvertToOIDCClient(clientMap, oc); err != nil {
@@ -84,14 +135,6 @@ func (oc *OIDCClient) GetInsertSQL() string {
 		RETURNING _id;`
 }
 
-func (oc *OIDCClient) GetArgs() pgx.NamedArgs {
-	args := pgx.NamedArgs{}
-	for k, v := range oc.ToAnyMap() {
-		args[k] = v
-	}
-	return args
-}
-
 func (oc *OIDCClient) GetTableIdentifier() pgx.Identifier {
 	return pgx.Identifier{"oauthdbschema", "oauthclient"}
 }
@@ -106,15 +149,6 @@ func (oc *OIDCClient) ToAnySlice() []any {
 		oc.Enabled,
 		oc.Metadata,
 	}
-}
-
-func (oc *OIDCClient) ToAnyMap() map[string]any {
-	m := make(map[string]any)
-	anySlice := oc.ToAnySlice()
-	for i, col := range oc.GetColumnNames() {
-		m[col] = anySlice[i]
-	}
-	return m
 }
 
 // IdpConfig is a row from the `platformdb.idp_configs` table
@@ -146,15 +180,6 @@ func (i *IdpConfig) ToAnySlice() []any {
 	}
 }
 
-func (i *IdpConfig) ToAnyMap() map[string]any {
-	m := make(map[string]any)
-	anySlice := i.ToAnySlice()
-	for i, col := range i.GetColumnNames() {
-		m[col] = anySlice[i]
-	}
-	return m
-}
-
 func (i *IdpConfig) GetColumnNames() []string {
 	return IdpConfigColumnNames
 }
@@ -172,14 +197,6 @@ func (i *IdpConfig) GetInsertSQL() string {
 		RETURNING uid;`
 }
 
-func (i *IdpConfig) GetArgs() pgx.NamedArgs {
-	args := pgx.NamedArgs{}
-	for k, v := range i.ToAnyMap() {
-		args[k] = v
-	}
-	return args
-}
-
 var IdpConfigColumnNames []string = []string{
 	"uid",
 	"description",
@@ -195,7 +212,7 @@ var IdpConfigColumnNames []string = []string{
 
 var IdpConfigsIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "idp_configs"}
 
-func ConvertToIdpConfig(idpMap map[string]interface{}, idpConfig *IdpConfig) (err error) {
+func ConvertToIdpConfig(idpMap map[string]any, idpConfig *IdpConfig) (err error) {
 	// DDL defaults enabled to true
 	if enabled, ok := idpMap["enabled"]; ok && (enabled == "false" || enabled == false) {
 		idpMap["enabled"] = false
@@ -205,7 +222,7 @@ func ConvertToIdpConfig(idpMap map[string]interface{}, idpConfig *IdpConfig) (er
 	// SAML with LDAP dependency mongo document will have ldap_config: {ldap_id: <value>}
 	// which directly maps to ldap_id column in sql
 	if ldap_config, ok := idpMap["ldap_config"]; ok {
-		if ldap_config, ok := ldap_config.(map[string]interface{}); ok {
+		if ldap_config, ok := ldap_config.(map[string]any); ok {
 			// If ldap_config is already a map, fetch the ldap_id
 			ldap_id := ldap_config["ldap_id"]
 			idpMap["ldap_id"] = ldap_id
@@ -233,7 +250,7 @@ func ConvertToIdpConfig(idpMap map[string]interface{}, idpConfig *IdpConfig) (er
 	return nil
 }
 
-func ConvertToIdpConfigs(idpMaps []map[string]interface{}, idpRows []IdpConfig) (err error) {
+func ConvertToIdpConfigs(idpMaps []map[string]any, idpRows []IdpConfig) (err error) {
 	for i, idpMap := range idpMaps {
 		idpConfig := &IdpConfig{}
 		if err = ConvertToIdpConfig(idpMap, idpConfig); err != nil {
@@ -303,15 +320,6 @@ func (u *User) ToAnySlice() []any {
 	}
 }
 
-func (u *User) ToAnyMap() map[string]any {
-	m := make(map[string]any)
-	anySlice := u.ToAnySlice()
-	for i, col := range u.GetColumnNames() {
-		m[col] = anySlice[i]
-	}
-	return m
-}
-
 func (u *User) GetColumnNames() []string {
 	return UserColumnNames
 }
@@ -345,15 +353,7 @@ func (u *User) GetInsertSQL() string {
 		RETURNING uid;`
 }
 
-func (u *User) GetArgs() pgx.NamedArgs {
-	args := pgx.NamedArgs{}
-	for k, v := range u.ToAnyMap() {
-		args[k] = v
-	}
-	return args
-}
-
-func ConvertToUser(userMap map[string]interface{}, user *User) (err error) {
+func ConvertToUser(userMap map[string]any, user *User) (err error) {
 	// If lastLogin is an empty string, delete it in order to make zero value consistent
 	if lastLogin, ok := userMap["lastLogin"]; ok && lastLogin == "" {
 		delete(userMap, "lastLogin")
@@ -386,7 +386,7 @@ func ConvertToUser(userMap map[string]interface{}, user *User) (err error) {
 	return nil
 }
 
-func ConvertToUsers(userMaps []map[string]interface{}, users []User) (err error) {
+func ConvertToUsers(userMaps []map[string]any, users []User) (err error) {
 	for i, userMap := range userMaps {
 		user := &User{}
 		if err = ConvertToUser(userMap, user); err != nil {
@@ -426,15 +426,6 @@ func (u *UserPreferences) ToAnySlice() []any {
 	}
 }
 
-func (u *UserPreferences) ToAnyMap() map[string]any {
-	m := make(map[string]any)
-	anySlice := u.ToAnySlice()
-	for i, col := range u.GetColumnNames() {
-		m[col] = anySlice[i]
-	}
-	return m
-}
-
 func (u *UserPreferences) GetColumnNames() []string {
 	return UserPreferencesColumnNames
 }
@@ -451,15 +442,7 @@ func (u *UserPreferences) GetInsertSQL() string {
 		ON CONFLICT DO NOTHING;`
 }
 
-func (u *UserPreferences) GetArgs() pgx.NamedArgs {
-	args := pgx.NamedArgs{}
-	for k, v := range u.ToAnyMap() {
-		args[k] = v
-	}
-	return args
-}
-
-func ConvertToUserPreferences(userPrefsMap map[string]interface{}, userPrefs *UserPreferences) (err error) {
+func ConvertToUserPreferences(userPrefsMap map[string]any, userPrefs *UserPreferences) (err error) {
 	// If either of the following is an empty string, delete it in order to make zero value consistent
 	if lastLogin, ok := userPrefsMap["lastLogin"]; ok && lastLogin == "" {
 		delete(userPrefsMap, "lastLogin")
@@ -491,7 +474,7 @@ func ConvertToUserPreferences(userPrefsMap map[string]interface{}, userPrefs *Us
 	return nil
 }
 
-func ConvertToUsersPreferences(usersPrefsMaps []map[string]interface{}, usersPrefs []UserPreferences) (err error) {
+func ConvertToUsersPreferences(usersPrefsMaps []map[string]any, usersPrefs []UserPreferences) (err error) {
 	for i, userPrefsMap := range usersPrefsMaps {
 		userPrefs := &UserPreferences{}
 		if err = ConvertToUserPreferences(userPrefsMap, userPrefs); err != nil {
@@ -519,7 +502,7 @@ var UserAttributesColumnNames []string = []string{
 
 var UsersAttributesIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "users_attributes"}
 
-func ConvertToUserAttributes(userAttrMap map[string]interface{}, userAttr *UserAttributes) (err error) {
+func ConvertToUserAttributes(userAttrMap map[string]any, userAttr *UserAttributes) (err error) {
 	if _, ok := userAttrMap["uid"]; !ok {
 		userAttrMap["uid"] = uuid.New()
 	}
@@ -538,7 +521,7 @@ func ConvertToUserAttributes(userAttrMap map[string]interface{}, userAttr *UserA
 	return nil
 }
 
-func ConvertToUsersAttributes(usersAttrsMaps []map[string]interface{}, usersAttrs []UserAttributes) (err error) {
+func ConvertToUsersAttributes(usersAttrsMaps []map[string]any, usersAttrs []UserAttributes) (err error) {
 	for i, userAttrsMap := range usersAttrsMaps {
 		userAttr := &UserAttributes{}
 		if err = ConvertToUserAttributes(userAttrsMap, userAttr); err != nil {
@@ -585,15 +568,6 @@ func (z *ZenInstance) GetColumnNames() []string {
 	return ZenInstanceColumnNames
 }
 
-func (z *ZenInstance) ToAnyMap() map[string]any {
-	m := make(map[string]any)
-	anySlice := z.ToAnySlice()
-	for i, col := range z.GetColumnNames() {
-		m[col] = anySlice[i]
-	}
-	return m
-}
-
 func (z *ZenInstance) GetTableIdentifier() pgx.Identifier {
 	return ZenInstancesIdentifier
 }
@@ -606,15 +580,7 @@ func (z *ZenInstance) GetInsertSQL() string {
 		ON CONFLICT DO NOTHING;`
 }
 
-func (z *ZenInstance) GetArgs() pgx.NamedArgs {
-	args := pgx.NamedArgs{}
-	for k, v := range z.ToAnyMap() {
-		args[k] = v
-	}
-	return args
-}
-
-func ConvertToZenInstance(zenInstanceMap map[string]interface{}, zenInstance *ZenInstance) (err error) {
+func ConvertToZenInstance(zenInstanceMap map[string]any, zenInstance *ZenInstance) (err error) {
 	fieldMap := map[string]string{
 		"_id":            "instance_id",
 		"clientId":       "client_id",
@@ -635,7 +601,7 @@ func ConvertToZenInstance(zenInstanceMap map[string]interface{}, zenInstance *Ze
 	return nil
 }
 
-func ConvertToZenInstances(zenInstanceMaps []map[string]interface{}, zenInstances []ZenInstance) (err error) {
+func ConvertToZenInstances(zenInstanceMaps []map[string]any, zenInstances []ZenInstance) (err error) {
 	for i, zenInstanceMap := range zenInstanceMaps {
 		zenInstance := &ZenInstance{}
 		if err = ConvertToZenInstance(zenInstanceMap, zenInstance); err != nil {
@@ -669,15 +635,6 @@ func (z *ZenInstanceUser) ToAnySlice() []any {
 	}
 }
 
-func (z *ZenInstanceUser) ToAnyMap() map[string]any {
-	m := make(map[string]any)
-	anySlice := z.ToAnySlice()
-	for i, col := range z.GetColumnNames() {
-		m[col] = anySlice[i]
-	}
-	return m
-}
-
 func (z *ZenInstanceUser) GetColumnNames() []string {
 	return ZenInstanceUserColumnNames
 }
@@ -694,15 +651,7 @@ func (z *ZenInstanceUser) GetInsertSQL() string {
 		ON CONFLICT DO NOTHING;`
 }
 
-func (z *ZenInstanceUser) GetArgs() pgx.NamedArgs {
-	args := pgx.NamedArgs{}
-	for k, v := range z.ToAnyMap() {
-		args[k] = v
-	}
-	return args
-}
-
-func ConvertToZenInstanceUser(zenInstanceUserMap map[string]interface{}, zenInstanceUser *ZenInstanceUser) (err error) {
+func ConvertToZenInstanceUser(zenInstanceUserMap map[string]any, zenInstanceUser *ZenInstanceUser) (err error) {
 	fieldMap := map[string]string{
 		"_id":           "uid",
 		"zenInstanceId": "zen_instance_id",
@@ -721,7 +670,7 @@ func ConvertToZenInstanceUser(zenInstanceUserMap map[string]interface{}, zenInst
 	return nil
 }
 
-func ConvertToZenInstanceUsers(zenInstanceUserMaps []map[string]interface{}, zenInstanceUsers []ZenInstanceUser) (err error) {
+func ConvertToZenInstanceUsers(zenInstanceUserMaps []map[string]any, zenInstanceUsers []ZenInstanceUser) (err error) {
 	for i, zenInstanceUserMap := range zenInstanceUserMaps {
 		zenInstanceUser := &ZenInstanceUser{}
 		if err = ConvertToZenInstanceUser(zenInstanceUserMap, zenInstanceUser); err != nil {
@@ -733,9 +682,9 @@ func ConvertToZenInstanceUsers(zenInstanceUserMaps []map[string]interface{}, zen
 }
 
 type SCIMAttributes struct {
-	ID    string                 `json:"id"`
-	Group map[string]interface{} `json:"group"`
-	User  map[string]interface{} `json:"user"`
+	ID    string         `json:"id"`
+	Group map[string]any `json:"group"`
+	User  map[string]any `json:"user"`
 }
 
 var SCIMAttributesColumnNames []string = []string{
@@ -746,7 +695,7 @@ var SCIMAttributesColumnNames []string = []string{
 
 var SCIMAttributesIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "scim_attributes"}
 
-func ConvertToSCIMAttributes(scimAttributesMap map[string]interface{}, scimAttributes *SCIMAttributes) (err error) {
+func ConvertToSCIMAttributes(scimAttributesMap map[string]any, scimAttributes *SCIMAttributes) (err error) {
 	fieldMap := map[string]string{
 		"_id": "id",
 	}
@@ -763,7 +712,7 @@ func ConvertToSCIMAttributes(scimAttributesMap map[string]interface{}, scimAttri
 	return nil
 }
 
-func ConvertToSCIMAttributesSlice(scimAttributesMaps []map[string]interface{}, scimAttributesSlice []SCIMAttributes) (err error) {
+func ConvertToSCIMAttributesSlice(scimAttributesMaps []map[string]any, scimAttributesSlice []SCIMAttributes) (err error) {
 	for i, scimAttributesMap := range scimAttributesMaps {
 		scimAttributes := &SCIMAttributes{}
 		if err = ConvertToSCIMAttributes(scimAttributesMap, scimAttributes); err != nil {
@@ -775,10 +724,10 @@ func ConvertToSCIMAttributesSlice(scimAttributesMaps []map[string]interface{}, s
 }
 
 type SCIMAttributesMapping struct {
-	IdpID   string                 `json:"idp_id"`
-	IdpType string                 `json:"idp_type"`
-	Group   map[string]interface{} `json:"group"`
-	User    map[string]interface{} `json:"user"`
+	IdpID   string         `json:"idp_id"`
+	IdpType string         `json:"idp_type"`
+	Group   map[string]any `json:"group"`
+	User    map[string]any `json:"user"`
 }
 
 var SCIMAttributesMappingsColumnNames []string = []string{
@@ -790,7 +739,7 @@ var SCIMAttributesMappingsColumnNames []string = []string{
 
 var SCIMAttributesMappingsIdentifier pgx.Identifier = pgx.Identifier{"platformdb", "scim_attributes_mappings"}
 
-func ConvertToSCIMAttributesMapping(scimAttributesMappingMap map[string]interface{}, scimAttributesMapping *SCIMAttributesMapping) (err error) {
+func ConvertToSCIMAttributesMapping(scimAttributesMappingMap map[string]any, scimAttributesMapping *SCIMAttributesMapping) (err error) {
 	fieldMap := map[string]string{
 		"_id": "idp_id",
 	}
@@ -807,7 +756,7 @@ func ConvertToSCIMAttributesMapping(scimAttributesMappingMap map[string]interfac
 	return nil
 }
 
-func ConvertToSCIMAttributesMappingSlice(scimAttributesMappingMaps []map[string]interface{}, scimAttributesMappingSlice []SCIMAttributesMapping) (err error) {
+func ConvertToSCIMAttributesMappingSlice(scimAttributesMappingMaps []map[string]any, scimAttributesMappingSlice []SCIMAttributesMapping) (err error) {
 	for i, scimAttributesMappingMap := range scimAttributesMappingMaps {
 		scimAttributesMapping := &SCIMAttributesMapping{}
 		if err = ConvertToSCIMAttributesMapping(scimAttributesMappingMap, scimAttributesMapping); err != nil {
@@ -1196,15 +1145,6 @@ func (ssu *ScimServerUser) ToAnySlice() []any {
 	}
 }
 
-func (ssu *ScimServerUser) ToAnyMap() map[string]any {
-	m := make(map[string]any)
-	anySlice := ssu.ToAnySlice()
-	for i, col := range ssu.GetColumnNames() {
-		m[col] = anySlice[i]
-	}
-	return m
-}
-
 func (ssu *ScimServerUser) GetColumnNames() []string {
 	return ScimServerUsersColumnNames
 }
@@ -1221,18 +1161,8 @@ func (ssu *ScimServerUser) GetInsertSQL() string {
 		ON CONFLICT DO NOTHING RETURNING id;`
 }
 
-func (ssu *ScimServerUser) GetArgs() pgx.NamedArgs {
-	args := pgx.NamedArgs{}
-	for k, v := range ssu.ToAnyMap() {
-		args[k] = v
-	}
-	return args
-}
-
-func ConvertToScimServerUser(scimServerUserMap map[string]interface{}, scimServerUser *ScimServerUser) (err error) {
-	if _, ok := scimServerUserMap["_id"]; ok {
-		delete(scimServerUserMap, "_id")
-	}
+func ConvertToScimServerUser(scimServerUserMap map[string]any, scimServerUser *ScimServerUser) (err error) {
+	delete(scimServerUserMap, "_id")
 	fieldMap := map[string]string{
 		"externalId":   "external_id",
 		"userName":     "user_name",
@@ -1282,15 +1212,6 @@ func (ssuc *ScimServerUserCustom) ToAnySlice() []any {
 	}
 }
 
-func (ssuc *ScimServerUserCustom) ToAnyMap() map[string]any {
-	m := make(map[string]any)
-	anySlice := ssuc.ToAnySlice()
-	for i, col := range ssuc.GetColumnNames() {
-		m[col] = anySlice[i]
-	}
-	return m
-}
-
 func (ssuc *ScimServerUserCustom) GetColumnNames() []string {
 	return ScimServerUsersCustomColumnNames
 }
@@ -1305,14 +1226,6 @@ func (ssuc *ScimServerUserCustom) GetInsertSQL() string {
 		(scim_server_user_uid, attribute_key, schema_name, attribute_value, attribute_value_complex)
 		VALUES (@scim_server_user_uid, @attribute_key, @schema_name, @attribute_value, @attribute_value_complex)
 		ON CONFLICT DO NOTHING RETURNING scim_server_user_uid;`
-}
-
-func (ssuc *ScimServerUserCustom) GetArgs() pgx.NamedArgs {
-	args := pgx.NamedArgs{}
-	for k, v := range ssuc.ToAnyMap() {
-		args[k] = v
-	}
-	return args
 }
 
 // ScimServerGroup is a row from the `platformdb.scim_server_groups` table
@@ -1352,15 +1265,6 @@ func (ssg *ScimServerGroup) ToAnySlice() []any {
 	}
 }
 
-func (ssg *ScimServerGroup) ToAnyMap() map[string]any {
-	m := make(map[string]any)
-	anySlice := ssg.ToAnySlice()
-	for i, col := range ssg.GetColumnNames() {
-		m[col] = anySlice[i]
-	}
-	return m
-}
-
 func (ssg *ScimServerGroup) GetColumnNames() []string {
 	return ScimServerGroupsColumnNames
 }
@@ -1377,18 +1281,8 @@ func (ssg *ScimServerGroup) GetInsertSQL() string {
 		ON CONFLICT DO NOTHING RETURNING id;`
 }
 
-func (ssg *ScimServerGroup) GetArgs() pgx.NamedArgs {
-	args := pgx.NamedArgs{}
-	for k, v := range ssg.ToAnyMap() {
-		args[k] = v
-	}
-	return args
-}
-
-func ConvertToScimServerGroup(scimServerGroupMap map[string]interface{}, scimServerGroup *ScimServerGroup) (err error) {
-	if _, ok := scimServerGroupMap["_id"]; ok {
-		delete(scimServerGroupMap, "_id")
-	}
+func ConvertToScimServerGroup(scimServerGroupMap map[string]any, scimServerGroup *ScimServerGroup) (err error) {
+	delete(scimServerGroupMap, "_id")
 	fieldMap := map[string]string{
 		"displayName": "display_name",
 	}
@@ -1434,15 +1328,6 @@ func (ssgc *ScimServerGroupCustom) ToAnySlice() []any {
 	}
 }
 
-func (ssgc *ScimServerGroupCustom) ToAnyMap() map[string]any {
-	m := make(map[string]any)
-	anySlice := ssgc.ToAnySlice()
-	for i, col := range ssgc.GetColumnNames() {
-		m[col] = anySlice[i]
-	}
-	return m
-}
-
 func (ssgc *ScimServerGroupCustom) GetColumnNames() []string {
 	return ScimServerGroupsCustomColumnNames
 }
@@ -1459,12 +1344,17 @@ func (ssgc *ScimServerGroupCustom) GetInsertSQL() string {
 		ON CONFLICT DO NOTHING RETURNING scim_server_group_uid;`
 }
 
-func (ssgc *ScimServerGroupCustom) GetArgs() pgx.NamedArgs {
-	args := pgx.NamedArgs{}
-	for k, v := range ssgc.ToAnyMap() {
-		args[k] = v
+type Member struct {
+	Value   string `bson:"value"`
+	Display string `bson:"display"`
+}
+
+func (m *Member) GetArgs() pgx.NamedArgs {
+	return pgx.NamedArgs{
+		"userId":  m.Value,
+		"realmId": "defaultSP",
+		"type":    "SAML",
 	}
-	return args
 }
 
 type Group struct {
@@ -1473,24 +1363,11 @@ type Group struct {
 	Members     []Member `bson:"members"`
 }
 
-type Member struct {
-	Value   string `bson:"value"`
-	Display string `bson:"display"`
-}
-
 func (g *Group) GetArgs() pgx.NamedArgs {
 	return pgx.NamedArgs{
 		"groupId":     g.GroupID,
 		"displayName": g.DisplayName,
 		"realmId":     "defaultSP",
-	}
-}
-
-func (m *Member) GetArgs() pgx.NamedArgs {
-	return pgx.NamedArgs{
-		"userId":  m.Value,
-		"realmId": "defaultSP",
-		"type":    "SAML",
 	}
 }
 
@@ -1520,7 +1397,7 @@ type OauthToken struct {
 	ProviderID  string `bson:"PROVIDERID"`
 	Type        string `bson:"TYPE"`
 	SubType     string `bson:"SUBTYPE"`
-	CreateDate  int64  `bson:"CREATEDAT"`
+	CreatedAt   int64  `bson:"CREATEDAT"`
 	Lifetime    int    `bson:"LIFETIME"`
 	Expires     int64  `bson:"EXPIRES"`
 	TokenString string `bson:"TOKENSTRING"`
@@ -1539,22 +1416,147 @@ func (ot *OauthToken) GetInsertSQL() string {
 			ON CONFLICT DO NOTHING;`
 }
 
-func (ot *OauthToken) GetArgs() pgx.NamedArgs {
-	return pgx.NamedArgs{
-		"LOOKUPKEY":   ot.LookupKey,
-		"UNIQUEID":    ot.UniqueID,
-		"PROVIDERID":  ot.ProviderID,
-		"TYPE":        ot.Type,
-		"SUBTYPE":     ot.SubType,
-		"CREATEDAT":   ot.CreateDate,
-		"LIFETIME":    ot.Lifetime,
-		"EXPIRES":     ot.Expires,
-		"TOKENSTRING": ot.TokenString,
-		"CLIENTID":    ot.ClientID,
-		"USERNAME":    ot.UserName,
-		"SCOPE":       ot.Scope,
-		"REDIRECTURI": ot.RedirectUri,
-		"STATEID":     ot.StateID,
-		"PROPS":       ot.Props,
+func (ot *OauthToken) GetColumnNames() []string {
+	return []string{
+		"LOOKUPKEY",
+		"UNIQUEID",
+		"PROVIDERID",
+		"TYPE",
+		"SUBTYPE",
+		"CREATEDAT",
+		"LIFETIME",
+		"EXPIRES",
+		"TOKENSTRING",
+		"CLIENTID",
+		"USERNAME",
+		"SCOPE",
+		"REDIRECTURI",
+		"STATEID",
+		"PROPS",
 	}
+}
+
+func (ot *OauthToken) ToAnySlice() []any {
+	return []any{
+		ot.LookupKey,
+		ot.UniqueID,
+		ot.ProviderID,
+		ot.Type,
+		ot.SubType,
+		ot.CreatedAt,
+		ot.Lifetime,
+		ot.Expires,
+		ot.TokenString,
+		ot.ClientID,
+		ot.UserName,
+		ot.Scope,
+		ot.RedirectUri,
+		ot.StateID,
+		ot.Props,
+	}
+}
+
+type Changelog struct {
+	ID          int                 `json:"id"`
+	Name        string              `json:"name"`
+	IMVersion   string              `json:"im_version"`
+	InstallTime *pgtype.Timestamptz `json:"install_version"`
+}
+
+func (c *Changelog) GetInsertSQL() string {
+	return `INSERT INTO metadata.changelog
+		(id, name, im_version, install_time)
+		VALUES (@id, @name, @im_version, @install_time)
+		ON CONFLICT DO NOTHING;`
+}
+
+func (c *Changelog) GetColumnNames() []string {
+	return []string{
+		"id",
+		"name",
+		"im_version",
+		"install_time",
+	}
+}
+
+func (c *Changelog) ToAnySlice() []any {
+	return []any{
+		c.ID,
+		c.Name,
+		c.IMVersion,
+		c.InstallTime,
+	}
+}
+
+var ChangelogTableIdentifier pgx.Identifier = pgx.Identifier{"metadata", "changelog"}
+
+func (c *Changelog) GetTableIdentifier() pgx.Identifier {
+	return ChangelogTableIdentifier
+}
+
+var ErrTableDoesNotExist error = errors.New("table does not exist")
+
+func HasTable(ctx context.Context, postgres *dbconn.PostgresDB, identifier pgx.Identifier) (has bool, err error) {
+	reqLogger := logf.FromContext(ctx)
+	if postgres.Conn.IsClosed() {
+		reqLogger.Info("Connecting to PostgresDB", "PostgresDB.Host", postgres.Host, "PostgresDB.Port", postgres.Port)
+		if err = postgres.Connect(ctx); err != nil {
+			reqLogger.Error(err, "Failed to connect to PostgresDB")
+			return
+		}
+		defer postgres.Disconnect(ctx)
+	}
+
+	existenceQuery := "SELECT EXISTS ( SELECT FROM pg_tables WHERE schemaname = $1 AND tablename = $2 );"
+	err = postgres.Conn.QueryRow(ctx, existenceQuery, identifier[0], identifier[1]).Scan(&has)
+	return
+}
+
+func GetChangelogs(ctx context.Context, from dbconn.DBConn) (c map[int]*Changelog, err error) {
+	reqLogger := logf.FromContext(ctx)
+	postgres, ok := from.(*dbconn.PostgresDB)
+	if !ok {
+		return nil, fmt.Errorf("from should be an instance of Postgres")
+	}
+	reqLogger.Info("Connecting to PostgresDB", "PostgresDB.Host", postgres.Host, "PostgresDB.Port", postgres.Port)
+	if err = postgres.Connect(ctx); err != nil {
+		reqLogger.Error(err, "Failed to connect to PostgresDB")
+		return
+	}
+	defer postgres.Disconnect(ctx)
+
+	if has, err := HasTable(ctx, postgres, ChangelogTableIdentifier); err != nil {
+		return nil, fmt.Errorf("failed to query %s: %w", ChangelogTableIdentifier.Sanitize(), err)
+	} else if !has {
+		return nil, fmt.Errorf("failed to query %s: %w", ChangelogTableIdentifier.Sanitize(), ErrTableDoesNotExist)
+	}
+	retrievalQuery := `SELECT id, name, im_version, install_time FROM metadata.changelog;`
+	rows, err := postgres.Conn.Query(ctx, retrievalQuery)
+	if err != nil {
+		return
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int
+		var name string
+		var imVersion string
+		var installTime pgtype.Timestamptz
+
+		err = rows.Scan(&id, &name, &imVersion, &installTime)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		if c == nil {
+			c = make(map[int]*Changelog, 0)
+		}
+		c[id] = &Changelog{ID: id, Name: name, IMVersion: imVersion, InstallTime: &installTime}
+	}
+
+	if rows.Err() != nil {
+		return nil, fmt.Errorf("error encountered while retrieving rows: %w", rows.Err())
+	}
+
+	return
 }

@@ -444,7 +444,7 @@ clean-dev: ## Remove dev overlays and dev bundle.
 clean-licenses: ## Remove licenses directory used for manager image builds.
 	rm -rf licenses
 
-clean-all: clean-bin clean-dev-files clean-licenses ## Runs all cleanup targets.
+clean-all: clean-bin clean-dev clean-licenses ## Runs all cleanup targets.
 
 
 .PHONY: all build run check install uninstall code-dev test test-e2e coverage images csv clean-all clean-bin clean-dev clean-licenses help

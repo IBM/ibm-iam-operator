@@ -451,20 +451,22 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		if ok {
 			reqLogger.Info("Received a migration result from the worker")
 		}
-		var condition *metav1.Condition
+		var runningCondition, performedCondition *metav1.Condition
 		if migrationResult != nil && migrationResult.Error != nil {
 			reqLogger.Error(migrationResult.Error, "Encountered an error while performing the current migration")
-			condition = operatorv1alpha1.NewMigrationFailureCondition(migrationResult.Incomplete[0].Name)
+			performedCondition = operatorv1alpha1.NewMigrationFailureCondition(migrationResult.Incomplete[0].Name)
 		} else if migrationResult != nil {
 			reqLogger.Info("Completed all migrations successfully")
-			condition = operatorv1alpha1.NewMigrationCompleteCondition()
+			performedCondition = operatorv1alpha1.NewMigrationCompleteCondition()
 		} else {
 			reqLogger.Info("No migrations needed to be performed by the worker")
-			condition = operatorv1alpha1.NewMigrationCompleteCondition()
+			performedCondition = operatorv1alpha1.NewMigrationCompleteCondition()
 		}
+		runningCondition = operatorv1alpha1.NewMigrationFinishedCondition()
 		r.dbSetupChan = nil
 		loopCtx := logf.IntoContext(ctx, reqLogger)
-		r.loopUntilConditionSet(loopCtx, req, condition)
+
+		r.loopUntilConditionsSet(loopCtx, req, performedCondition, runningCondition)
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	default:
 		reqLogger.Info("Migration still in progress; check again in 10s")
@@ -472,21 +474,26 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	}
 }
 
-func (r *AuthenticationReconciler) loopUntilConditionSet(ctx context.Context, req ctrl.Request, condition *metav1.Condition) {
+func (r *AuthenticationReconciler) loopUntilConditionsSet(ctx context.Context, req ctrl.Request, conditions ...*metav1.Condition) {
 	reqLogger := logf.FromContext(ctx)
-	conditionSet := false
-	for !conditionSet {
+	conditionsSet := false
+	for !conditionsSet {
 		authCR := &operatorv1alpha1.Authentication{}
 		if result, err := r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 			reqLogger.Info("Failed to retrieve Authentication CR for status update; retrying")
 			continue
 		}
-		meta.SetStatusCondition(&authCR.Status.Conditions, *condition)
+		for _, condition := range conditions {
+			if condition == nil {
+				continue
+			}
+			meta.SetStatusCondition(&authCR.Status.Conditions, *condition)
+		}
 		if err := r.Client.Status().Update(ctx, authCR); err != nil {
-			reqLogger.Error(err, "Failed to set condition on Authentication; retrying", "condition.Type", condition.Type)
+			reqLogger.Error(err, "Failed to set conditions on Authentication; retrying", "conditions", conditions)
 			continue
 		}
-		conditionSet = true
+		conditionsSet = true
 	}
 }
 

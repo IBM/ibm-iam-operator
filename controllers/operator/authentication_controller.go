@@ -460,7 +460,7 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 			condition = operatorv1alpha1.NewMigrationCompleteCondition()
 		} else {
 			reqLogger.Info("No migrations needed to be performed by the worker")
-			condition = operatorv1alpha1.NewNoMigrationsRunCondition()
+			condition = operatorv1alpha1.NewMigrationCompleteCondition()
 		}
 		r.dbSetupChan = nil
 		loopCtx := logf.IntoContext(ctx, reqLogger)

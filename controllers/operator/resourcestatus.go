@@ -41,7 +41,7 @@ const (
 )
 
 func getServiceStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getServiceStatus").V(3)
+	reqLogger := logf.FromContext(ctx).WithName("getServiceStatus").V(1)
 	kind := "Service"
 	status = operatorv1alpha1.ManagedResourceStatus{
 		ObjectName: namespacedName.Name,
@@ -66,7 +66,7 @@ func getServiceStatus(ctx context.Context, k8sClient client.Client, namespacedNa
 }
 
 func getAllServiceStatus(ctx context.Context, k8sClient client.Client, names []string, namespace string) (statuses []operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getAllServiceStatus").V(3)
+	reqLogger := logf.FromContext(ctx).WithName("getAllServiceStatus").V(1)
 	for _, name := range names {
 		nsn := types.NamespacedName{Name: name, Namespace: namespace}
 		statuses = append(statuses, getServiceStatus(ctx, k8sClient, nsn))
@@ -76,7 +76,7 @@ func getAllServiceStatus(ctx context.Context, k8sClient client.Client, names []s
 }
 
 func getDeploymentStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getDeploymentStatus").V(3)
+	reqLogger := logf.FromContext(ctx).WithName("getDeploymentStatus").V(1)
 	kind := "Deployment"
 	status = operatorv1alpha1.ManagedResourceStatus{
 		ObjectName: namespacedName.Name,
@@ -106,7 +106,7 @@ func getDeploymentStatus(ctx context.Context, k8sClient client.Client, namespace
 }
 
 func getAllDeploymentStatus(ctx context.Context, k8sClient client.Client, names []string, namespace string) (statuses []operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getAllDeploymentStatus").V(3)
+	reqLogger := logf.FromContext(ctx).WithName("getAllDeploymentStatus").V(1)
 	for _, name := range names {
 		nsn := types.NamespacedName{Name: name, Namespace: namespace}
 		statuses = append(statuses, getDeploymentStatus(ctx, k8sClient, nsn))
@@ -116,7 +116,7 @@ func getAllDeploymentStatus(ctx context.Context, k8sClient client.Client, names 
 }
 
 func getJobStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getJobStatus").V(3)
+	reqLogger := logf.FromContext(ctx).WithName("getJobStatus").V(1)
 	kind := "Job"
 	status = operatorv1alpha1.ManagedResourceStatus{
 		ObjectName: namespacedName.Name,
@@ -146,7 +146,7 @@ func getJobStatus(ctx context.Context, k8sClient client.Client, namespacedName t
 }
 
 func getAllJobStatus(ctx context.Context, k8sClient client.Client, names []string, namespace string) (statuses []operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getAllJobStatus").V(3)
+	reqLogger := logf.FromContext(ctx).WithName("getAllJobStatus").V(1)
 	for _, name := range names {
 		nsn := types.NamespacedName{Name: name, Namespace: namespace}
 		statuses = append(statuses, getJobStatus(ctx, k8sClient, nsn))
@@ -156,7 +156,7 @@ func getAllJobStatus(ctx context.Context, k8sClient client.Client, names []strin
 }
 
 func getRouteStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getRouteStatus").V(3)
+	reqLogger := logf.FromContext(ctx).WithName("getRouteStatus").V(1)
 	kind := "Route"
 	status = operatorv1alpha1.ManagedResourceStatus{
 		ObjectName: namespacedName.Name,
@@ -188,7 +188,7 @@ func getRouteStatus(ctx context.Context, k8sClient client.Client, namespacedName
 }
 
 func getAllRouteStatus(ctx context.Context, k8sClient client.Client, names []string, namespace string) (statuses []operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getAllRouteStatus").V(3)
+	reqLogger := logf.FromContext(ctx).WithName("getAllRouteStatus").V(1)
 	for _, name := range names {
 		nsn := types.NamespacedName{Name: name, Namespace: namespace}
 		statuses = append(statuses, getRouteStatus(ctx, k8sClient, nsn))
@@ -198,7 +198,7 @@ func getAllRouteStatus(ctx context.Context, k8sClient client.Client, names []str
 }
 
 func getZenExtensionStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getRouteStatus").V(3)
+	reqLogger := logf.FromContext(ctx).WithName("getRouteStatus").V(1)
 	kind := "ZenExtension"
 	status = operatorv1alpha1.ManagedResourceStatus{
 		ObjectName: namespacedName.Name,
@@ -227,7 +227,7 @@ func getZenExtensionStatus(ctx context.Context, k8sClient client.Client, namespa
 }
 
 func getAllZenExtensionStatus(ctx context.Context, k8sClient client.Client, names []string, namespace string) (statuses []operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getAllZenExtensionStatus").V(3)
+	reqLogger := logf.FromContext(ctx).WithName("getAllZenExtensionStatus").V(1)
 	for _, name := range names {
 		nsn := types.NamespacedName{Name: name, Namespace: namespace}
 		statuses = append(statuses, getZenExtensionStatus(ctx, k8sClient, nsn))
@@ -237,7 +237,7 @@ func getAllZenExtensionStatus(ctx context.Context, k8sClient client.Client, name
 }
 
 func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, k8sClient client.Client, authentication *operatorv1alpha1.Authentication) (status operatorv1alpha1.ServiceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getCurrentServiceStatus").V(3)
+	reqLogger := logf.FromContext(ctx).WithName("getCurrentServiceStatus").V(1)
 	type statusRetrieval struct {
 		names []string
 		f     statusRetrievalFunc

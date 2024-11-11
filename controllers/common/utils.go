@@ -264,6 +264,13 @@ func MergeMap(in map[string]string, mergeMap map[string]string) map[string]strin
 	return mergeMap
 }
 
+func GetBindInfoRefreshMap() map[string]string {
+	return map[string]string{
+		"bindinfoRefresh/configmap": DatastoreEDBCMName,
+		"bindinfoRefresh/secret":    DatastoreEDBSecretName,
+	}
+}
+
 // ReduceSubreconcilerResultsAndErrors takes a slice of Result pointers and a slice of errors and reduces them to a
 // single Result pointer and error to be used in a subreconciler.Evaluate call.
 func ReduceSubreconcilerResultsAndErrors(results []*ctrl.Result, errs []error) (result *ctrl.Result, err error) {

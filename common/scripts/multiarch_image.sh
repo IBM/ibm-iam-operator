@@ -40,7 +40,7 @@ do
         ${CONTAINER_CLI} inspect "${IMAGE_REPO}"/"${IMAGE_NAME}"-"${arch}":"${VERSION}" && break
         sleep "${RETRY_INTERVAL}"
         if [ "${i}" -eq "${MAX_PULLING_RETRY}" ]; then
-            echo "Failed to found image '${IMAGE_REPO}'/'${IMAGE_NAME}'-'${arch}':'${VERSION}'!!!"
+            echo "Failed to find image '${IMAGE_REPO}'/'${IMAGE_NAME}'-'${arch}':'${VERSION}'!!!"
             exit 1
         fi
     done

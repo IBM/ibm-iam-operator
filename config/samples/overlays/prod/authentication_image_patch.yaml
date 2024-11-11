@@ -5,16 +5,16 @@ metadata:
 spec:
   authService:
     imageRegistry: icr.io/cpopen/cpfs
-    imageTag: 4.5.7
+    imageTag: 4.5.8
   clientRegistration:
     imageRegistry: icr.io/cpopen/cpfs
-    imageTag: 4.5.7
+    imageTag: 4.5.8
   identityManager:
     imageRegistry: icr.io/cpopen/cpfs
-    imageTag: 4.5.7
+    imageTag: 4.5.8
   identityProvider:
     imageRegistry: icr.io/cpopen/cpfs
-    imageTag: 4.5.7
+    imageTag: 4.5.8
   initMongodb:
     imageRegistry: icr.io/cpopen/cpfs
-    imageTag: 4.5.7
+    imageTag: 4.5.8

@@ -83,6 +83,13 @@ func PlanMigrations(ctx context.Context, to, from dbconn.DBConn) (mq *migration.
 			Build())
 	}
 
+	if _, ok := changelogs[v1schema.IncreaseTokenstringSize.ID]; !ok {
+		reqLogger.Info("Adding migration", "migrationName", v1schema.IncreaseTokenstringSize.Name)
+		*mq = append(*mq, migration.FromMigration(v1schema.IncreaseTokenstringSize).
+			To(to).
+			Build())
+	}
+
 	if _, ok := changelogs[v1schema.MongoToEDBv1.ID]; !ok && mongo != nil {
 		reqLogger.Info("Adding migration", "migrationName", v1schema.MongoToEDBv1.Name)
 		*mq = append(*mq, migration.FromMigration(v1schema.MongoToEDBv1).

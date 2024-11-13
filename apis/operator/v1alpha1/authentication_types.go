@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -196,28 +197,41 @@ type AuthenticationStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
+const ConditionMigrationsRunning = "MigrationsRunning"
+
 const ConditionMigrated string = "MigrationsPerformed"
 const MessageMigrationSuccess string = "All migrations completed successfully"
 const MessageMigrationInProgress string = "Migrations are currently being performed; monitor progress in the IM Operator \"migration_worker\" logs"
-const ReasonMigrationSuccess string = "Complete"
-const ReasonMigrationInProgress string = "InProgress"
+const MessageMigrationFinished string = "Migration attempt finished"
+const ReasonMigrationComplete string = "Complete"
+const ReasonMigrationsInProgress string = "InProgress"
+const ReasonMigrationsDone string = "Done"
 const ReasonMigrationFailure string = "Failed"
 
-func NewMigrationSuccessCondition() *metav1.Condition {
+func NewMigrationCompleteCondition() *metav1.Condition {
 	return &metav1.Condition{
 		Type:    ConditionMigrated,
 		Status:  metav1.ConditionTrue,
-		Reason:  ReasonMigrationSuccess,
+		Reason:  ReasonMigrationComplete,
 		Message: MessageMigrationSuccess,
 	}
 }
 
 func NewMigrationInProgressCondition() *metav1.Condition {
 	return &metav1.Condition{
-		Type:    ConditionMigrated,
-		Status:  metav1.ConditionFalse,
-		Reason:  ReasonMigrationInProgress,
+		Type:    ConditionMigrationsRunning,
+		Status:  metav1.ConditionTrue,
+		Reason:  ReasonMigrationsInProgress,
 		Message: MessageMigrationInProgress,
+	}
+}
+
+func NewMigrationFinishedCondition() *metav1.Condition {
+	return &metav1.Condition{
+		Type:    ConditionMigrationsRunning,
+		Status:  metav1.ConditionFalse,
+		Reason:  ReasonMigrationsDone,
+		Message: MessageMigrationFinished,
 	}
 }
 
@@ -264,11 +278,7 @@ const AnnotationAuthRetainMigrationArtifacts string = "authentication.operator.i
 const AnnotationAuthDBSchemaVersion string = "authentication.operator.ibm.com/db-schema-version"
 
 func (a *Authentication) HasBeenMigrated() bool {
-	annotations := a.GetAnnotations()
-	if value, ok := annotations[AnnotationAuthMigrationComplete]; ok && value == "true" {
-		return true
-	}
-	return false
+	return meta.IsStatusConditionPresentAndEqual(a.Status.Conditions, ConditionMigrated, metav1.ConditionTrue)
 }
 
 func (a *Authentication) HasNotBeenMigrated() bool {
@@ -297,4 +307,16 @@ func (a *Authentication) HasDBSchemaVersion() bool {
 
 func (a *Authentication) HasNoDBSchemaVersion() bool {
 	return !a.HasDBSchemaVersion()
+}
+
+func (a *Authentication) GetDBSchemaVersion() string {
+	annotations := a.GetAnnotations()
+	if version, ok := annotations[AnnotationAuthDBSchemaVersion]; ok {
+		return version
+	}
+	return ""
+}
+
+func (a *Authentication) IsReady() bool {
+	return a.Status.Service.Status == "Ready"
 }

@@ -20,14 +20,14 @@ import (
 	"context"
 
 	"fmt"
-	"maps"
-	"os"
 	"reflect"
 	"sync"
 	"time"
 
 	ctrlcommon "github.com/IBM/ibm-iam-operator/controllers/common"
-	"github.com/IBM/ibm-iam-operator/migration"
+	database "github.com/IBM/ibm-iam-operator/database"
+	dbconn "github.com/IBM/ibm-iam-operator/database/connectors"
+	"github.com/IBM/ibm-iam-operator/database/migration"
 	certmgr "github.com/ibm/ibm-cert-manager-operator/apis/cert-manager/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -37,6 +37,7 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
@@ -47,7 +48,6 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	zenv1 "github.com/IBM/ibm-iam-operator/apis/zen.cpd.ibm.com/v1"
 	"github.com/opdev/subreconciler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -96,7 +96,7 @@ var finalizerName = "authentication.operator.ibm.com"
 // FinalizerMigration is the finalizer appended to resources that are being retained during migration
 const FinalizerMigration string = "authentication.operator.ibm.com/migration"
 
-func (r *AuthenticationReconciler) addMigrationFinalizer(ctx context.Context, key client.ObjectKey, obj client.Object) (updated bool, err error) {
+func (r *AuthenticationReconciler) addMongoMigrationFinalizer(ctx context.Context, key client.ObjectKey, obj client.Object) (updated bool, err error) {
 	if err = r.Get(ctx, key, obj); k8sErrors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
@@ -114,7 +114,7 @@ func (r *AuthenticationReconciler) addMigrationFinalizer(ctx context.Context, ke
 	return false, nil
 }
 
-func (r *AuthenticationReconciler) finalizeMigrationObject(ctx context.Context, key client.ObjectKey, obj client.Object) (finalized bool, err error) {
+func (r *AuthenticationReconciler) finalizeMongoMigrationObject(ctx context.Context, key client.ObjectKey, obj client.Object) (finalized bool, err error) {
 	if err = r.Get(ctx, key, obj); k8sErrors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
@@ -143,7 +143,7 @@ func (r *AuthenticationReconciler) finalizeMigrationObject(ctx context.Context, 
 	return true, nil
 }
 
-func (r *AuthenticationReconciler) addMigrationFinalizers(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+func (r *AuthenticationReconciler) addMongoMigrationFinalizers(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "addFinalizers")
 	reqLogger.Info("Add finalizers to MongoDB resources in case migration is needed")
 	authCR := &operatorv1alpha1.Authentication{}
@@ -176,7 +176,7 @@ func (r *AuthenticationReconciler) addMigrationFinalizers(ctx context.Context, r
 
 	for key, obj := range toAddFinalizer {
 		var objUpdated bool
-		if objUpdated, err = r.addMigrationFinalizer(ctx, key, obj); k8sErrors.IsNotFound(err) {
+		if objUpdated, err = r.addMongoMigrationFinalizer(ctx, key, obj); k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Object not found; not adding migration finalizer",
 				"Object.Name", key.Name,
 				"Object.Namespace", key.Namespace)
@@ -205,20 +205,20 @@ func (r *AuthenticationReconciler) addMigrationFinalizers(ctx context.Context, r
 	return subreconciler.ContinueReconciling()
 }
 
-func (r *AuthenticationReconciler) handleRetainAnnotation(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleRetainAnnotation")
-	reqLogger.Info("Clean up MongoDB resources if no longer being retained")
+func (r *AuthenticationReconciler) handleMongoDBCleanup(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleMongoDBCleanup")
+	reqLogger.Info("Clean up MongoDB resources if no longer needed")
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 
 	// if retain annotation is unset or set to true - continue reconciling
-	if authCR.IsRetainingArtifacts() {
-		reqLogger.Info("Annotation does not signal a need to clean up resources; continuing")
+	if authCR.HasNotBeenMigrated() {
+		reqLogger.Info("Migrations have not completed yet; skipping")
 		return subreconciler.ContinueReconciling()
 	}
-	reqLogger.Info("Annotation signals a need to clean up resources")
+	reqLogger.Info("Condition indicates migrations have completed")
 
 	mongoDBServiceName := "mongodb"
 	mongoDBPreloadCMName := "mongodb-preload-endpoint"
@@ -233,14 +233,16 @@ func (r *AuthenticationReconciler) handleRetainAnnotation(ctx context.Context, r
 		types.NamespacedName{Name: mongoCACertName, Namespace: req.Namespace}:      &corev1.Secret{},
 	}
 
+	anyObjUpdated := false
 	for key, obj := range toFinalize {
 		var objUpdated bool
-		if objUpdated, err = r.finalizeMigrationObject(ctx, key, obj); err != nil {
+		if objUpdated, err = r.finalizeMongoMigrationObject(ctx, key, obj); err != nil {
 			reqLogger.Error(err, "Failed to finalize object due to an unexpected error; requeueing",
 				"Object.Name", key.Name,
 				"Object.Namespace", key.Namespace)
 			return subreconciler.RequeueWithError(err)
 		} else if objUpdated {
+			anyObjUpdated = true
 			reqLogger.Info("Object was finalized",
 				"Object.Name", key.Name,
 				"Object.Namespace", key.Namespace)
@@ -251,20 +253,29 @@ func (r *AuthenticationReconciler) handleRetainAnnotation(ctx context.Context, r
 		}
 	}
 
+	prevAnnotationCount := len(authCR.Annotations)
 	delete(authCR.Annotations, operatorv1alpha1.AnnotationAuthMigrationComplete)
 	delete(authCR.Annotations, operatorv1alpha1.AnnotationAuthRetainMigrationArtifacts)
+	curAnnotationCount := len(authCR.Annotations)
 
-	if err = r.Update(ctx, authCR); err != nil {
-		reqLogger.Error(err, "Failed to remove annotations from Authentication")
-		return subreconciler.RequeueWithError(err)
+	if curAnnotationCount != prevAnnotationCount {
+		if err = r.Update(ctx, authCR); err != nil {
+			reqLogger.Error(err, "Failed to remove annotations from Authentication")
+			return subreconciler.RequeueWithError(err)
+		}
+		anyObjUpdated = true
 	}
 
-	reqLogger.Info("All migration objects finalized; requeueing")
+	if anyObjUpdated {
+		reqLogger.Info("One or more objects were cleaned up; requeueing")
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	}
 
-	return subreconciler.Requeue()
+	reqLogger.Info("No cleanup was necessary; continuing")
+	return subreconciler.ContinueReconciling()
 }
 
-func (r *AuthenticationReconciler) getPostgresDB(ctx context.Context, req ctrl.Request) (p *migration.PostgresDB, err error) {
+func (r *AuthenticationReconciler) getPostgresDB(ctx context.Context, req ctrl.Request) (p *dbconn.PostgresDB, err error) {
 	datastoreCertSecret := &corev1.Secret{}
 	if err = r.Get(ctx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBSecretName, Namespace: req.Namespace}, datastoreCertSecret); err != nil {
 		return nil, err
@@ -275,14 +286,14 @@ func (r *AuthenticationReconciler) getPostgresDB(ctx context.Context, req ctrl.R
 		return nil, err
 	}
 
-	return migration.NewPostgresDB(
-		migration.Name(datastoreCertCM.Data["DATABASE_NAME"]),
-		migration.ID(req.Namespace),
-		migration.Port(datastoreCertCM.Data["DATABASE_PORT"]),
-		migration.User(datastoreCertCM.Data["DATABASE_USER"]),
-		migration.Host(datastoreCertCM.Data["DATABASE_RW_ENDPOINT"]),
-		migration.Schemas("platformdb", "oauthdbschema"),
-		migration.TLSConfig(
+	return dbconn.NewPostgresDB(
+		dbconn.Name(datastoreCertCM.Data["DATABASE_NAME"]),
+		dbconn.ID(req.Namespace),
+		dbconn.Port(datastoreCertCM.Data["DATABASE_PORT"]),
+		dbconn.User(datastoreCertCM.Data["DATABASE_USER"]),
+		dbconn.Host(datastoreCertCM.Data["DATABASE_RW_ENDPOINT"]),
+		dbconn.Schemas("platformdb", "oauthdbschema", "metadata"),
+		dbconn.TLSConfig(
 			datastoreCertSecret.Data["ca.crt"],
 			datastoreCertSecret.Data["tls.crt"],
 			datastoreCertSecret.Data["tls.key"]))
@@ -305,7 +316,7 @@ func (r *AuthenticationReconciler) getMongoHost(ctx context.Context, namespace s
 	return
 }
 
-func (r *AuthenticationReconciler) getMongoDB(ctx context.Context, req ctrl.Request) (mongo *migration.MongoDB, err error) {
+func (r *AuthenticationReconciler) getMongoDB(ctx context.Context, req ctrl.Request) (mongo *dbconn.MongoDB, err error) {
 	mongoName := "platform-db"
 	mongoPort := "27017"
 	mongoHost, err := r.getMongoHost(ctx, req.Namespace)
@@ -330,14 +341,14 @@ func (r *AuthenticationReconciler) getMongoDB(ctx context.Context, req ctrl.Requ
 		}
 	}
 
-	return migration.NewMongoDB(
-		migration.Name(mongoName),
-		migration.Port(mongoPort),
-		migration.Host(mongoHost),
-		migration.User(string(secrets[mongoAdminCredsName].Data["user"])),
-		migration.Password(string(secrets[mongoAdminCredsName].Data["password"])),
-		migration.Schemas(mongoName),
-		migration.TLSConfig(
+	return dbconn.NewMongoDB(
+		dbconn.Name(mongoName),
+		dbconn.Port(mongoPort),
+		dbconn.Host(mongoHost),
+		dbconn.User(string(secrets[mongoAdminCredsName].Data["user"])),
+		dbconn.Password(string(secrets[mongoAdminCredsName].Data["password"])),
+		dbconn.Schemas(mongoName),
+		dbconn.TLSConfig(
 			secrets[mongoCACertName].Data["ca.crt"],
 			secrets[mongoClientCertName].Data["tls.crt"],
 			secrets[mongoClientCertName].Data["tls.key"]))
@@ -350,15 +361,11 @@ func (r *AuthenticationReconciler) setMigrationCompleteStatus(ctx context.Contex
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
-	if meta.IsStatusConditionPresentAndEqual(authCR.Status.Conditions, operatorv1alpha1.ConditionMigrated, metav1.ConditionTrue) {
-		reqLogger.Info("Migration success condition has already been set; continuing")
+	if authCR.HasBeenMigrated() {
+		reqLogger.Info("MigrationsPerformed condition has already been set; continuing")
 		return subreconciler.ContinueReconciling()
 	}
-	if authCR.HasNotBeenMigrated() {
-		reqLogger.Info("Authentication still has pending migrations; requeueing")
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
-	condition := operatorv1alpha1.NewMigrationSuccessCondition()
+	condition := operatorv1alpha1.NewMigrationCompleteCondition()
 	meta.SetStatusCondition(&authCR.Status.Conditions, *condition)
 	if err = r.Client.Status().Update(ctx, authCR); err != nil {
 		reqLogger.Info("Failed to set migration success condition on Authentication", "reason", err.Error())
@@ -377,16 +384,10 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		return
 	}
 
-	// Terminating condition for handleMigration subreconciler
-	if authCR.HasBeenMigrated() {
-		reqLogger.Info("Mongo to EDB data migration is complete, cleaning up mongo")
-		if err := r.shutdownMongo(ctx, req); err != nil {
-			reqLogger.Error(err, "Failed to scale down MongoDB")
-		}
-		return
-	}
+	var migrations *migration.MigrationQueue
+	var postgres *dbconn.PostgresDB
+	var mongo *dbconn.MongoDB
 
-	var postgres *migration.PostgresDB
 	if postgres, err = r.getPostgresDB(ctx, req); k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Could not find all resources for configuring EDB connection; requeueing")
 		return subreconciler.RequeueWithDelay(opreqWait)
@@ -395,24 +396,10 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		return subreconciler.RequeueWithError(err)
 	}
 
-	initEDB := migration.NewMigration().
-		Name("initEDB").
-		To(postgres).
-		RunFunc(migration.InitSchemas).
-		Build()
-
-	var migrations []*migration.Migration
-
-	if authCR.HasNoDBSchemaVersion() {
-		reqLogger.Info("DB schema version annotation unset; adding initialization migration")
-		migrations = append(migrations, initEDB)
-	}
-
-	if needToMigrate, err := r.needToMigrateFromMongo(ctx, authCR); err != nil {
+	if needsMongoMigration, err := r.needToMigrateFromMongo(ctx, authCR); err != nil {
 		reqLogger.Error(err, "Failed to determine whether migration from MongoDB is needed")
 		return subreconciler.RequeueWithError(err)
-	} else if needToMigrate {
-		var mongo *migration.MongoDB
+	} else if needsMongoMigration {
 		if mongo, err = r.getMongoDB(ctx, req); k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Could not find all resources for configuring MongoDB connection; requeueing")
 			return subreconciler.RequeueWithDelay(opreqWait)
@@ -420,21 +407,21 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 			reqLogger.Error(err, "Failed to find resources for configuring MongoDB connection")
 			return subreconciler.RequeueWithError(err)
 		}
-		migrateFromMongo := migration.NewMigration().
-			Name("MongoToV1").
-			To(postgres).
-			From(mongo).
-			RunFunc(migration.MongoToV1).
-			Build()
-		migrations = append(migrations, migrateFromMongo)
 	}
 
-	if len(migrations) > 0 && r.dbSetupChan == nil {
+	migrations, err = database.PlanMigrations(ctx, postgres, mongo)
+	if err != nil {
+		err = fmt.Errorf("failed to form a migration plan: %w", err)
+		reqLogger.Error(err, "Failed to handle migrations")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	if migrations.Len() > 0 && r.dbSetupChan == nil {
 		reqLogger.Info("Found migrations; starting a migration worker")
 		r.dbSetupChan = make(chan *migration.Result, 1)
-		go migration.Migrate(context.Background(),
+		go database.Migrate(context.Background(),
 			r.dbSetupChan,
-			migrations...)
+			migrations)
 		condition := operatorv1alpha1.NewMigrationInProgressCondition()
 		meta.SetStatusCondition(&authCR.Status.Conditions, *condition)
 		if err = r.Client.Status().Update(ctx, authCR); err != nil {
@@ -461,45 +448,25 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	//   enqueueing migrations can begin anew.
 	select {
 	case migrationResult, ok := <-r.dbSetupChan:
-		if !ok {
-			reqLogger.Info("No more migrations to perform and worker closed; removing worker and continuing")
-			r.dbSetupChan = nil
-			return subreconciler.ContinueReconciling()
+		if ok {
+			reqLogger.Info("Received a migration result from the worker")
 		}
-		reqLogger.Info("Received a migration result from the worker")
+		var runningCondition, performedCondition *metav1.Condition
 		if migrationResult != nil && migrationResult.Error != nil {
 			reqLogger.Error(migrationResult.Error, "Encountered an error while performing the current migration")
-			// Remove the failed channel now so that migration can repeat on next reconcile loop
-			r.dbSetupChan = nil
-			condition := operatorv1alpha1.NewMigrationFailureCondition(migrationResult.Incomplete[0].Name)
-			meta.SetStatusCondition(&authCR.Status.Conditions, *condition)
-			if err = r.Client.Status().Update(ctx, authCR); err != nil {
-				reqLogger.Error(err, "Failed to set condition on Authentication", "condition", operatorv1alpha1.ConditionMigrated)
-				return subreconciler.RequeueWithDelayAndError(defaultLowerWait, migrationResult.Error)
-			}
+			performedCondition = operatorv1alpha1.NewMigrationFailureCondition(migrationResult.Incomplete[0].Name)
 		} else if migrationResult != nil {
 			reqLogger.Info("Completed all migrations successfully")
-			condition := operatorv1alpha1.NewMigrationSuccessCondition()
-			meta.SetStatusCondition(&authCR.Status.Conditions, *condition)
-			if err = r.Client.Status().Update(ctx, authCR); err != nil {
-				reqLogger.Error(err, "Failed to set condition on Authentication", "condition", operatorv1alpha1.ConditionMigrated)
-				return subreconciler.RequeueWithDelayAndError(defaultLowerWait, migrationResult.Error)
-			}
+			performedCondition = operatorv1alpha1.NewMigrationCompleteCondition()
+		} else {
+			reqLogger.Info("No migrations needed to be performed by the worker")
+			performedCondition = operatorv1alpha1.NewMigrationCompleteCondition()
 		}
-		if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-			return subreconciler.RequeueWithDelay(defaultLowerWait)
-		}
-		annotationsChanged := setMigrationAnnotations(authCR, migrationResult)
-		if annotationsChanged {
-			reqLogger.Info("Setting updated migration annotations on Authentication before requeue")
-			if err = r.Update(ctx, authCR); err != nil {
-				reqLogger.Error(err, "Failed to set migration annotations on Authentication")
-				return subreconciler.RequeueWithError(err)
-			}
-		}
-		if migrationResult.Error != nil {
-			return subreconciler.RequeueWithDelayAndError(defaultLowerWait, migrationResult.Error)
-		}
+		runningCondition = operatorv1alpha1.NewMigrationFinishedCondition()
+		r.dbSetupChan = nil
+		loopCtx := logf.IntoContext(ctx, reqLogger)
+
+		r.loopUntilConditionsSet(loopCtx, req, performedCondition, runningCondition)
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	default:
 		reqLogger.Info("Migration still in progress; check again in 10s")
@@ -507,42 +474,27 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	}
 }
 
-// setMigrationAnnotations uses the values stored in a `migration.Result` to determine whether updates to the
-// Authentication CR's annotations need to be made. Returns `true` if new annotation values were set on the CR.
-func setMigrationAnnotations(authCR *operatorv1alpha1.Authentication, result *migration.Result) (changed bool) {
-	if result == nil {
-		return false
-	}
-	var observedAnnotations, desiredAnnotations map[string]string
-	observedAnnotations = authCR.DeepCopy().GetAnnotations()
-	if observedAnnotations == nil {
-		observedAnnotations = make(map[string]string)
-		desiredAnnotations = make(map[string]string)
-	} else {
-		desiredAnnotations = authCR.DeepCopy().GetAnnotations()
-	}
-	for _, c := range result.Complete {
-		switch c.Name {
-		case "initEDB":
-			desiredAnnotations[operatorv1alpha1.AnnotationAuthDBSchemaVersion] = "1.0.0"
-		case "MongoToV1":
-			desiredAnnotations[operatorv1alpha1.AnnotationAuthMigrationComplete] = "true"
-			desiredAnnotations[operatorv1alpha1.AnnotationAuthRetainMigrationArtifacts] = "true"
-
+func (r *AuthenticationReconciler) loopUntilConditionsSet(ctx context.Context, req ctrl.Request, conditions ...*metav1.Condition) {
+	reqLogger := logf.FromContext(ctx)
+	conditionsSet := false
+	for !conditionsSet {
+		authCR := &operatorv1alpha1.Authentication{}
+		if result, err := r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+			reqLogger.Info("Failed to retrieve Authentication CR for status update; retrying")
+			continue
 		}
-	}
-	for _, i := range result.Incomplete {
-		if i.Name == "MongoToV1" {
-			desiredAnnotations[operatorv1alpha1.AnnotationAuthMigrationComplete] = "false"
+		for _, condition := range conditions {
+			if condition == nil {
+				continue
+			}
+			meta.SetStatusCondition(&authCR.Status.Conditions, *condition)
 		}
+		if err := r.Client.Status().Update(ctx, authCR); err != nil {
+			reqLogger.Error(err, "Failed to set conditions on Authentication; retrying", "conditions", conditions)
+			continue
+		}
+		conditionsSet = true
 	}
-
-	if maps.Equal(observedAnnotations, desiredAnnotations) {
-		return false
-	}
-	authCR.SetAnnotations(desiredAnnotations)
-
-	return true
 }
 
 func (r *AuthenticationReconciler) getPreloadMongoDBConfigMap(ctx context.Context, namespace string) (cm *corev1.ConfigMap, err error) {
@@ -574,6 +526,9 @@ func (r *AuthenticationReconciler) hasMongoDBService(ctx context.Context, authCR
 // needToMigrateFromMongo attempts to determine whether a migration from MongoDB is needed. Returns an error when an
 // unexpected error occurs while trying to get resources from the cluster.
 func (r *AuthenticationReconciler) needToMigrateFromMongo(ctx context.Context, authCR *operatorv1alpha1.Authentication) (need bool, err error) {
+	if authCR.HasBeenMigrated() {
+		return false, nil
+	}
 	var hasResource bool
 	if hasResource, err = r.hasPreloadMongoDBConfigMap(ctx, authCR.Namespace); hasResource {
 		return true, nil
@@ -633,49 +588,6 @@ func (r *AuthenticationReconciler) ensureDatastoreSecretAndCM(ctx context.Contex
 		"Secret.Namespace", authCR.Namespace)
 
 	return subreconciler.ContinueReconciling()
-}
-
-// cleans up the mongo pod by scaling down the mongodb operator as well as mongo statefulset
-func (r *AuthenticationReconciler) shutdownMongo(ctx context.Context, req ctrl.Request) (err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "shutdownMongoDB")
-	operatorNamespace, exists := os.LookupEnv("POD_NAMESPACE")
-	if !exists {
-		operatorNamespace = req.Namespace
-	}
-	desiredReplicas := int32(0)
-	mongoOprDeployment := &appsv1.Deployment{}
-	if err = r.Get(ctx, types.NamespacedName{Name: ctrlcommon.MongoOprDeploymentName, Namespace: operatorNamespace}, mongoOprDeployment); err != nil {
-		return err
-	} else {
-		// scaledown the replicas to 0
-		if mongoOprDeployment.Spec.Replicas != &desiredReplicas {
-			mongoOprDeployment.Spec.Replicas = &desiredReplicas
-			if err = r.Update(ctx, mongoOprDeployment); err != nil {
-				reqLogger.Error(err, "Error updating the mongodb operator deployment")
-				return err
-			}
-			reqLogger.Info("Mongo operator deployment is scaled down to 0")
-		} else {
-			reqLogger.Info("Mongo operator deployment has already been scaled down to 0")
-		}
-		mongoSts := &appsv1.StatefulSet{}
-		if err = r.Get(ctx, types.NamespacedName{Name: ctrlcommon.MongoStatefulsetName, Namespace: req.Namespace}, mongoSts); err != nil {
-			return err
-		} else {
-			// scaledown the replicas to 0
-			if mongoSts.Spec.Replicas != &desiredReplicas {
-				mongoSts.Spec.Replicas = &desiredReplicas
-				if err = r.Update(ctx, mongoSts); err != nil {
-					reqLogger.Error(err, "Error updating the mongodb statefulset")
-					return err
-				}
-				reqLogger.Info("Mongo statefulset is scaled down to 0")
-			} else {
-				reqLogger.Info("Mongo statefulset has already been scaled down to 0")
-			}
-		}
-	}
-	return nil
 }
 
 func (r *AuthenticationReconciler) getLatestAuthentication(ctx context.Context, req ctrl.Request, authentication *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
@@ -840,21 +752,21 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		} else {
 			reqLogger.Info("Updated status")
 		}
+		reqLogger.V(1).Info("Final result", "result", result, "err", err)
 	}()
 
-	if subResult, err := r.addMigrationFinalizers(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-		return subreconciler.Evaluate(subResult, err)
-	}
-
-	if result, err := r.handleOperandRequest(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err := r.addMongoMigrationFinalizers(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+		reqLogger.V(1).Info("Should halt or requeue after addMongoMigrationFinalizers", "result", result, "err", err)
 		return subreconciler.Evaluate(result, err)
 	}
 
-	if subResult, err := r.handleRetainAnnotation(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-		return subreconciler.Evaluate(subResult, err)
+	if result, err := r.handleOperandRequest(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+		reqLogger.V(1).Info("Should halt or requeue after handleOperandRequest", "result", result, "err", err)
+		return subreconciler.Evaluate(result, err)
 	}
 
 	if result, err := r.createEDBShareClaim(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+		reqLogger.V(1).Info("Should halt or requeue after createEDBShareClaim", "result", result, "err", err)
 		return subreconciler.Evaluate(result, err)
 	}
 
@@ -933,6 +845,11 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	if subResult, err := r.setMigrationCompleteStatus(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
+	}
+
+	if result, err := r.handleMongoDBCleanup(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+		reqLogger.V(1).Info("Should halt or requeue after handleMongoDBCleanup", "result", result, "err", err)
+		return subreconciler.Evaluate(result, err)
 	}
 
 	// Check if this Deployment already exists and create it if it doesn't

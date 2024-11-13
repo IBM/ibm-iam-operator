@@ -143,6 +143,14 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Annotations[nssAnnotation]; ok {
 			authDep.Spec.Template.ObjectMeta.Annotations[nssAnnotation] = val
 		}
+		bindInfoAnnotation := "bindinfo/restartTime"
+		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Annotations[bindInfoAnnotation]; ok {
+			authDep.Spec.Template.ObjectMeta.Annotations[bindInfoAnnotation] = val
+		}
+		metaLabels := ctrlCommon.MergeMap(map[string]string{"operator.ibm.com/bindinfoRefresh": "enabled"}, currentDeployment.Labels)
+		metaAnnotations := ctrlCommon.MergeMap(ctrlCommon.GetBindInfoRefreshMap(), currentDeployment.Annotations)
+		currentDeployment.Labels = metaLabels
+		currentDeployment.Annotations = metaAnnotations
 		currentDeployment.Spec = authDep.Spec
 		err = r.Client.Update(context.TODO(), currentDeployment)
 		if err != nil {
@@ -195,6 +203,14 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 		if val, ok := currentManagerDeployment.Spec.Template.ObjectMeta.Annotations[nssAnnotation]; ok {
 			ocwDep.Spec.Template.ObjectMeta.Annotations[nssAnnotation] = val
 		}
+		bindInfoAnnotation := "bindinfo/restartTime"
+		if val, ok := currentManagerDeployment.Spec.Template.ObjectMeta.Annotations[bindInfoAnnotation]; ok {
+			ocwDep.Spec.Template.ObjectMeta.Annotations[bindInfoAnnotation] = val
+		}
+		metaLabels := ctrlCommon.MergeMap(map[string]string{"operator.ibm.com/bindinfoRefresh": "enabled"}, currentManagerDeployment.Labels)
+		metaAnnotations := ctrlCommon.MergeMap(ctrlCommon.GetBindInfoRefreshMap(), currentManagerDeployment.Annotations)
+		currentManagerDeployment.Labels = metaLabels
+		currentManagerDeployment.Annotations = metaAnnotations
 		currentManagerDeployment.Spec = ocwDep.Spec
 		err = r.Client.Update(context.TODO(), currentManagerDeployment)
 		if err != nil {
@@ -239,17 +255,25 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 			return err
 		}
 	} else {
-		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentManagerDeployment.Namespace, "Deployment.Name", currentManagerDeployment.Name)
+		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentProviderDeployment.Namespace, "Deployment.Name", currentProviderDeployment.Name)
 		reqLogger.Info("SAAS tenant configmap was found", "Updating deployment with value from configmap", saasTenantConfigMapName)
 		provDep := generateProviderDeploymentObject(instance, r.Scheme, providerDeployment, samlConsoleURL, saasServiceIdCrn)
 		certmanagerLabel := "certmanager.k8s.io/time-restarted"
-		if val, ok := currentManagerDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
+		if val, ok := currentProviderDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
 			provDep.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val
 		}
 		nssAnnotation := "nss.ibm.com/namespaceList"
 		if val, ok := currentProviderDeployment.Spec.Template.ObjectMeta.Annotations[nssAnnotation]; ok {
 			provDep.Spec.Template.ObjectMeta.Annotations[nssAnnotation] = val
 		}
+		bindInfoAnnotation := "bindinfo/restartTime"
+		if val, ok := currentProviderDeployment.Spec.Template.ObjectMeta.Annotations[bindInfoAnnotation]; ok {
+			provDep.Spec.Template.ObjectMeta.Annotations[bindInfoAnnotation] = val
+		}
+		metaLabels := ctrlCommon.MergeMap(map[string]string{"operator.ibm.com/bindinfoRefresh": "enabled"}, currentProviderDeployment.Labels)
+		metaAnnotations := ctrlCommon.MergeMap(ctrlCommon.GetBindInfoRefreshMap(), currentProviderDeployment.Annotations)
+		currentProviderDeployment.Labels = metaLabels
+		currentProviderDeployment.Annotations = metaAnnotations
 		currentProviderDeployment.Spec = provDep.Spec
 		err = r.Client.Update(context.TODO(), currentProviderDeployment)
 		if err != nil {
@@ -310,13 +334,13 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
 
 	metaLabels := common.MergeMap(map[string]string{"app": deployment}, instance.Spec.Labels)
+	metaLabels = common.MergeMap(map[string]string{"operator.ibm.com/bindinfoRefresh": "enabled"}, metaLabels)
 	podMetadataLabels := map[string]string{
-		"app":                              deployment,
-		"k8s-app":                          deployment,
-		"component":                        deployment,
-		"app.kubernetes.io/instance":       "platform-auth-service",
-		"intent":                           "projected",
-		"operator.ibm.com/bindinfoRefresh": "enabled",
+		"app":                        deployment,
+		"k8s-app":                    deployment,
+		"component":                  deployment,
+		"app.kubernetes.io/instance": "platform-auth-service",
+		"intent":                     "projected",
 	}
 	podLabels := common.MergeMap(podMetadataLabels, instance.Spec.Labels)
 
@@ -325,6 +349,10 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 			Name:      deployment,
 			Namespace: instance.Namespace,
 			Labels:    metaLabels,
+			Annotations: map[string]string{
+				"bindinfoRefresh/configmap": ctrlCommon.DatastoreEDBCMName,
+				"bindinfoRefresh/secret":    ctrlCommon.DatastoreEDBSecretName,
+			},
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -344,8 +372,6 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 						"productID":                          "068a62892a1e4db39641342e592daa25",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager",
-						"bindinfoRefresh/configmap":          ctrlCommon.DatastoreEDBCMName,
-						"bindinfoRefresh/secret":             ctrlCommon.DatastoreEDBSecretName,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -468,13 +494,13 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
 
 	metaLabels := common.MergeMap(map[string]string{"app": deployment}, instance.Spec.Labels)
+	metaLabels = common.MergeMap(map[string]string{"operator.ibm.com/bindinfoRefresh": "enabled"}, metaLabels)
 	podMetadataLabels := map[string]string{
-		"app":                              deployment,
-		"k8s-app":                          deployment,
-		"component":                        deployment,
-		"app.kubernetes.io/instance":       "platform-identity-provider",
-		"intent":                           "projected",
-		"operator.ibm.com/bindinfoRefresh": "enabled",
+		"app":                        deployment,
+		"k8s-app":                    deployment,
+		"component":                  deployment,
+		"app.kubernetes.io/instance": "platform-identity-provider",
+		"intent":                     "projected",
 	}
 	podLabels := common.MergeMap(podMetadataLabels, instance.Spec.Labels)
 
@@ -483,6 +509,10 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 			Name:      deployment,
 			Namespace: instance.Namespace,
 			Labels:    metaLabels,
+			Annotations: map[string]string{
+				"bindinfoRefresh/configmap": ctrlCommon.DatastoreEDBCMName,
+				"bindinfoRefresh/secret":    ctrlCommon.DatastoreEDBSecretName,
+			},
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -502,8 +532,6 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 						"productID":                          "068a62892a1e4db39641342e592daa25",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager",
-						"bindinfoRefresh/configmap":          ctrlCommon.DatastoreEDBCMName,
-						"bindinfoRefresh/secret":             ctrlCommon.DatastoreEDBSecretName,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -626,13 +654,13 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
 
 	metaLabels := common.MergeMap(map[string]string{"app": deployment}, instance.Spec.Labels)
+	metaLabels = common.MergeMap(map[string]string{"operator.ibm.com/bindinfoRefresh": "enabled"}, metaLabels)
 	podMetadataLabels := map[string]string{
-		"app":                              deployment,
-		"k8s-app":                          deployment,
-		"component":                        deployment,
-		"app.kubernetes.io/instance":       "platform-identity-management",
-		"intent":                           "projected",
-		"operator.ibm.com/bindinfoRefresh": "enabled",
+		"app":                        deployment,
+		"k8s-app":                    deployment,
+		"component":                  deployment,
+		"app.kubernetes.io/instance": "platform-identity-management",
+		"intent":                     "projected",
 	}
 	podLabels := common.MergeMap(podMetadataLabels, instance.Spec.Labels)
 
@@ -641,6 +669,10 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 			Name:      deployment,
 			Namespace: instance.Namespace,
 			Labels:    metaLabels,
+			Annotations: map[string]string{
+				"bindinfoRefresh/configmap": ctrlCommon.DatastoreEDBCMName,
+				"bindinfoRefresh/secret":    ctrlCommon.DatastoreEDBSecretName,
+			},
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -660,8 +692,6 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 						"productID":                          "068a62892a1e4db39641342e592daa25",
 						"productMetric":                      "FREE",
 						"clusterhealth.ibm.com/dependencies": "cert-manager",
-						"bindinfoRefresh/configmap":          ctrlCommon.DatastoreEDBCMName,
-						"bindinfoRefresh/secret":             ctrlCommon.DatastoreEDBSecretName,
 					},
 				},
 				Spec: corev1.PodSpec{

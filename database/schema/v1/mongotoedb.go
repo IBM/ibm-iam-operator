@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package migration
+package v1
 
 import (
 	"context"
@@ -22,274 +22,18 @@ import (
 	"fmt"
 	"strings"
 
-	v1schema "github.com/IBM/ibm-iam-operator/migration/schema/v1"
+	dbconn "github.com/IBM/ibm-iam-operator/database/connectors"
+	"github.com/IBM/ibm-iam-operator/database/migration"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	mongoOptions "go.mongodb.org/mongo-driver/mongo/options"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type Result struct {
-	Complete   []*Migration
-	Incomplete []*Migration
-
-	Error error
-}
-
-func (r *Result) IsFailure() bool {
-	return r.Error != nil && len(r.Incomplete) > 0
-}
-
-func (r *Result) IsSuccess() bool {
-	return !r.IsFailure()
-}
-
-type DBConn interface {
-	Connect(context.Context) error
-	Configure(...DBOption) error
-	RunDDL(context.Context, string) error
-	HasSchemas(context.Context) (bool, error)
-	Disconnect(context.Context) error
-}
-
-type PostgresDB struct {
-	*DBOptions
-	Conn *pgx.Conn
-}
-
-func NewPostgresDB(opts ...DBOption) (*PostgresDB, error) {
-	p := &PostgresDB{
-		DBOptions: &DBOptions{},
-	}
-	if err := p.Configure(opts...); err != nil {
-		return nil, err
-	}
-	return p, nil
-}
-
-func (p *PostgresDB) Connect(ctx context.Context) (err error) {
-	dsn := fmt.Sprintf("host=%s user=%s dbname=%s port=%s sslmode=require", p.Host, p.User, p.Name, p.Port)
-	var connConfig *pgx.ConnConfig
-	if connConfig, err = pgx.ParseConfig(dsn); err != nil {
-		return err
-	}
-	connConfig.TLSConfig = p.TLSConfig
-	if p.Conn, err = pgx.ConnectConfig(ctx, connConfig); err != nil {
-		return err
-	}
-
-	return
-}
-
-func (p *PostgresDB) Disconnect(ctx context.Context) error {
-	return p.Conn.Close(ctx)
-}
-
-func (p *PostgresDB) RunDDL(ctx context.Context, ddl string) (err error) {
-	_, err = p.Conn.Exec(ctx, ddl)
-	return
-}
-
-var _ DBConn = &PostgresDB{}
-
-type MongoDB struct {
-	*DBOptions
-	Client *mongo.Client
-}
-
-func NewMongoDB(opts ...DBOption) (m *MongoDB, err error) {
-	m = &MongoDB{
-		DBOptions: &DBOptions{},
-	}
-	if err := m.Configure(opts...); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-func (m *MongoDB) Connect(ctx context.Context) (err error) {
-	uri := fmt.Sprintf("mongodb://%s:%s@%s:%s/?ssl=true&replicaSet=rs0&readPreference=secondaryPreferred&authSource=%s",
-		m.User,
-		m.Password,
-		m.Host,
-		m.Port,
-		"admin")
-	mongoClientOpts := mongoOptions.Client().ApplyURI(uri).SetTLSConfig(m.TLSConfig)
-	if m.Client, err = mongo.Connect(ctx, mongoClientOpts); err != nil {
-		return err
-	}
-	return
-}
-
-func (m *MongoDB) Disconnect(ctx context.Context) error {
-	return m.Client.Disconnect(ctx)
-}
-
-func (m *MongoDB) RunDDL(ctx context.Context, ddl string) error {
-	return fmt.Errorf("does not support executing DDL")
-}
-
-func (m *MongoDB) HasSchemas(ctx context.Context) (bool, error) {
-	return false, nil
-}
-
-var _ DBConn = &MongoDB{}
-
-type Migration struct {
-	Name    string
-	To      DBConn
-	From    DBConn
-	runFunc func(context.Context, DBConn, DBConn) error
-}
-
-type MigrationBuilder struct {
-	Migration *Migration
-}
-
-func NewMigration() *MigrationBuilder {
-	return &MigrationBuilder{
-		Migration: &Migration{},
-	}
-}
-
-func (m *MigrationBuilder) Build() *Migration {
-	return m.Migration
-}
-
-func (m *MigrationBuilder) Name(name string) *MigrationBuilder {
-	m.Migration.Name = name
-	return m
-}
-
-func (m *MigrationBuilder) To(to DBConn) *MigrationBuilder {
-	m.Migration.To = to
-	return m
-}
-
-func (m *MigrationBuilder) From(from DBConn) *MigrationBuilder {
-	m.Migration.From = from
-	return m
-}
-
-func (m *MigrationBuilder) RunFunc(f func(context.Context, DBConn, DBConn) error) *MigrationBuilder {
-	m.Migration.runFunc = f
-	return m
-}
-
-func (m *Migration) Run(ctx context.Context) (err error) {
-	if m.To != nil {
-		if err = m.To.Connect(ctx); err != nil {
-			return fmt.Errorf("failed to connect to target database: %w", err)
-		}
-		defer m.To.Disconnect(ctx)
-	}
-	if m.From != nil {
-		if err = m.From.Connect(ctx); err != nil {
-			return fmt.Errorf("failed to connect to source database: %w", err)
-		}
-		defer m.From.Disconnect(ctx)
-	}
-	return m.runFunc(ctx, m.To, m.From)
-}
-
-// Migrate initializes the EDB database for the IM Operands and performs any additional migrations that may be needed.
-func Migrate(ctx context.Context, c chan *Result, migrations ...*Migration) {
-	reqLogger := logf.FromContext(ctx).WithName("migration_worker")
-
-	migrationCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	migrationCtx = logf.IntoContext(migrationCtx, reqLogger)
-
-	var err error
-	result := &Result{}
-	for _, m := range migrations {
-		if len(result.Incomplete) > 0 {
-			result.Incomplete = append(result.Incomplete, m)
-			continue
-		}
-		if err = m.Run(migrationCtx); err != nil {
-			result.Error = fmt.Errorf("failure occurred during %s: %w", m.Name, err)
-			result.Incomplete = append(result.Incomplete, m)
-			continue
-		}
-		result.Complete = append(result.Complete, m)
-	}
-
-	c <- result
-	close(c)
-}
-
-func (p *PostgresDB) HasSchemas(ctx context.Context) (bool, error) {
+var mongoToV1Func migration.MigrationFunc = func(ctx context.Context, to, from dbconn.DBConn) (err error) {
 	reqLogger := logf.FromContext(ctx)
-	var err error
-	var rows pgx.Rows
-	if rows, err = p.Conn.Query(ctx, "SELECT schema_name FROM information_schema.schemata;"); err != nil {
-		reqLogger.Error(err, "Failed to retrieve schema names")
-		return false, err
-	}
-	defer rows.Close()
-
-	foundSchemas := map[string]bool{}
-
-	for _, schemaName := range p.Schemas {
-		foundSchemas[schemaName] = false
-	}
-
-	for rows.Next() {
-		var s string
-		if err = rows.Scan(&s); err != nil {
-			return false, err
-		}
-		if _, ok := foundSchemas[s]; ok {
-			foundSchemas[s] = true
-		}
-	}
-
-	if rows.Err() != nil {
-		return false, err
-	}
-
-	for _, present := range foundSchemas {
-		if !present {
-			return false, nil
-		}
-	}
-
-	return true, nil
-}
-
-// InitSchemas executes the DDL that initializes the schemas and tables that the different IM Operands will use.
-func InitSchemas(ctx context.Context, to, from DBConn) (err error) {
-	reqLogger := logf.FromContext(ctx)
-	postgres, ok := to.(*PostgresDB)
-	if !ok {
-		return fmt.Errorf("from should be an instance of Postgres")
-	}
-	if err = postgres.Connect(ctx); err != nil {
-		reqLogger.Error(err, "Failed to connect to Postgres")
-		return
-	}
-	defer postgres.Disconnect(ctx)
-
-	var schemasPresent bool
-	schemasPresent, err = postgres.HasSchemas(ctx)
-	if err != nil {
-		reqLogger.Error(err, "Failed to determine whether schemas present")
-		return
-	}
-	if !schemasPresent {
-		if err = to.RunDDL(ctx, v1schema.DBInitMigration); err != nil {
-			reqLogger.Error(err, "Failed to execute DDL")
-		}
-	}
-	return
-}
-
-func MongoToV1(ctx context.Context, to, from DBConn) (err error) {
-	reqLogger := logf.FromContext(ctx)
-	mongodb, ok := from.(*MongoDB)
+	mongodb, ok := from.(*dbconn.MongoDB)
 	reqLogger.Info("Connecting to MongoDB", "MongoDB.Host", mongodb.Host, "MongoDB.Port", mongodb.Port)
 	if !ok {
 		return fmt.Errorf("from should be an instance of MongoDB")
@@ -300,7 +44,7 @@ func MongoToV1(ctx context.Context, to, from DBConn) (err error) {
 	}
 	defer mongodb.Disconnect(ctx)
 
-	postgres, ok := to.(*PostgresDB)
+	postgres, ok := to.(*dbconn.PostgresDB)
 	reqLogger.Info("Connecting to PostgresDB", "PostgresDB.Host", postgres.Host, "PostgresDB.Port", postgres.Port)
 	if !ok {
 		return fmt.Errorf("from should be an instance of Postgres")
@@ -336,7 +80,7 @@ func MongoToV1(ctx context.Context, to, from DBConn) (err error) {
 	return
 }
 
-func insertOIDCClients(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+func insertOIDCClients(ctx context.Context, mongodb *dbconn.MongoDB, postgres *dbconn.PostgresDB) (err error) {
 	dbName := "OAuthDBSchema"
 	collectionName := "OauthClient"
 	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
@@ -363,15 +107,15 @@ func insertOIDCClients(ctx context.Context, mongodb *MongoDB, postgres *Postgres
 			continue
 		}
 
-		oc := &v1schema.OIDCClient{}
-		if err = v1schema.ConvertToOIDCClient(result, oc); err != nil {
+		oc := &OIDCClient{}
+		if err = ConvertToOIDCClient(result, oc); err != nil {
 			reqLogger.Error(err, "Failed to unmarshal oauthclient")
 			errCount++
 			err = nil
 			continue
 		}
 		query := oc.GetInsertSQL()
-		args := oc.GetArgs()
+		args := GetNamedArgsFromRow(oc)
 		var id *string
 		err = postgres.Conn.QueryRow(ctx, query, args).Scan(&id)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -409,7 +153,7 @@ func insertOIDCClients(ctx context.Context, mongodb *MongoDB, postgres *Postgres
 	return
 }
 
-func insertOauthTokens(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+func insertOauthTokens(ctx context.Context, mongodb *dbconn.MongoDB, postgres *dbconn.PostgresDB) (err error) {
 	dbName := "OAuthDBSchema"
 	collectionName := "OauthToken"
 	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
@@ -423,8 +167,8 @@ func insertOauthTokens(ctx context.Context, mongodb *MongoDB, postgres *Postgres
 	errCount := 0
 	migrateCount := 0
 	for cursor.Next(ctx) {
-		var token v1schema.OauthToken
-		if err = cursor.Decode(&token); err != nil {
+		token := &OauthToken{}
+		if err = cursor.Decode(token); err != nil {
 			reqLogger.Error(err, "Failed to decode Mongo document")
 			errCount++
 			err = nil
@@ -432,7 +176,7 @@ func insertOauthTokens(ctx context.Context, mongodb *MongoDB, postgres *Postgres
 		}
 
 		query := token.GetInsertSQL()
-		args := token.GetArgs()
+		args := GetNamedArgsFromRow(token)
 		_, err = postgres.Conn.Exec(ctx, query, args)
 		if errors.Is(err, pgx.ErrNoRows) {
 			reqLogger.Info("Row already exists in EDB")
@@ -469,7 +213,7 @@ func insertOauthTokens(ctx context.Context, mongodb *MongoDB, postgres *Postgres
 	return
 }
 
-func insertIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+func insertIdpConfigs(ctx context.Context, mongodb *dbconn.MongoDB, postgres *dbconn.PostgresDB) (err error) {
 	dbName := "platform-db"
 	collectionName := "cloudpak_ibmid_v3"
 	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
@@ -495,15 +239,15 @@ func insertIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresD
 			err = nil
 			continue
 		}
-		idpConfig := &v1schema.IdpConfig{}
-		if err = v1schema.ConvertToIdpConfig(result, idpConfig); err != nil {
+		idpConfig := &IdpConfig{}
+		if err = ConvertToIdpConfig(result, idpConfig); err != nil {
 			reqLogger.Error(err, "Failed to unmarshal idp_config")
 			errCount++
 			err = nil
 			continue
 		}
 		query := idpConfig.GetInsertSQL()
-		args := idpConfig.GetArgs()
+		args := GetNamedArgsFromRow(idpConfig)
 		var uid *string
 		err := postgres.Conn.QueryRow(ctx, query, args).Scan(&uid)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -532,7 +276,7 @@ func insertIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresD
 	return
 }
 
-func insertDirectoriesAsIdpConfigs(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+func insertDirectoriesAsIdpConfigs(ctx context.Context, mongodb *dbconn.MongoDB, postgres *dbconn.PostgresDB) (err error) {
 	dbName := "platform-db"
 	collectionName := "Directory"
 	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
@@ -559,15 +303,15 @@ func insertDirectoriesAsIdpConfigs(ctx context.Context, mongodb *MongoDB, postgr
 			continue
 		}
 
-		var idpConfig *v1schema.IdpConfig
+		var idpConfig *IdpConfig
 		var uid string
-		if idpConfig, err = v1schema.ConvertV2DirectoryToV3IdpConfig(result); err != nil {
+		if idpConfig, err = ConvertV2DirectoryToV3IdpConfig(result); err != nil {
 			reqLogger.Error(err, "Failed to convert Directory to v3-compatible IDP config")
 			errCount++
 			continue
 		}
 		query := idpConfig.GetInsertSQL()
-		args := idpConfig.GetArgs()
+		args := GetNamedArgsFromRow(idpConfig)
 		err := postgres.Conn.QueryRow(ctx, query, args).Scan(&uid)
 		if errors.Is(err, pgx.ErrNoRows) {
 			reqLogger.Info("Row already exists in EDB")
@@ -605,12 +349,12 @@ func insertDirectoriesAsIdpConfigs(ctx context.Context, mongodb *MongoDB, postgr
 	return
 }
 
-func insertV2SamlAsIdpConfig(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+func insertV2SamlAsIdpConfig(ctx context.Context, mongodb *dbconn.MongoDB, postgres *dbconn.PostgresDB) (err error) {
 	dbName := "platform-db"
 	collectionName := "cloudpak_ibmid_v2"
 	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
 	v3SamlFilter := bson.M{"protocol": "saml"}
-	v3Saml := &v1schema.IdpConfig{}
+	v3Saml := &IdpConfig{}
 	err = mongodb.Client.Database(dbName).Collection("cloudpak_ibmid_v3").FindOne(ctx, v3SamlFilter).Decode(v3Saml)
 	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
 		reqLogger.Error(err, "Failed to read v3 SAML document from MongoDB", "MongoDB.DB", "platform-db", "MongoDB.Collection", "cloudpak_ibmid_v3")
@@ -646,9 +390,9 @@ func insertV2SamlAsIdpConfig(ctx context.Context, mongodb *MongoDB, postgres *Po
 			continue
 		}
 
-		var idpConfig *v1schema.IdpConfig
+		var idpConfig *IdpConfig
 		var uid string
-		if idpConfig, err = v1schema.ConvertV2SamlToIdpConfig(result); err != nil {
+		if idpConfig, err = ConvertV2SamlToIdpConfig(result); err != nil {
 			reqLogger.Error(err, "Failed to convert SAML to v3-compatible IDP config")
 			errCount++
 			continue
@@ -666,7 +410,7 @@ func insertV2SamlAsIdpConfig(ctx context.Context, mongodb *MongoDB, postgres *Po
 		}
 		idpConfig.IDPConfig["idp_metadata"] = saml.Metadata
 		query := idpConfig.GetInsertSQL()
-		args := idpConfig.GetArgs()
+		args := GetNamedArgsFromRow(idpConfig)
 		err := postgres.Conn.QueryRow(ctx, query, args).Scan(&uid)
 		if errors.Is(err, pgx.ErrNoRows) {
 			reqLogger.Info("Row already exists in EDB")
@@ -714,9 +458,9 @@ func insertV2SamlAsIdpConfig(ctx context.Context, mongodb *MongoDB, postgres *Po
 	return
 }
 
-func insertUser(ctx context.Context, postgres *PostgresDB, user *v1schema.User) (uid *uuid.UUID, err error) {
+func insertUser(ctx context.Context, postgres *dbconn.PostgresDB, user *User) (uid *uuid.UUID, err error) {
 	reqLogger := logf.FromContext(ctx)
-	args := user.GetArgs()
+	args := GetNamedArgsFromRow(user)
 	query := user.GetInsertSQL()
 	uid = &uuid.UUID{}
 	err = postgres.Conn.QueryRow(ctx, query, args).Scan(uid)
@@ -735,14 +479,14 @@ func insertUser(ctx context.Context, postgres *PostgresDB, user *v1schema.User) 
 	return
 }
 
-func getUserFromMongoCursor(cursor *mongo.Cursor) (user *v1schema.User, err error) {
+func getUserFromMongoCursor(cursor *mongo.Cursor) (user *User, err error) {
 	var result map[string]any
 	if err = cursor.Decode(&result); err != nil {
 		err = fmt.Errorf("failed to decode MongoDB document: %w", err)
 		return
 	}
-	user = &v1schema.User{}
-	if err = v1schema.ConvertToUser(result, user); err != nil {
+	user = &User{}
+	if err = ConvertToUser(result, user); err != nil {
 		err = fmt.Errorf("failed to unmarshal into user: %w", err)
 		user = nil
 		return
@@ -750,7 +494,7 @@ func getUserFromMongoCursor(cursor *mongo.Cursor) (user *v1schema.User, err erro
 	return
 }
 
-func insertUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+func insertUserRelatedRows(ctx context.Context, mongodb *dbconn.MongoDB, postgres *dbconn.PostgresDB) (err error) {
 	dbName := "platform-db"
 	collectionName := "Users"
 	reqLogger := logf.FromContext(ctx)
@@ -770,7 +514,7 @@ func insertUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *Post
 	errCount := 0
 	migrateCount := 0
 	for cursor.Next(ctx) {
-		var user *v1schema.User
+		var user *User
 		user, err = getUserFromMongoCursor(cursor)
 		if err != nil {
 			errCount++
@@ -803,12 +547,12 @@ func insertUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *Post
 
 		if err = migrateUserPreferencesRowForUser(ctx, mongodb, postgres, user); err != nil {
 			errCount++
-			reqLogger.Error(err, "Inserting UserPreferences failed", "identifier", v1schema.UsersIdentifier)
+			reqLogger.Error(err, "Inserting UserPreferences failed", "identifier", UsersIdentifier)
 			continue
 		}
 		if err = migrateZenInstanceUserRowForUser(ctx, mongodb, postgres, user); err != nil {
 			errCount++
-			reqLogger.Error(err, "Inserting ZenInstanceUser failed", "identifier", v1schema.UsersIdentifier)
+			reqLogger.Error(err, "Inserting ZenInstanceUser failed", "identifier", UsersIdentifier)
 			continue
 		}
 		if err != nil {
@@ -823,7 +567,7 @@ func insertUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *Post
 		reqLogger.Error(err, "Migration of platform-db.Users not successful", "failedCount", errCount, "successCount", migrateCount)
 		return
 	} else if errCount == 0 && migrateCount == 0 {
-		reqLogger.Info("No documents needed to be migrated; continuing", "identifier", v1schema.UsersIdentifier)
+		reqLogger.Info("No documents needed to be migrated; continuing", "identifier", UsersIdentifier)
 		return
 	}
 
@@ -835,7 +579,7 @@ func insertUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *Post
 	return
 }
 
-func migrateUserPreferencesRowForUser(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB, user *v1schema.User) (err error) {
+func migrateUserPreferencesRowForUser(ctx context.Context, mongodb *dbconn.MongoDB, postgres *dbconn.PostgresDB, user *User) (err error) {
 	reqLogger := logf.FromContext(ctx)
 	preferenceId := strings.Join([]string{"preferenceId", user.UserID}, "_")
 	migrationKey := postgres.GetMigrationKey()
@@ -847,23 +591,23 @@ func migrateUserPreferencesRowForUser(ctx context.Context, mongodb *MongoDB, pos
 	}
 	cursor, err := mongodb.Client.Database("platform-db").Collection("UserPreferences").Find(ctx, filter)
 	if err != nil {
-		reqLogger.Error(err, "Failed to get cursor from MongoDB", "identifier", v1schema.UsersPreferencesIdentifier)
+		reqLogger.Error(err, "Failed to get cursor from MongoDB", "identifier", UsersPreferencesIdentifier)
 		return
 	}
 	migrateCount := 0
 	for cursor.Next(ctx) {
 		var result map[string]interface{}
 		if err = cursor.Decode(&result); err != nil {
-			reqLogger.Error(err, "Failed to decode Mongo document", "identifier", v1schema.UsersPreferencesIdentifier)
+			reqLogger.Error(err, "Failed to decode Mongo document", "identifier", UsersPreferencesIdentifier)
 			return err
 		}
-		userPrefs := &v1schema.UserPreferences{}
-		if err = v1schema.ConvertToUserPreferences(result, userPrefs); err != nil {
-			reqLogger.Error(err, "Failed to unmarshal UserPreferences", "identifier", v1schema.UsersPreferencesIdentifier)
+		userPrefs := &UserPreferences{}
+		if err = ConvertToUserPreferences(result, userPrefs); err != nil {
+			reqLogger.Error(err, "Failed to unmarshal UserPreferences", "identifier", UsersPreferencesIdentifier)
 			return err
 		}
 		userPrefs.UserUID = user.UID.String()
-		args := userPrefs.GetArgs()
+		args := GetNamedArgsFromRow(userPrefs)
 
 		query := userPrefs.GetInsertSQL()
 		reqLogger.Info("Executing query for UserPreferences", "preferenceId", preferenceId, "uid", userPrefs.UserUID)
@@ -872,7 +616,7 @@ func migrateUserPreferencesRowForUser(ctx context.Context, mongodb *MongoDB, pos
 			reqLogger.Info("Row already exists in EDB")
 			err = nil
 		} else if err != nil {
-			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.users_preferences", "identifier", v1schema.UsersPreferencesIdentifier)
+			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.users_preferences", "identifier", UsersPreferencesIdentifier)
 			return err
 		}
 		updateFilter := bson.D{{Key: "_id", Value: preferenceId}}
@@ -887,7 +631,7 @@ func migrateUserPreferencesRowForUser(ctx context.Context, mongodb *MongoDB, pos
 		migrateCount++
 	}
 	if migrateCount == 0 {
-		reqLogger.Info("No documents needed to be migrated; continuing", "identifier", v1schema.UsersPreferencesIdentifier)
+		reqLogger.Info("No documents needed to be migrated; continuing", "identifier", UsersPreferencesIdentifier)
 		return
 	}
 
@@ -914,7 +658,7 @@ func xorDecode(e string) (d string, err error) {
 	return string(dBytes), nil
 }
 
-func setClientSecretIfEmpty(ctx context.Context, mongodb *MongoDB, zenInstance *v1schema.ZenInstance) (set bool, err error) {
+func setClientSecretIfEmpty(ctx context.Context, mongodb *dbconn.MongoDB, zenInstance *ZenInstance) (set bool, err error) {
 	if zenInstance.ClientSecret != "" {
 		return
 	}
@@ -922,7 +666,7 @@ func setClientSecretIfEmpty(ctx context.Context, mongodb *MongoDB, zenInstance *
 	dbName := "OAuthDBSchema"
 	collectionName := "OauthClient"
 	clientIDFilter := bson.D{{Key: "CLIENTID", Value: zenInstance.ClientID}}
-	oc := &v1schema.OIDCClient{}
+	oc := &OIDCClient{}
 	err = mongodb.Client.
 		Database(dbName).
 		Collection(collectionName).
@@ -945,15 +689,15 @@ func setClientSecretIfEmpty(ctx context.Context, mongodb *MongoDB, zenInstance *
 	return
 }
 
-func getHighestRoleForUserFromTeam(userID string, team *v1schema.Team) (role v1schema.Role) {
+func getHighestRoleForUserFromTeam(userID string, team *Team) (role Role) {
 	teamUser := team.Users.GetUser(userID)
 	if teamUser == nil {
-		return v1schema.Authenticated
+		return Authenticated
 	}
 	return teamUser.Roles.GetHighestRole()
 }
 
-func setUserV3Role(ctx context.Context, mongodb *MongoDB, user *v1schema.User) (set bool, err error) {
+func setUserV3Role(ctx context.Context, mongodb *dbconn.MongoDB, user *User) (set bool, err error) {
 	if user.Role != "" {
 		return
 	}
@@ -965,9 +709,9 @@ func setUserV3Role(ctx context.Context, mongodb *MongoDB, user *v1schema.User) (
 		Collection(collectionName).
 		Find(ctx, filter)
 
-	var highest v1schema.Role
+	var highest Role
 	for cursor.Next(ctx) {
-		team := &v1schema.Team{}
+		team := &Team{}
 		if err = cursor.Decode(&team); err != nil {
 			return
 		}
@@ -981,7 +725,7 @@ func setUserV3Role(ctx context.Context, mongodb *MongoDB, user *v1schema.User) (
 	return
 }
 
-func insertZenInstances(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+func insertZenInstances(ctx context.Context, mongodb *dbconn.MongoDB, postgres *dbconn.PostgresDB) (err error) {
 	dbName := "platform-db"
 	collectionName := "ZenInstance"
 	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
@@ -1009,8 +753,8 @@ func insertZenInstances(ctx context.Context, mongodb *MongoDB, postgres *Postgre
 			continue
 		}
 
-		zenInstance := &v1schema.ZenInstance{}
-		if err = v1schema.ConvertToZenInstance(result, zenInstance); err != nil {
+		zenInstance := &ZenInstance{}
+		if err = ConvertToZenInstance(result, zenInstance); err != nil {
 			reqLogger.Error(err, "Failed to unmarshal ZenInstance")
 			errCount++
 			err = nil
@@ -1024,7 +768,7 @@ func insertZenInstances(ctx context.Context, mongodb *MongoDB, postgres *Postgre
 			continue
 		}
 
-		args := zenInstance.GetArgs()
+		args := GetNamedArgsFromRow(zenInstance)
 		query := zenInstance.GetInsertSQL()
 		_, err := postgres.Conn.Exec(ctx, query, args)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -1065,7 +809,7 @@ func insertZenInstances(ctx context.Context, mongodb *MongoDB, postgres *Postgre
 	return
 }
 
-func migrateZenInstanceUserRowForUser(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB, user *v1schema.User) (err error) {
+func migrateZenInstanceUserRowForUser(ctx context.Context, mongodb *dbconn.MongoDB, postgres *dbconn.PostgresDB, user *User) (err error) {
 	dbName := "platform-db"
 	collectionName := "ZenInstanceUsers"
 	reqLogger := logf.FromContext(ctx).WithValues()
@@ -1090,8 +834,8 @@ func migrateZenInstanceUserRowForUser(ctx context.Context, mongodb *MongoDB, pos
 			return
 		}
 
-		zenInstanceUser := &v1schema.ZenInstanceUser{}
-		if err = v1schema.ConvertToZenInstanceUser(result, zenInstanceUser); err != nil {
+		zenInstanceUser := &ZenInstanceUser{}
+		if err = ConvertToZenInstanceUser(result, zenInstanceUser); err != nil {
 			reqLogger.Error(err, "Failed to unmarshal ZenInstanceUser")
 			return
 		}
@@ -1123,7 +867,7 @@ func migrateZenInstanceUserRowForUser(ctx context.Context, mongodb *MongoDB, pos
 			reqLogger.Error(err, "Failed to determine migration status of ZenInstance referred to by this ZenInstanceUser")
 			return
 		}
-		args := zenInstanceUser.GetArgs()
+		args := GetNamedArgsFromRow(zenInstanceUser)
 
 		query := zenInstanceUser.GetInsertSQL()
 		_, err = postgres.Conn.Exec(ctx, query, args)
@@ -1160,7 +904,7 @@ func migrateZenInstanceUserRowForUser(ctx context.Context, mongodb *MongoDB, pos
 	return
 }
 
-func insertSCIMAttributes(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+func insertSCIMAttributes(ctx context.Context, mongodb *dbconn.MongoDB, postgres *dbconn.PostgresDB) (err error) {
 	dbName := "platform-db"
 	collectionName := "ScimAttributes"
 	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
@@ -1187,8 +931,8 @@ func insertSCIMAttributes(ctx context.Context, mongodb *MongoDB, postgres *Postg
 			err = nil
 			continue
 		}
-		scimAttr := &v1schema.SCIMAttributes{}
-		if err = v1schema.ConvertToSCIMAttributes(result, scimAttr); err != nil {
+		scimAttr := &SCIMAttributes{}
+		if err = ConvertToSCIMAttributes(result, scimAttr); err != nil {
 			reqLogger.Error(err, "Failed to unmarshal ScimAttributes")
 			errCount++
 			err = nil
@@ -1241,7 +985,7 @@ func insertSCIMAttributes(ctx context.Context, mongodb *MongoDB, postgres *Postg
 	return
 }
 
-func insertSCIMAttributeMappings(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+func insertSCIMAttributeMappings(ctx context.Context, mongodb *dbconn.MongoDB, postgres *dbconn.PostgresDB) (err error) {
 	dbName := "platform-db"
 	collectionName := "ScimAttributeMapping"
 	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
@@ -1268,8 +1012,8 @@ func insertSCIMAttributeMappings(ctx context.Context, mongodb *MongoDB, postgres
 			err = nil
 			continue
 		}
-		scimAttrMapping := &v1schema.SCIMAttributesMapping{}
-		if err = v1schema.ConvertToSCIMAttributesMapping(result, scimAttrMapping); err != nil {
+		scimAttrMapping := &SCIMAttributesMapping{}
+		if err = ConvertToSCIMAttributesMapping(result, scimAttrMapping); err != nil {
 			reqLogger.Error(err, "Failed to unmarshal ScimAttributeMapping")
 			errCount++
 			err = nil
@@ -1323,7 +1067,7 @@ func insertSCIMAttributeMappings(ctx context.Context, mongodb *MongoDB, postgres
 	return
 }
 
-func removeInvalidUserPreferences(usersPrefs []v1schema.UserPreferences) (updated []v1schema.UserPreferences) {
+func removeInvalidUserPreferences(usersPrefs []UserPreferences) (updated []UserPreferences) {
 	for _, userPrefs := range usersPrefs {
 		if userPrefs.LastLogin != nil {
 			updated = append(updated, userPrefs)
@@ -1332,9 +1076,9 @@ func removeInvalidUserPreferences(usersPrefs []v1schema.UserPreferences) (update
 	return
 }
 
-func getSSUserFromMap(result map[string]any) (ssUser *v1schema.ScimServerUser, err error) {
-	ssUser = &v1schema.ScimServerUser{}
-	if err = v1schema.ConvertToScimServerUser(result, ssUser); err != nil {
+func getSSUserFromMap(result map[string]any) (ssUser *ScimServerUser, err error) {
+	ssUser = &ScimServerUser{}
+	if err = ConvertToScimServerUser(result, ssUser); err != nil {
 		err = fmt.Errorf("failed to unmarshal into scimserveruser: %w", err)
 		ssUser = nil
 		return
@@ -1342,9 +1086,9 @@ func getSSUserFromMap(result map[string]any) (ssUser *v1schema.ScimServerUser, e
 	return
 }
 
-func insertSSUser(ctx context.Context, postgres *PostgresDB, ssUser *v1schema.ScimServerUser) (err error) {
+func insertSSUser(ctx context.Context, postgres *dbconn.PostgresDB, ssUser *ScimServerUser) (err error) {
 	reqLogger := logf.FromContext(ctx)
-	args := ssUser.GetArgs()
+	args := GetNamedArgsFromRow(ssUser)
 	query := ssUser.GetInsertSQL()
 	var id *string
 	err = postgres.Conn.QueryRow(ctx, query, args).Scan(&id)
@@ -1358,9 +1102,9 @@ func insertSSUser(ctx context.Context, postgres *PostgresDB, ssUser *v1schema.Sc
 	return
 }
 
-func insertSSUserCustom(ctx context.Context, postgres *PostgresDB, ssUserCustom *v1schema.ScimServerUserCustom) (err error) {
+func insertSSUserCustom(ctx context.Context, postgres *dbconn.PostgresDB, ssUserCustom *ScimServerUserCustom) (err error) {
 	reqLogger := logf.FromContext(ctx)
-	args := ssUserCustom.GetArgs()
+	args := GetNamedArgsFromRow(ssUserCustom)
 	query := ssUserCustom.GetInsertSQL()
 	var id *string
 	err = postgres.Conn.QueryRow(ctx, query, args).Scan(&id)
@@ -1374,7 +1118,7 @@ func insertSSUserCustom(ctx context.Context, postgres *PostgresDB, ssUserCustom 
 	return
 }
 
-func insertSSUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+func insertSSUserRelatedRows(ctx context.Context, mongodb *dbconn.MongoDB, postgres *dbconn.PostgresDB) (err error) {
 	dbName := "platform-db"
 	collectionName := "ScimServerUsers"
 	reqLogger := logf.FromContext(ctx)
@@ -1394,7 +1138,7 @@ func insertSSUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *Po
 	errCount := 0
 	migrateCount := 0
 	for cursor.Next(ctx) {
-		var ssUser *v1schema.ScimServerUser
+		var ssUser *ScimServerUser
 		// mongo doc is split into 3 maps
 		// ssUserMap - goes as a row into scim_server_users table
 		// ssUserCustomMap - goes as a multiple rows into scim_server_users_custom table
@@ -1424,7 +1168,7 @@ func insertSSUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *Po
 		for key, value := range ssUserCustomMap {
 			switch v := value.(type) {
 			case string:
-				ssUserCustom := &v1schema.ScimServerUserCustom{
+				ssUserCustom := &ScimServerUserCustom{
 					ScimServerUserUID: id,
 					AttributeKey:      key,
 					AttributeValue:    v,
@@ -1435,7 +1179,7 @@ func insertSSUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *Po
 					continue
 				}
 			case any:
-				ssUserCustom := &v1schema.ScimServerUserCustom{
+				ssUserCustom := &ScimServerUserCustom{
 					ScimServerUserUID:     id,
 					AttributeKey:          key,
 					AttributeValueComplex: v,
@@ -1456,7 +1200,7 @@ func insertSSUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *Po
 				for k, val := range v {
 					switch v := val.(type) {
 					case string:
-						ssUserCustom := &v1schema.ScimServerUserCustom{
+						ssUserCustom := &ScimServerUserCustom{
 							ScimServerUserUID: id,
 							AttributeKey:      k,
 							AttributeValue:    v,
@@ -1468,7 +1212,7 @@ func insertSSUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *Po
 							continue
 						}
 					case any:
-						ssUserCustom := &v1schema.ScimServerUserCustom{
+						ssUserCustom := &ScimServerUserCustom{
 							ScimServerUserUID:     id,
 							AttributeKey:          k,
 							AttributeValueComplex: v,
@@ -1491,7 +1235,7 @@ func insertSSUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *Po
 		reqLogger.Error(err, "Migration of platform-db.ScimServerUsers not successful", "failedCount", errCount, "successCount", migrateCount)
 		return
 	} else if errCount == 0 && migrateCount == 0 {
-		reqLogger.Info("No documents needed to be migrated; continuing", "identifier", v1schema.ScimServerUsersIdentifier)
+		reqLogger.Info("No documents needed to be migrated; continuing", "identifier", ScimServerUsersIdentifier)
 		return
 	}
 
@@ -1503,9 +1247,9 @@ func insertSSUserRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *Po
 	return
 }
 
-func getSSGroupFromMap(result map[string]any) (ssGroup *v1schema.ScimServerGroup, err error) {
-	ssGroup = &v1schema.ScimServerGroup{}
-	if err = v1schema.ConvertToScimServerGroup(result, ssGroup); err != nil {
+func getSSGroupFromMap(result map[string]any) (ssGroup *ScimServerGroup, err error) {
+	ssGroup = &ScimServerGroup{}
+	if err = ConvertToScimServerGroup(result, ssGroup); err != nil {
 		err = fmt.Errorf("failed to unmarshal into scimservergroup: %w", err)
 		ssGroup = nil
 		return
@@ -1513,9 +1257,9 @@ func getSSGroupFromMap(result map[string]any) (ssGroup *v1schema.ScimServerGroup
 	return
 }
 
-func insertSSGroup(ctx context.Context, postgres *PostgresDB, ssGroup *v1schema.ScimServerGroup) (err error) {
+func insertSSGroup(ctx context.Context, postgres *dbconn.PostgresDB, ssGroup *ScimServerGroup) (err error) {
 	reqLogger := logf.FromContext(ctx)
-	args := ssGroup.GetArgs()
+	args := GetNamedArgsFromRow(ssGroup)
 	query := ssGroup.GetInsertSQL()
 	var id *string
 	err = postgres.Conn.QueryRow(ctx, query, args).Scan(&id)
@@ -1529,9 +1273,9 @@ func insertSSGroup(ctx context.Context, postgres *PostgresDB, ssGroup *v1schema.
 	return
 }
 
-func insertSSGroupCustom(ctx context.Context, postgres *PostgresDB, ssGroupCustom *v1schema.ScimServerGroupCustom) (err error) {
+func insertSSGroupCustom(ctx context.Context, postgres *dbconn.PostgresDB, ssGroupCustom *ScimServerGroupCustom) (err error) {
 	reqLogger := logf.FromContext(ctx)
-	args := ssGroupCustom.GetArgs()
+	args := GetNamedArgsFromRow(ssGroupCustom)
 	query := ssGroupCustom.GetInsertSQL()
 	var id *string
 	err = postgres.Conn.QueryRow(ctx, query, args).Scan(&id)
@@ -1545,7 +1289,7 @@ func insertSSGroupCustom(ctx context.Context, postgres *PostgresDB, ssGroupCusto
 	return
 }
 
-func insertSSGroupRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+func insertSSGroupRelatedRows(ctx context.Context, mongodb *dbconn.MongoDB, postgres *dbconn.PostgresDB) (err error) {
 	dbName := "platform-db"
 	collectionName := "ScimServerGroups"
 	reqLogger := logf.FromContext(ctx)
@@ -1565,7 +1309,7 @@ func insertSSGroupRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *P
 	errCount := 0
 	migrateCount := 0
 	for cursor.Next(ctx) {
-		var ssGroup *v1schema.ScimServerGroup
+		var ssGroup *ScimServerGroup
 		// mongo doc is split into 3 maps
 		// ssGroupMap - goes as a row into scim_server_groups table
 		// ssGroupCustomMap - goes as a multiple rows into scim_server_groups_custom table
@@ -1595,7 +1339,7 @@ func insertSSGroupRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *P
 		for key, value := range ssGroupCustomMap {
 			switch v := value.(type) {
 			case string:
-				ssGroupCustom := &v1schema.ScimServerGroupCustom{
+				ssGroupCustom := &ScimServerGroupCustom{
 					ScimServerGroupUID: id,
 					AttributeKey:       key,
 					AttributeValue:     v,
@@ -1606,7 +1350,7 @@ func insertSSGroupRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *P
 					continue
 				}
 			case any:
-				ssGroupCustom := &v1schema.ScimServerGroupCustom{
+				ssGroupCustom := &ScimServerGroupCustom{
 					ScimServerGroupUID:    id,
 					AttributeKey:          key,
 					AttributeValueComplex: v,
@@ -1627,7 +1371,7 @@ func insertSSGroupRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *P
 				for k, val := range v {
 					switch v := val.(type) {
 					case string:
-						ssGroupCustom := &v1schema.ScimServerGroupCustom{
+						ssGroupCustom := &ScimServerGroupCustom{
 							ScimServerGroupUID: id,
 							AttributeKey:       k,
 							AttributeValue:     v,
@@ -1639,7 +1383,7 @@ func insertSSGroupRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *P
 							continue
 						}
 					case any:
-						ssGroupCustom := &v1schema.ScimServerGroupCustom{
+						ssGroupCustom := &ScimServerGroupCustom{
 							ScimServerGroupUID:    id,
 							AttributeKey:          k,
 							AttributeValueComplex: v,
@@ -1662,7 +1406,7 @@ func insertSSGroupRelatedRows(ctx context.Context, mongodb *MongoDB, postgres *P
 		reqLogger.Error(err, "Migration of platform-db.ScimServerGroups not successful", "failedCount", errCount, "successCount", migrateCount)
 		return
 	} else if errCount == 0 && migrateCount == 0 {
-		reqLogger.Info("No documents needed to be migrated; continuing", "identifier", v1schema.ScimServerUsersIdentifier)
+		reqLogger.Info("No documents needed to be migrated; continuing", "identifier", ScimServerUsersIdentifier)
 		return
 	}
 
@@ -1687,7 +1431,7 @@ func populateSSUserCustomMap(ssUserMap map[string]any) map[string]any {
 	delete(ssUserMap, "_id")
 	ssUserCustomMap := make(map[string]any)
 	for key, value := range ssUserMap {
-		if !contains(v1schema.ScimServerUsersMongoFieldNames, key) {
+		if !contains(ScimServerUsersMongoFieldNames, key) {
 			ssUserCustomMap[key] = value
 		}
 	}
@@ -1698,7 +1442,7 @@ func populateSSGroupCustomMap(ssGroupMap map[string]any) map[string]any {
 	delete(ssGroupMap, "_id")
 	ssGroupCustomMap := make(map[string]any)
 	for key, value := range ssGroupMap {
-		if !contains(v1schema.ScimServerGroupsMongoFieldNames, key) {
+		if !contains(ScimServerGroupsMongoFieldNames, key) {
 			ssGroupCustomMap[key] = value
 		}
 	}
@@ -1745,7 +1489,7 @@ func populateSSGroupCustomSchemaMap(ssGroupCustomMap map[string]any) map[string]
 	return grpSchemaMap
 }
 
-func insertGroupsAndMemberRefs(ctx context.Context, mongodb *MongoDB, postgres *PostgresDB) (err error) {
+func insertGroupsAndMemberRefs(ctx context.Context, mongodb *dbconn.MongoDB, postgres *dbconn.PostgresDB) (err error) {
 	dbName := "platform-db"
 	collectionName := "Groups"
 	reqLogger := logf.FromContext(ctx).WithValues("MongoDB.DB", dbName, "MongoDB.Collection", collectionName)
@@ -1763,10 +1507,10 @@ func insertGroupsAndMemberRefs(ctx context.Context, mongodb *MongoDB, postgres *
 	}
 	errCount := 0
 	migrateCount := 0
-	var xref v1schema.UserGroup
+	var xref UserGroup
 	xrefQuery := xref.GetInsertSQL()
 	for cursor.Next(ctx) {
-		var group v1schema.Group
+		var group Group
 		if err = cursor.Decode(&group); err != nil {
 			reqLogger.Error(err, "Failed to decode Mongo document")
 			errCount++
@@ -1839,4 +1583,4 @@ func insertGroupsAndMemberRefs(ctx context.Context, mongodb *MongoDB, postgres *
 	return
 }
 
-type copyFunc func(context.Context, *MongoDB, *PostgresDB) error
+type copyFunc func(context.Context, *dbconn.MongoDB, *dbconn.PostgresDB) error

@@ -4,6 +4,10 @@ generatorOptions:
   disableNameSuffixHash: true
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+images:
+  - name: controller
+    newName: icr.io/cpopen/ibm-iam-operator
+    newTag: 4.9.0
 patches:
 - path: ./image_env_vars_patch.yaml
   target:
@@ -11,13 +15,3 @@ patches:
     kind: Deployment
     name: ibm-iam-operator
     version: v1
-- path: ./add_pull_secret.yaml
-  target:
-    group: apps
-    kind: Deployment
-    name: ibm-iam-operator
-    version: v1
-images:
-- name: controller
-  newName: docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-scratch-docker-local/rwhundle/ibm-iam-operator
-  newTag: zen-issue-39543-cd

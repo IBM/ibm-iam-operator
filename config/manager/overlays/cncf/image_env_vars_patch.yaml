@@ -25,4 +25,4 @@
   path: /spec/template/spec/containers/0/env/-
   value:
     name: WATCH_NAMESPACE
-    value: im-deploy-test
+    value: ibm-common-services

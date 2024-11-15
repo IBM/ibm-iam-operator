@@ -11,7 +11,13 @@ patches:
     kind: Deployment
     name: ibm-iam-operator
     version: v1
+- path: ./add_pull_secret.yaml
+  target:
+    group: apps
+    kind: Deployment
+    name: ibm-iam-operator
+    version: v1
 images:
 - name: controller
   newName: docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-scratch-docker-local/rwhundle/ibm-iam-operator
-  newTag: latest
+  newTag: zen-issue-39543-cd

@@ -269,10 +269,6 @@ type AuthenticationList struct {
 	Items           []Authentication `json:"items"`
 }
 
-func init() {
-	SchemeBuilder.Register(&Authentication{}, &AuthenticationList{})
-}
-
 const AnnotationAuthMigrationComplete string = "authentication.operator.ibm.com/migration-complete"
 const AnnotationAuthRetainMigrationArtifacts string = "authentication.operator.ibm.com/retain-migration-artifacts"
 const AnnotationAuthDBSchemaVersion string = "authentication.operator.ibm.com/db-schema-version"
@@ -319,4 +315,9 @@ func (a *Authentication) GetDBSchemaVersion() string {
 
 func (a *Authentication) IsReady() bool {
 	return a.Status.Service.Status == "Ready"
+}
+
+func init() {
+	SchemeBuilder.Register(&Authentication{}, &AuthenticationList{})
+	ODLMEnabledSchemeBuilder.Register(&Authentication{}, &AuthenticationList{})
 }

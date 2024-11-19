@@ -222,8 +222,10 @@ func (r *AuthenticationReconciler) handleZenExtension(ctx context.Context, req c
 	clusterInfoConfigMap := &corev1.ConfigMap{}
 	clusterAddressFieldName := "cluster_address"
 	clusterAddressAuthFieldName := "cluster_address_auth"
+	clusterEndpointFieldName := "cluster_endpoint"
 
 	authHost := ""
+	clusterEndpoint := ""
 	fns := []subreconciler.Fn{
 		r.getClusterInfoConfigMap(authCR, clusterInfoConfigMap),
 		r.verifyConfigMapHasCorrectOwnership(authCR, clusterInfoConfigMap),
@@ -240,12 +242,16 @@ func (r *AuthenticationReconciler) handleZenExtension(ctx context.Context, req c
 		//authHost must be set to the zen front door
 		//is should be set from above
 		authHost = zenHost
+		clusterEndpoint = "https://" + zenHost
 	} else {
 		authHost = clusterInfoConfigMap.Data[clusterAddressFieldName]
+		clusterEndpoint = clusterInfoConfigMap.Data[clusterEndpointFieldName]
 	}
 
 	desiredFields := map[string]string{
 		clusterAddressAuthFieldName: authHost,
+		clusterAddressFieldName:     authHost,
+		clusterEndpointFieldName:    clusterEndpoint,
 	}
 	return r.ensureConfigMapHasEqualFields(authCR, desiredFields, clusterInfoConfigMap)(ctx)
 }

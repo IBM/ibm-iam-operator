@@ -253,3 +253,10 @@ func MergeMap(in map[string]string, mergeMap map[string]string) map[string]strin
 	}
 	return mergeMap
 }
+
+func GetBindInfoRefreshMap() map[string]string {
+	return map[string]string{
+		"bindinfoRefresh/configmap": DatastoreEDBCMName,
+		"bindinfoRefresh/secret":    DatastoreEDBSecretName,
+	}
+}

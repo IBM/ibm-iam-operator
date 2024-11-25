@@ -126,10 +126,6 @@ var alterUsersAttributesUniqueConstraints migration.MigrationFunc = func(ctx con
 	if err != nil {
 		return
 	}
-	_, err = tx.Exec(ctx, "ALTER TABLE oauthdbschema.users_attributes ADD CONSTRAINT users_attributes_uniqueness UNIQUE (user_uid,name);")
-	if err != nil {
-		return
-	}
 
 	err = tx.Commit(ctx)
 	return

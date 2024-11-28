@@ -30,6 +30,7 @@ func AllMigrations() []*migration.Migration {
 		InitOperandSchemas,
 		MongoToEDBv1,
 		IncreaseOIDCUsernameSize,
+		IncreaseTokenstringSize,
 	}
 }
 
@@ -57,6 +58,13 @@ var IncreaseOIDCUsernameSize *migration.Migration = migration.NewMigration().
 	Name("IncreaseOIDCUsernameSize").
 	ID(3).
 	RunFunc(&increaseOIDCUsernameSizeFunc).
+	Dependencies([]*migration.Migration{InitOperandSchemas, CreateMetadataSchema}).
+	Build()
+
+var IncreaseTokenstringSize *migration.Migration = migration.NewMigration().
+	Name("IncreaseTokenstringSize").
+	ID(4).
+	RunFunc(&increaseTokenstringSizeFunc).
 	Dependencies([]*migration.Migration{InitOperandSchemas, CreateMetadataSchema}).
 	Build()
 
@@ -116,6 +124,31 @@ var increaseOIDCUsernameSizeFunc migration.MigrationFunc = func(ctx context.Cont
 		return
 	}
 
+	err = tx.Commit(ctx)
+	return
+}
+
+var increaseTokenstringSizeFunc migration.MigrationFunc = func(ctx context.Context, to, from dbconn.DBConn) (err error) {
+	reqLogger := logf.FromContext(ctx)
+	postgres, ok := to.(*dbconn.PostgresDB)
+	if !ok {
+		return fmt.Errorf("to should be an instance of Postgres")
+	}
+	reqLogger.Info("Connecting to PostgresDB", "PostgresDB.Host", postgres.Host, "PostgresDB.Port", postgres.Port)
+	if err = postgres.Connect(ctx); err != nil {
+		reqLogger.Error(err, "Failed to connect to Postgres")
+		return
+	}
+	defer postgres.Disconnect(ctx)
+	tx, err := postgres.Conn.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	_, err = tx.Exec(ctx, "ALTER TABLE oauthdbschema.oauthtoken ALTER COLUMN tokenstring TYPE varchar;")
+	if err != nil {
+		return
+	}
 	err = tx.Commit(ctx)
 	return
 }

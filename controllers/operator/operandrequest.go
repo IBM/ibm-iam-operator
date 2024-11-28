@@ -131,12 +131,23 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 	observedOperands := observedOpReq.Spec.Requests[0].Operands
 	observedMongoDBOperand := getMongoDBOperandFromOpReq(observedOpReq)
 
-	if r.needToPreserveMongoDBInOpReq(ctx, authCR) && observedMongoDBOperand != nil &&
+	// If MongoDB is still needed, and observed OpReq has MongoDB, and the list of desired Operands does not have
+	// MongoDB listed
+
+	needToMigrate, err := r.needToMigrateFromMongo(ctx, authCR)
+	if err != nil {
+		reqLogger.Info("Failed to determine whether there is a need to migrate from MongoDB", "err", err.Error())
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	}
+
+	if needToMigrate && observedMongoDBOperand != nil &&
 		!hasMongoDBOperandFromOperands(desiredOperands) {
 		desiredOperands = append(desiredOperands, *observedMongoDBOperand)
 	}
 
+	reqLogger.V(1).Info("List Operands", "observedOperands", observedOperands, "desiredOperands", desiredOperands)
 	if !operandsAreEqual(observedOperands, desiredOperands) {
+		reqLogger.V(1).Info("Operands are different, set to desired")
 		observedOpReq.Spec.Requests[0].Operands = desiredOperands
 		changed = true
 	}
@@ -210,27 +221,10 @@ func (r *AuthenticationReconciler) needsEmbeddedEDB(ctx context.Context, authCR 
 	return !isConfiguredForExternal, err
 }
 
-func (r *AuthenticationReconciler) servicesNamespaceHasMongoDBService(ctx context.Context, authCR *operatorv1alpha1.Authentication) bool {
-	service := &corev1.Service{}
-	mongoDBServiceName := "mongodb"
-	err := r.Get(ctx, types.NamespacedName{Name: mongoDBServiceName, Namespace: authCR.Namespace}, service)
-	return err == nil
-}
-
 func isIBMMongoDBOperator(name string) bool {
 	const earlierMongoDBOperatorName string = "ibm-mongodb-operator"
 	const newerMongoDBOperatorName string = "ibm-im-mongodb-operator"
 	return name == earlierMongoDBOperatorName || name == newerMongoDBOperatorName
-}
-
-func (r *AuthenticationReconciler) needToMigrateMongoDB(ctx context.Context, authCR *operatorv1alpha1.Authentication) bool {
-	return authCR.HasNotBeenMigrated() && r.servicesNamespaceHasMongoDBService(ctx, authCR)
-}
-
-// needToPreserveMongoDBInOpReq indicates whether the reconciler should keep the requirement for MongoDB in its
-// OperandRequest
-func (r *AuthenticationReconciler) needToPreserveMongoDBInOpReq(ctx context.Context, authCR *operatorv1alpha1.Authentication) bool {
-	return r.needToMigrateMongoDB(ctx, authCR) || authCR.IsRetainingArtifacts()
 }
 
 func getMongoDBOperandFromOpReq(opReq *operatorv1alpha1.OperandRequest) *operatorv1alpha1.Operand {

@@ -70,7 +70,7 @@ var IncreaseTokenstringSize *migration.Migration = migration.NewMigration().
 
 var AlterUsersAttributesTable *migration.Migration = migration.NewMigration().
 	Name("AlterUsersAttributesUniqueConstraints").
-	ID(4).
+	ID(5).
 	RunFunc(&alterUsersAttributesUniqueConstraints).
 	Dependencies([]*migration.Migration{InitOperandSchemas, CreateMetadataSchema}).
 	Build()

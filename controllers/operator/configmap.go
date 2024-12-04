@@ -33,20 +33,24 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
+	"github.com/opdev/subreconciler"
 	osconfigv1 "github.com/openshift/api/config/v1"
 	"gopkg.in/yaml.v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/discovery"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentConfigMap *corev1.ConfigMap, needToRequeue *bool) (err error) {
@@ -56,7 +60,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 	var newConfigMap *corev1.ConfigMap
 
 	configMapList := []string{"platform-auth-idp", "registration-script", "oauth-client-map", "registration-json"}
-	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{r.authIdpConfigMap, registrationScriptConfigMap}
+	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{registrationScriptConfigMap}
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
@@ -161,6 +165,9 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 		*needToRequeue = true
 		return
 	}
+
+	// TODO: rip this out
+	r.handlePlatformAuthIDP(context.Background(), instance)
 
 	// Creation the default configmaps
 	for index, configMap := range configMapList {
@@ -479,6 +486,162 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 	return nil
 }
 
+func updateFields(observed, updates *corev1.ConfigMap, keys ...string) (updated bool) {
+	for _, key := range keys {
+		if value, ok := updates.Data[key]; ok && observed.Data[key] != value {
+			observed.Data[key] = value
+			updated = true
+		}
+	}
+	return
+}
+
+type matcherFunc func(*corev1.ConfigMap) bool
+
+func observedKeyValueNotSet(key string) matcherFunc {
+	return func(observed *corev1.ConfigMap) bool {
+		_, ok := observed.Data[key]
+		return !ok
+	}
+}
+
+func observedKeyValueSet(key, value string) matcherFunc {
+	return func(observed *corev1.ConfigMap) bool {
+		observedValue, ok := observed.Data[key]
+		if ok && value == observedValue {
+			return true
+		}
+		return false
+	}
+}
+
+func not(matches matcherFunc) matcherFunc {
+	return func(observed *corev1.ConfigMap) bool {
+		return !matches(observed)
+	}
+}
+
+func observedKeyValueContains(key, value string) matcherFunc {
+	return func(observed *corev1.ConfigMap) bool {
+		observedValue, ok := observed.Data[key]
+		if ok && strings.Contains(observedValue, value) {
+			return true
+		}
+		return false
+	}
+}
+
+func updatesValuesWhen(matches matcherFunc, keys ...string) (fn func(*corev1.ConfigMap, *corev1.ConfigMap) bool) {
+	return func(observed, updates *corev1.ConfigMap) bool {
+		if matches(observed) {
+			return updateFields(observed, updates, keys...)
+		}
+		return false
+	}
+}
+
+func (r *AuthenticationReconciler) handlePlatformAuthIDP(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx).WithValues("ConfigMap.Namespace", authCR.Namespace, "ConfigMap.Name", "platform-auth-idp")
+	observed := &corev1.ConfigMap{}
+	var desired *corev1.ConfigMap
+	err = r.Get(ctx, types.NamespacedName{Name: "platform-auth-idp", Namespace: authCR.Namespace}, observed)
+	if k8sErrors.IsNotFound(err) {
+		desired = r.authIdpConfigMap(authCR)
+		if err := r.Create(ctx, desired); k8sErrors.IsAlreadyExists(err) {
+			reqLogger.Info("ConfigMap was found while creating")
+			return subreconciler.RequeueWithDelay(defaultLowerWait)
+		} else if err != nil {
+			reqLogger.Info("ConfigMap could not be created for an unexpected reason", "msg", err.Error())
+			return subreconciler.RequeueWithDelay(defaultLowerWait)
+		}
+		reqLogger.Info("ConfigMap created")
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	}
+	desired = r.authIdpConfigMap(authCR)
+	cmUpdateRequired := false
+	desiredRoksUrl, _ := desired.Data["ROKS_URL"]
+
+	updateFns := []func(*corev1.ConfigMap, *corev1.ConfigMap) bool{
+		updatesValuesWhen(not(observedKeyValueSet("ROKS_URL", desiredRoksUrl)),
+			"ROKS_URL"),
+		updatesValuesWhen(not(observedKeyValueSet("IS_OPENSHIFT_ENV", strconv.FormatBool(r.RunningOnOpenShiftCluster()))),
+			"IS_OPENSHIFT_ENV"),
+		updatesValuesWhen(observedKeyValueSet("OS_TOKEN_LENGTH", "45"),
+			"OS_TOKEN_LENGTH"),
+		updatesValuesWhen(observedKeyValueContains("IDENTITY_MGMT_URL", "127.0.0.1"),
+			"IDENTITY_MGMT_URL"),
+		updatesValuesWhen(
+			observedKeyValueContains("BASE_OIDC_URL", "127.0.0.1"),
+			"BASE_OIDC_URL"),
+		updatesValuesWhen(
+			observedKeyValueContains("IDENTITY_AUTH_DIRECTORY_URL", "127.0.0.1"),
+			"IDENTITY_AUTH_DIRECTORY_URL"),
+		updatesValuesWhen(
+			observedKeyValueContains("IDENTITY_PROVIDER_URL", "127.0.0.1"),
+			"IDENTITY_PROVIDER_URL"),
+		updatesValuesWhen(observedKeyValueNotSet("LDAP_RECURSIVE_SEARCH"),
+			"LDAP_RECURSIVE_SEARCH"),
+		updatesValuesWhen(observedKeyValueNotSet("CLAIMS_SUPPORTED"),
+			"CLAIMS_SUPPORTED",
+			"CLAIMS_MAP",
+			"SCOPE_CLAIM",
+			"BOOTSTRAP_USERID"),
+		updatesValuesWhen(observedKeyValueNotSet("PROVIDER_ISSUER_URL"),
+			"PROVIDER_ISSUER_URL"),
+		updatesValuesWhen(observedKeyValueNotSet("PREFERRED_LOGIN"),
+			"PREFERRED_LOGIN"),
+		updatesValuesWhen(observedKeyValueNotSet("DB_CONNECT_TIMEOUT"),
+			"DB_CONNECT_TIMEOUT",
+			"DB_IDLE_TIMEOUT",
+			"DB_CONNECT_MAX_RETRIES",
+			"DB_POOL_MIN_SIZE",
+			"DB_POOL_MAX_SIZE",
+			"SEQL_LOGGING"),
+		updatesValuesWhen(observedKeyValueNotSet("DB_SSL_MODE"),
+			"DB_SSL_MODE"),
+		updatesValuesWhen(observedKeyValueNotSet("SCIM_LDAP_ATTRIBUTES_MAPPING"),
+			"SCIM_LDAP_ATTRIBUTES_MAPPING",
+			"SCIM_LDAP_SEARCH_SIZE_LIMIT",
+			"SCIM_LDAP_SEARCH_TIME_LIMIT",
+			"SCIM_ASYNC_PARALLEL_LIMIT",
+			"SCIM_GET_DISPLAY_FOR_GROUP_USERS"),
+		updatesValuesWhen(observedKeyValueNotSet("SCIM_AUTH_CACHE_MAX_SIZE"),
+			"SCIM_AUTH_CACHE_MAX_SIZE"),
+		updatesValuesWhen(observedKeyValueNotSet("SCIM_AUTH_CACHE_TTL_VALUE"),
+			"SCIM_AUTH_CACHE_TTL_VALUE"),
+		updatesValuesWhen(observedKeyValueNotSet("AUTH_SVC_LDAP_CONFIG_TIMEOUT"),
+			"AUTH_SVC_LDAP_CONFIG_TIMEOUT"),
+		updatesValuesWhen(observedKeyValueNotSet("IBM_CLOUD_SAAS"),
+			"IBM_CLOUD_SAAS",
+			"SAAS_CLIENT_REDIRECT_URL"),
+		updatesValuesWhen(observedKeyValueNotSet("ATTR_MAPPING_FROM_CONFIG"),
+			"ATTR_MAPPING_FROM_CONFIG"),
+		updatesValuesWhen(observedKeyValueNotSet("LDAP_CTX_POOL_INITSIZE"),
+			"LDAP_CTX_POOL_INITSIZE",
+			"LDAP_CTX_POOL_MAXSIZE",
+			"LDAP_CTX_POOL_TIMEOUT",
+			"LDAP_CTX_POOL_WAITTIME",
+			"LDAP_CTX_POOL_PREFERREDSIZE"),
+	}
+
+	for _, update := range updateFns {
+		cmUpdateRequired = update(observed, desired) || cmUpdateRequired
+	}
+
+	if !cmUpdateRequired {
+		return subreconciler.ContinueReconciling()
+	}
+
+	if err = r.Update(ctx, observed); err != nil {
+		reqLogger.Info("Failed to update Configmap", "msg", err.Error())
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	}
+
+	reqLogger.Info("ConfigMap updated")
+
+	return subreconciler.RequeueWithDelay(defaultLowerWait)
+}
+
 type registrationJSONData struct {
 	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method"`
 	ClientID                string   `json:"client_id"`
@@ -496,7 +659,7 @@ type registrationJSONData struct {
 	RedirectURIs            []string `json:"redirect_uris"`
 }
 
-func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
+func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.Authentication) *corev1.ConfigMap {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	isPublicCloud := isPublicCloud(r.Client, instance.Namespace, "ibmcloud-cluster-info")
 	bootStrapUserId := instance.Spec.Config.BootstrapUserId
@@ -507,6 +670,7 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 	if isPublicCloud {
 		roksUserPrefix = "IAM#"
 	}
+
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-auth-idp",
@@ -593,11 +757,16 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 			"SCIM_AUTH_CACHE_MAX_SIZE":           "1000",
 			"SCIM_AUTH_CACHE_TTL_VALUE":          "60",
 			"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
+			"IS_OPENSHIFT_ENV":                   strconv.FormatBool(r.RunningOnOpenShiftCluster()),
 		},
 	}
 
+	if desiredRoksUrl, err := readROKSURL(instance); err == nil && len(desiredRoksUrl) > 0 {
+		newConfigMap.Data["ROKS_URL"] = desiredRoksUrl
+	}
+
 	// Set Authentication instance as the owner and controller of the ConfigMap
-	err := controllerutil.SetControllerReference(instance, newConfigMap, scheme)
+	err := controllerutil.SetControllerReference(instance, newConfigMap, r.Scheme)
 	if err != nil {
 		reqLogger.Error(err, "Failed to set owner for ConfigMap")
 		return nil

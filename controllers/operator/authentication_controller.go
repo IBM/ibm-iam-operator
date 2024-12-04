@@ -42,8 +42,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	handler "sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	zenv1 "github.com/IBM/ibm-iam-operator/apis/zen.cpd.ibm.com/v1"
@@ -872,7 +877,7 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 // SetupWithManager sets up the controller with the Manager.
 func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
-	builder := ctrl.NewControllerManagedBy(mgr).
+	authCtrl := ctrl.NewControllerManagedBy(mgr).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.Secret{}).
 		Owns(&certmgr.Certificate{}).
@@ -884,13 +889,55 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	//Add routes
 	if ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
-		builder.Owns(&routev1.Route{})
+		authCtrl.Owns(&routev1.Route{})
 	}
 	if ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
-		builder.Owns(&zenv1.ZenExtension{})
+		authCtrl.Owns(&zenv1.ZenExtension{})
 	}
 
-	return builder.For(&operatorv1alpha1.Authentication{}).
+	productCMPred := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldObj := e.ObjectOld.(*corev1.ConfigMap)
+			newObj := e.ObjectNew.(*corev1.ConfigMap)
+
+			return oldObj.Name == ZenProductConfigmapName && oldObj.Data[URL_PREFIX] != newObj.Data[URL_PREFIX]
+		},
+
+		// Allow create events
+		CreateFunc: func(e event.CreateEvent) bool {
+			obj := e.Object.(*corev1.ConfigMap)
+			return obj.Name == ZenProductConfigmapName
+		},
+
+		// Allow delete events
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			obj := e.Object.(*corev1.ConfigMap)
+			return obj.Name == ZenProductConfigmapName
+		},
+
+		// Allow generic events (e.g., external triggers)
+		GenericFunc: func(e event.GenericEvent) bool {
+			obj := e.Object.(*corev1.ConfigMap)
+			return obj.Name == ZenProductConfigmapName
+		},
+	}
+
+	globalCMPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
+		return o.GetName() == ctrlcommon.GlobalConfigMapName
+	})
+
+	authCtrl.Watches(&corev1.ConfigMap{},
+		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
+			authCR, _ := ctrlcommon.GetAuthentication(ctx, &r.Client)
+			return []reconcile.Request{
+				{NamespacedName: types.NamespacedName{
+					Name:      authCR.Name,
+					Namespace: authCR.Namespace,
+				}},
+			}
+		}), builder.WithPredicates(predicate.Or(globalCMPred, productCMPred)),
+	)
+	return authCtrl.For(&operatorv1alpha1.Authentication{}).
 		Complete(r)
 }
 

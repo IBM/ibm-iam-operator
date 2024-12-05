@@ -90,6 +90,13 @@ func PlanMigrations(ctx context.Context, to, from dbconn.DBConn) (mq *migration.
 			Build())
 	}
 
+	if _, ok := changelogs[v1schema.AlterUsersAttributesTable.ID]; !ok {
+		reqLogger.Info("Adding migration", "migrationName", v1schema.AlterUsersAttributesTable.Name)
+		*mq = append(*mq, migration.FromMigration(v1schema.AlterUsersAttributesTable).
+			To(to).
+			Build())
+	}
+
 	if _, ok := changelogs[v1schema.MongoToEDBv1.ID]; !ok && mongo != nil {
 		reqLogger.Info("Adding migration", "migrationName", v1schema.MongoToEDBv1.Name)
 		*mq = append(*mq, migration.FromMigration(v1schema.MongoToEDBv1).

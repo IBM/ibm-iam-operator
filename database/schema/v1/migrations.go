@@ -31,6 +31,7 @@ func AllMigrations() []*migration.Migration {
 		MongoToEDBv1,
 		IncreaseOIDCUsernameSize,
 		IncreaseTokenstringSize,
+		AlterUsersAttributesTable,
 	}
 }
 
@@ -68,6 +69,13 @@ var IncreaseTokenstringSize *migration.Migration = migration.NewMigration().
 	Dependencies([]*migration.Migration{InitOperandSchemas, CreateMetadataSchema}).
 	Build()
 
+var AlterUsersAttributesTable *migration.Migration = migration.NewMigration().
+	Name("AlterUsersAttributesUniqueConstraints").
+	ID(5).
+	RunFunc(&alterUsersAttributesUniqueConstraints).
+	Dependencies([]*migration.Migration{InitOperandSchemas, CreateMetadataSchema}).
+	Build()
+
 var initOperandSchemasFunc migration.MigrationFunc = func(ctx context.Context, to, from dbconn.DBConn) (err error) {
 	reqLogger := logf.FromContext(ctx)
 	postgres, ok := to.(*dbconn.PostgresDB)
@@ -95,6 +103,32 @@ var initOperandSchemasFunc migration.MigrationFunc = func(ctx context.Context, t
 	}
 	reqLogger.Info("Initial schema already exists; marking as complete")
 
+	return
+}
+
+var alterUsersAttributesUniqueConstraints migration.MigrationFunc = func(ctx context.Context, to, from dbconn.DBConn) (err error) {
+	reqLogger := logf.FromContext(ctx)
+	postgres, ok := to.(*dbconn.PostgresDB)
+	if !ok {
+		return fmt.Errorf("to should be an instance of Postgres")
+	}
+	reqLogger.Info("Connecting to PostgresDB", "PostgresDB.Host", postgres.Host, "PostgresDB.Port", postgres.Port)
+	if err = postgres.Connect(ctx); err != nil {
+		reqLogger.Error(err, "Failed to connect to Postgres")
+		return
+	}
+	defer postgres.Disconnect(ctx)
+	tx, err := postgres.Conn.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	_, err = tx.Exec(ctx, "ALTER TABLE platformdb.users_attributes ADD CONSTRAINT users_attributes_uniqueness UNIQUE (user_uid,name);")
+	if err != nil {
+		return
+	}
+
+	err = tx.Commit(ctx)
 	return
 }
 

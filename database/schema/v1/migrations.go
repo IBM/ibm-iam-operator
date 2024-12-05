@@ -31,6 +31,7 @@ func AllMigrations() []*migration.Migration {
 		MongoToEDBv1,
 		IncreaseOIDCUsernameSize,
 		IncreaseTokenstringSize,
+		AlterUsersAttributesTable,
 	}
 }
 

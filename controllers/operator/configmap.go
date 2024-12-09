@@ -54,24 +54,21 @@ import (
 // present. Returns an error when the ConfigMap is not found and returns an
 // empty string whenever the ConfigMap is found but the CNCF domain name is not
 // set.
-func (r *AuthenticationReconciler) getCNCFDomain(ctx context.Context, req ctrl.Request) (domainName string, err error) {
+func getCNCFDomain(ctx context.Context, cl client.Client, authCR *operatorv1alpha1.Authentication) (domainName string, err error) {
 	logger := logf.FromContext(ctx)
-	cm := &corev1.ConfigMap{}
 	cmName := ctrlcommon.GlobalConfigMapName
-	cmNs := req.Namespace
-	err = r.Get(ctx, types.NamespacedName{Name: cmName, Namespace: cmNs}, cm)
+	cmNs := authCR.Namespace
+	cm := &corev1.ConfigMap{}
+	err = cl.Get(ctx, types.NamespacedName{Name: cmName, Namespace: cmNs}, cm)
 	if err != nil {
 		logger.Error(err, "Failed to get ConfigMap")
 		return
 	}
 	logger.Info("Found ConfigMap", "name", cm.Name, "namespace", cm.Namespace)
 
-	clusterTypeValue := cm.Data["kubernetes_cluster_type"]
-	if !strings.EqualFold(clusterTypeValue, "cncf") {
-		return "", fmt.Errorf("not configured for CNCF")
-	}
-
-	if domainName = cm.Data["domain_name"]; domainName == "" {
+	if !strings.EqualFold(cm.Data["kubernetes_cluster_type"], "cncf") {
+		return "", nil
+	} else if cm.Data["domain_name"] == "" {
 		return "", fmt.Errorf("domain name not configured")
 	}
 
@@ -79,14 +76,15 @@ func (r *AuthenticationReconciler) getCNCFDomain(ctx context.Context, req ctrl.R
 }
 
 // handleIBMCloudClusterInfo creates the ibmcloud-cluster-info configmap if not created already
-func (r *AuthenticationReconciler) handleIBMCloudClusterInfo(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
+func (r *AuthenticationReconciler) handleIBMCloudClusterInfo(ctx context.Context, authCR *operatorv1alpha1.Authentication, observed *corev1.ConfigMap) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx).WithValues("ConfigMap.Namespace", authCR.Namespace, "ConfigMap.Name", ctrlcommon.IBMCloudClusterInfoCMName)
-	observed := &corev1.ConfigMap{}
-	var generated *corev1.ConfigMap
+	generated := &corev1.ConfigMap{}
+	if err = r.generateIBMCloudClusterInfoConfigMap(ctx, authCR, generated); err != nil {
+		return subreconciler.RequeueWithError(err)
+	}
 	cmKey := types.NamespacedName{Name: ctrlcommon.IBMCloudClusterInfoCMName, Namespace: authCR.Namespace}
 	if err = r.Client.Get(ctx, cmKey, observed); k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Create new ConfigMap")
-		generated = r.ibmcloudClusterInfoConfigMap(authCR, r.RunningOnOpenShiftCluster(), domainName)
 		if err = r.Client.Create(ctx, generated); err != nil {
 			reqLogger.Error(err, "Failed to create new ConfigMap")
 			return subreconciler.RequeueWithDelay(defaultLowerWait)
@@ -127,8 +125,7 @@ func (r *AuthenticationReconciler) handleIBMCloudClusterInfo(ctx context.Context
 	}
 
 	reqLogger.Info("Became controller and labeled to indicate association with IM; attempting update")
-	err = r.Client.Update(ctx, observed)
-	if err != nil {
+	if err = r.Update(ctx, observed); err != nil {
 		reqLogger.Error(err, "Failed to update ConfigMap")
 		return subreconciler.RequeueWithError(err)
 	}
@@ -138,134 +135,53 @@ func (r *AuthenticationReconciler) handleIBMCloudClusterInfo(ctx context.Context
 }
 
 func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-
-	var isOSEnv bool
-	var domainName string
-	var newConfigMap *corev1.ConfigMap
-
-	configMapList := []string{"platform-auth-idp", "registration-script", "oauth-client-map", "registration-json"}
-	functionList := []func(*operatorv1alpha1.Authentication, *runtime.Scheme) *corev1.ConfigMap{registrationScriptConfigMap}
+	//reqLogger := logf.FromContext(ctx)
 
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 
-	if domainName, err = r.getCNCFDomain(ctx, req); err != nil {
-		reqLogger.Info("Could not retrieve global ConfigMap; requeueing", "reason", err.Error())
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	} else if domainName == "" {
-		// If a domain name is not returned, the current environment is not CNCF
-		isOSEnv = true
-	}
-
 	// Ensure that the ibmcloud-cluster-info configmap is created
-	r.handleIBMCloudClusterInfo(ctx, req)
+	ibmCloudClusterInfoCM := &corev1.ConfigMap{}
 
-	// Public Cloud to be checked from ibmcloud-cluster-info
-	var publicCloud bool
-	if publicCloud, err = r.isHostedOnIBMCloud(ctx, authCR.Namespace); err != nil {
-		reqLogger.Info("Failed to determine whether running on public cloud", "msg", err.Error())
-		return
-	}
-
-	//icpConsoleURL , icpProxyURL to be fetched from ibmcloud-cluster-info
-	proxyConfigMapName := ctrlcommon.IBMCloudClusterInfoCMName
-	proxyConfigMap := &corev1.ConfigMap{}
-	err = r.Client.Get(ctx, types.NamespacedName{Name: proxyConfigMapName, Namespace: authCR.Namespace}, proxyConfigMap)
-	if err != nil {
-		if k8sErrors.IsNotFound(err) {
-			reqLogger.Error(err, "The configmap ", proxyConfigMapName, " is not created yet")
-			return
-		}
-		reqLogger.Error(err, "Failed to get ConfigMap", proxyConfigMapName)
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
-	icpProxyURL, ok := proxyConfigMap.Data["proxy_address"]
-	if !ok {
-		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain proxy address")
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
-	icpConsoleURL, ok := proxyConfigMap.Data["cluster_address"]
-
-	if !ok {
-		reqLogger.Error(nil, "The configmap", proxyConfigMapName, "doesn't contain cluster_address address")
+	var subresult *ctrl.Result
+	subresult, err = r.handleIBMCloudClusterInfo(ctx, authCR, ibmCloudClusterInfoCM)
+	if subreconciler.ShouldHaltOrRequeue(subresult, err) {
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
 
-	// TODO: rip this out
-	r.handlePlatformAuthIDP(ctx, authCR)
-
-	// Creation the default configmaps
-	for index, configMap := range configMapList {
-		err = r.Client.Get(ctx, types.NamespacedName{Name: configMap, Namespace: authCR.Namespace}, currentConfigMap)
-		if err != nil {
-			if k8sErrors.IsNotFound(err) {
-				// Define a new ConfigMap
-				if configMapList[index] == "registration-json" {
-				} else if configMapList[index] == "oauth-client-map" {
-					newConfigMap = oauthClientConfigMap(authCR, icpConsoleURL, icpProxyURL, r.Scheme)
-				} else {
-					newConfigMap = functionList[index](authCR, r.Scheme)
-					if configMapList[index] == "platform-auth-idp" {
-						// TODO: Be sure this behavior has been carried over to new function
-						if authCR.Spec.Config.ROKSEnabled && authCR.Spec.Config.ROKSURL == "https://roks.domain.name:443" { //we enable it by default
-							reqLogger.Info("Create platform-auth-idp Configmap roks settings", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-							issuer, err := readROKSURL(context.Background())
-							if err != nil {
-								reqLogger.Error(err, "Failed to get issuer URL", "ConfigMap.Namespace", authCR.Namespace, "ConfigMap.Name", configMap)
-								return subreconciler.RequeueWithError(err)
-							}
-							newConfigMap.Data["ROKS_ENABLED"] = "true"
-							newConfigMap.Data["ROKS_URL"] = issuer
-							if authCR.Spec.Config.ROKSUserPrefix == "changeme" { //we change it to empty prefix, that's the new default in 3.5
-								if publicCloud {
-									newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
-								} else {
-									newConfigMap.Data["ROKS_USER_PREFIX"] = ""
-								}
-							} else { // user specifies prefix but does not specify roksEnabled and roksURL we take the user provided prefix
-								newConfigMap.Data["ROKS_USER_PREFIX"] = authCR.Spec.Config.ROKSUserPrefix
-							}
-						} else {
-							reqLogger.Info("Honor end user's setting", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-							//if user does not specify the prefix, we set it to IAM# to be consistent with previous release
-							if authCR.Spec.Config.ROKSEnabled && authCR.Spec.Config.ROKSURL != "https://roks.domain.name:443" && authCR.Spec.Config.ROKSUserPrefix == "changeme" {
-								newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
-							}
-						}
-						reqLogger.Info("Adding new variable to configmap", "Configmap.Namespace", currentConfigMap.Namespace, "isOSEnv", isOSEnv)
-						// Detect cluster type - cncf or openshift
-						// if global cm, ignore CR, and populate auth-idp with value from global
-						// if no global cm, take value from CR - NOT REQD.
-						newConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(r.RunningOnOpenShiftCluster())
-
-					} else {
-						//user specifies roksEnabled and roksURL, but not roksPrefix, then we set prefix to IAM# (consistent with previous release behavior)
-						if authCR.Spec.Config.ROKSEnabled && authCR.Spec.Config.ROKSURL != "https://roks.domain.name:443" && authCR.Spec.Config.ROKSUserPrefix == "changeme" {
-							newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
-						}
-					}
-				}
-				reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", authCR.Namespace, "ConfigMap.Name", configMap)
-				err = r.Client.Create(context.TODO(), newConfigMap)
-				if err != nil {
-					reqLogger.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", authCR.Namespace, "ConfigMap.Name", configMap)
-					return
-				}
-				// ConfigMap created successfully - return and requeue
-				return subreconciler.RequeueWithDelay(defaultLowerWait)
-			} else {
-				reqLogger.Error(err, "Failed to get ConfigMap", "ConfigMap.Namespace", authCR.Namespace, "ConfigMap.Name", configMap)
-				return
-			}
-		} else {
-
-		}
+	cmUpdaters := []*cmUpdater{
+		{
+			Name:     "platform-auth-idp",
+			generate: generateAuthIdpConfigMap,
+			update:   updatePlatformAuthIDP,
+		},
+		{
+			Name:     "registration-json",
+			generate: generateRegistrationJsonConfigMap,
+			update:   updateRegistrationJSON,
+			onChange: replaceOIDCClientRegistrationJob,
+		},
+		{
+			Name:     "oauth-client-map",
+			generate: generateOAuthClientConfigMap,
+		},
+		{
+			Name:     "registration-script",
+			generate: generateRegistrationScriptConfigMap,
+		},
 	}
 
-	return subreconciler.ContinueReconciling()
+	subresults := []*ctrl.Result{}
+	errs := []error{}
+	for _, updater := range cmUpdaters {
+		subresult, err = updater.CreateOrUpdate(ctx, r.Client, authCR, ibmCloudClusterInfoCM)
+		subresults = append(subresults, subresult)
+		errs = append(errs, err)
+	}
+
+	return ctrlcommon.ReduceSubreconcilerResultsAndErrors(subresults, errs)
 }
 
 func updateFields(observed, updates *corev1.ConfigMap, keys ...string) (updated bool) {
@@ -322,104 +238,61 @@ func updatesValuesWhen(matches matcherFunc, keys ...string) (fn func(*corev1.Con
 	}
 }
 
-func (r *AuthenticationReconciler) handleRegistrationJSON(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	cmName := "registration-json"
-	cm := &corev1.ConfigMap{}
-	// TODO Set icpConsoleURL
-	var generatedCM *corev1.ConfigMap
-	err = r.Get(ctx, types.NamespacedName{Name: cmName, Namespace: authCR.Namespace}, cm)
-	if k8sErrors.IsNotFound(err) {
-		generatedCM = generateRegistrationJsonConfigMap(ctx, authCR, icpConsoleURL)
-		if generatedCM == nil {
-			err = fmt.Errorf("an error occurred during registration-json generation")
-			return subreconciler.RequeueWithError(err)
-		}
-		reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", authCR.Namespace, "ConfigMap.Name", cmName)
-		err = r.Client.Create(ctx, generatedCM)
-		if err != nil {
-			reqLogger.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", authCR.Namespace, "ConfigMap.Name", cmName)
-			return
-		}
-		// ConfigMap created successfully - return and requeue
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	} else if err != nil {
-
+func replaceOIDCClientRegistrationJob(ctx context.Context, cl client.Client, authCR *operatorv1alpha1.Authentication) (err error) {
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "oidc-client-registration",
+			Namespace: authCR.Namespace,
+		},
 	}
-	generatedCM = generateRegistrationJsonConfigMap(ctx, authCR, icpConsoleURL)
-	if generatedCM == nil {
-		err = fmt.Errorf("an error occurred during registration-json generation")
-		return subreconciler.RequeueWithError(err)
+	if err = cl.Delete(ctx, job); k8sErrors.IsNotFound(err) {
+		return nil
 	}
-	reqLogger.Info("Calculated new platform-oidc-registration.json")
-	var currentRegistrationJSON, newRegistrationJSON *registrationJSONData
-	newRegistrationJSON = &registrationJSONData{}
-	currentRegistrationJSON = &registrationJSONData{}
-	if err = json.Unmarshal([]byte(newConfigMap.Data["platform-oidc-registration.json"]), newRegistrationJSON); err != nil {
-		reqLogger.Error(err, "Failed to unmarshal calculated ConfigMap")
-		return subreconciler.RequeueWithError(err)
-	}
-	if err = json.Unmarshal([]byte(currentConfigMap.Data["platform-oidc-registration.json"]), currentRegistrationJSON); err != nil {
-		reqLogger.Error(err, "Failed to unmarshal observed ConfigMap")
-		return subreconciler.RequeueWithError(err)
-	}
-	var updatedJSON, updatedOwnerRefs bool
-	if !reflect.DeepEqual(newRegistrationJSON, currentRegistrationJSON) {
-		reqLogger.Info("Difference found in observed vs calculated platform-oidc-registration.json")
-		var newJSON []byte
-		if newJSON, err = json.MarshalIndent(newRegistrationJSON, "", "  "); err != nil {
-			reqLogger.Error(err, "Failed to marshal JSON for registration-json update")
-			return subreconciler.RequeueWithError(err)
-		}
-		currentConfigMap.Data["platform-oidc-registration.json"] = string(newJSON[:])
-		updatedJSON = true
-	}
-	if !reflect.DeepEqual(newConfigMap.GetOwnerReferences(), currentConfigMap.GetOwnerReferences()) {
-		reqLogger.Info("Difference found in observed vs calculated OwnerReferences")
-		currentConfigMap.OwnerReferences = newConfigMap.GetOwnerReferences()
-		updatedOwnerRefs = true
-	}
-	if updatedJSON || updatedOwnerRefs {
-		reqLogger.Info("Updating ConfigMap")
-		if err = r.Client.Update(context.Background(), currentConfigMap); err != nil {
-			reqLogger.Error(err, "Failed to update ConfigMap", "Name", "registration-json", "Namespace", authCR.Namespace)
-			return subreconciler.RequeueWithError(err)
-		}
-		reqLogger.Info("ConfigMap successfully updated")
-		if updatedJSON {
-			reqLogger.Info("Deleting Job to re-run with upated ConfigMap", "Job.Name", "oidc-client-registration")
-
-			job := &batchv1.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "oidc-client-registration",
-					Namespace: authCR.Namespace,
-				},
-			}
-			if err = r.Client.Delete(context.TODO(), job); err != nil {
-				if k8sErrors.IsNotFound(err) {
-					reqLogger.Info("Job not found on cluster; continuing", "Job.Name", "oidc-client-registration")
-					return subreconciler.ContinueReconciling()
-				}
-				reqLogger.Error(err, "Could not delete job", "Job.Name", "oidc-client-registration")
-				return
-			}
-			reqLogger.Info("Deleted Job", "Job.Name", "oidc-client-registration")
-			return subreconciler.RequeueWithDelay(defaultLowerWait)
-		}
-	} else {
-		reqLogger.Info("No ConfigMap update required")
-	}
+	return
 }
 
-func (r *AuthenticationReconciler) handlePlatformAuthIDP(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
-	cmName := "platform-auth-idp"
-	reqLogger := logf.FromContext(ctx).WithValues("ConfigMap.Namespace", authCR.Namespace, "ConfigMap.Name", cmName)
+func updateRegistrationJSON(observed, generated *corev1.ConfigMap) (updated bool, err error) {
+	observedJSON := &registrationJSONData{}
+	if err = json.Unmarshal([]byte(observed.Data["platform-oidc-registration.json"]), observedJSON); err != nil {
+		return
+	}
+	generatedJSON := &registrationJSONData{}
+	if err = json.Unmarshal([]byte(generated.Data["platform-oidc-registration.json"]), generatedJSON); err != nil {
+		return
+	}
+	if !reflect.DeepEqual(generatedJSON, observedJSON) {
+		var newJSON []byte
+		if newJSON, err = json.MarshalIndent(generatedJSON, "", "  "); err != nil {
+			return
+		}
+
+		observed.Data["platform-oidc-registration.json"] = string(newJSON[:])
+		updated = true
+	}
+	if !reflect.DeepEqual(generated.GetOwnerReferences(), observed.GetOwnerReferences()) {
+		observed.OwnerReferences = generated.GetOwnerReferences()
+		updated = true
+	}
+	return
+}
+
+type cmUpdater struct {
+	Name     string
+	generate func(context.Context, client.Client, *operatorv1alpha1.Authentication, *corev1.ConfigMap, *corev1.ConfigMap) error
+	update   func(*corev1.ConfigMap, *corev1.ConfigMap) (bool, error)
+	onChange func(context.Context, client.Client, *operatorv1alpha1.Authentication) error
+}
+
+func (u *cmUpdater) CreateOrUpdate(ctx context.Context, cl client.Client, authCR *operatorv1alpha1.Authentication, ibmcloudClusterInfo *corev1.ConfigMap) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx).WithValues("ConfigMap.Namespace", authCR.Namespace, "ConfigMap.Name", u.Name)
 	observed := &corev1.ConfigMap{}
-	var desired *corev1.ConfigMap
-	err = r.Get(ctx, types.NamespacedName{Name: cmName, Namespace: authCR.Namespace}, observed)
-	if k8sErrors.IsNotFound(err) {
-		desired = r.authIdpConfigMap(ctx, authCR)
-		if err := r.Create(ctx, desired); k8sErrors.IsAlreadyExists(err) {
+	generated := &corev1.ConfigMap{}
+	if err = u.generate(ctx, cl, authCR, ibmcloudClusterInfo, generated); err != nil {
+		return subreconciler.RequeueWithError(err)
+	}
+	cmKey := types.NamespacedName{Name: u.Name, Namespace: authCR.Namespace}
+	if err = cl.Get(ctx, cmKey, observed); k8sErrors.IsNotFound(err) {
+		if err := cl.Create(ctx, generated); k8sErrors.IsAlreadyExists(err) {
 			reqLogger.Info("ConfigMap was found while creating")
 			return subreconciler.RequeueWithDelay(defaultLowerWait)
 		} else if err != nil {
@@ -427,16 +300,50 @@ func (r *AuthenticationReconciler) handlePlatformAuthIDP(ctx context.Context, au
 			return subreconciler.RequeueWithDelay(defaultLowerWait)
 		}
 		reqLogger.Info("ConfigMap created")
+		if u.onChange == nil {
+			return subreconciler.RequeueWithDelay(defaultLowerWait)
+		}
+
+		if err = u.onChange(ctx, cl, authCR); err != nil {
+			reqLogger.Info("Error occurred while performing post-update work", "reason", err.Error())
+		}
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
-	desired = r.authIdpConfigMap(ctx, authCR)
-	cmUpdateRequired := false
-	desiredRoksUrl := desired.Data["ROKS_URL"]
 
+	if u.update == nil {
+		return subreconciler.ContinueReconciling()
+	}
+	updated := false
+	updated, err = u.update(generated, observed)
+	if err != nil {
+		return subreconciler.RequeueWithError(err)
+	} else if !updated {
+		return subreconciler.ContinueReconciling()
+	}
+
+	if err = cl.Update(ctx, observed); err != nil {
+		reqLogger.Info("Failed to update Configmap", "msg", err.Error())
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	}
+
+	reqLogger.Info("ConfigMap updated successfully")
+	if u.onChange == nil {
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	}
+
+	if err = u.onChange(ctx, cl, authCR); err != nil {
+		reqLogger.Info("Error occurred while performing post-update work", "reason", err.Error())
+	}
+
+	return subreconciler.RequeueWithDelay(defaultLowerWait)
+}
+
+func updatePlatformAuthIDP(observed, generated *corev1.ConfigMap) (updated bool, err error) {
+	desiredRoksUrl := generated.Data["ROKS_URL"]
 	updateFns := []func(*corev1.ConfigMap, *corev1.ConfigMap) bool{
 		updatesValuesWhen(not(observedKeyValueSet("ROKS_URL", desiredRoksUrl)),
 			"ROKS_URL"),
-		updatesValuesWhen(not(observedKeyValueSet("IS_OPENSHIFT_ENV", strconv.FormatBool(r.RunningOnOpenShiftCluster()))),
+		updatesValuesWhen(not(observedKeyValueSet("IS_OPENSHIFT_ENV", generated.Data["IS_OPENSHIFT_ENV"])),
 			"IS_OPENSHIFT_ENV"),
 		updatesValuesWhen(observedKeyValueSet("OS_TOKEN_LENGTH", "45"),
 			"OS_TOKEN_LENGTH"),
@@ -497,21 +404,10 @@ func (r *AuthenticationReconciler) handlePlatformAuthIDP(ctx context.Context, au
 	}
 
 	for _, update := range updateFns {
-		cmUpdateRequired = update(observed, desired) || cmUpdateRequired
+		updated = update(observed, generated) || updated
 	}
 
-	if !cmUpdateRequired {
-		return subreconciler.ContinueReconciling()
-	}
-
-	if err = r.Update(ctx, observed); err != nil {
-		reqLogger.Info("Failed to update Configmap", "msg", err.Error())
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
-
-	reqLogger.Info("ConfigMap updated")
-
-	return subreconciler.RequeueWithDelay(defaultLowerWait)
+	return
 }
 
 type registrationJSONData struct {
@@ -531,19 +427,41 @@ type registrationJSONData struct {
 	RedirectURIs            []string `json:"redirect_uris"`
 }
 
-func (r *AuthenticationReconciler) authIdpConfigMap(ctx context.Context, authCR *operatorv1alpha1.Authentication) *corev1.ConfigMap {
+func generateAuthIdpConfigMap(ctx context.Context, cl client.Client, authCR *operatorv1alpha1.Authentication, ibmcloudClusterInfo, generated *corev1.ConfigMap) (err error) {
 	reqLogger := logf.FromContext(ctx)
-	onIBMCloud, _ := r.isHostedOnIBMCloud(ctx, authCR.Namespace)
+	onIBMCloud, _ := isHostedOnIBMCloud(ctx, cl, authCR.Namespace)
+
 	bootStrapUserId := authCR.Spec.Config.BootstrapUserId
-	roksUserPrefix := authCR.Spec.Config.ROKSUserPrefix
 	if len(bootStrapUserId) > 0 && strings.EqualFold(bootStrapUserId, "kubeadmin") && onIBMCloud {
 		bootStrapUserId = ""
 	}
-	if onIBMCloud {
+
+	roksUserPrefix := authCR.Spec.Config.ROKSUserPrefix
+	if onIBMCloud || (authCR.Spec.Config.ROKSEnabled && roksUserPrefix == "changeme") {
 		roksUserPrefix = "IAM#"
 	}
 
-	newConfigMap := &corev1.ConfigMap{
+	var desiredRoksUrl string
+	if authCR.Spec.Config.ROKSEnabled {
+		if desiredRoksUrl, err = readROKSURL(ctx); err != nil {
+			reqLogger.Error(err, "Failed to get issuer URL")
+			return
+		} else if len(desiredRoksUrl) == 0 {
+			reqLogger.Error(err, "Failed to get issuer URL")
+			err = fmt.Errorf("issuer URL is empty")
+			return
+		}
+	}
+
+	var isOSEnv bool
+	if domainName, err := getCNCFDomain(ctx, cl, authCR); err != nil {
+		reqLogger.Info("Could not retrieve cluster configuration; requeueing", "reason", err.Error())
+		return err
+	} else {
+		isOSEnv = domainName == ""
+	}
+
+	*generated = corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-auth-idp",
 			Namespace: authCR.Namespace,
@@ -576,7 +494,7 @@ func (r *AuthenticationReconciler) authIdpConfigMap(ctx context.Context, authCR 
 			"IBM_CLOUD_SAAS":                     strconv.FormatBool(authCR.Spec.Config.IBMCloudSaas),
 			"ATTR_MAPPING_FROM_CONFIG":           strconv.FormatBool(authCR.Spec.Config.AttrMappingFromConfig),
 			"SAAS_CLIENT_REDIRECT_URL":           authCR.Spec.Config.SaasClientRedirectUrl,
-			"ROKS_URL":                           authCR.Spec.Config.ROKSURL,
+			"ROKS_URL":                           desiredRoksUrl,
 			"ROKS_USER_PREFIX":                   roksUserPrefix,
 			"CLAIMS_SUPPORTED":                   authCR.Spec.Config.ClaimsSupported,
 			"CLAIMS_MAP":                         authCR.Spec.Config.ClaimsMap,
@@ -629,29 +547,26 @@ func (r *AuthenticationReconciler) authIdpConfigMap(ctx context.Context, authCR 
 			"SCIM_AUTH_CACHE_MAX_SIZE":           "1000",
 			"SCIM_AUTH_CACHE_TTL_VALUE":          "60",
 			"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
-			"IS_OPENSHIFT_ENV":                   strconv.FormatBool(r.RunningOnOpenShiftCluster()),
+			"IS_OPENSHIFT_ENV":                   strconv.FormatBool(isOSEnv),
 		},
 	}
 
-	if desiredRoksUrl, err := readROKSURL(context.Background()); err == nil && len(desiredRoksUrl) > 0 {
-		newConfigMap.Data["ROKS_URL"] = desiredRoksUrl
+	// Set Authentication authCR as the owner and controller of the ConfigMap
+	if err = controllerutil.SetControllerReference(authCR, generated, cl.Scheme()); err != nil {
+		reqLogger.Error(err, "Failed to set owner for ConfigMap")
+		return
 	}
 
-	// Set Authentication authCR as the owner and controller of the ConfigMap
-	err := controllerutil.SetControllerReference(authCR, newConfigMap, r.Scheme)
-	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for ConfigMap")
-		return nil
-	}
-	return newConfigMap
+	return
 }
 
-func generateRegistrationJsonConfigMap(ctx context.Context, authCR *operatorv1alpha1.Authentication, icpConsoleURL string) *corev1.ConfigMap {
+func generateRegistrationJsonConfigMap(ctx context.Context, cl client.Client, authCR *operatorv1alpha1.Authentication, ibmcloudClusterInfo, generated *corev1.ConfigMap) (err error) {
 	reqLogger := logf.FromContext(ctx)
 
 	// Calculate the ICP Registration Console URI(s)
 	icpRegistrationConsoleURIs := []string{}
 	const apiRegistrationPath = "/auth/liberty/callback"
+	icpConsoleURL := ibmcloudClusterInfo.Data["cluster_address"]
 	icpRegistrationConsoleURIs = append(icpRegistrationConsoleURIs, strings.Join([]string{"https://", icpConsoleURL, apiRegistrationPath}, ""))
 	parseConsoleURL := strings.Split(icpConsoleURL, ":")
 	// If the console URI is using port 443, a copy of the URI without the port number needs to be included as well
@@ -661,10 +576,10 @@ func generateRegistrationJsonConfigMap(ctx context.Context, authCR *operatorv1al
 	}
 
 	platformOIDCCredentials := &corev1.Secret{}
-	objectKey := types.NamespacedName{Name: "platform-oidc-credentials", Namespace: req.Namespace}
-	if err = r.Get(ctx, objectKey, platformOIDCCredentials); err != nil {
+	objectKey := types.NamespacedName{Name: "platform-oidc-credentials", Namespace: authCR.Namespace}
+	if err = cl.Get(ctx, objectKey, platformOIDCCredentials); err != nil {
 		reqLogger.Error(err, "Failed to get Secret for registration-json update")
-		return subreconciler.RequeueWithError(err)
+		return
 	}
 
 	observedWLPClientID := string(platformOIDCCredentials.Data["WLP_CLIENT_ID"][:])
@@ -682,12 +597,12 @@ func generateRegistrationJsonConfigMap(ctx context.Context, authCR *operatorv1al
 	}
 	registrationJsonTpl := template.Must(template.New("registrationJson").Parse(registrationJson))
 	var registrationJsonBytes bytes.Buffer
-	if err := registrationJsonTpl.Execute(&registrationJsonBytes, vals); err != nil {
+	if err = registrationJsonTpl.Execute(&registrationJsonBytes, vals); err != nil {
 		reqLogger.Error(err, "Failed to execute registrationJson template")
-		return nil
+		return
 	}
 
-	newConfigMap := &corev1.ConfigMap{
+	*generated = corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "registration-json",
 			Namespace: authCR.Namespace,
@@ -699,18 +614,15 @@ func generateRegistrationJsonConfigMap(ctx context.Context, authCR *operatorv1al
 	}
 
 	// Set Authentication authCR as the owner and controller of the ConfigMap
-	err := controllerutil.SetControllerReference(authCR, newConfigMap, scheme)
-	if err != nil {
+	if err = controllerutil.SetControllerReference(authCR, generated, cl.Scheme()); err != nil {
 		reqLogger.Error(err, "Failed to set owner for ConfigMap")
-		return nil
 	}
-	return newConfigMap
+	return
 }
 
-func registrationScriptConfigMap(authCR *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
-
-	reqLogger := log.WithValues("authCR.Namespace", authCR.Namespace, "authCR.Name", authCR.Name)
-	newConfigMap := &corev1.ConfigMap{
+func generateRegistrationScriptConfigMap(ctx context.Context, cl client.Client, authCR *operatorv1alpha1.Authentication, ibmcloudClusterInfo, generated *corev1.ConfigMap) (err error) {
+	reqLogger := logf.FromContext(ctx).WithValues("ConfigMap.Namespace", authCR.Namespace, "ConfigMap.Name", "registration-script")
+	*generated = corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "registration-script",
 			Namespace: authCR.Namespace,
@@ -722,19 +634,18 @@ func registrationScriptConfigMap(authCR *operatorv1alpha1.Authentication, scheme
 	}
 
 	// Set Authentication authCR as the owner and controller of the ConfigMap
-	err := controllerutil.SetControllerReference(authCR, newConfigMap, scheme)
-	if err != nil {
+	if err = controllerutil.SetControllerReference(authCR, generated, cl.Scheme()); err != nil {
 		reqLogger.Error(err, "Failed to set owner for ConfigMap")
-		return nil
 	}
-	return newConfigMap
+	return
 
 }
 
-func oauthClientConfigMap(authCR *operatorv1alpha1.Authentication, icpConsoleURL string, icpProxyURL string, scheme *runtime.Scheme) *corev1.ConfigMap {
-
-	reqLogger := log.WithValues("authCR.Namespace", authCR.Namespace, "authCR.Name", authCR.Name)
-	newConfigMap := &corev1.ConfigMap{
+func generateOAuthClientConfigMap(ctx context.Context, cl client.Client, authCR *operatorv1alpha1.Authentication, ibmcloudClusterInfo, generated *corev1.ConfigMap) (err error) {
+	reqLogger := logf.FromContext(ctx).WithValues("ConfigMap.Namespace", authCR.Namespace, "ConfigMap.Name", "oauth-client-map")
+	icpConsoleURL := ibmcloudClusterInfo.Data["cluster_address"]
+	icpProxyURL := ibmcloudClusterInfo.Data["proxy_address"]
+	*generated = corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "oauth-client-map",
 			Namespace: authCR.Namespace,
@@ -749,18 +660,19 @@ func oauthClientConfigMap(authCR *operatorv1alpha1.Authentication, icpConsoleURL
 	}
 
 	// Set Authentication authCR as the owner and controller of the ConfigMap
-	err := controllerutil.SetControllerReference(authCR, newConfigMap, scheme)
-	if err != nil {
+	if err = controllerutil.SetControllerReference(authCR, generated, cl.Scheme()); err != nil {
 		reqLogger.Error(err, "Failed to set owner for ConfigMap")
-		return nil
 	}
-	return newConfigMap
-
+	return
 }
 
-func (r *AuthenticationReconciler) ibmcloudClusterInfoConfigMap(authCR *operatorv1alpha1.Authentication, isOSEnv bool, domainName string) *corev1.ConfigMap {
-
+func (r *AuthenticationReconciler) generateIBMCloudClusterInfoConfigMap(ctx context.Context, authCR *operatorv1alpha1.Authentication, generated *corev1.ConfigMap) (err error) {
 	reqLogger := log.WithValues("authCR.Namespace", authCR.Namespace, "authCR.Name", authCR.Name)
+	var domainName string
+	if domainName, err = getCNCFDomain(ctx, r.Client, authCR); err != nil {
+		reqLogger.Info("Could not retrieve cluster configuration; requeueing", "reason", err.Error())
+		return
+	}
 
 	rhttpPort := os.Getenv("ROUTE_HTTP_PORT")
 	if rhttpPort == "" {
@@ -775,13 +687,13 @@ func (r *AuthenticationReconciler) ibmcloudClusterInfoConfigMap(authCR *operator
 		cname = ClusterNameValue
 	}
 	// if the env identified as CNCF
-	if !isOSEnv {
+	if domainName != "" {
 		reqLogger.Info("Env type is CNCF")
 
 		ClusterAddress := strings.Join([]string{strings.Join([]string{"cp-console", authCR.Namespace}, "-"), domainName}, ".")
 		ep := "https://" + ClusterAddress
 
-		newConfigMap := &corev1.ConfigMap{
+		*generated = corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ctrlcommon.IBMCloudClusterInfoCMName,
 				Namespace: authCR.Namespace,
@@ -794,136 +706,113 @@ func (r *AuthenticationReconciler) ibmcloudClusterInfoConfigMap(authCR *operator
 				RouteHTTPSPort: rhttpsPort,
 				ClusterName:    cname,
 				ProxyAddress:   ClusterAddress,
-				ProviderSVC:    "https://platform-identity-provider" + "." + authCR.Namespace + ".svc:4300",
-				IDMgmtSVC:      "https://platform-identity-management" + "." + authCR.Namespace + ".svc:4500",
+				ProviderSVC:    fmt.Sprintf("https://platform-identity-provider.%s.svc:4300", authCR.Namespace),
+				IDMgmtSVC:      fmt.Sprintf("https://platform-identity-management.%s.svc:4500", authCR.Namespace),
 			},
 		}
 
 		// Set Authentication authCR as the owner and controller of the ConfigMap
-		err := controllerutil.SetControllerReference(authCR, newConfigMap, r.Scheme)
+		err = controllerutil.SetControllerReference(authCR, generated, r.Scheme)
 		if err != nil {
 			reqLogger.Error(err, "Failed to set owner for ConfigMap")
-			return nil
 		}
-		return newConfigMap
-
-	} else if isOSEnv { // if the env identified as OCP
-
-		reqLogger.Info("Env Type is OCP")
-		// get domain name from ingresses.config/cluster from openshift-ingress-operator ns
-		var DomainName string
-		var ProxyDomainName string
-		ingressConfigName := "cluster"
-		ingressConfig := &osconfigv1.Ingress{}
-
-		clusterClient, err := r.createOrGetClusterClient()
-		if err != nil {
-			reqLogger.Error(err, "Failure creating or getting cluster client")
-		}
-
-		reqLogger.Info("Going to READ openshift ingress cluster config")
-		errGet := clusterClient.Get(context.TODO(), types.NamespacedName{Name: ingressConfigName}, ingressConfig)
-
-		if errGet == nil {
-			reqLogger.Info("Successfully READ openshift ingress cluster config")
-			appsDomain := ingressConfig.Spec.AppsDomain
-			if len(appsDomain) > 0 {
-				reqLogger.Info("appsDomain has been configured", "appsDomain.value", appsDomain)
-
-				if authCR.Spec.Config.OnPremMultipleDeploy {
-					multipleauthCRRouteName := strings.Join([]string{"cp-console", authCR.Namespace}, "-")
-					DomainName = strings.Join([]string{multipleauthCRRouteName, appsDomain}, ".")
-					multipleauthCRProxyRouteName := strings.Join([]string{"cp-proxy", authCR.Namespace}, "-")
-					ProxyDomainName = strings.Join([]string{multipleauthCRProxyRouteName, appsDomain}, ".")
-				} else {
-					DomainName = strings.Join([]string{"cp-console", appsDomain}, ".")
-					ProxyDomainName = strings.Join([]string{"cp-proxy", appsDomain}, ".")
-				}
-			} else {
-				ingressDomain := ingressConfig.Spec.Domain
-				reqLogger.Info("appsDomain is not configured , going to fetch default domain", "ingressDomain.value", ingressDomain)
-				if authCR.Spec.Config.OnPremMultipleDeploy {
-					multipleauthCRRouteName := strings.Join([]string{"cp-console", authCR.Namespace}, "-")
-					DomainName = strings.Join([]string{multipleauthCRRouteName, ingressDomain}, ".")
-					multipleauthCRProxyRouteName := strings.Join([]string{"cp-proxy", authCR.Namespace}, "-")
-					ProxyDomainName = strings.Join([]string{multipleauthCRProxyRouteName, ingressDomain}, ".")
-				} else {
-					DomainName = strings.Join([]string{"cp-console", ingressDomain}, ".")
-					ProxyDomainName = strings.Join([]string{"cp-proxy", ingressDomain}, ".")
-				}
-			}
-		} else {
-			if !k8sErrors.IsNotFound(errGet) {
-				reqLogger.Error(errGet, "Failed to READ openshift ingress cluster config")
-			}
-		}
-
-		// get clusterApiServer Details cm console-config from openshift-console ns
-		OSconsoleConfigMap := &corev1.ConfigMap{}
-
-		err = clusterClient.Get(context.TODO(), types.NamespacedName{Name: "console-config", Namespace: "openshift-console"}, OSconsoleConfigMap)
-
-		if err != nil {
-			reqLogger.Error(err, "Failed to get console-config configmap from openshift-console namespace")
-			return nil
-		}
-
-		var result map[interface{}]interface{}
-		var apiaddr string
-		if err := yaml.Unmarshal([]byte(OSconsoleConfigMap.Data["console-config.yaml"]), &result); err != nil {
-			reqLogger.Error(err, "Failed to read console-config.yaml from console-config configmap")
-			return nil
-		}
-
-		for k, v := range result {
-			if k.(string) == "clusterInfo" {
-				cinfo := v.(map[interface{}]interface{})
-				for k1, v1 := range cinfo {
-					if k1.(string) == "masterPublicURL" {
-						apiaddr = v1.(string)
-						apiaddr = strings.TrimPrefix(apiaddr, "https://")
-						break
-					}
-				}
-				break
-			}
-		}
-
-		pos := strings.LastIndex(apiaddr, ":")
-
-		newConfigMap := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      ctrlcommon.IBMCloudClusterInfoCMName,
-				Namespace: authCR.Namespace,
-				Labels:    map[string]string{"app": "auth-idp"},
-			},
-			Data: map[string]string{
-				ClusterAddr:          DomainName,
-				ClusterEP:            "https://" + DomainName,
-				RouteHTTPPort:        rhttpPort,
-				RouteHTTPSPort:       rhttpsPort,
-				ClusterName:          cname,
-				ClusterAPIServerHost: apiaddr[0:pos],
-				ClusterAPIServerPort: apiaddr[pos+1:],
-				ProxyAddress:         ProxyDomainName,
-				ProviderSVC:          "https://platform-identity-provider" + "." + authCR.Namespace + ".svc:4300",
-				IDMgmtSVC:            "https://platform-identity-management" + "." + authCR.Namespace + ".svc:4500",
-			},
-		}
-
-		// Set Authentication authCR as the owner and controller of the ConfigMap
-		errset := controllerutil.SetControllerReference(authCR, newConfigMap, r.Scheme)
-
-		if errset != nil {
-			reqLogger.Error(err, "Failed to set owner for ConfigMap")
-			return nil
-		}
-		return newConfigMap
+		return
 	}
 
-	reqLogger.Info("Failed to create ibmcloudClusterInfoConfigMap , can't determine the env type")
-	return nil
+	reqLogger.Info("Env Type is OCP")
+	// get domain name from ingresses.config/cluster from openshift-ingress-operator ns
+	var DomainName string
+	var ProxyDomainName string
+	ingressConfigName := "cluster"
+	ingressConfig := &osconfigv1.Ingress{}
 
+	clusterClient, err := r.createOrGetClusterClient()
+	if err != nil {
+		reqLogger.Error(err, "Failure creating or getting cluster client")
+		return
+	}
+
+	reqLogger.Info("Going to READ openshift ingress cluster config")
+	if err = clusterClient.Get(ctx, types.NamespacedName{Name: ingressConfigName}, ingressConfig); err != nil {
+		reqLogger.Error(err, "Failed to READ openshift ingress cluster config")
+		return
+	}
+
+	reqLogger.Info("Successfully READ openshift ingress cluster config")
+
+	var baseDomain string
+	multipleauthCRRouteName := strings.Join([]string{"cp-console", authCR.Namespace}, "-")
+	multipleauthCRProxyRouteName := strings.Join([]string{"cp-proxy", authCR.Namespace}, "-")
+	if len(ingressConfig.Spec.AppsDomain) > 0 {
+		baseDomain = ingressConfig.Spec.AppsDomain
+	} else {
+		baseDomain = ingressConfig.Spec.Domain
+	}
+	if authCR.Spec.Config.OnPremMultipleDeploy {
+		DomainName = strings.Join([]string{multipleauthCRRouteName, baseDomain}, ".")
+		ProxyDomainName = strings.Join([]string{multipleauthCRProxyRouteName, baseDomain}, ".")
+	} else {
+		DomainName = strings.Join([]string{"cp-console", baseDomain}, ".")
+		ProxyDomainName = strings.Join([]string{"cp-proxy", baseDomain}, ".")
+	}
+
+	// get clusterApiServer Details cm console-config from openshift-console ns
+	OSconsoleConfigMap := &corev1.ConfigMap{}
+	OSConsoleCMKey := types.NamespacedName{Name: "console-config", Namespace: "openshift-console"}
+	if err = clusterClient.Get(ctx, OSConsoleCMKey, OSconsoleConfigMap); err != nil {
+		reqLogger.Error(err, "Failed to get console-config configmap from openshift-console namespace")
+		return nil
+	}
+
+	var result map[interface{}]interface{}
+	var apiaddr string
+	if err := yaml.Unmarshal([]byte(OSconsoleConfigMap.Data["console-config.yaml"]), &result); err != nil {
+		reqLogger.Error(err, "Failed to read console-config.yaml from console-config configmap")
+		return nil
+	}
+
+	for k, v := range result {
+		if k.(string) == "clusterInfo" {
+			cinfo := v.(map[interface{}]interface{})
+			for k1, v1 := range cinfo {
+				if k1.(string) == "masterPublicURL" {
+					apiaddr = v1.(string)
+					apiaddr = strings.TrimPrefix(apiaddr, "https://")
+					break
+				}
+			}
+			break
+		}
+	}
+
+	pos := strings.LastIndex(apiaddr, ":")
+
+	newConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ctrlcommon.IBMCloudClusterInfoCMName,
+			Namespace: authCR.Namespace,
+			Labels:    map[string]string{"app": "auth-idp"},
+		},
+		Data: map[string]string{
+			ClusterAddr:          DomainName,
+			ClusterEP:            "https://" + DomainName,
+			RouteHTTPPort:        rhttpPort,
+			RouteHTTPSPort:       rhttpsPort,
+			ClusterName:          cname,
+			ClusterAPIServerHost: apiaddr[0:pos],
+			ClusterAPIServerPort: apiaddr[pos+1:],
+			ProxyAddress:         ProxyDomainName,
+			ProviderSVC:          fmt.Sprintf("https://platform-identity-provider.%s.svc:4300", authCR.Namespace),
+			IDMgmtSVC:            fmt.Sprintf("https://platform-identity-management.%s.svc:4500", authCR.Namespace),
+		},
+	}
+
+	// Set Authentication authCR as the owner and controller of the ConfigMap
+	if err = controllerutil.SetControllerReference(authCR, newConfigMap, r.Scheme); err != nil {
+		reqLogger.Error(err, "Failed to set owner for ConfigMap")
+	}
+
+	return
 }
 
 var (
@@ -958,11 +847,11 @@ func (r *AuthenticationReconciler) createOrGetClusterClient() (client.Client, er
 }
 
 // isHostedOnIBMCloud checks the
-func (r *AuthenticationReconciler) isHostedOnIBMCloud(ctx context.Context, namespace string) (isPublicCloud bool, err error) {
+func isHostedOnIBMCloud(ctx context.Context, cl client.Client, namespace string) (isPublicCloud bool, err error) {
 	reqLogger := logf.FromContext(ctx).V(1)
 	cmName := ctrlcommon.IBMCloudClusterInfoCMName
 	cm := &corev1.ConfigMap{}
-	if err = r.Get(ctx, types.NamespacedName{Name: cmName, Namespace: namespace}, cm); err != nil {
+	if err = cl.Get(ctx, types.NamespacedName{Name: cmName, Namespace: namespace}, cm); err != nil {
 		reqLogger.Info("Error getting ConfigMap", "ConfigMap.Name", cmName, "ConfigMap.Namespace", namespace, "msg", err.Error())
 		return
 	}

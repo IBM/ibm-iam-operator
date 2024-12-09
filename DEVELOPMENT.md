@@ -138,7 +138,7 @@ MODE=dev make bundle-build
 To set the version of the project to a new SemVer, run the following:
 
 ```sh
-# NEW_VERSION is the desired SemVer to set across source and artifacts, e.g. 4.5.8
+# NEW_VERSION is the desired SemVer to set across source and artifacts, e.g. 4.5.9
 VERSION="${NEW_VERSION:-}" make update-version
 ```
 

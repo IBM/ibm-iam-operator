@@ -213,6 +213,8 @@ spec:
                     type: integer
                   preferredLogin:
                     type: string
+                  defaultLogin:
+                    type: string
                   providerIssuerURL:
                     type: string
                   roksEnabled:

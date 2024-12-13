@@ -77,6 +77,7 @@ metadata:
               "oidcIssuerURL": "https://127.0.0.1:443/idauth/oidc/endpoint/OP",
               "openshiftPort": 443,
               "preferredLogin": "",
+              "defaultLogin": "",
               "providerIssuerURL": "",
               "roksEnabled": true,
               "roksURL": "https://roks.domain.name:443",

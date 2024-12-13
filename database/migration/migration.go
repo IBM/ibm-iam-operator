@@ -124,7 +124,6 @@ func (m *Migration) Run(ctx context.Context) (err error) {
 			return fmt.Errorf("failed to connect to target database: %w", err)
 		}
 		defer m.To.Disconnect(ctx)
-		fmt.Sprintf("Log to verify as this has InsecureSkipVerify changes")
 	}
 	if m.From != nil {
 		if err = m.From.Connect(ctx); err != nil {

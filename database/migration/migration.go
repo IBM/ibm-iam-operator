@@ -219,7 +219,6 @@ func Migrate(ctx context.Context, c chan *Result, to, from dbconn.DBConn) {
 		result.Error = err
 		c <- result
 		close(c)
-		reqLogger.Info("Log to verify as this has InsecureSkipVerify change")
 		return
 	}
 

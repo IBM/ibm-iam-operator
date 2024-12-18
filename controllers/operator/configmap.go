@@ -260,6 +260,12 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 					currentConfigMap.Data["PREFERRED_LOGIN"] = newConfigMap.Data["PREFERRED_LOGIN"]
 					cmUpdateRequired = true
 				}
+				if _, keyExists := currentConfigMap.Data["DEFAULT_LOGIN"]; !keyExists {
+					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					newConfigMap = functionList[index](instance, r.Scheme)
+					currentConfigMap.Data["DEFAULT_LOGIN"] = newConfigMap.Data["DEFAULT_LOGIN"]
+					cmUpdateRequired = true
+				}
 				if _, keyExists := currentConfigMap.Data["DB_CONNECT_TIMEOUT"]; !keyExists {
 					reqLogger.Info("Updating an existing Configmap with connection pooling information", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.Scheme)
@@ -548,6 +554,7 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 			"BOOTSTRAP_USERID":                   bootStrapUserId,
 			"PROVIDER_ISSUER_URL":                instance.Spec.Config.ProviderIssuerURL,
 			"PREFERRED_LOGIN":                    instance.Spec.Config.PreferredLogin,
+			"DEFAULT_LOGIN":                      instance.Spec.Config.DefaultLogin,
 			"LIBERTY_TOKEN_LENGTH":               "1024",
 			"OS_TOKEN_LENGTH":                    "51",
 			"LIBERTY_DEBUG_ENABLED":              "false",

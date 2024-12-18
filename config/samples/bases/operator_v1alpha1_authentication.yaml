@@ -59,6 +59,7 @@ spec:
     xframeDomain: ''
     zenFrontDoor: false
     preferredLogin: ''
+    defaultLogin: ''
     bootstrapUserId: kubeadmin
     providerIssuerURL: ''
     claimsSupported: name,family_name,display_name,given_name,preferred_username

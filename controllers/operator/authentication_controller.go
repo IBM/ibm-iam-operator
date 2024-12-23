@@ -802,11 +802,8 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return
 	}
 
-	//Check if this ConfigMap already exists and create it if it doesn't
-	currentConfigMap := &corev1.ConfigMap{}
-	err = r.handleConfigMap(instance, wlpClientID, wlpClientSecret, currentConfigMap, &needToRequeue)
-	if err != nil {
-		return
+	if subResult, err := r.handleConfigMaps(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
 	}
 
 	// Check if this Job already exists and create it if it doesn't

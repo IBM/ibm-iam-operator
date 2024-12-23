@@ -19,6 +19,9 @@ package common
 const GlobalConfigMapName string = "ibm-cpp-config"
 const CommonServiceName string = "common-service"
 
+// Name of ConfigMap that configures IBM Cloud cluster information
+const IBMCloudClusterInfoCMName string = "ibmcloud-cluster-info"
+
 // Name of ConfigMap that configures external or embedded EDB for IM
 const DatastoreEDBCMName string = "im-datastore-edb-cm"
 

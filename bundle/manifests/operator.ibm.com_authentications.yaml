@@ -78,6 +78,7 @@ spec:
                 - imageName
                 - imageRegistry
                 - imageTag
+                - resources
                 type: object
               authService:
                 properties:

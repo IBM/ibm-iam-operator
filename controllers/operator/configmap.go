@@ -184,10 +184,12 @@ func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctr
 	return ctrlcommon.ReduceSubreconcilerResultsAndErrors(subresults, errs)
 }
 
-func updateFields(observed, updates *corev1.ConfigMap, keys ...string) (updated bool) {
+func updateFields(observed, update *corev1.ConfigMap, keys ...string) (updated bool) {
 	for _, key := range keys {
-		if value, ok := updates.Data[key]; ok && observed.Data[key] != value {
-			observed.Data[key] = value
+		observedVal, ok := observed.Data[key]
+		updateVal := update.Data[key]
+		if !ok || observedVal != updateVal {
+			observed.Data[key] = updateVal
 			updated = true
 		}
 	}
@@ -364,7 +366,7 @@ func updatePlatformAuthIDP(observed, generated *corev1.ConfigMap) (updated bool,
 			"PROVIDER_ISSUER_URL"),
 		updatesValuesWhen(not(observedKeySet("PREFERRED_LOGIN")),
 			"PREFERRED_LOGIN"),
-		updatesValuesWhen(not(observedKeySet("DEFAULT_LOGIN")),
+		updatesValuesWhen(not(observedKeyValueSetTo("DEFAULT_LOGIN", generated.Data["DEFAULT_LOGIN"])),
 			"DEFAULT_LOGIN"),
 		updatesValuesWhen(not(observedKeySet("DB_CONNECT_TIMEOUT")),
 			"DB_CONNECT_TIMEOUT",

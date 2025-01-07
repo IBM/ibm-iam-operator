@@ -427,6 +427,7 @@ var _ = Describe("ConfigMap handling", func() {
 					"LOG_LEVEL_AUTHSVC":                  "info",
 					"LOG_LEVEL_IDMGMT":                   "info",
 					"LOG_LEVEL_MW":                       "info",
+					"DEFAULT_LOGIN":                      "",
 					"IDTOKEN_LIFETIME":                   "12h",
 					"SESSION_TIMEOUT":                    "43200",
 					"OIDC_ISSUER_URL":                    authCR.Spec.Config.OIDCIssuerURL,
@@ -501,6 +502,10 @@ var _ = Describe("ConfigMap handling", func() {
 						"SCOPE_CLAIM",
 						"BOOTSTRAP_USERID",
 					},
+				},
+				{
+					"DEFAULT_LOGIN",
+					[]string{"DEFAULT_LOGIN"},
 				},
 				{
 					"PROVIDER_ISSUER_URL",

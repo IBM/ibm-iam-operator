@@ -30,13 +30,6 @@ func (in *ZenExtension) DeepCopyInto(out *ZenExtension) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	if in.Spec != nil {
-		in, out := &in.Spec, &out.Spec
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	}
 	in.Status.DeepCopyInto(&out.Status)
 }
 

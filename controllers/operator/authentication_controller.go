@@ -863,7 +863,7 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
-	if result, err := r.handleZenExtension(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err := r.handleZenFrontDoor(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return subreconciler.Evaluate(result, err)
 	}
 

@@ -25,13 +25,14 @@ import (
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:path=zenextensions,scope=Namespaced
 
-// ZenExtension is the Schema for the zen extension API
+// ZenExtension is the Schema for the zen extension API. The spec is omitted
+// from this struct because the ZenExtension API does not have any guaranteed
+// structure, which is incompatible with controller-gen code generation.
 type ZenExtension struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// +kubebuilder:pruning:PreserveUnknownFields
-	Spec   map[string]string  `json:"spec,omitempty"`
 	Status ZenExtensionStatus `json:"status,omitempty"`
 }
 

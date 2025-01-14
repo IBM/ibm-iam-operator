@@ -121,12 +121,12 @@ func (r *ClientReconciler) confirmAuthenticationIsReady(ctx context.Context, req
 		return subreconciler.RequeueWithDelay(wait.Jitter(baseAuthenticationWaitTime, 1.0))
 	}
 
-	if authCR.IsReady() {
-		reqLogger.Info("Authentication CR is ready; proceding with Client reconciliation")
+	if authCR.Status.Service.DeploymentsReady() && authCR.Status.Service.ServicesReady() {
+		reqLogger.Info("Authentication Deployments and Services are ready; proceding with Client reconciliation")
 		return subreconciler.ContinueReconciling()
 	}
 
-	reqLogger.Info("Authentication CR is not ready yet; delaying Client reconciliation")
+	reqLogger.Info("Authentication Deployments and Services are not ready yet; delaying Client reconciliation")
 	return subreconciler.RequeueWithDelay(wait.Jitter(baseAuthenticationWaitTime, 1.0))
 }
 

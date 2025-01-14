@@ -22,9 +22,11 @@ import (
 	"reflect"
 	"sync"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -318,6 +320,32 @@ func (a *Authentication) GetDBSchemaVersion() string {
 	return ""
 }
 
-func (a *Authentication) IsReady() bool {
-	return a.Status.Service.Status == "Ready"
+func (s ServiceStatus) IsReady() bool {
+	return s.Status == "Ready"
+}
+
+func (s ServiceStatus) GVKReady(gvk schema.GroupVersionKind) bool {
+	apiVersion, kind := gvk.ToAPIVersionAndKind()
+	var found, ready int
+	for _, resource := range s.ManagedResources {
+		if resource.APIVersion != apiVersion || resource.Kind != kind {
+			continue
+		}
+		found++
+		if resource.Status != "Ready" {
+			return false
+		}
+		ready++
+	}
+	return found > 0 && found == ready
+}
+
+func (s ServiceStatus) DeploymentsReady() bool {
+	gvk := appsv1.SchemeGroupVersion.WithKind("Deployment")
+	return s.GVKReady(gvk)
+}
+
+func (s ServiceStatus) ServicesReady() bool {
+	gvk := corev1.SchemeGroupVersion.WithKind("Service")
+	return s.GVKReady(gvk)
 }

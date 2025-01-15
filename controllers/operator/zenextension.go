@@ -24,14 +24,15 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	zenv1 "github.com/IBM/ibm-iam-operator/apis/zen.cpd.ibm.com/v1"
 	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
-	"github.com/go-logr/logr"
 	"github.com/opdev/subreconciler"
 
-	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -109,166 +110,212 @@ var IamNginxExtensions = `[
 ]
 `
 
-// handleZenExtension manages the generation of the ZenExtension when iam behind the zen front door is requested
-func (r *AuthenticationReconciler) handleZenExtension(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	uiZenExtName := "common-web-ui-zen-extension"
-	needToRequeue := false
+type ZenExtensionWithSpec struct {
+	metav1.ObjectMeta
+	metav1.TypeMeta
+	Status zenv1.ZenExtensionStatus
+	Spec   map[string]any
+}
 
-	reqLogger := logf.FromContext(ctx).WithValues(
-		"subreconciler", "handleZenExtension",
-		"ZenExtension.Name", ImZenExtName,
-		"ZenExtension.Namespace", req.Namespace)
+func (zs *ZenExtensionWithSpec) ToUnstructured(s *runtime.Scheme) (u *unstructured.Unstructured, err error) {
+	noSpec := &zenv1.ZenExtension{
+		ObjectMeta: zs.ObjectMeta,
+		TypeMeta:   zs.TypeMeta,
+		Status:     zs.Status,
+	}
+	u = &unstructured.Unstructured{}
+	if err = s.Convert(noSpec, u, nil); err != nil {
+		return nil, err
+	}
+	u.Object["spec"] = zs.Spec
+	return u, nil
+}
 
-	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return
+func getZenExtensionWithSpec(s *runtime.Scheme, u *unstructured.Unstructured) (zs *ZenExtensionWithSpec, err error) {
+	noSpec := &zenv1.ZenExtension{}
+	if err = s.Convert(u, noSpec, nil); err != nil {
+		return nil, err
 	}
 
-	zenHost := ""
+	spec, ok := u.Object["spec"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("failed to get spec from unstructured ZenExtension")
+	}
+	zs = &ZenExtensionWithSpec{
+		ObjectMeta: noSpec.ObjectMeta,
+		TypeMeta:   noSpec.TypeMeta,
+		Spec:       spec,
+		Status:     noSpec.Status,
+	}
 
-	if authCR.Spec.Config.ZenFrontDoor {
+	return
+}
+
+func (r *AuthenticationReconciler) getOrCreateZenExtension(ctx context.Context, observed, desired client.Object) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx)
+	err = r.Get(ctx, types.NamespacedName{Name: desired.GetName(), Namespace: desired.GetNamespace()}, observed)
+	// Create if not found
+	if k8sErrors.IsNotFound(err) {
+		reqLogger.Info("ZenExtension not found, creating")
+		if err = r.Create(ctx, desired); k8sErrors.IsAlreadyExists(err) {
+			reqLogger.Info("ZenExtension already exists; continuing")
+			return subreconciler.ContinueReconciling()
+		} else if err != nil {
+			reqLogger.Error(err, "Failed to create ZenExtension")
+			return subreconciler.RequeueWithError(err)
+		}
+		reqLogger.Info("Created ZenExtension")
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to get ZenExtension")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	reqLogger.Info("Found ZenExtension")
+	return subreconciler.ContinueReconciling()
+}
+
+func (r *AuthenticationReconciler) createOrUpdateZenExtension(authCR *operatorv1alpha1.Authentication) subreconciler.Fn {
+	return func(ctx context.Context) (result *ctrl.Result, err error) {
+		reqLogger := logf.FromContext(ctx)
+		if !authCR.Spec.Config.ZenFrontDoor {
+			return subreconciler.ContinueReconciling()
+		}
+
 		reqLogger.Info("Zen front door requested - Ensure that ZenExtension is updated with correct front door config")
+		if !ctrlCommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
+			reqLogger.Info("Zen front door has been requested, but the ZenExtension CRD does not exist - reconciliation of ZenExtension not possible")
+			return subreconciler.ContinueReconciling()
+		}
 
-		if ctrlCommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
-			commonWebUIZenExt := &zenv1.ZenExtension{}
-			err = r.Get(ctx, types.NamespacedName{Name: uiZenExtName, Namespace: authCR.Namespace}, commonWebUIZenExt)
-			if err != nil {
-				if k8sErrors.IsNotFound(err) {
-					reqLogger.Info("ZenExtension:common-web-ui-zen-extension does not exist - nothing to reconcile; continuing")
-				} else if err != nil {
-					reqLogger.Error(err, "Failed to get ZenExtension:common-web-ui-zen-extension - Not Requeuing, assume zen is not installed")
-				}
-				return subreconciler.ContinueReconciling()
-			}
-			//Get the routehost from the ibmcloud-cluster-info configmap
-			zenHost, err = r.getZenHost(ctx, authCR, &needToRequeue, reqLogger)
-			if err != nil {
-				return subreconciler.RequeueWithError(err)
-			}
-			if needToRequeue {
-				return subreconciler.RequeueWithDelay(opreqWait)
-			}
+		zenHost := ""
+		//Get the routehost from the ibmcloud-cluster-info configmap
+		if zenHost, err = r.getZenHost(ctx, authCR); err != nil {
+			reqLogger.Error(err, "Could not get Zen host value")
+			return subreconciler.RequeueWithDelay(defaultLowerWait)
+		}
 
-			desiredZenExt := &zenv1.ZenExtension{}
-			if result, err := r.getDesiredZenExtension(ctx, authCR, zenHost, desiredZenExt); subreconciler.ShouldRequeue(result, err) {
-				return subreconciler.RequeueWithError(err)
-			}
-			if needToRequeue {
-				return subreconciler.RequeueWithDelay(opreqWait)
-			}
+		var unstrObserved, unstrDesired *unstructured.Unstructured
+		desiredZenExt := &ZenExtensionWithSpec{}
+		if subResult, err := r.getDesiredZenExtension(ctx, authCR, zenHost, desiredZenExt); subreconciler.ShouldRequeue(subResult, err) {
+			return subResult, err
+		}
 
-			observedZenExt := &zenv1.ZenExtension{}
-			err = r.Get(ctx, types.NamespacedName{Name: ImZenExtName, Namespace: authCR.Namespace}, observedZenExt)
+		if unstrDesired, err = desiredZenExt.ToUnstructured(r.Scheme); err != nil {
+			reqLogger.Info("Failed to convert generated ZenExtension to unstructured", "reason", err.Error())
+			return subreconciler.RequeueWithDelay(defaultLowerWait)
+		}
 
-			if k8sErrors.IsNotFound(err) {
-				reqLogger.Info("ZenExtension not found, creating")
+		unstrObserved = &unstructured.Unstructured{
+			Object: map[string]any{"kind": "ZenExtension", "apiVersion": zenv1.GroupVersion.String()},
+		}
 
-				if err = r.Create(ctx, desiredZenExt); k8sErrors.IsAlreadyExists(err) {
-					reqLogger.Info("ZenExtension already exists; continuing")
-					return subreconciler.ContinueReconciling()
-				} else if err != nil {
-					reqLogger.Error(err, "Failed to create ZenExtension")
-					return subreconciler.RequeueWithError(err)
-				}
-				reqLogger.Info("Created ZenExtension")
-				return subreconciler.RequeueWithDelay(opreqWait)
-			} else if err != nil {
-				reqLogger.Error(err, "Failed to get ZenExtension")
-				return subreconciler.RequeueWithError(err)
-			}
+		if subResult, err := r.getOrCreateZenExtension(ctx, unstrObserved, unstrDesired); subreconciler.ShouldRequeue(subResult, err) {
+			return subResult, err
+		}
 
-			if !reflect.DeepEqual(observedZenExt.Spec, desiredZenExt.Spec) {
+		var observedZenExt *ZenExtensionWithSpec
+		if observedZenExt, err = getZenExtensionWithSpec(r.Scheme, unstrObserved); err != nil {
+			reqLogger.Info("Failed to convert unstructured into ZenExtension", "reason", err.Error())
+			return subreconciler.RequeueWithDelay(opreqWait)
+		}
 
-				observedZenExt.Spec[NginxConf] = desiredZenExt.Spec[NginxConf]
-				observedZenExt.Spec[Extensions] = desiredZenExt.Spec[Extensions]
-				if err = r.Update(ctx, observedZenExt); err != nil {
-					reqLogger.Error(err, "Failed to update ZenExtension")
-					return subreconciler.RequeueWithError(err)
-				}
-				reqLogger.Info("Updated ZenExtension successfully")
-				return subreconciler.RequeueWithDelay(defaultLowerWait)
-			}
+		if reflect.DeepEqual(observedZenExt.Spec, desiredZenExt.Spec) {
 			reqLogger.Info("No changes to ZenExtension; continue")
-		} else {
-			reqLogger.Info("Error - Zen front door has been requested, but the ZenExtension CRD does not exist - reconciliation of ZenExtension not possible")
+			return subreconciler.ContinueReconciling()
 		}
-	} else {
-		//The zen front door is disabled, if the zen extension exists, delete it
-		reqLogger.Info("Zen front door disabled")
 
-		observedZenExt := &zenv1.ZenExtension{}
-		zext_err := r.Get(ctx, types.NamespacedName{Name: ImZenExtName, Namespace: authCR.Namespace}, observedZenExt)
-		if zext_err == nil {
-			//Delete the existing zen extension
-			derr := r.Delete(ctx, observedZenExt)
-			if derr != nil {
-				if !k8sErrors.IsNotFound(derr) {
-					reqLogger.Info("WARNING zen front door disabled, but iam zenextension exists and could not be deleted", "error", derr)
-				}
-			} else {
-				reqLogger.Info("Iam zen extension deleted successfully")
-			}
-		} else {
-			//error getting zen extension, only report if its not a notfound error
-			if !k8sErrors.IsNotFound(zext_err) {
-				reqLogger.Error(zext_err, "Zen front door is disabled, but could not get iam zenextension for cleanup")
-			}
+		// Update if not equal
+		observedZenExt.Spec[NginxConf] = desiredZenExt.Spec[NginxConf]
+		observedZenExt.Spec[Extensions] = desiredZenExt.Spec[Extensions]
+
+		if unstrObserved, err = observedZenExt.ToUnstructured(r.Scheme); err != nil {
+			reqLogger.Info("Failed to convert to unstructured for update", "reason", err.Error())
+			return subreconciler.RequeueWithDelay(opreqWait)
 		}
+
+		if err = r.Update(ctx, unstrObserved); err != nil {
+			reqLogger.Error(err, "Failed to update ZenExtension")
+			return subreconciler.RequeueWithError(err)
+		}
+		reqLogger.Info("Updated ZenExtension successfully")
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	}
+}
+
+func (r *AuthenticationReconciler) removeZenExtension(authCR *operatorv1alpha1.Authentication) subreconciler.Fn {
+	return func(ctx context.Context) (result *ctrl.Result, err error) {
+		reqLogger := logf.FromContext(ctx)
+		if authCR.Spec.Config.ZenFrontDoor {
+			return subreconciler.ContinueReconciling()
+		}
+
+		reqLogger.Info("Zen front door not enabled")
+		observedZenExt := &zenv1.ZenExtension{}
+		frontDoorKey := types.NamespacedName{Name: ImZenExtName, Namespace: authCR.Namespace}
+		if err = r.Get(ctx, frontDoorKey, observedZenExt); k8sErrors.IsNotFound(err) {
+			reqLogger.Info("Zen front door not found; continuing")
+			return subreconciler.ContinueReconciling()
+		} else if err != nil {
+			reqLogger.Error(err, "Zen front door is disabled, but could not get iam ZenExtension for cleanup")
+			return subreconciler.RequeueWithError(err)
+		}
+
+		//Delete the existing zen extension
+		if err = r.Delete(ctx, observedZenExt); k8sErrors.IsNotFound(err) {
+			reqLogger.Info("ZenExtension not found; no deletion needed")
+			return subreconciler.ContinueReconciling()
+		} else if err != nil {
+			reqLogger.Info("Zen front door disabled, but iam zenextension exists and could not be deleted", "reason", err.Error())
+			return subreconciler.RequeueWithError(err)
+		}
+		reqLogger.Info("Zen front door deleted successfully")
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	}
+}
+
+// handleZenExtension manages the generation of the ZenExtension when iam behind the zen front door is requested
+func (r *AuthenticationReconciler) handleZenFrontDoor(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	subLogger := logf.FromContext(ctx).WithValues(
+		"subreconciler", "handleZenFrontDoor",
+		"ZenExtension.Name", ImZenExtName,
+		"ZenExtension.Namespace", req.Namespace)
+	subCtx := logf.IntoContext(ctx, subLogger)
+
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(subCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
 	}
 
 	//In addition to reconciling the zen extension, we must set the proper value of
 	//cluster_address_auth in the ibmcloud-cluster-info configmap
-
-	clusterInfoConfigMap := &corev1.ConfigMap{}
-	clusterAddressFieldName := "cluster_address"
-	clusterAddressAuthFieldName := "cluster_address_auth"
-	clusterEndpointFieldName := "cluster_endpoint"
-
-	authHost := ""
-	clusterEndpoint := ""
 	fns := []subreconciler.Fn{
-		r.getClusterInfoConfigMap(authCR, clusterInfoConfigMap),
-		r.verifyConfigMapHasCorrectOwnership(authCR, clusterInfoConfigMap),
-		r.verifyConfigMapHasField(authCR, clusterAddressFieldName, clusterInfoConfigMap),
+		r.removeZenExtension(authCR),
+		r.createOrUpdateZenExtension(authCR),
 	}
 
 	for _, fn := range fns {
-		if result, err = fn(ctx); subreconciler.ShouldRequeue(result, err) {
+		if result, err = fn(subCtx); subreconciler.ShouldRequeue(result, err) {
 			return
 		}
 	}
 
-	if authCR.Spec.Config.ZenFrontDoor && ctrlCommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
-		//authHost must be set to the zen front door
-		//is should be set from above
-		authHost = zenHost
-		clusterEndpoint = "https://" + zenHost
-	} else {
-		authHost = clusterInfoConfigMap.Data[clusterAddressFieldName]
-		clusterEndpoint = clusterInfoConfigMap.Data[clusterEndpointFieldName]
-	}
-
-	desiredFields := map[string]string{
-		clusterAddressAuthFieldName: authHost,
-		clusterAddressFieldName:     authHost,
-		clusterEndpointFieldName:    clusterEndpoint,
-	}
-	return r.ensureConfigMapHasEqualFields(authCR, desiredFields, clusterInfoConfigMap)(ctx)
+	return subreconciler.ContinueReconciling()
 }
 
-func (r *AuthenticationReconciler) getDesiredZenExtension(ctx context.Context, authCR *operatorv1alpha1.Authentication, zenHost string, desiredZenExt *zenv1.ZenExtension) (result *ctrl.Result, err error) {
+func (r *AuthenticationReconciler) getDesiredZenExtension(ctx context.Context, authCR *operatorv1alpha1.Authentication, zenHost string, desiredZenExt *ZenExtensionWithSpec) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx)
 	wlpClientID := ""
 	if result, err = r.getWlpClientID(authCR, &wlpClientID)(ctx); subreconciler.ShouldRequeue(result, err) {
 		return
 	}
 
-	*desiredZenExt = zenv1.ZenExtension{
+	*desiredZenExt = ZenExtensionWithSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ImZenExtName,
 			Namespace: authCR.Namespace,
 		},
-		Spec: map[string]string{
+		Spec: map[string]any{
 			NginxConf:  fmt.Sprintf(IamNginxConfig, authCR.Namespace, wlpClientID, zenHost),
 			Extensions: IamNginxExtensions,
 		},
@@ -281,30 +328,4 @@ func (r *AuthenticationReconciler) getDesiredZenExtension(ctx context.Context, a
 	}
 
 	return subreconciler.ContinueReconciling()
-}
-
-func (r *AuthenticationReconciler) getZenHost(ctx context.Context, authCR *operatorv1alpha1.Authentication, needToRequeue *bool, reqLogger logr.Logger) (zenHost string, err error) {
-	zenHost = ""
-
-	//Get the routehost from the ibmcloud-cluster-info configmap
-	productConfigMap := &corev1.ConfigMap{}
-	err = r.Client.Get(ctx, types.NamespacedName{Name: ZenProductConfigmapName, Namespace: authCR.Namespace}, productConfigMap)
-	if err != nil {
-		if k8sErrors.IsNotFound(err) {
-			reqLogger.Info("Zen product configmap doesnot exist - requeuing until it does")
-			*needToRequeue = true
-			err = nil
-			return
-		}
-		reqLogger.Error(err, "Failed to get Zen product configmap "+ZenProductConfigmapName)
-		return
-	}
-
-	if productConfigMap.Data == nil || len(productConfigMap.Data[URL_PREFIX]) == 0 {
-		err = fmt.Errorf("Zen %s is not set in configmap %s", URL_PREFIX, ZenProductConfigmapName)
-		return
-	}
-
-	zenHost = productConfigMap.Data[URL_PREFIX]
-	return
 }

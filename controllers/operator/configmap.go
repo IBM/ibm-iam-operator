@@ -120,11 +120,22 @@ func (r *AuthenticationReconciler) handleIBMCloudClusterInfo(ctx context.Context
 		reqLogger.Info("ibmcloud-cluster-info Configmap is already created by IM operator")
 	}
 
+	updateFns := []func(*corev1.ConfigMap, *corev1.ConfigMap) bool{
+		updatesValuesWhen(not(observedKeyValueSetTo("cluster_address", generated.Data["cluster_address"])),
+			"cluster_address",
+			"cluster_address_auth",
+			"cluster_endpoint"),
+	}
+
+	for _, update := range updateFns {
+		updated = update(observed, generated) || updated
+	}
+
 	if !updated {
 		return subreconciler.ContinueReconciling()
 	}
 
-	reqLogger.Info("Became controller and labeled to indicate association with IM; attempting update")
+	reqLogger.Info("Attempting to update ibmcloud-cluster-info")
 	if err = r.Update(ctx, observed); err != nil {
 		reqLogger.Error(err, "Failed to update ConfigMap")
 		return subreconciler.RequeueWithError(err)
@@ -135,8 +146,6 @@ func (r *AuthenticationReconciler) handleIBMCloudClusterInfo(ctx context.Context
 }
 
 func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	//reqLogger := logf.FromContext(ctx)
-
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
@@ -215,9 +224,42 @@ func observedKeyValueSetTo(key, value string) matcherFunc {
 	}
 }
 
-func not(matches matcherFunc) matcherFunc {
+func zenFrontDoorEnabled(authCR *operatorv1alpha1.Authentication) matcherFunc {
 	return func(observed *corev1.ConfigMap) bool {
-		return !matches(observed)
+		return authCR.Spec.Config.ZenFrontDoor
+	}
+}
+
+func not(isMatch matcherFunc) matcherFunc {
+	return func(observed *corev1.ConfigMap) bool {
+		return !isMatch(observed)
+	}
+}
+
+func and(matchers ...matcherFunc) matcherFunc {
+	return func(observed *corev1.ConfigMap) (matches bool) {
+		if len(matchers) == 0 {
+			return false
+		}
+		matches = true
+		for _, isMatch := range matchers {
+			if !isMatch(observed) {
+				return false
+			}
+		}
+		return
+	}
+}
+
+func or(matchers ...matcherFunc) matcherFunc {
+	return func(observed *corev1.ConfigMap) (matches bool) {
+		matches = false
+		for _, isMatch := range matchers {
+			if isMatch(observed) {
+				return true
+			}
+		}
+		return
 	}
 }
 
@@ -675,63 +717,144 @@ func generateOAuthClientConfigMap(ctx context.Context, cl client.Client, authCR 
 	return
 }
 
-func (r *AuthenticationReconciler) generateIBMCloudClusterInfoConfigMap(ctx context.Context, authCR *operatorv1alpha1.Authentication, generated *corev1.ConfigMap) (err error) {
-	reqLogger := log.WithValues("authCR.Namespace", authCR.Namespace, "authCR.Name", authCR.Name)
-	var domainName string
-	if domainName, err = getCNCFDomain(ctx, r.Client, authCR); err != nil {
-		reqLogger.Info("Could not retrieve cluster configuration; requeueing", "reason", err.Error())
+func (r *AuthenticationReconciler) generateCNCFClusterInfo(ctx context.Context, authCR *operatorv1alpha1.Authentication, domainName string, generated *corev1.ConfigMap) (err error) {
+	reqLogger := logf.FromContext(ctx)
+
+	rhttpPort, rhttpsPort, cname := getClusterInfoFromEnv()
+
+	zenHost := ""
+	clusterAddress := strings.Join([]string{strings.Join([]string{"cp-console", authCR.Namespace}, "-"), domainName}, ".")
+	clusterEndpoint := "https://" + clusterAddress
+	clusterAddressAuth := clusterAddress
+	if authCR.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
+		zenHost, err = r.getZenHost(ctx, authCR)
+		if err == nil {
+			clusterAddressAuth = zenHost
+			clusterAddress = zenHost
+			clusterEndpoint = "https://" + zenHost
+		} else {
+			reqLogger.Info("Zen host could not be retrieved; using defaults")
+		}
+	}
+
+	*generated = corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ctrlcommon.IBMCloudClusterInfoCMName,
+			Namespace: authCR.Namespace,
+			Labels:    map[string]string{"app": "auth-idp"},
+		},
+		Data: map[string]string{
+			ClusterAddr:            clusterAddress,
+			"cluster_address_auth": clusterAddressAuth,
+			ClusterEP:              clusterEndpoint,
+			RouteHTTPPort:          rhttpPort,
+			RouteHTTPSPort:         rhttpsPort,
+			ClusterName:            cname,
+			ProxyAddress:           clusterAddress,
+			ProviderSVC:            fmt.Sprintf("https://platform-identity-provider.%s.svc:4300", authCR.Namespace),
+			IDMgmtSVC:              fmt.Sprintf("https://platform-identity-management.%s.svc:4500", authCR.Namespace),
+		},
+	}
+
+	return
+}
+
+func (r *AuthenticationReconciler) generateOCPClusterInfo(ctx context.Context, authCR *operatorv1alpha1.Authentication, generated *corev1.ConfigMap) (err error) {
+	reqLogger := logf.FromContext(ctx)
+
+	rhttpPort, rhttpsPort, cname := getClusterInfoFromEnv()
+
+	domainName, proxyDomainName, err := r.getDomainFromIngressConfig(ctx, authCR)
+	if err != nil {
 		return
 	}
 
-	rhttpPort := os.Getenv("ROUTE_HTTP_PORT")
+	apiHost, apiPort, err := r.getClusterAPIServerStrFromConsoleConfig(ctx)
+	if err != nil {
+		return
+	}
+
+	zenHost := ""
+	clusterAddress := domainName
+	clusterEndpoint := "https://" + clusterAddress
+	clusterAddressAuth := clusterAddress
+	if authCR.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
+		zenHost, err = r.getZenHost(ctx, authCR)
+		if err == nil {
+			clusterAddressAuth = zenHost
+			clusterAddress = zenHost
+			clusterEndpoint = "https://" + zenHost
+		} else {
+			reqLogger.Info("Zen host could not be retrieved; using defaults")
+		}
+	}
+
+	*generated = corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ctrlcommon.IBMCloudClusterInfoCMName,
+			Namespace: authCR.Namespace,
+			Labels:    map[string]string{"app": "auth-idp"},
+		},
+		Data: map[string]string{
+			ClusterAddr:            clusterAddress,
+			"cluster_address_auth": clusterAddressAuth,
+			ClusterEP:              clusterEndpoint,
+			RouteHTTPPort:          rhttpPort,
+			RouteHTTPSPort:         rhttpsPort,
+			ClusterName:            cname,
+			ClusterAPIServerHost:   apiHost,
+			ClusterAPIServerPort:   apiPort,
+			ProxyAddress:           proxyDomainName,
+			ProviderSVC:            fmt.Sprintf("https://platform-identity-provider.%s.svc:4300", authCR.Namespace),
+			IDMgmtSVC:              fmt.Sprintf("https://platform-identity-management.%s.svc:4500", authCR.Namespace),
+		},
+	}
+
+	return
+}
+
+func getClusterInfoFromEnv() (rhttpPort, rhttpsPort, cname string) {
+	rhttpPort = os.Getenv("ROUTE_HTTP_PORT")
 	if rhttpPort == "" {
 		rhttpPort = RouteHTTPPortValue
 	}
-	rhttpsPort := os.Getenv("ROUTE_HTTPS_PORT")
+	rhttpsPort = os.Getenv("ROUTE_HTTPS_PORT")
 	if rhttpsPort == "" {
 		rhttpsPort = RouteHTTPSPortValue
 	}
-	cname := os.Getenv("cluster_name")
+	cname = os.Getenv("cluster_name")
 	if cname == "" {
 		cname = ClusterNameValue
 	}
-	// if the env identified as CNCF
-	if domainName != "" {
-		reqLogger.Info("Env type is CNCF")
 
-		ClusterAddress := strings.Join([]string{strings.Join([]string{"cp-console", authCR.Namespace}, "-"), domainName}, ".")
-		ep := "https://" + ClusterAddress
+	return
+}
 
-		*generated = corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      ctrlcommon.IBMCloudClusterInfoCMName,
-				Namespace: authCR.Namespace,
-				Labels:    map[string]string{"app": "auth-idp"},
-			},
-			Data: map[string]string{
-				ClusterAddr:    ClusterAddress,
-				ClusterEP:      ep,
-				RouteHTTPPort:  rhttpPort,
-				RouteHTTPSPort: rhttpsPort,
-				ClusterName:    cname,
-				ProxyAddress:   ClusterAddress,
-				ProviderSVC:    fmt.Sprintf("https://platform-identity-provider.%s.svc:4300", authCR.Namespace),
-				IDMgmtSVC:      fmt.Sprintf("https://platform-identity-management.%s.svc:4500", authCR.Namespace),
-			},
-		}
-
-		// Set Authentication authCR as the owner and controller of the ConfigMap
-		err = controllerutil.SetControllerReference(authCR, generated, r.Client.Scheme())
-		if err != nil {
-			reqLogger.Error(err, "Failed to set owner for ConfigMap")
-		}
+func (r *AuthenticationReconciler) getZenHost(ctx context.Context, authCR *operatorv1alpha1.Authentication) (zenHost string, err error) {
+	reqLogger := logf.FromContext(ctx)
+	//Get the routehost from the ibmcloud-cluster-info configmap
+	productConfigMap := &corev1.ConfigMap{}
+	err = r.Client.Get(ctx, types.NamespacedName{Name: ZenProductConfigmapName, Namespace: authCR.Namespace}, productConfigMap)
+	if k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Zen product configmap does not exist")
+		err = fmt.Errorf("expected product ConfigMap to be present but it was not found")
+		return
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to get Zen product configmap "+ZenProductConfigmapName)
 		return
 	}
 
-	reqLogger.Info("Env Type is OCP")
-	// get domain name from ingresses.config/cluster from openshift-ingress-operator ns
-	var DomainName string
-	var ProxyDomainName string
+	if productConfigMap.Data == nil || len(productConfigMap.Data[URL_PREFIX]) == 0 {
+		err = fmt.Errorf("Zen %s is not set in configmap %s", URL_PREFIX, ZenProductConfigmapName)
+		return
+	}
+
+	zenHost = productConfigMap.Data[URL_PREFIX]
+	return
+}
+
+func (r *AuthenticationReconciler) getDomainFromIngressConfig(ctx context.Context, authCR *operatorv1alpha1.Authentication) (domainName, proxyDomainName string, err error) {
+	reqLogger := logf.FromContext(ctx)
 	ingressConfigName := "cluster"
 	ingressConfig := &osconfigv1.Ingress{}
 
@@ -758,66 +881,73 @@ func (r *AuthenticationReconciler) generateIBMCloudClusterInfoConfigMap(ctx cont
 		baseDomain = ingressConfig.Spec.Domain
 	}
 	if authCR.Spec.Config.OnPremMultipleDeploy {
-		DomainName = strings.Join([]string{multipleauthCRRouteName, baseDomain}, ".")
-		ProxyDomainName = strings.Join([]string{multipleauthCRProxyRouteName, baseDomain}, ".")
+		domainName = strings.Join([]string{multipleauthCRRouteName, baseDomain}, ".")
+		proxyDomainName = strings.Join([]string{multipleauthCRProxyRouteName, baseDomain}, ".")
 	} else {
-		DomainName = strings.Join([]string{"cp-console", baseDomain}, ".")
-		ProxyDomainName = strings.Join([]string{"cp-proxy", baseDomain}, ".")
+		domainName = strings.Join([]string{"cp-console", baseDomain}, ".")
+		proxyDomainName = strings.Join([]string{"cp-proxy", baseDomain}, ".")
 	}
 
+	return
+}
+
+func (r *AuthenticationReconciler) getClusterAPIServerStrFromConsoleConfig(ctx context.Context) (apiHost, apiPort string, err error) {
 	// get clusterApiServer Details cm console-config from openshift-console ns
 	OSconsoleConfigMap := &corev1.ConfigMap{}
 	OSConsoleCMKey := types.NamespacedName{Name: "console-config", Namespace: "openshift-console"}
 	if err = clusterClient.Get(ctx, OSConsoleCMKey, OSconsoleConfigMap); err != nil {
-		reqLogger.Error(err, "Failed to get console-config configmap from openshift-console namespace")
-		return nil
+		err = fmt.Errorf("failed to get console-config configmap from openshift-console namespace: %w", err)
+		return
 	}
 
-	var result map[interface{}]interface{}
+	type consoleConfig struct {
+		APIVersion  string `yaml:"apiVersion"`
+		ClusterInfo struct {
+			MasterPublicURL string `yaml:"masterPublicURL"`
+		} `yaml:"clusterInfo"`
+	}
+
+	result := &consoleConfig{}
 	var apiaddr string
-	if err := yaml.Unmarshal([]byte(OSconsoleConfigMap.Data["console-config.yaml"]), &result); err != nil {
-		reqLogger.Error(err, "Failed to read console-config.yaml from console-config configmap")
-		return nil
+	if err = yaml.Unmarshal([]byte(OSconsoleConfigMap.Data["console-config.yaml"]), result); err != nil {
+		err = fmt.Errorf("failed to read console-config.yaml from console-config configmap: %w", err)
+		return
 	}
 
-	for k, v := range result {
-		if k.(string) == "clusterInfo" {
-			cinfo := v.(map[interface{}]interface{})
-			for k1, v1 := range cinfo {
-				if k1.(string) == "masterPublicURL" {
-					apiaddr = v1.(string)
-					apiaddr = strings.TrimPrefix(apiaddr, "https://")
-					break
-				}
-			}
-			break
-		}
+	if result.ClusterInfo.MasterPublicURL == "" {
+		err = fmt.Errorf("console-config.yaml contains field .clusterInfo.masterPublicURL, but it is not in the expected format")
+		return
 	}
+	apiaddr = strings.TrimPrefix(result.ClusterInfo.MasterPublicURL, "https://")
 
 	pos := strings.LastIndex(apiaddr, ":")
+	return apiaddr[0:pos], apiaddr[pos+1:], nil
+}
 
-	*generated = corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      ctrlcommon.IBMCloudClusterInfoCMName,
-			Namespace: authCR.Namespace,
-			Labels:    map[string]string{"app": "auth-idp"},
-		},
-		Data: map[string]string{
-			ClusterAddr:          DomainName,
-			ClusterEP:            "https://" + DomainName,
-			RouteHTTPPort:        rhttpPort,
-			RouteHTTPSPort:       rhttpsPort,
-			ClusterName:          cname,
-			ClusterAPIServerHost: apiaddr[0:pos],
-			ClusterAPIServerPort: apiaddr[pos+1:],
-			ProxyAddress:         ProxyDomainName,
-			ProviderSVC:          fmt.Sprintf("https://platform-identity-provider.%s.svc:4300", authCR.Namespace),
-			IDMgmtSVC:            fmt.Sprintf("https://platform-identity-management.%s.svc:4500", authCR.Namespace),
-		},
+func (r *AuthenticationReconciler) generateIBMCloudClusterInfoConfigMap(ctx context.Context, authCR *operatorv1alpha1.Authentication, generated *corev1.ConfigMap) (err error) {
+	reqLogger := logf.FromContext(ctx)
+	var domainName string
+	if domainName, err = getCNCFDomain(ctx, r.Client, authCR); err != nil {
+		reqLogger.Info("Could not retrieve cluster configuration; requeueing", "reason", err.Error())
+		return
+	}
+
+	// if the env identified as CNCF
+	if domainName != "" {
+		reqLogger.Info("Env type is CNCF")
+		err = r.generateCNCFClusterInfo(ctx, authCR, domainName, generated)
+	} else {
+		reqLogger.Info("Env Type is OCP")
+		err = r.generateOCPClusterInfo(ctx, authCR, generated)
+	}
+
+	if err != nil {
+		reqLogger.Info("Failed to generate ibmcloud-cluster-info contents", "reason", err.Error())
+		return
 	}
 
 	// Set Authentication authCR as the owner and controller of the ConfigMap
-	if err = controllerutil.SetControllerReference(authCR, generated, r.Scheme); err != nil {
+	if err = controllerutil.SetControllerReference(authCR, generated, r.Client.Scheme()); err != nil {
 		reqLogger.Error(err, "Failed to set owner for ConfigMap")
 	}
 

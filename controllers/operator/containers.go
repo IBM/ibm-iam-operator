@@ -130,7 +130,7 @@ func convertToLibertyFormat(memory string) string {
 
 }
 
-func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authServiceImage string) corev1.Container {
+func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authServiceImage string, icpConsoleURL string) corev1.Container {
 
 	resources := instance.Spec.AuthService.Resources
 
@@ -274,6 +274,10 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 					Key: "scim_admin_password",
 				},
 			},
+		},
+		{
+			Name:  "MASTER_HOST",
+			Value: icpConsoleURL,
 		},
 	}
 
@@ -1129,9 +1133,9 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 
 }
 
-func buildContainers(instance *operatorv1alpha1.Authentication, authServiceImage string) []corev1.Container {
+func buildContainers(instance *operatorv1alpha1.Authentication, authServiceImage string, icpConsoleURL string) []corev1.Container {
 
-	authServiceContainer := buildAuthServiceContainer(instance, authServiceImage)
+	authServiceContainer := buildAuthServiceContainer(instance, authServiceImage, icpConsoleURL)
 	//identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId)
 	//identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL)
 

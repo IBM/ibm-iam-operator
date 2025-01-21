@@ -128,8 +128,11 @@ var alterUsersAttributesUniqueConstraints migration.MigrationFunc = func(ctx con
 		return
 	}
 	_, err = tx.Exec(ctx, "ALTER TABLE platformdb.users_attributes DROP CONSTRAINT fk_useratt_fk;")
-	_, err2 := tx.Exec(ctx, "ALTER TABLE platformdb.users_attributes ADD CONSTRAINT fk_useratt_fk FOREIGN KEY (user_uid) REFERENCES platformdb.users (uid) ON DELETE CASCADE;")
-	if err != nil || err2 != nil {
+	if err != nil {
+		return
+	}
+	_, err = tx.Exec(ctx, "ALTER TABLE platformdb.users_attributes ADD CONSTRAINT fk_useratt_fk FOREIGN KEY (user_uid) REFERENCES platformdb.users (uid) ON DELETE CASCADE;")
+	if err != nil {
 		return
 	}
 

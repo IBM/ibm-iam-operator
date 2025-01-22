@@ -125,6 +125,7 @@ func (r *AuthenticationReconciler) handleIBMCloudClusterInfo(ctx context.Context
 			"cluster_address",
 			"cluster_address_auth",
 			"cluster_endpoint"),
+		updatesValuesWhen(not(observedKeySet("cluster_address_auth")), "cluster_address_auth"),
 	}
 
 	for _, update := range updateFns {

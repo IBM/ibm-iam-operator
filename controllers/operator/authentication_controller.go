@@ -929,6 +929,9 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	authCtrl.Watches(&corev1.ConfigMap{},
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
 			authCR, _ := ctrlcommon.GetAuthentication(ctx, &r.Client)
+			if authCR == nil {
+				return
+			}
 			return []reconcile.Request{
 				{NamespacedName: types.NamespacedName{
 					Name:      authCR.Name,

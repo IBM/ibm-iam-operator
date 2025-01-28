@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -245,7 +246,12 @@ func (r *AuthenticationReconciler) createClusterCACert(i *operatorv1alpha1.Authe
 		return
 	}
 
-	if !ctrlCommon.IsControllerOf(i, current) {
+	gvk := schema.GroupVersionKind{
+		Kind:    "Authentication",
+		Group:   "operator.ibm.com",
+		Version: "v1alpha1",
+	}
+	if !ctrlCommon.IsControllerOf(gvk, i, current) {
 		reqLogger.Info("The secret is already controlled by another object; deleting it and recreating in another loop")
 		err = r.Client.Delete(context.TODO(), current)
 		if err != nil {

@@ -154,6 +154,14 @@ func ClusterHasZenExtensionGroupVersion(dc *discovery.DiscoveryClient) (found bo
 	return
 }
 
+func ClusterHasCertificateV1Alpha1(dc *discovery.DiscoveryClient) (found bool) {
+	found, _ = clusterHasGroupVersion(dc, schema.GroupVersion{
+		Group:   "certmanager.k8s.io",
+		Version: "v1alpha1",
+	})
+	return
+}
+
 // The following is brought over from earlier versions of the operator-sdk
 
 // GetWatchNamespace returns the Namespace the operator should be watching for changes

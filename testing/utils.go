@@ -39,6 +39,63 @@ func ConfirmThatItContinuesReconciling(result *ctrl.Result, err error) {
 	Expect(subreconciler.ShouldHaltOrRequeue(result, err)).To(BeFalse())
 }
 
+type fakeErrorClient interface {
+	client.Client
+	Error() error
+}
+
+type FakeErrorClient struct {
+	client.Client
+	ErrFunc       func() error
+	GetAllowed    bool
+	UpdateAllowed bool
+	CreateAllowed bool
+	DeleteAllowed bool
+}
+
+var _ fakeErrorClient = &FakeErrorClient{}
+
+func (f *FakeErrorClient) Error() error {
+	return f.ErrFunc()
+}
+
+func (f *FakeErrorClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if f.GetAllowed {
+		return f.Client.Get(ctx, key, obj, opts...)
+	}
+	return f.Error()
+}
+
+func (f *FakeErrorClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+	if f.UpdateAllowed {
+		return f.Client.Update(ctx, obj, opts...)
+	}
+	return f.Error()
+}
+
+func (f *FakeErrorClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	if f.CreateAllowed {
+		return f.Client.Create(ctx, obj, opts...)
+	}
+	return f.Error()
+}
+
+func (f *FakeErrorClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
+	if f.DeleteAllowed {
+		return f.Client.Delete(ctx, obj, opts...)
+	}
+	return f.Error()
+}
+
+func NewFakeTimeoutClient(cl client.Client) *FakeErrorClient {
+	return &FakeErrorClient{
+		Client: cl,
+		ErrFunc: func() error {
+			return k8sErrors.NewTimeoutError("dummy error", 500)
+		},
+	}
+}
+
 type FakeTimeoutClient struct {
 	client.Client
 	goodCalls int

@@ -56,6 +56,7 @@ func NewOIDCClientRegistrationError(clientID, requestMethod, origErrMsg string, 
 		return
 	}
 	if response == nil || response.Body == nil {
+		oidcErr.Description = "no response received"
 		return
 	}
 	defer response.Body.Close()

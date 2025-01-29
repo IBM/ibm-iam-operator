@@ -518,7 +518,7 @@ func (r *AuthenticationReconciler) newRoute(authCR *operatorv1alpha1.Authenticat
 	weight := int32(100)
 
 	commonLabel := map[string]string{"app": "im"}
-	routeLabels := ctrlcommon.MergeMap(commonLabel, authCR.Spec.Labels)
+	routeLabels := ctrlcommon.MergeMaps(nil, authCR.Spec.Labels, commonLabel, ctrlcommon.GetCommonLabels())
 
 	route := &routev1.Route{
 		TypeMeta: metav1.TypeMeta{

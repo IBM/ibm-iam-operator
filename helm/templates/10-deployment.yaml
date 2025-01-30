@@ -58,19 +58,20 @@ spec:
         - name: cluster_name
           value: ""
         - name: ICP_PLATFORM_AUTH_IMAGE
-          value: "{{ .Values.imagePullPrefix }}/{{ .Values.entitledNs }}/icp-platform-auth:{{ .Values.operands.platformAuthService.imageTag }}"
+          value: "{{ .Values.imagePullPrefix }}/{{ .Values.imageRegistryNamespaceOperand }}/icp-platform-auth:{{ .Values.operands.platformAuthService.imageTag }}"
         - name: ICP_IDENTITY_PROVIDER_IMAGE
-          value: "{{ .Values.imagePullPrefix }}/{{ .Values.entitledNs }}/icp-identity-provider:{{ .Values.operands.platformIdentityProvider.imageTag }}"
+          value: "{{ .Values.imagePullPrefix }}/{{ .Values.imageRegistryNamespaceOperand }}/icp-identity-provider:{{ .Values.operands.platformIdentityProvider.imageTag }}"
         - name: ICP_IDENTITY_MANAGER_IMAGE
-          value: "{{ .Values.imagePullPrefix }}/{{ .Values.entitledNs }}/icp-identity-manager:{{ .Values.operands.platformIdentityManagement.imageTag }}"
+          value: "{{ .Values.imagePullPrefix }}/{{ .Values.imageRegistryNamespaceOperand }}/icp-identity-manager:{{ .Values.operands.platformIdentityManagement.imageTag }}"
         - name: IM_INITCONTAINER_IMAGE
-          value: "{{ .Values.imagePullPrefix }}/{{ .Values.entitledNs }}/im-initcontainer:{{ .Values.operands.imInitContainer.imageTag }}"
+          value: "{{ .Values.imagePullPrefix }}/{{ .Values.imageRegistryNamespaceOperand }}/im-initcontainer:{{ .Values.operands.imInitContainer.imageTag }}"
         - name: WATCH_NAMESPACE
           valueFrom:
-            configMapKeyRef:
-              name: namespace-scope
-              key: namespaces
-        image: "{{ .Values.imagePullPrefix }}/{{ .Values.nonentitledNs }}/ibm-iam-operator:{{ .Values.operator.imageTag }}"
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: IMAGE_PULL_SECRET
+          value: {{ .Values.imagePullSecret }}
+        image: "{{ .Values.imagePullPrefix }}/{{ .Values.imageRegistryNamespaceOperator }}/ibm-iam-operator:{{ .Values.operator.imageTag }}"
         imagePullPolicy: "{{ .Values.imagePullPolicy }}"
         name: ibm-iam-operator
         resources:

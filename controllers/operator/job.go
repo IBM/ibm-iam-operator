@@ -18,6 +18,7 @@ package operator
 
 import (
 	"context"
+	"os"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/controllers/common"
@@ -108,6 +109,8 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 				corev1.ResourceMemory: *memory128},
 		}
 	}
+
+	imagePullSecret := os.Getenv("IMAGE_PULL_SECRET")
 
 	newJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -212,6 +215,11 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 				},
 			},
 		},
+	}
+
+	if imagePullSecret != "" {
+		newJob.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: imagePullSecret}}
+
 	}
 
 	// Set Authentication instance as the owner and controller of the Job

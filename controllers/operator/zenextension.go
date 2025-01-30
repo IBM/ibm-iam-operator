@@ -253,13 +253,15 @@ func (r *AuthenticationReconciler) removeZenExtension(authCR *operatorv1alpha1.A
 		reqLogger.Info("Zen front door not enabled")
 		observedZenExt := &zenv1.ZenExtension{}
 		frontDoorKey := types.NamespacedName{Name: ImZenExtName, Namespace: authCR.Namespace}
+		// TODO Figure out specific package error for API not present on cluster
 		if err = r.Get(ctx, frontDoorKey, observedZenExt); k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Zen front door not found; continuing")
 			return subreconciler.ContinueReconciling()
-		} else if err != nil {
-			reqLogger.Error(err, "Zen front door is disabled, but could not get iam ZenExtension for cleanup")
-			return subreconciler.RequeueWithError(err)
 		}
+		//else if err != nil {
+		//	reqLogger.Error(err, "Zen front door is disabled, but could not get iam ZenExtension for cleanup")
+		//	return subreconciler.RequeueWithError(err)
+		//}
 
 		//Delete the existing zen extension
 		if err = r.Delete(ctx, observedZenExt); k8sErrors.IsNotFound(err) {

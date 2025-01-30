@@ -24,7 +24,7 @@ BUILD_LOCALLY ?= 1
 NAMESPACE=ibm-common-services
 GIT_COMMIT_ID=$(shell git rev-parse --short HEAD)
 GIT_REMOTE_URL=$(shell git config --get remote.origin.url)
-IMAGE_BUILD_OPTS=--build-arg "VCS_REF=$(GIT_COMMIT_ID)" --build-arg "VCS_URL=$(GIT_REMOTE_URL)"
+IMAGE_BUILD_OPTS=--build-arg "VCS_REF=$(GIT_COMMIT_ID)" --build-arg "VCS_URL=$(GIT_REMOTE_URL)" --build-arg "IMG_VERSION=$(VERSION)" --build-arg "IMG_RELEASE=$(shell date +%s)"
 
 # Image URL to use all building/pushing image targets;
 # Use your own docker registry and image name for dev/test by overridding the IMG and REGISTRY environment variable.

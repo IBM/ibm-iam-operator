@@ -66,9 +66,7 @@ spec:
         - name: IM_INITCONTAINER_IMAGE
           value: "{{ .Values.imagePullPrefix }}/{{ .Values.imageRegistryNamespaceOperand }}/im-initcontainer:{{ .Values.operands.imInitContainer.imageTag }}"
         - name: WATCH_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
+          value: '{{ .Release.Namespace }}'
         - name: IMAGE_PULL_SECRET
           value: {{ .Values.imagePullSecret }}
         image: "{{ .Values.imagePullPrefix }}/{{ .Values.imageRegistryNamespaceOperator }}/ibm-iam-operator:{{ .Values.operator.imageTag }}"

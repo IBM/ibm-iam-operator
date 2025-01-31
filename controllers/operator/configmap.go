@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -75,7 +76,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 
 	ctrlCommon.GetClusterType(context.Background(), &r.Client, ctrlCommon.GlobalConfigMapName)
 
-	if !ctrlCommon.ClusterHasRouteGroupVersion() && !ctrlCommon.ClusterHasOpenShiftConfigGroupVerison() {
+	if !ctrlCommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient) && !ctrlCommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
 		isOSEnv = false
 		reqLogger.Info("Checked cluster type", "Configmap.Namespace", instance.Namespace, "ConfigMap.Name", globalConfigMapName, "clusterType", r.clusterType)
 		domainName = globalConfigMap.Data["domain_name"]
@@ -104,7 +105,12 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 
 		if labels != nil {
 			value, ok := labels["app"]
-			if ok && value == "auth-idp" && ctrlCommon.IsControllerOf(instance, currentConfigMap) {
+			gvk := schema.GroupVersionKind{
+				Kind:    "Authentication",
+				Group:   "operator.ibm.com",
+				Version: "v1alpha1",
+			}
+			if ok && value == "auth-idp" && ctrlCommon.IsControllerOf(gvk, instance, currentConfigMap) {
 				reqLogger.Info("ibmcloud-cluster-info Configmap is already created by IM operator", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
 			} else if ok && value == "management-ingress" && ctrlCommon.GetControllerKind(currentConfigMap) == "ManagementIngress" {
 				reqLogger.Info("Configmap is already created by managementingress , IM installation may not proceed further until the configmap is removed", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
@@ -891,7 +897,12 @@ func createOrGetClusterClient() (client.Client, error) {
 		return nil, err
 	}
 
-	if ctrlCommon.ClusterHasRouteGroupVersion() {
+	dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	if ctrlCommon.ClusterHasRouteGroupVersion(dc) {
 		utilruntime.Must(osconfigv1.AddToScheme(OpenShiftConfigScheme))
 	}
 	utilruntime.Must(corev1.AddToScheme(OpenShiftConfigScheme))

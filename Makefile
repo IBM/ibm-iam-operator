@@ -298,6 +298,13 @@ test: manifests generate fmt vet envtest ## Run tests.
 update-version: manifests kustomize yq ## Update the Operator SemVer across the project.
 	./hack/update_operator_version
 
+.PHONY: crd-checker
+crd-checker: ## Compare schema
+	CURR_BRANCH=basename $(git symbolic-ref HEAD)
+	echo ${CURR_BRANCH}
+	git show ${CURR_BRANCH}:bundle/manifests/operator.ibm.com_authentications.yaml > updated_manifest.yaml
+	git show master:bundle/manifests/operator.ibm.com_authentications.yaml > original_manifest.yaml
+	/Users/rashmi_kh/go/src/crd-schema-checker/crd-schema-checker check-manifests --existing-crd-filename=/Users/rashmi_kh/Documents/GIT/IAM-OPERATOR/ibm-iam-operator/abcd.yaml --new-crd-filename=/Users/rashmi_kh/Documents/GIT/IAM-OPERATOR/ibm-iam-operator/abc.yaml
 
 ##@ Build
 

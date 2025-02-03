@@ -1,9 +1,8 @@
 module github.com/IBM/ibm-iam-operator
 
-go 1.23
+go 1.23.5
 
 require (
-	github.com/go-logr/logr v1.2.4
 	github.com/google/uuid v1.6.0
 	github.com/ibm/ibm-cert-manager-operator v0.0.0-20220602233809-3a62073266c7
 	github.com/jackc/pgx/v5 v5.5.4
@@ -29,6 +28,7 @@ require (
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
+	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/zapr v1.2.4 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect

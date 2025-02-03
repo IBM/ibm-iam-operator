@@ -31,6 +31,7 @@ import (
 	certmgr "github.com/ibm/ibm-cert-manager-operator/apis/cert-manager/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -627,9 +629,9 @@ func (r *AuthenticationReconciler) RunningOnUnknownCluster() bool {
 func (r *AuthenticationReconciler) addFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
 	r.Mutex.Lock()
 	defer r.Mutex.Unlock()
-	if !containsString(instance.Finalizers, finalizerName) {
+	if !ctrlcommon.ContainsString(instance.Finalizers, finalizerName) {
 		instance.Finalizers = append(instance.Finalizers, finalizerName)
-		err = r.Client.Update(ctx, instance)
+		err = r.Update(ctx, instance)
 	}
 	return
 }
@@ -638,9 +640,9 @@ func (r *AuthenticationReconciler) addFinalizer(ctx context.Context, finalizerNa
 func (r *AuthenticationReconciler) removeFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
 	r.Mutex.Lock()
 	defer r.Mutex.Unlock()
-	if containsString(instance.Finalizers, finalizerName) {
-		instance.Finalizers = removeString(instance.Finalizers, finalizerName)
-		err = r.Client.Update(ctx, instance)
+	if ctrlcommon.ContainsString(instance.Finalizers, finalizerName) {
+		instance.Finalizers = ctrlcommon.RemoveString(instance.Finalizers, finalizerName)
+		err = r.Update(ctx, instance)
 		if err != nil {
 			return fmt.Errorf("error updating the CR to remove the finalizer: %w", err)
 		}
@@ -818,9 +820,11 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return
 	}
 	// create clusterrole and clusterrolebinding
-	r.createClusterRole(instance)
+	if subResult, err := r.handleClusterRoles(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
 
-	if subResult, err := r.handleClusterRoleBinding(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+	if subResult, err := r.handleClusterRoleBindings(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
 	}
 
@@ -863,8 +867,8 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
-	if result, err := r.handleZenFrontDoor(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return subreconciler.Evaluate(result, err)
+	if subResult, err := r.handleZenFrontDoor(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
 	}
 
 	if subResult, err := r.handleRoutes(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
@@ -884,8 +888,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{}).
 		Owns(&corev1.Service{}).
 		Owns(&net.Ingress{}).
-		Owns(&appsv1.Deployment{}).
-		Owns(&operatorv1alpha1.OperandRequest{})
+		Owns(&appsv1.Deployment{})
 
 	//Add routes
 	if ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
@@ -893,6 +896,9 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	if ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
 		authCtrl.Owns(&zenv1.ZenExtension{})
+	}
+	if ctrlcommon.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
+		authCtrl.Owns(&operatorv1alpha1.OperandRequest{})
 	}
 
 	productCMPred := predicate.Funcs{
@@ -944,22 +950,80 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// Helper functions to check and remove string from a slice of strings.
-func containsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
+func apiResourceIsNamespaced(gvk schema.GroupVersionKind, apiLists []*metav1.APIResourceList) (isNamespaced bool) {
+	for _, apiList := range apiLists {
+		if apiList.GroupVersion != gvk.GroupVersion().String() {
+			continue
+		}
+		for _, r := range apiList.APIResources {
+			if r.Kind == gvk.Kind {
+				return r.Namespaced
+			}
 		}
 	}
 	return false
 }
 
-func removeString(slice []string, s string) (result []string) {
-	for _, item := range slice {
-		if item == s {
-			continue
+func (r *AuthenticationReconciler) hasAPIAccessInNamespaces(ctx context.Context, namespaces []string, gv schema.GroupVersion, kind string, verbs []string) (hasAccess bool, err error) {
+	for _, namespace := range namespaces {
+		if hasAccess, err = r.hasAPIAccess(ctx, namespace, gv, kind, verbs); err != nil || !hasAccess {
+			return
 		}
-		result = append(result, item)
 	}
-	return
+
+	return true, nil
+}
+
+// hasAPIAccess uses SelfSubjectAccessReviews to confirm whether the Opertor's ServiceAccount has authorization to use a
+// list of verbs on a given apiversion and kind.
+func (r *AuthenticationReconciler) hasAPIAccess(ctx context.Context, namespace string, gv schema.GroupVersion, kind string, verbs []string) (hasAccess bool, err error) {
+	reqLogger := logf.FromContext(ctx).V(1).WithValues("namespace", namespace, "gv", gv, "kind", kind, "verbs", verbs)
+	_, apiLists, err := r.DiscoveryClient.ServerGroupsAndResources()
+	if err != nil {
+		reqLogger.Error(err, "Failed to obtain groups and API resources for access check")
+		return false, fmt.Errorf("failed to obtain groups and API resources for access check: %w", err)
+	}
+	gvk := gv.WithKind(kind)
+	isNamespaced := apiResourceIsNamespaced(gvk, apiLists)
+	if !isNamespaced {
+		namespace = ""
+	}
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{gv})
+	if namespace == "" {
+		mapper.Add(gvk, meta.RESTScopeRoot)
+	} else {
+		mapper.Add(gvk, meta.RESTScopeNamespace)
+	}
+
+	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		reqLogger.Error(err, "Failed to create REST mapping for access check")
+		return false, fmt.Errorf("failed to create REST mapping for access check: %w", err)
+	}
+
+	gvr := &mapping.Resource
+
+	for _, verb := range verbs {
+		ssar := &authorizationv1.SelfSubjectAccessReview{
+			Spec: authorizationv1.SelfSubjectAccessReviewSpec{
+				ResourceAttributes: &authorizationv1.ResourceAttributes{
+					Namespace: namespace,
+					Verb:      verb,
+					Group:     gvr.Group,
+					Resource:  gvr.Resource,
+				},
+			},
+		}
+		if err = r.Create(ctx, ssar); err != nil {
+			reqLogger.Error(err, "Failed to make access check query")
+			return false, fmt.Errorf("failed to make access check query: %w", err)
+		}
+		if !ssar.Status.Allowed {
+			reqLogger.Info("Operator ServiceAccount is not authorized")
+			return
+		}
+	}
+
+	reqLogger.Info("Operator ServiceAccount is authorized")
+	return true, nil
 }

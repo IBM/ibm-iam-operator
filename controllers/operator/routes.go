@@ -28,7 +28,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -65,7 +67,7 @@ type reconcileRouteFields struct {
 }
 
 func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := log.WithValues("func", "ReconcileRoutes", "namespace", req.Namespace)
+	reqLogger := log.WithValues("subreconciler", "handleRoutes", "Namespace", req.Namespace)
 	handleRouteCtx := logf.IntoContext(ctx, reqLogger)
 
 	if !ctrlcommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient) {
@@ -90,8 +92,8 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Re
 // traffic.
 func (r *AuthenticationReconciler) checkForZenFrontDoor(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx)
-	if shouldHaveRoutes(authCR) {
-		reqLogger.Info("Zen front door has not been enabled, so IM Routes will be created")
+	if shouldHaveRoutes(authCR, &r.DiscoveryClient) {
+		reqLogger.Info("IM Routes will be created")
 		return subreconciler.ContinueReconciling()
 	}
 	reqLogger.Info("Zen front door has been enabled, so IM Routes will be removed if they are present")
@@ -116,17 +118,18 @@ func (r *AuthenticationReconciler) checkForZenFrontDoor(ctx context.Context, aut
 }
 
 func (r *AuthenticationReconciler) reconcileAllRoutes(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx)
 	allRoutesFields := &map[string]*reconcileRouteFields{}
 	if result, err = r.getAllRoutesFields(authCR, allRoutesFields)(ctx); subreconciler.ShouldRequeue(result, err) {
 		return
 	}
 
-	result, err = r.removeIdauth(ctx, authCR)
-
 	allRouteReconcilers := make([]subreconciler.Fn, 0)
 	for _, routeFields := range *allRoutesFields {
 		allRouteReconcilers = append(allRouteReconcilers, r.reconcileRoute(authCR, routeFields))
 	}
+
+	allRouteReconcilers = append(allRouteReconcilers, r.removeExtraRoutes(authCR, allRoutesFields))
 
 	results := []*ctrl.Result{}
 	errs := []error{}
@@ -135,27 +138,53 @@ func (r *AuthenticationReconciler) reconcileAllRoutes(ctx context.Context, authC
 		results = append(results, result)
 		errs = append(errs, err)
 	}
-	return ctrlcommon.ReduceSubreconcilerResultsAndErrors(results, errs)
+	if result, err = ctrlcommon.ReduceSubreconcilerResultsAndErrors(results, errs); err != nil {
+		reqLogger.Info("Errors were encountered while reconciling Routes; requeueing")
+	} else if subreconciler.ShouldRequeue(result, err) {
+		reqLogger.Info("One or more Routes were reconciled; requeueing")
+	} else {
+		reqLogger.Info("Routes already up-to-date")
+	}
+	return
 }
 
-func (r *AuthenticationReconciler) removeIdauth(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	reqLogger.Info("Determined platform-id-auth Route should not exist; removing if present")
-	observedRoute := &routev1.Route{}
-	err = r.Get(ctx, types.NamespacedName{Name: "platform-id-auth", Namespace: authCR.Namespace}, observedRoute)
-	if k8sErrors.IsNotFound(err) {
-		return subreconciler.ContinueReconciling()
-	} else if err != nil {
-		reqLogger.Error(err, "Failed to get existing platform-id-auth route for reconciliation")
-		return subreconciler.RequeueWithError(err)
+// removeExtraRoutes produces a subreconciler that deletes any Route that is labeled as IM's and is not in the list of
+// Routes that the Operator wants to exist.
+func (r *AuthenticationReconciler) removeExtraRoutes(authCR *operatorv1alpha1.Authentication, allRoutesFields *map[string]*reconcileRouteFields) (fn subreconciler.Fn) {
+	return func(ctx context.Context) (result *ctrl.Result, err error) {
+		reqLogger := logf.FromContext(ctx)
+		routesList := &routev1.RouteList{}
+		desiredRoutesNames := func(rrf *map[string]*reconcileRouteFields) []string {
+			n := []string{}
+			for _, fields := range *rrf {
+				n = append(n, fields.Name)
+			}
+			return n
+		}(allRoutesFields)
+
+		err = r.List(ctx, routesList, client.InNamespace(authCR.Namespace), client.MatchingLabels{"app": "im"})
+		changed := false
+		for _, item := range routesList.Items {
+			if !ctrlcommon.ContainsString(desiredRoutesNames, item.Name) {
+				reqLogger.Info("Removing extra Route", "Name", item.Name)
+				if err = r.Delete(ctx, &item); k8sErrors.IsNotFound(err) {
+					reqLogger.Info("Route was not found; continuing", "Name", item.Name)
+					err = nil
+				} else if err != nil {
+					reqLogger.Info("Failed to delete extra Route for unexpected reason", "reason", err.Error(), "Name", item.Name)
+					return subreconciler.RequeueWithDelay(defaultLowerWait)
+				}
+				reqLogger.Info("Successfully deleted extra Route", "Name", item.Name)
+				changed = true
+			}
+		}
+		if changed {
+			reqLogger.Info("Deleted all extra Routes; requeuing")
+			return subreconciler.RequeueWithDelay(defaultLowerWait)
+		}
+
+		return
 	}
-	err = r.Delete(ctx, observedRoute)
-	if err != nil {
-		reqLogger.Error(err, "Failed to delete platform-id-auth Route")
-		return subreconciler.RequeueWithError(err)
-	}
-	reqLogger.Info("Successfully deleted platform-id-auth Route")
-	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
 func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.Authentication, allRoutesFields *map[string]*reconcileRouteFields) (fn subreconciler.Fn) {
@@ -276,12 +305,12 @@ func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.A
 func (r *AuthenticationReconciler) reconcileRoute(authCR *operatorv1alpha1.Authentication, fields *reconcileRouteFields) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		namespace := authCR.Namespace
-		reqLogger := log.WithValues("name", fields.Name, "namespace", namespace)
+		reqLogger := logf.FromContext(ctx, "name", fields.Name, "namespace", namespace).V(1)
 
 		reqLogger.Info("Reconciling route", "annotations", fields.Annotations, "routeHost", fields.RouteHost, "routePath", fields.RoutePath)
 
 		fCtx := logf.IntoContext(ctx, reqLogger)
-		if shouldNotHaveRoutes(authCR) {
+		if shouldNotHaveRoutes(authCR, &r.DiscoveryClient) {
 			return r.ensureRouteDoesNotExist(fCtx, authCR, fields)
 		}
 
@@ -378,7 +407,7 @@ func (r *AuthenticationReconciler) ensureRouteExists(ctx context.Context, authCR
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
 
-	if !IsRouteEqual(calculatedRoute, observedRoute) {
+	if !IsRouteEqual(ctx, calculatedRoute, observedRoute) {
 		reqLogger.Info("Updating route")
 
 		observedRoute.Name = calculatedRoute.Name
@@ -395,19 +424,19 @@ func (r *AuthenticationReconciler) ensureRouteExists(ctx context.Context, authCR
 	return subreconciler.ContinueReconciling()
 }
 
-func shouldNotHaveRoutes(authCR *operatorv1alpha1.Authentication) bool {
-	return authCR.Spec.Config.ZenFrontDoor
+func shouldNotHaveRoutes(authCR *operatorv1alpha1.Authentication, dc *discovery.DiscoveryClient) bool {
+	return authCR.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(dc)
 }
 
-func shouldHaveRoutes(authCR *operatorv1alpha1.Authentication) bool {
-	return !shouldNotHaveRoutes(authCR)
+func shouldHaveRoutes(authCR *operatorv1alpha1.Authentication, dc *discovery.DiscoveryClient) bool {
+	return !shouldNotHaveRoutes(authCR, dc)
 }
 
 // Use DeepEqual to determine if 2 routes are equal.
 // Check annotations and Spec.
 // If there are any differences, return false. Otherwise, return true.
-func IsRouteEqual(oldRoute, newRoute *routev1.Route) bool {
-	logger := log.WithValues("name", oldRoute.Name, "namespace", oldRoute.Namespace)
+func IsRouteEqual(ctx context.Context, oldRoute, newRoute *routev1.Route) bool {
+	logger := logf.FromContext(ctx, "name", oldRoute.Name, "namespace", oldRoute.Namespace).V(1)
 
 	if !reflect.DeepEqual(oldRoute.Name, newRoute.Name) {
 		logger.Info("Names not equal", "old", oldRoute.Name, "new", newRoute.Name)
@@ -476,8 +505,6 @@ func IsRouteEqual(oldRoute, newRoute *routev1.Route) bool {
 		logger.Info("Specs not equal", loggedValues...)
 		return false
 	}
-
-	logger.Info("Routes are equal")
 
 	return true
 }
@@ -564,7 +591,7 @@ func (r *AuthenticationReconciler) getClusterAddress(authCR *operatorv1alpha1.Au
 
 func (r *AuthenticationReconciler) getClusterInfoConfigMap(authCR *operatorv1alpha1.Authentication, cm *corev1.ConfigMap) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		reqLogger := logf.FromContext(ctx)
+		reqLogger := logf.FromContext(ctx).V(1)
 		err = r.Get(ctx, types.NamespacedName{Name: ClusterInfoConfigmapName, Namespace: authCR.Namespace}, cm)
 		if k8sErrors.IsNotFound(err) {
 			reqLogger.Info("ConfigMap was not found",

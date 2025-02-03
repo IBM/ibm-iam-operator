@@ -16,6 +16,8 @@ FROM docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-edge-docker-l
 
 ARG VCS_REF
 ARG VCS_URL
+ARG IMG_VERSION
+ARG IMG_RELEASE
 
 LABEL org.label-schema.vendor="IBM" \
     org.label-schema.name="ibm-iam-operator" \
@@ -27,7 +29,10 @@ LABEL org.label-schema.vendor="IBM" \
     name="ibm-iam-operator" \
     vendor="IBM" \
     description="IBM IM Operator" \
-    summary="IBM IM Operator"
+    summary="IBM IM Operator" \
+    maintainer="IBM IM Squad" \
+    version=$IMG_VERSION \
+    release=$IMG_RELEASE
 
 ENV OPERATOR=/usr/local/bin/ibm-iam-operator \
     USER_UID=1001 \
@@ -37,7 +42,7 @@ WORKDIR /
 
 COPY build/_output/bin/manager ${OPERATOR}
 
-COPY licenses /
+COPY licenses /licenses
 
 USER ${USER_UID}
 

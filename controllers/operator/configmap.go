@@ -492,8 +492,18 @@ func generateAuthIdpConfigMap(ctx context.Context, cl client.Client, authCR *ope
 		roksUserPrefix = "IAM#"
 	}
 
+	var isOSEnv bool
+	if domainName, err := getCNCFDomain(ctx, cl, authCR); err != nil {
+		reqLogger.Info("Could not retrieve cluster configuration; requeueing", "reason", err.Error())
+		return err
+	} else {
+		isOSEnv = domainName == ""
+	}
+
 	var desiredRoksUrl string
-	if authCR.Spec.Config.ROKSEnabled {
+	if authCR.Spec.Config.ROKSEnabled && !isOSEnv {
+		reqLogger.Info(".spec.config.roksEnabled is set to true, but workload does not appear to be running on OpenShift; disabling in ConfigMap")
+	} else if authCR.Spec.Config.ROKSEnabled {
 		if desiredRoksUrl, err = readROKSURL(ctx); err != nil {
 			reqLogger.Error(err, "Failed to get issuer URL")
 			return
@@ -502,14 +512,6 @@ func generateAuthIdpConfigMap(ctx context.Context, cl client.Client, authCR *ope
 			err = fmt.Errorf("issuer URL is empty")
 			return
 		}
-	}
-
-	var isOSEnv bool
-	if domainName, err := getCNCFDomain(ctx, cl, authCR); err != nil {
-		reqLogger.Info("Could not retrieve cluster configuration; requeueing", "reason", err.Error())
-		return err
-	} else {
-		isOSEnv = domainName == ""
 	}
 
 	*generated = corev1.ConfigMap{
@@ -541,7 +543,7 @@ func generateAuthIdpConfigMap(ctx context.Context, cl client.Client, authCR *ope
 			"PDP_REDIS_CACHE_DEFAULT_TTL":        "600",
 			"FIPS_ENABLED":                       strconv.FormatBool(authCR.Spec.Config.FIPSEnabled),
 			"NONCE_ENABLED":                      strconv.FormatBool(authCR.Spec.Config.NONCEEnabled),
-			"ROKS_ENABLED":                       strconv.FormatBool(authCR.Spec.Config.ROKSEnabled),
+			"ROKS_ENABLED":                       strconv.FormatBool(authCR.Spec.Config.ROKSEnabled && isOSEnv),
 			"IBM_CLOUD_SAAS":                     strconv.FormatBool(authCR.Spec.Config.IBMCloudSaas),
 			"ATTR_MAPPING_FROM_CONFIG":           strconv.FormatBool(authCR.Spec.Config.AttrMappingFromConfig),
 			"SAAS_CLIENT_REDIRECT_URL":           authCR.Spec.Config.SaasClientRedirectUrl,

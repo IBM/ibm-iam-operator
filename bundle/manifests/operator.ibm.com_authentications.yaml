@@ -189,6 +189,8 @@ spec:
                     type: string
                   defaultAdminUser:
                     type: string
+                  defaultLogin:
+                    type: string
                   enableImpersonation:
                     type: boolean
                   fipsEnabled:
@@ -212,8 +214,6 @@ spec:
                     format: int32
                     type: integer
                   preferredLogin:
-                    type: string
-                  defaultLogin:
                     type: string
                   providerIssuerURL:
                     type: string

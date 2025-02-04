@@ -21,7 +21,7 @@ import (
 	"reflect"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
-	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
+	ctrlcommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	"github.com/opdev/subreconciler"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -45,8 +45,8 @@ func (r *AuthenticationReconciler) addEmbeddedEDBIfNeeded(ctx context.Context, a
 			Name: "common-service-postgresql",
 			Bindings: map[string]operatorv1alpha1.Bindable{
 				"protected-im-db": {
-					Secret:    ctrlCommon.DatastoreEDBSecretName,
-					Configmap: ctrlCommon.DatastoreEDBCMName,
+					Secret:    ctrlcommon.DatastoreEDBSecretName,
+					Configmap: ctrlcommon.DatastoreEDBCMName,
 				},
 			},
 		})
@@ -62,6 +62,12 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 		"subreconciler", "handleOperandRequest",
 		"OperandRequest.Name", opReqName,
 		"OperandRequest.Namespace", req.Namespace)
+
+	if !ctrlcommon.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
+		reqLogger.Info("The OperandRequest API resource is not supported by this cluster; assuming EDB connection will be configured manually", "Secret", ctrlcommon.DatastoreEDBSecretName, "ConfigMap", ctrlcommon.DatastoreEDBCMName, "Namespace", req.Namespace)
+		return subreconciler.ContinueReconciling()
+	}
+
 	reqLogger.Info("Ensure that OperandRequest is updated with correct Operands")
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
@@ -203,22 +209,24 @@ func (r *AuthenticationReconciler) isConfiguredForExternalEDB(ctx context.Contex
 	reqLogger := logf.FromContext(ctx)
 	cm := &corev1.ConfigMap{}
 
-	err = r.Get(ctx, types.NamespacedName{Name: ctrlCommon.DatastoreEDBCMName, Namespace: authCR.Namespace}, cm)
+	err = r.Get(ctx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBCMName, Namespace: authCR.Namespace}, cm)
 	if err != nil && k8sErrors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get ConfigMap from services namespace", "name", ctrlCommon.DatastoreEDBCMName)
+		reqLogger.Error(err, "Failed to get ConfigMap from services namespace", "name", ctrlcommon.DatastoreEDBCMName)
 		return false, err
 	}
 
 	return cm.Data["IS_EMBEDDED"] == "false", nil
 }
 
-// needsEmbeddedEDB is the inverse of isConfiguredForExternalEDB, save for passthrough of any error encountered that is
-// not an IsNotFound.
-func (r *AuthenticationReconciler) needsEmbeddedEDB(ctx context.Context, authCR *operatorv1alpha1.Authentication) (needsEmbedded bool, err error) {
+// needsExternalEDB returns whether the IM install needs an external EDB configured.
+func (r *AuthenticationReconciler) needsExternalEDB(ctx context.Context, authCR *operatorv1alpha1.Authentication) (needsExternal bool, err error) {
+	if !ctrlcommon.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
+		return true, nil
+	}
 	isConfiguredForExternal, err := r.isConfiguredForExternalEDB(ctx, authCR)
-	return !isConfiguredForExternal, err
+	return isConfiguredForExternal, err
 }
 
 func isIBMMongoDBOperator(name string) bool {
@@ -266,8 +274,8 @@ func (r *AuthenticationReconciler) createEDBShareClaim(ctx context.Context, req 
 		return
 	}
 
-	if usingExternal, err := r.isConfiguredForExternalEDB(ctx, authCR); err == nil && usingExternal {
-		reqLogger.Info("Configured for connecting external EDB; skipping CommonService CR creation")
+	if needsExternal, err := r.needsExternalEDB(ctx, authCR); err == nil && needsExternal {
+		reqLogger.Info("External EDB configuration details to be set up; skipping creation of CommonService CR for EDB share")
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {
 		return subreconciler.RequeueWithError(err)

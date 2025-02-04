@@ -27,6 +27,7 @@ import (
 	"github.com/opdev/subreconciler"
 
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -160,6 +161,10 @@ func (r *AuthenticationReconciler) getOrCreateZenExtension(ctx context.Context, 
 		if err = r.Create(ctx, desired); k8sErrors.IsAlreadyExists(err) {
 			reqLogger.Info("ZenExtension already exists; continuing")
 			return subreconciler.ContinueReconciling()
+		} else if meta.IsNoMatchError(err) {
+			reqLogger.Info("Could not get the ZenExtension because the resource does not appear to be supported on this cluster")
+			reqLogger.Info("Skipping ZenExtension")
+			return subreconciler.ContinueReconciling()
 		} else if err != nil {
 			reqLogger.Error(err, "Failed to create ZenExtension")
 			return subreconciler.RequeueWithError(err)
@@ -251,22 +256,22 @@ func (r *AuthenticationReconciler) removeZenExtension(authCR *operatorv1alpha1.A
 		}
 
 		reqLogger.Info("Zen front door not enabled")
-		observedZenExt := &zenv1.ZenExtension{}
-		frontDoorKey := types.NamespacedName{Name: ImZenExtName, Namespace: authCR.Namespace}
-		if err = r.Get(ctx, frontDoorKey, observedZenExt); k8sErrors.IsNotFound(err) {
-			reqLogger.Info("Zen front door not found; continuing")
-			return subreconciler.ContinueReconciling()
-		} else if err != nil {
-			reqLogger.Error(err, "Zen front door is disabled, but could not get iam ZenExtension for cleanup")
-			return subreconciler.RequeueWithError(err)
+		observedZenExt := &zenv1.ZenExtension{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ImZenExtName,
+				Namespace: authCR.Namespace,
+			},
 		}
-
 		//Delete the existing zen extension
 		if err = r.Delete(ctx, observedZenExt); k8sErrors.IsNotFound(err) {
 			reqLogger.Info("ZenExtension not found; no deletion needed")
 			return subreconciler.ContinueReconciling()
+		} else if meta.IsNoMatchError(err) {
+			reqLogger.Info("Could not delete the ZenExtension because the resource does not appear to be supported on this cluster")
+			reqLogger.Info("Skipping ZenExtension deletion")
+			return subreconciler.ContinueReconciling()
 		} else if err != nil {
-			reqLogger.Info("Zen front door disabled, but iam zenextension exists and could not be deleted", "reason", err.Error())
+			reqLogger.Info("Failed to delete the ZenExtension due to an unexpected error", "err", err.Error())
 			return subreconciler.RequeueWithError(err)
 		}
 		reqLogger.Info("Zen front door deleted successfully")
@@ -285,6 +290,14 @@ func (r *AuthenticationReconciler) handleZenFrontDoor(ctx context.Context, req c
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(subCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
+	}
+	if !ctrlCommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
+		if authCR.Spec.Config.ZenFrontDoor {
+			subLogger.Info("The ZenExtension CRD must be installed before the Zen front door can be configured")
+			return subreconciler.ContinueReconciling()
+		}
+		subLogger.Info("ZenExtension resource is not supported; skipping")
+		return subreconciler.ContinueReconciling()
 	}
 
 	//In addition to reconciling the zen extension, we must set the proper value of

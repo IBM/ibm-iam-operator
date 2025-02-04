@@ -20,31 +20,39 @@ import (
 	"context"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
+	ctrlcommon "github.com/IBM/ibm-iam-operator/controllers/common"
+	"github.com/opdev/subreconciler"
 	rbacv1 "k8s.io/api/rbac/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-func (r *AuthenticationReconciler) createClusterRole(instance *operatorv1alpha1.Authentication) {
+func (r *AuthenticationReconciler) handleClusterRoles(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	reqLogger := log.WithValues("subreconciler", "handleClusterRoles")
 
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	// Define a new ClusterRole
-	operandClusterRole := r.iamOperandClusterRole(instance)
-	reqLogger.Info("Creating ibm-iam-operand-restricted clusterrole")
-	err := r.Client.Create(context.TODO(), operandClusterRole)
-	if err != nil {
-		reqLogger.Info("Failed to create ibm-iam-operand-restricted clusterrole or its already present")
+	canCreateClusterRoles, err := r.hasAPIAccess(ctx, "", rbacv1.SchemeGroupVersion, "clusterroles", []string{"create"})
+	if !canCreateClusterRoles {
+		reqLogger.Info("The Operator's ServiceAccount does not have the necessary accesses to create the ClusterRole; skipping")
+		return subreconciler.ContinueReconciling()
+	} else if err != nil {
+		return subreconciler.RequeueWithError(err)
 	}
-	// ClusterRole created successfully - return and requeue
 
-}
-func (r *AuthenticationReconciler) iamOperandClusterRole(instance *operatorv1alpha1.Authentication) *rbacv1.ClusterRole {
+	if !ctrlcommon.ClusterHasOpenShiftUserGroupVersion(&r.DiscoveryClient) {
+		reqLogger.Info("user.openshift.io/v1 was not found on the cluster; skipping")
+		return subreconciler.ContinueReconciling()
+	}
 
-	// reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+
 	operandClusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ibm-iam-operand-restricted",
-			Labels:    map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/managed-by": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"},
-			Namespace: "",
+			Name:   "ibm-iam-operand-restricted",
+			Labels: map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/managed-by": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"},
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -54,6 +62,14 @@ func (r *AuthenticationReconciler) iamOperandClusterRole(instance *operatorv1alp
 			},
 		},
 	}
-	return operandClusterRole
-
+	reqLogger = reqLogger.WithValues("ClusterRole.Name", operandClusterRole.Name)
+	if err := r.Create(ctx, operandClusterRole); k8sErrors.IsAlreadyExists(err) {
+		reqLogger.Info("ClusterRole already exists; continuing")
+		return subreconciler.ContinueReconciling()
+	} else if err != nil {
+		reqLogger.Info("Encountered an unexpected error while trying to create ClusterRole", "error", err.Error())
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	}
+	reqLogger.Info("ClusterRole created")
+	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }

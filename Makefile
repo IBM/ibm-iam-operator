@@ -171,7 +171,7 @@ KUSTOMIZE_VERSION ?= v5.4.3
 CONTROLLER_TOOLS_VERSION ?= v0.16.3
 OPERATOR_SDK_VERSION ?= v1.37.0
 YQ_VERSION ?= v4.44.3
-GO_VERSION ?= 1.23.1
+GO_VERSION ?= 1.23.5
 
 # This pinned version of go has its version pinned to its name, so order of operations is inverted here.
 GO ?= $(LOCALBIN)/go$(GO_VERSION)

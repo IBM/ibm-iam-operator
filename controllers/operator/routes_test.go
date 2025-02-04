@@ -496,8 +496,9 @@ var _ = Describe("Route handling", func() {
 		})
 	})
 
-	Describe("getClusterAddress", func() {
+	Describe("getClusterAddressAndCertAuthEP", func() {
 		var clusterAddress string
+		var imCertAuthEP string
 		BeforeEach(func() {
 			crds, err := envtest.InstallCRDs(cfg, envtest.CRDInstallOptions{
 				Paths: []string{filepath.Join(".", "testdata", "crds", "routes")},
@@ -528,6 +529,7 @@ var _ = Describe("Route handling", func() {
 				Data: map[string]string{
 					"cluster_address":      "cp-console-example.apps.cluster.ibm.com",
 					"cluster_address_auth": "cp-console-example.apps.cluster.ibm.com",
+					"im_certauth_endpoint": "im-certauth-passthrough-exampleapps.cluster.ibm.com",
 				},
 			}
 			controllerutil.SetOwnerReference(authCR, clusterInfoConfigMap, scheme)
@@ -540,21 +542,24 @@ var _ = Describe("Route handling", func() {
 				Client: cl,
 			}
 			clusterAddress = ""
+			imCertAuthEP = ""
 		})
 
 		It("returns a function that signals to continue reconciling when cluster address is retrieved successfully", func() {
-			fn := r.getClusterAddress(authCR, &clusterAddress)
+			fn := r.getClusterAddressAndCertAuthEP(authCR, &clusterAddress, &imCertAuthEP)
 			result, err := fn(ctx)
 			Expect(clusterAddress).To(Equal(clusterInfoConfigMap.Data["cluster_address"]))
+			Expect(imCertAuthEP).To(Equal(clusterInfoConfigMap.Data[IMCrtAuthEP]))
 			testutil.ConfirmThatItContinuesReconciling(result, err)
 		})
 
 		It("returns a function that signals to requeue with a delay when ConfigMap is not present", func() {
 			err := r.Delete(ctx, clusterInfoConfigMap)
 			Expect(err).ToNot(HaveOccurred())
-			fn := r.getClusterAddress(authCR, &clusterAddress)
+			fn := r.getClusterAddressAndCertAuthEP(authCR, &clusterAddress, &imCertAuthEP)
 			result, err := fn(ctx)
 			Expect(clusterAddress).To(BeZero())
+			Expect(imCertAuthEP).To(BeZero())
 			testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
 		})
 
@@ -566,9 +571,10 @@ var _ = Describe("Route handling", func() {
 					Client: cl,
 				},
 			}
-			fn := rFailing.getClusterAddress(authCR, &clusterAddress)
+			fn := rFailing.getClusterAddressAndCertAuthEP(authCR, &clusterAddress, &imCertAuthEP)
 			result, err := fn(ctx)
 			Expect(clusterAddress).To(BeZero())
+			Expect(imCertAuthEP).To(BeZero())
 			testutil.ConfirmThatItRequeuesWithError(result, err)
 		})
 	})

@@ -33,16 +33,12 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	"github.com/opdev/subreconciler"
-	osconfigv1 "github.com/openshift/api/config/v1"
-	"gopkg.in/yaml.v2"
+	routev1 "github.com/openshift/api/route/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -721,6 +717,80 @@ func generateOAuthClientConfigMap(ctx context.Context, cl client.Client, authCR 
 	return
 }
 
+func getHostFromDummyRoute(ctx context.Context, cl client.Client, authCR *operatorv1alpha1.Authentication) (host string, err error) {
+	reqLogger := logf.FromContext(ctx).V(1)
+	dummyRoute := &routev1.Route{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Route",
+			APIVersion: routev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "domain-test",
+			Namespace: authCR.Namespace,
+		},
+		Spec: routev1.RouteSpec{
+			To: routev1.RouteTargetReference{
+				Name: "domain-test",
+			},
+		},
+	}
+	if err = controllerutil.SetControllerReference(authCR, dummyRoute, cl.Scheme()); err != nil {
+		return
+	}
+	dummyKey := types.NamespacedName{Name: "domain-test", Namespace: authCR.Namespace}
+	if err = cl.Create(ctx, dummyRoute); err != nil && !k8sErrors.IsAlreadyExists(err) {
+		return
+	}
+	if err = cl.Get(ctx, dummyKey, dummyRoute); err != nil {
+		return
+	}
+	reqLogger.Info("Got dummy route", "spec", dummyRoute.Spec)
+
+	if err = cl.Delete(ctx, dummyRoute); err != nil && !k8sErrors.IsNotFound(err) {
+		reqLogger.Error(err, "Failed to delete dummy Route")
+		return "", err
+	}
+
+	return dummyRoute.Spec.Host, nil
+}
+
+func (r *AuthenticationReconciler) getDomain(ctx context.Context, authCR *operatorv1alpha1.Authentication) (domain string, err error) {
+	reqLogger := logf.FromContext(ctx)
+
+	commonLabel := map[string]string{"app": "im"}
+	routeLabels := ctrlcommon.MergeMap(commonLabel, authCR.Spec.Labels)
+
+	imRoutes := &routev1.RouteList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(authCR.Namespace),
+		client.MatchingLabels(routeLabels),
+	}
+
+	if err = r.List(ctx, imRoutes, listOpts...); err != nil && !k8sErrors.IsNotFound(err) {
+		reqLogger.Error(err, "Failed to list Routes")
+		return
+	}
+
+	var host string
+	if len(imRoutes.Items) == 0 {
+		if host, err = getHostFromDummyRoute(ctx, r.Client, authCR); err != nil {
+			reqLogger.Error(err, "Could not get host name from dummy Route")
+			return
+		}
+	} else {
+		host = imRoutes.Items[0].Spec.Host
+	}
+
+	splitHost := strings.SplitN(host, ".", 2)
+	reqLogger.Info("split host", "value", splitHost)
+	if len(splitHost) < 2 {
+		return
+	}
+	domain = splitHost[1]
+
+	return domain, err
+}
+
 func (r *AuthenticationReconciler) generateCNCFClusterInfo(ctx context.Context, authCR *operatorv1alpha1.Authentication, domainName string, generated *corev1.ConfigMap) (err error) {
 	reqLogger := logf.FromContext(ctx)
 
@@ -765,19 +835,35 @@ func (r *AuthenticationReconciler) generateCNCFClusterInfo(ctx context.Context, 
 	return
 }
 
+func (r *AuthenticationReconciler) getAPIHostAndPort() (host, port string) {
+	cfg, err := config.GetConfig()
+	if err != nil {
+		return
+	}
+
+	splitHost := strings.Split(cfg.Host, ":")
+	return splitHost[0], splitHost[1]
+}
+
 func (r *AuthenticationReconciler) generateOCPClusterInfo(ctx context.Context, authCR *operatorv1alpha1.Authentication, generated *corev1.ConfigMap) (err error) {
 	reqLogger := logf.FromContext(ctx)
 
 	rhttpPort, rhttpsPort, cname := getClusterInfoFromEnv()
 
-	certAuthDomainName, domainName, proxyDomainName, err := r.getDomainFromIngressConfig(ctx, authCR)
+	baseDomain, err := r.getDomain(ctx, authCR)
 	if err != nil {
 		return
 	}
 
-	apiHost, apiPort, err := r.getClusterAPIServerStrFromConsoleConfig(ctx)
-	if err != nil {
-		return
+	var domainName, proxyDomainName string
+	multipleauthCRRouteName := strings.Join([]string{"cp-console", authCR.Namespace}, "-")
+	multipleauthCRProxyRouteName := strings.Join([]string{"cp-proxy", authCR.Namespace}, "-")
+	if authCR.Spec.Config.OnPremMultipleDeploy {
+		domainName = strings.Join([]string{multipleauthCRRouteName, baseDomain}, ".")
+		proxyDomainName = strings.Join([]string{multipleauthCRProxyRouteName, baseDomain}, ".")
+	} else {
+		domainName = strings.Join([]string{"cp-console", baseDomain}, ".")
+		proxyDomainName = strings.Join([]string{"cp-proxy", baseDomain}, ".")
 	}
 
 	zenHost := ""
@@ -794,6 +880,8 @@ func (r *AuthenticationReconciler) generateOCPClusterInfo(ctx context.Context, a
 			reqLogger.Info("Zen host could not be retrieved; using defaults")
 		}
 	}
+
+	apiHost, apiPort := r.getAPIHostAndPort()
 
 	*generated = corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -860,80 +948,6 @@ func (r *AuthenticationReconciler) getZenHost(ctx context.Context, authCR *opera
 	return
 }
 
-func (r *AuthenticationReconciler) getDomainFromIngressConfig(ctx context.Context, authCR *operatorv1alpha1.Authentication) (certAuthDomainName, domainName, proxyDomainName string, err error) {
-	reqLogger := logf.FromContext(ctx)
-	ingressConfigName := "cluster"
-	ingressConfig := &osconfigv1.Ingress{}
-
-	clusterClient, err := r.createOrGetClusterClient()
-	if err != nil {
-		reqLogger.Error(err, "Failure creating or getting cluster client")
-		return
-	}
-
-	reqLogger.Info("Going to READ openshift ingress cluster config")
-	if err = clusterClient.Get(ctx, types.NamespacedName{Name: ingressConfigName}, ingressConfig); err != nil {
-		reqLogger.Error(err, "Failed to READ openshift ingress cluster config")
-		return
-	}
-
-	reqLogger.Info("Successfully READ openshift ingress cluster config")
-
-	var baseDomain string
-	multipleauthCRRouteName := strings.Join([]string{"cp-console", authCR.Namespace}, "-")
-	multipleCertAuthRouteName := strings.Join([]string{IMCrtAuthRouteName, authCR.Namespace}, "-")
-	multipleauthCRProxyRouteName := strings.Join([]string{"cp-proxy", authCR.Namespace}, "-")
-	if len(ingressConfig.Spec.AppsDomain) > 0 {
-		baseDomain = ingressConfig.Spec.AppsDomain
-	} else {
-		baseDomain = ingressConfig.Spec.Domain
-	}
-	if authCR.Spec.Config.OnPremMultipleDeploy {
-		domainName = strings.Join([]string{multipleauthCRRouteName, baseDomain}, ".")
-		certAuthDomainName = strings.Join([]string{multipleCertAuthRouteName, baseDomain}, ".")
-		proxyDomainName = strings.Join([]string{multipleauthCRProxyRouteName, baseDomain}, ".")
-	} else {
-		domainName = strings.Join([]string{"cp-console", baseDomain}, ".")
-		certAuthDomainName = strings.Join([]string{IMCrtAuthRouteName, baseDomain}, ".")
-		proxyDomainName = strings.Join([]string{"cp-proxy", baseDomain}, ".")
-	}
-
-	return
-}
-
-func (r *AuthenticationReconciler) getClusterAPIServerStrFromConsoleConfig(ctx context.Context) (apiHost, apiPort string, err error) {
-	// get clusterApiServer Details cm console-config from openshift-console ns
-	OSconsoleConfigMap := &corev1.ConfigMap{}
-	OSConsoleCMKey := types.NamespacedName{Name: "console-config", Namespace: "openshift-console"}
-	if err = clusterClient.Get(ctx, OSConsoleCMKey, OSconsoleConfigMap); err != nil {
-		err = fmt.Errorf("failed to get console-config configmap from openshift-console namespace: %w", err)
-		return
-	}
-
-	type consoleConfig struct {
-		APIVersion  string `yaml:"apiVersion"`
-		ClusterInfo struct {
-			MasterPublicURL string `yaml:"masterPublicURL"`
-		} `yaml:"clusterInfo"`
-	}
-
-	result := &consoleConfig{}
-	var apiaddr string
-	if err = yaml.Unmarshal([]byte(OSconsoleConfigMap.Data["console-config.yaml"]), result); err != nil {
-		err = fmt.Errorf("failed to read console-config.yaml from console-config configmap: %w", err)
-		return
-	}
-
-	if result.ClusterInfo.MasterPublicURL == "" {
-		err = fmt.Errorf("console-config.yaml contains field .clusterInfo.masterPublicURL, but it is not in the expected format")
-		return
-	}
-	apiaddr = strings.TrimPrefix(result.ClusterInfo.MasterPublicURL, "https://")
-
-	pos := strings.LastIndex(apiaddr, ":")
-	return apiaddr[0:pos], apiaddr[pos+1:], nil
-}
-
 func (r *AuthenticationReconciler) generateIBMCloudClusterInfoConfigMap(ctx context.Context, authCR *operatorv1alpha1.Authentication, generated *corev1.ConfigMap) (err error) {
 	reqLogger := logf.FromContext(ctx)
 	var domainName string
@@ -962,37 +976,6 @@ func (r *AuthenticationReconciler) generateIBMCloudClusterInfoConfigMap(ctx cont
 	}
 
 	return
-}
-
-var (
-	clusterClient               client.Client
-	OpenShiftConfigScheme       = runtime.NewScheme()
-	ConfigMapSchemeGroupVersion = schema.GroupVersion{Group: "", Version: "v1"}
-	ConfigSchemeGroupVersion    = schema.GroupVersion{Group: "config.openshift.io", Version: "v1"}
-)
-
-func (r *AuthenticationReconciler) createOrGetClusterClient() (client.Client, error) {
-	// return if cluster client already exists
-	if clusterClient != nil {
-		return clusterClient, nil
-	}
-	// get a config to talk to the apiserver
-	cfg, err := config.GetConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	if ctrlcommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient) {
-		utilruntime.Must(osconfigv1.AddToScheme(OpenShiftConfigScheme))
-	}
-	utilruntime.Must(corev1.AddToScheme(OpenShiftConfigScheme))
-
-	clusterClient, err = client.New(cfg, client.Options{Scheme: OpenShiftConfigScheme})
-	if err != nil {
-		return nil, err
-	}
-
-	return clusterClient, nil
 }
 
 // isHostedOnIBMCloud checks the

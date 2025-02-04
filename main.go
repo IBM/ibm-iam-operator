@@ -54,7 +54,6 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(oidcsecurityv1.AddToScheme(scheme))
-	utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(certmgrv1.AddToScheme(scheme))
 	utilruntime.Must(zenv1.AddToScheme(scheme))
 	// Add the Route scheme if found on the cluster
@@ -67,6 +66,13 @@ func init() {
 	if err != nil {
 		return
 	}
+
+	if controllercommon.ClusterHasOperandRequestAPIResource(dc) {
+		utilruntime.Must(operatorv1alpha1.AddODLMEnabledToScheme(scheme))
+	} else {
+		utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
+	}
+
 	if controllercommon.ClusterHasRouteGroupVersion(dc) {
 		utilruntime.Must(routev1.AddToScheme(scheme))
 	}

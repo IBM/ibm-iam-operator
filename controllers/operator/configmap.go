@@ -126,6 +126,7 @@ func (r *AuthenticationReconciler) handleIBMCloudClusterInfo(ctx context.Context
 			"cluster_address_auth",
 			"cluster_endpoint"),
 		updatesValuesWhen(not(observedKeySet("cluster_address_auth")), "cluster_address_auth"),
+		updatesValuesWhen(not(observedKeySet(IMCrtAuthEP)), IMCrtAuthEP),
 	}
 
 	for _, update := range updateFns {
@@ -727,6 +728,7 @@ func (r *AuthenticationReconciler) generateCNCFClusterInfo(ctx context.Context, 
 
 	zenHost := ""
 	clusterAddress := strings.Join([]string{strings.Join([]string{"cp-console", authCR.Namespace}, "-"), domainName}, ".")
+	imCertAuthEP := strings.Join([]string{strings.Join([]string{IMCrtAuthRouteName, authCR.Namespace}, "-"), domainName}, ".")
 	clusterEndpoint := "https://" + clusterAddress
 	clusterAddressAuth := clusterAddress
 	if authCR.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
@@ -748,6 +750,7 @@ func (r *AuthenticationReconciler) generateCNCFClusterInfo(ctx context.Context, 
 		},
 		Data: map[string]string{
 			ClusterAddr:            clusterAddress,
+			IMCrtAuthEP:            imCertAuthEP,
 			"cluster_address_auth": clusterAddressAuth,
 			ClusterEP:              clusterEndpoint,
 			RouteHTTPPort:          rhttpPort,
@@ -767,7 +770,7 @@ func (r *AuthenticationReconciler) generateOCPClusterInfo(ctx context.Context, a
 
 	rhttpPort, rhttpsPort, cname := getClusterInfoFromEnv()
 
-	domainName, proxyDomainName, err := r.getDomainFromIngressConfig(ctx, authCR)
+	certAuthDomainName, domainName, proxyDomainName, err := r.getDomainFromIngressConfig(ctx, authCR)
 	if err != nil {
 		return
 	}
@@ -800,6 +803,7 @@ func (r *AuthenticationReconciler) generateOCPClusterInfo(ctx context.Context, a
 		},
 		Data: map[string]string{
 			ClusterAddr:            clusterAddress,
+			IMCrtAuthEP:            certAuthDomainName,
 			"cluster_address_auth": clusterAddressAuth,
 			ClusterEP:              clusterEndpoint,
 			RouteHTTPPort:          rhttpPort,
@@ -856,7 +860,7 @@ func (r *AuthenticationReconciler) getZenHost(ctx context.Context, authCR *opera
 	return
 }
 
-func (r *AuthenticationReconciler) getDomainFromIngressConfig(ctx context.Context, authCR *operatorv1alpha1.Authentication) (domainName, proxyDomainName string, err error) {
+func (r *AuthenticationReconciler) getDomainFromIngressConfig(ctx context.Context, authCR *operatorv1alpha1.Authentication) (certAuthDomainName, domainName, proxyDomainName string, err error) {
 	reqLogger := logf.FromContext(ctx)
 	ingressConfigName := "cluster"
 	ingressConfig := &osconfigv1.Ingress{}
@@ -877,6 +881,7 @@ func (r *AuthenticationReconciler) getDomainFromIngressConfig(ctx context.Contex
 
 	var baseDomain string
 	multipleauthCRRouteName := strings.Join([]string{"cp-console", authCR.Namespace}, "-")
+	multipleCertAuthRouteName := strings.Join([]string{IMCrtAuthRouteName, authCR.Namespace}, "-")
 	multipleauthCRProxyRouteName := strings.Join([]string{"cp-proxy", authCR.Namespace}, "-")
 	if len(ingressConfig.Spec.AppsDomain) > 0 {
 		baseDomain = ingressConfig.Spec.AppsDomain
@@ -885,9 +890,11 @@ func (r *AuthenticationReconciler) getDomainFromIngressConfig(ctx context.Contex
 	}
 	if authCR.Spec.Config.OnPremMultipleDeploy {
 		domainName = strings.Join([]string{multipleauthCRRouteName, baseDomain}, ".")
+		certAuthDomainName = strings.Join([]string{multipleCertAuthRouteName, baseDomain}, ".")
 		proxyDomainName = strings.Join([]string{multipleauthCRProxyRouteName, baseDomain}, ".")
 	} else {
 		domainName = strings.Join([]string{"cp-console", baseDomain}, ".")
+		certAuthDomainName = strings.Join([]string{IMCrtAuthRouteName, baseDomain}, ".")
 		proxyDomainName = strings.Join([]string{"cp-proxy", baseDomain}, ".")
 	}
 

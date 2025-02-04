@@ -161,6 +161,7 @@ func (r *AuthenticationReconciler) removeIdauth(ctx context.Context, authCR *ope
 func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.Authentication, allRoutesFields *map[string]*reconcileRouteFields) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		routeHost := ""
+		imCertAuthEP := ""
 		wlpClientID := ""
 		var (
 			platformAuthCert               []byte
@@ -169,7 +170,7 @@ func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.A
 		)
 
 		fns := []subreconciler.Fn{
-			r.getClusterAddress(authCR, &routeHost),
+			r.getClusterAddressAndCertAuthEP(authCR, &routeHost, &imCertAuthEP),
 			r.getWlpClientID(authCR, &wlpClientID),
 			r.getCertificateForService(PlatformAuthServiceName, authCR, &platformAuthCert),
 			r.getCertificateForService(PlatformIdentityManagementServiceName, authCR, &platformIdentityManagementCert),
@@ -261,6 +262,15 @@ func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.A
 				RoutePort:         9443,
 				ServiceName:       PlatformAuthServiceName,
 				DestinationCAcert: platformAuthCert,
+			},
+			IMCrtAuthRouteName: {
+				Annotations: map[string]string{
+					"haproxy.router.openshift.io/balance": "source",
+				},
+				Name:        IMCrtAuthRouteName,
+				RouteHost:   imCertAuthEP,
+				RoutePort:   9443,
+				ServiceName: PlatformAuthServiceName,
 			},
 		}
 
@@ -527,6 +537,18 @@ func (r *AuthenticationReconciler) newRoute(authCR *operatorv1alpha1.Authenticat
 			InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
 			DestinationCACertificate:      string(fields.DestinationCAcert),
 		}
+	} else if fields.RoutePath == "" {
+		// Passthrough route (if RoutePath is empty)
+		route.Spec.TLS = &routev1.TLSConfig{
+			Termination:                   routev1.TLSTerminationPassthrough,
+			InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+		}
+	} else {
+		// Edge route (if RoutePath is present)
+		route.Spec.TLS = &routev1.TLSConfig{
+			Termination:                   routev1.TLSTerminationEdge,
+			InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+		}
 	}
 
 	err := controllerutil.SetControllerReference(authCR, route, r.Client.Scheme())
@@ -538,16 +560,18 @@ func (r *AuthenticationReconciler) newRoute(authCR *operatorv1alpha1.Authenticat
 	return route, nil
 }
 
-func (r *AuthenticationReconciler) getClusterAddress(authCR *operatorv1alpha1.Authentication, clusterAddress *string) (fn subreconciler.Fn) {
+func (r *AuthenticationReconciler) getClusterAddressAndCertAuthEP(authCR *operatorv1alpha1.Authentication, clusterAddress *string, imCertAuthEP *string) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		clusterInfoConfigMap := &corev1.ConfigMap{}
 
 		clusterAddressFieldName := "cluster_address"
+		imCertAuthEndpointName := "im_certauth_endpoint"
 
 		fns := []subreconciler.Fn{
 			r.getClusterInfoConfigMap(authCR, clusterInfoConfigMap),
 			r.verifyConfigMapHasCorrectOwnership(authCR, clusterInfoConfigMap),
 			r.verifyConfigMapHasField(authCR, clusterAddressFieldName, clusterInfoConfigMap),
+			r.verifyConfigMapHasField(authCR, imCertAuthEndpointName, clusterInfoConfigMap),
 		}
 
 		for _, fn := range fns {
@@ -557,6 +581,7 @@ func (r *AuthenticationReconciler) getClusterAddress(authCR *operatorv1alpha1.Au
 		}
 
 		*clusterAddress = clusterInfoConfigMap.Data[clusterAddressFieldName]
+		*imCertAuthEP = clusterInfoConfigMap.Data[imCertAuthEndpointName]
 
 		return subreconciler.ContinueReconciling()
 	}

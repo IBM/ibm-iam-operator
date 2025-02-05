@@ -838,8 +838,8 @@ func (r *AuthenticationReconciler) getAPIHostAndPort() (host, port string) {
 		return
 	}
 
-	splitHost := strings.Split(cfg.Host, ":")
-	return splitHost[0], splitHost[1]
+	index := strings.LastIndex(cfg.Host, ":")
+	return cfg.Host[0:index], cfg.Host[index+1:]
 }
 
 func (r *AuthenticationReconciler) generateOCPClusterInfo(ctx context.Context, authCR *operatorv1alpha1.Authentication, generated *corev1.ConfigMap) (err error) {

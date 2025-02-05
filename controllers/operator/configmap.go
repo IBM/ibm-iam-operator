@@ -117,9 +117,10 @@ func (r *AuthenticationReconciler) handleIBMCloudClusterInfo(ctx context.Context
 	}
 
 	updateFns := []func(*corev1.ConfigMap, *corev1.ConfigMap) bool{
-		updatesValuesWhen(not(observedKeyValueSetTo("cluster_address", generated.Data["cluster_address"])),
+		updatesValuesWhen(and(zenFrontDoorEnabled(authCR), not(observedKeyValueSetTo("cluster_address", generated.Data["cluster_address"]))),
 			"cluster_address",
 			"cluster_address_auth",
+			"proxy_address",
 			"cluster_endpoint"),
 		updatesValuesWhen(not(observedKeySet("cluster_address_auth")), "cluster_address_auth"),
 	}
@@ -872,6 +873,7 @@ func (r *AuthenticationReconciler) generateOCPClusterInfo(ctx context.Context, a
 			clusterAddressAuth = zenHost
 			clusterAddress = zenHost
 			clusterEndpoint = "https://" + zenHost
+			proxyDomainName = zenHost
 		} else {
 			reqLogger.Info("Zen host could not be retrieved; using defaults")
 		}

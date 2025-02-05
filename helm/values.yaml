@@ -1,6 +1,6 @@
-imagePullSecret: ibm-entitlement-key
+# imagePullSecret: ibm-entitlement-key
 imagePullPolicy: IfNotPresent
-imagePullPrefix: icr.io
+# imagePullPrefix: icr.io
 imageRegistryNamespaceOperand: cpopen/cpfs
 imageRegistryNamespaceOperator: cpopen
 

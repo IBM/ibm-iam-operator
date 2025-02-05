@@ -854,14 +854,17 @@ func (r *AuthenticationReconciler) generateOCPClusterInfo(ctx context.Context, a
 		return
 	}
 
-	var domainName, proxyDomainName string
+	var domainName, certAuthDomainName, proxyDomainName string
 	multipleauthCRRouteName := strings.Join([]string{"cp-console", authCR.Namespace}, "-")
+	multipleCertAuthRouteName := strings.Join([]string{IMCrtAuthRouteName, authCR.Namespace}, "-")
 	multipleauthCRProxyRouteName := strings.Join([]string{"cp-proxy", authCR.Namespace}, "-")
 	if authCR.Spec.Config.OnPremMultipleDeploy {
 		domainName = strings.Join([]string{multipleauthCRRouteName, baseDomain}, ".")
+		certAuthDomainName = strings.Join([]string{multipleCertAuthRouteName, baseDomain}, ".")
 		proxyDomainName = strings.Join([]string{multipleauthCRProxyRouteName, baseDomain}, ".")
 	} else {
 		domainName = strings.Join([]string{"cp-console", baseDomain}, ".")
+		certAuthDomainName = strings.Join([]string{IMCrtAuthRouteName, baseDomain}, ".")
 		proxyDomainName = strings.Join([]string{"cp-proxy", baseDomain}, ".")
 	}
 

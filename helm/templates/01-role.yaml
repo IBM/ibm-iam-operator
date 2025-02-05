@@ -6,6 +6,7 @@ metadata:
     app.kubernetes.io/managed-by: ibm-iam-operator
     app.kubernetes.io/name: ibm-iam-operator
   name: ibm-iam-operator
+  namespace: {{.Values.global.operatorNamespace}}
 rules:
 - apiGroups:
   - route.openshift.io

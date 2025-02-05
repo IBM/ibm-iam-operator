@@ -5,7 +5,7 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: ibm-iam-operator
-  namespace: '{{.Release.Namespace}}'
+  namespace: {{.Values.global.operatorNamespace}}
 roleRef:
     kind: ClusterRole
     name: ibm-iam-operator

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/opdev/subreconciler"
 	routev1 "github.com/openshift/api/route/v1"
@@ -190,7 +191,7 @@ func (r *AuthenticationReconciler) removeExtraRoutes(authCR *operatorv1alpha1.Au
 func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.Authentication, allRoutesFields *map[string]*reconcileRouteFields) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		routeHost := ""
-		imCertAuthEP := ""
+		imCertAuthHost := ""
 		wlpClientID := ""
 		var (
 			platformAuthCert               []byte
@@ -199,7 +200,7 @@ func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.A
 		)
 
 		fns := []subreconciler.Fn{
-			r.getClusterAddressAndCertAuthEP(authCR, &routeHost, &imCertAuthEP),
+			r.getClusterAddressAndCertAuthHost(authCR, &routeHost, &imCertAuthHost),
 			r.getWlpClientID(authCR, &wlpClientID),
 			r.getCertificateForService(PlatformAuthServiceName, authCR, &platformAuthCert),
 			r.getCertificateForService(PlatformIdentityManagementServiceName, authCR, &platformIdentityManagementCert),
@@ -297,7 +298,7 @@ func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.A
 					"haproxy.router.openshift.io/balance": "source",
 				},
 				Name:        IMCrtAuthRouteName,
-				RouteHost:   imCertAuthEP,
+				RouteHost:   imCertAuthHost,
 				RoutePort:   9443,
 				ServiceName: PlatformAuthServiceName,
 			},
@@ -587,7 +588,7 @@ func (r *AuthenticationReconciler) newRoute(authCR *operatorv1alpha1.Authenticat
 	return route, nil
 }
 
-func (r *AuthenticationReconciler) getClusterAddressAndCertAuthEP(authCR *operatorv1alpha1.Authentication, clusterAddress *string, imCertAuthEP *string) (fn subreconciler.Fn) {
+func (r *AuthenticationReconciler) getClusterAddressAndCertAuthHost(authCR *operatorv1alpha1.Authentication, clusterAddress *string, imCertAuthHost *string) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		clusterInfoConfigMap := &corev1.ConfigMap{}
 
@@ -608,7 +609,10 @@ func (r *AuthenticationReconciler) getClusterAddressAndCertAuthEP(authCR *operat
 		}
 
 		*clusterAddress = clusterInfoConfigMap.Data[clusterAddressFieldName]
-		*imCertAuthEP = clusterInfoConfigMap.Data[imCertAuthEndpointName]
+		imCertAuthEP := clusterInfoConfigMap.Data[imCertAuthEndpointName]
+		imCertAuthEP = strings.TrimPrefix(imCertAuthEP, "https://")
+
+		*imCertAuthHost = imCertAuthEP
 
 		return subreconciler.ContinueReconciling()
 	}

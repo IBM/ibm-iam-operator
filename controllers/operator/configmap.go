@@ -798,8 +798,9 @@ func (r *AuthenticationReconciler) generateCNCFClusterInfo(ctx context.Context, 
 
 	zenHost := ""
 	clusterAddress := strings.Join([]string{strings.Join([]string{"cp-console", authCR.Namespace}, "-"), domainName}, ".")
-	imCertAuthEP := strings.Join([]string{strings.Join([]string{IMCrtAuthRouteName, authCR.Namespace}, "-"), domainName}, ".")
+	imCertAuthAddress := strings.Join([]string{strings.Join([]string{IMCrtAuthRouteName, authCR.Namespace}, "-"), domainName}, ".")
 	clusterEndpoint := "https://" + clusterAddress
+	imCertAuthEP := "https://" + imCertAuthAddress
 	clusterAddressAuth := clusterAddress
 	if authCR.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
 		zenHost, err = r.getZenHost(ctx, authCR)
@@ -872,6 +873,7 @@ func (r *AuthenticationReconciler) generateOCPClusterInfo(ctx context.Context, a
 	zenHost := ""
 	clusterAddress := domainName
 	clusterEndpoint := "https://" + clusterAddress
+	imCertAuthEndpoint := "https://" + certAuthDomainName
 	clusterAddressAuth := clusterAddress
 	if authCR.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
 		zenHost, err = r.getZenHost(ctx, authCR)
@@ -895,7 +897,7 @@ func (r *AuthenticationReconciler) generateOCPClusterInfo(ctx context.Context, a
 		},
 		Data: map[string]string{
 			ClusterAddr:            clusterAddress,
-			IMCrtAuthEP:            certAuthDomainName,
+			IMCrtAuthEP:            imCertAuthEndpoint,
 			"cluster_address_auth": clusterAddressAuth,
 			ClusterEP:              clusterEndpoint,
 			RouteHTTPPort:          rhttpPort,

@@ -318,7 +318,7 @@ var _ = Describe("ConfigMap handling", func() {
 			err = r.Get(ctx, cmKey, observed)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(observed.Data).ToNot(BeNil())
-			Expect(observed.Data["cluster_address_auth"]).To(Equal(observed.Data["cluster_address"]))
+			Expect(observed.Data["cluster_address_auth"]).To(Equal("cp-console-data-ns.example1.ibm.com"))
 			Expect(observed.Labels).ToNot(BeNil())
 			Expect(observed.Labels["app"]).To(Equal("auth-idp"))
 			Expect(observed.OwnerReferences).ToNot(BeEmpty())

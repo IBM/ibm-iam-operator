@@ -331,21 +331,25 @@ func (r *AuthenticationReconciler) reconcileRoute(authCR *operatorv1alpha1.Authe
 
 func (r *AuthenticationReconciler) ensureRouteDoesNotExist(ctx context.Context, authCR *operatorv1alpha1.Authentication, fields *reconcileRouteFields) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx)
-	reqLogger.Info("Determined Route should not exist; removing if present")
-	observedRoute := &routev1.Route{}
-	err = r.Get(ctx, types.NamespacedName{Name: fields.Name, Namespace: authCR.Namespace}, observedRoute)
-	if k8sErrors.IsNotFound(err) {
-		return subreconciler.ContinueReconciling()
-	} else if err != nil {
-		reqLogger.Error(err, "Failed to get existing route for reconciliation")
-		return subreconciler.RequeueWithError(err)
+	// do not delete imm-certauth-passthrough route even for zenFrontDoor case
+	if fields.Name != IMCrtAuthRouteName {
+		reqLogger.Info("Determined Route should not exist; removing if present")
+		observedRoute := &routev1.Route{}
+		err = r.Get(ctx, types.NamespacedName{Name: fields.Name, Namespace: authCR.Namespace}, observedRoute)
+		if k8sErrors.IsNotFound(err) {
+			return subreconciler.ContinueReconciling()
+		} else if err != nil {
+			reqLogger.Error(err, "Failed to get existing route for reconciliation")
+			return subreconciler.RequeueWithError(err)
+		}
+		err = r.Delete(ctx, observedRoute)
+		if err != nil {
+			reqLogger.Error(err, "Failed to delete the Route")
+			return subreconciler.RequeueWithError(err)
+		}
+		reqLogger.Info("Successfully deleted the Route")
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
-	err = r.Delete(ctx, observedRoute)
-	if err != nil {
-		reqLogger.Error(err, "Failed to delete the Route")
-		return subreconciler.RequeueWithError(err)
-	}
-	reqLogger.Info("Successfully deleted the Route")
 
 	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }

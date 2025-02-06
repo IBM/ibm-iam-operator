@@ -255,20 +255,6 @@ metadata:
     app.kubernetes.io/name: ibm-iam-operator
 rules:
 - apiGroups:
-  - config.openshift.io
-  resources:
-  - ingresses
-  verbs:
-  - get
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  resourceNames:
-  - console-config
-  verbs:
-  - get
-- apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - clusterroles

@@ -36,7 +36,7 @@ func (r *AuthenticationReconciler) handleClusterRoleBindings(ctx context.Context
 	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleClusterRoleBindings")
 	reqLogger.Info("Ensure that the ClusterRoleBinding is created")
 
-	canCreateCRB, err := r.hasAPIAccess(ctx, "", rbacv1.SchemeGroupVersion, "clusterrolebindings", []string{"create"})
+	canCreateCRB, err := r.hasAPIAccess(ctx, "", rbacv1.SchemeGroupVersion.Group, "clusterrolebindings", []string{"create"})
 	if !canCreateCRB {
 		reqLogger.Info("The Operator's ServiceAccount does not have the necessary accesses to create the ClusterRoleBinding; skipping")
 		return subreconciler.ContinueReconciling()

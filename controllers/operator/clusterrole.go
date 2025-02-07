@@ -31,7 +31,7 @@ import (
 func (r *AuthenticationReconciler) handleClusterRoles(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	reqLogger := log.WithValues("subreconciler", "handleClusterRoles")
 
-	canCreateClusterRoles, err := r.hasAPIAccess(ctx, "", rbacv1.SchemeGroupVersion, "clusterroles", []string{"create"})
+	canCreateClusterRoles, err := r.hasAPIAccess(ctx, "", rbacv1.SchemeGroupVersion.Group, "clusterroles", []string{"create"})
 	if !canCreateClusterRoles {
 		reqLogger.Info("The Operator's ServiceAccount does not have the necessary accesses to create the ClusterRole; skipping")
 		return subreconciler.ContinueReconciling()

@@ -964,62 +964,28 @@ func apiResourceIsNamespaced(gvk schema.GroupVersionKind, apiLists []*metav1.API
 	return false
 }
 
-func (r *AuthenticationReconciler) hasAPIAccessInNamespaces(ctx context.Context, namespaces []string, gv schema.GroupVersion, kind string, verbs []string) (hasAccess bool, err error) {
-	for _, namespace := range namespaces {
-		if hasAccess, err = r.hasAPIAccess(ctx, namespace, gv, kind, verbs); err != nil || !hasAccess {
-			return
-		}
-	}
-
-	return true, nil
-}
-
 // hasAPIAccess uses SelfSubjectAccessReviews to confirm whether the Opertor's ServiceAccount has authorization to use a
 // list of verbs on a given apiversion and kind.
-func (r *AuthenticationReconciler) hasAPIAccess(ctx context.Context, namespace string, gv schema.GroupVersion, kind string, verbs []string) (hasAccess bool, err error) {
-	reqLogger := logf.FromContext(ctx).V(1).WithValues("namespace", namespace, "gv", gv, "kind", kind, "verbs", verbs)
-	_, apiLists, err := r.DiscoveryClient.ServerGroupsAndResources()
-	if err != nil {
-		reqLogger.Error(err, "Failed to obtain groups and API resources for access check")
-		return false, fmt.Errorf("failed to obtain groups and API resources for access check: %w", err)
-	}
-	gvk := gv.WithKind(kind)
-	isNamespaced := apiResourceIsNamespaced(gvk, apiLists)
-	if !isNamespaced {
-		namespace = ""
-	}
-	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{gv})
-	if namespace == "" {
-		mapper.Add(gvk, meta.RESTScopeRoot)
-	} else {
-		mapper.Add(gvk, meta.RESTScopeNamespace)
-	}
-
-	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-	if err != nil {
-		reqLogger.Error(err, "Failed to create REST mapping for access check")
-		return false, fmt.Errorf("failed to create REST mapping for access check: %w", err)
-	}
-
-	gvr := &mapping.Resource
-
+func (r *AuthenticationReconciler) hasAPIAccess(ctx context.Context, namespace string, group string, resource string, verbs []string) (hasAccess bool, err error) {
+	reqLogger := logf.FromContext(ctx).V(1).WithValues("namespace", namespace, "group", group, "resource", resource, "verbs", verbs)
 	for _, verb := range verbs {
 		ssar := &authorizationv1.SelfSubjectAccessReview{
 			Spec: authorizationv1.SelfSubjectAccessReviewSpec{
 				ResourceAttributes: &authorizationv1.ResourceAttributes{
 					Namespace: namespace,
 					Verb:      verb,
-					Group:     gvr.Group,
-					Resource:  gvr.Resource,
+					Group:     group,
+					Resource:  resource,
 				},
 			},
 		}
+		reqLogger.Info("Creating SSAR", "namespace", namespace, "verb", verb, "group", group, "resource", resource)
 		if err = r.Create(ctx, ssar); err != nil {
 			reqLogger.Error(err, "Failed to make access check query")
 			return false, fmt.Errorf("failed to make access check query: %w", err)
 		}
 		if !ssar.Status.Allowed {
-			reqLogger.Info("Operator ServiceAccount is not authorized")
+			reqLogger.Info("Operator ServiceAccount is not authorized", "allowed", ssar.Status.Allowed, "denied", ssar.Status.Denied, "reason", ssar.Status.Reason)
 			return
 		}
 	}

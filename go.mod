@@ -1,9 +1,8 @@
 module github.com/IBM/ibm-iam-operator
 
-go 1.23
+go 1.23.5
 
 require (
-	github.com/go-logr/logr v1.2.4
 	github.com/google/uuid v1.6.0
 	github.com/ibm/ibm-cert-manager-operator v0.0.0-20220602233809-3a62073266c7
 	github.com/jackc/pgx/v5 v5.5.4
@@ -13,7 +12,6 @@ require (
 	github.com/openshift/api v0.0.0-20231003083825-c3f7566f6ef6
 	github.com/zach-klippenstein/goregen v0.0.0-20160303162051-795b5e3961ea
 	go.mongodb.org/mongo-driver v1.14.0
-	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.28.2
 	k8s.io/apimachinery v0.28.2
 	k8s.io/client-go v0.28.1
@@ -29,6 +27,7 @@ require (
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
+	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/zapr v1.2.4 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
@@ -83,6 +82,7 @@ require (
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.28.1 // indirect
 	k8s.io/component-base v0.28.1 // indirect

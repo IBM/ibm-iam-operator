@@ -21,7 +21,10 @@
 BUILD_LOCALLY ?= 1
 
 # The namespace that operator will be deployed in
-NAMESPACE=ibm-common-services
+CONTROL_NS ?= ibm-common-services
+DATA_NS ?= $(CONTROL_NS)
+WATCH_NS ?= $(DATA_NS)
+
 GIT_COMMIT_ID=$(shell git rev-parse --short HEAD)
 GIT_REMOTE_URL=$(shell git config --get remote.origin.url)
 IMAGE_BUILD_OPTS=--build-arg "VCS_REF=$(GIT_COMMIT_ID)" --build-arg "VCS_URL=$(GIT_REMOTE_URL)" --build-arg "IMG_VERSION=$(VERSION)" --build-arg "IMG_RELEASE=$(shell date +%s)"
@@ -168,7 +171,7 @@ KUSTOMIZE_VERSION ?= v5.4.3
 CONTROLLER_TOOLS_VERSION ?= v0.16.3
 OPERATOR_SDK_VERSION ?= v1.37.0
 YQ_VERSION ?= v4.44.3
-GO_VERSION ?= 1.23.1
+GO_VERSION ?= 1.23.5
 
 # This pinned version of go has its version pinned to its name, so order of operations is inverted here.
 GO ?= $(LOCALBIN)/go$(GO_VERSION)
@@ -362,7 +365,6 @@ bundle-render: ## Render the bundle contents into the local FBC index.
 	./hack/bundle-render $(IMG).v$(BUNDLE_VERSION) $(BUNDLE_IMG)
 
 TARGET_ARCH=$(LOCAL_ARCH)
-
 build-image: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator manager image
 	@echo "Building manager binary for linux/$(TARGET_ARCH)"
 	@CGO_ENABLED=0 GOOS=linux GOARCH=$(TARGET_ARCH) $(GO) build -a -o build/_output/bin/manager main.go
@@ -394,8 +396,8 @@ images: $(CONFIG_DOCKER_TARGET)  ## Build the multi-arch manifest.
 
 ##@ Deployment
 
-ifndef ignore-not-found
-  ignore-not-found = false
+ifndef IGNORE_NOT_FOUND
+  IGNORE_NOT_FOUND = false
 endif
 
 .PHONY: install
@@ -404,18 +406,23 @@ install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~
 
 .PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/crd | kubectl delete --ignore-not-found=$(IGNORE_NOT_FOUND) -f -
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | kubectl apply -f -
-	- oc apply -f config/samples/bases/operator_v1alpha1_authentication.yaml -n ${NAMESPACE}
+	kubectl get namespace $(CONTROL_NS) || kubectl create namespace $(CONTROL_NS)
+	kubectl get namespace $(DATA_NS) || kubectl create namespace $(DATA_NS)
+	cd config/manager/overlays/$(MODE) && $(KUSTOMIZE) edit set image controller=$(IMAGE_TAG_BASE):$(VERSION)
+	#@ 
+	WATCH_NS=$(WATCH_NS) $(YQ) -i 'with(.[] | select(.value.name == "WATCH_NAMESPACE") ; .value.value |= env(WATCH_NS))' \
+		config/manager/overlays/$(MODE)/image_env_vars_patch.yaml
+	$(KUSTOMIZE) build config/default/overlays/$(MODE) | kubectl apply -n $(CONTROL_NS) -f -
+	$(KUSTOMIZE) build config/samples/overlays/$(MODE) | kubectl apply -n $(DATA_NS) -f -
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	- oc delete -f config/samples/bases/operator_v1alpha1_authentication.yaml -n ${NAMESPACE}
-	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/samples/overlays/$(MODE) | kubectl delete --ignore-not-found=$(IGNORE_NOT_FOUND) -n $(DATA_NS) -f -
+	$(KUSTOMIZE) build config/default/overlays/$(MODE) | kubectl delete --ignore-not-found=$(IGNORE_NOT_FOUND) -n $(CONTROL_NS) -f -
 
 # A comma-separated list of bundle images (e.g. make catalog-build BUNDLE_IMGS=example.com/operator-bundle:v0.1.0,example.com/operator-bundle:v0.2.0).
 # These images MUST exist in a registry and be pull-able.

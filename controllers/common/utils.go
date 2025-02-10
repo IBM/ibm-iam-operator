@@ -188,6 +188,11 @@ func ClusterHasZenExtensionGroupVersion(dc *discovery.DiscoveryClient) (found bo
 	return
 }
 
+func ClusterHasOperandRequestAPIResource(dc *discovery.DiscoveryClient) (found bool) {
+	found, _ = clusterHasAPIResource(dc, operatorv1alpha1.GroupVersion, "operandrequests")
+	return
+}
+
 func ClusterHasCertificateV1Alpha1(dc *discovery.DiscoveryClient) (found bool) {
 	found, _ = clusterHasGroupVersion(dc, schema.GroupVersion{
 		Group:   "certmanager.k8s.io",

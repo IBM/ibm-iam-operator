@@ -472,7 +472,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 						},
 					},
 					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret),
-					Containers:     buildContainers(instance, authServiceImage),
+					Containers:     buildContainers(instance, authServiceImage, icpConsoleURL),
 					InitContainers: buildInitContainers(initContainerImage),
 				},
 			},

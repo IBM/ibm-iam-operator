@@ -90,9 +90,9 @@ func PlanMigrations(ctx context.Context, to, from dbconn.DBConn) (mq *migration.
 			Build())
 	}
 
-	if _, ok := changelogs[v1schema.AlterUsersAttributesTable.ID]; !ok {
-		reqLogger.Info("Adding migration", "migrationName", v1schema.AlterUsersAttributesTable.Name)
-		*mq = append(*mq, migration.FromMigration(v1schema.AlterUsersAttributesTable).
+	if _, ok := changelogs[v1schema.AlterUsersAttributesUniqueAndCascadeDeleteConstraint.ID]; !ok {
+		reqLogger.Info("Adding migration", "migrationName", v1schema.AlterUsersAttributesUniqueAndCascadeDeleteConstraint.Name)
+		*mq = append(*mq, migration.FromMigration(v1schema.AlterUsersAttributesUniqueAndCascadeDeleteConstraint).
 			To(to).
 			Build())
 	}

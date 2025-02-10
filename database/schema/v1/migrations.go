@@ -31,7 +31,7 @@ func AllMigrations() []*migration.Migration {
 		MongoToEDBv1,
 		IncreaseOIDCUsernameSize,
 		IncreaseTokenstringSize,
-		AlterUsersAttributesTable,
+		AlterUsersAttributesUniqueAndCascadeDeleteConstraint,
 	}
 }
 
@@ -69,10 +69,10 @@ var IncreaseTokenstringSize *migration.Migration = migration.NewMigration().
 	Dependencies([]*migration.Migration{InitOperandSchemas, CreateMetadataSchema}).
 	Build()
 
-var AlterUsersAttributesTable *migration.Migration = migration.NewMigration().
-	Name("AlterUsersAttributesUniqueConstraints").
+var AlterUsersAttributesUniqueAndCascadeDeleteConstraint *migration.Migration = migration.NewMigration().
+	Name("AlterUsersAttributesUniqueAndCascadeDeleteConstraint").
 	ID(5).
-	RunFunc(&alterUsersAttributesUniqueConstraints).
+	RunFunc(&alterUsersAttributesUniqueAndCascadeDeleteConstraint).
 	Dependencies([]*migration.Migration{InitOperandSchemas, CreateMetadataSchema}).
 	Build()
 
@@ -106,7 +106,7 @@ var initOperandSchemasFunc migration.MigrationFunc = func(ctx context.Context, t
 	return
 }
 
-var alterUsersAttributesUniqueConstraints migration.MigrationFunc = func(ctx context.Context, to, from dbconn.DBConn) (err error) {
+var alterUsersAttributesUniqueAndCascadeDeleteConstraint migration.MigrationFunc = func(ctx context.Context, to, from dbconn.DBConn) (err error) {
 	reqLogger := logf.FromContext(ctx)
 	postgres, ok := to.(*dbconn.PostgresDB)
 	if !ok {
@@ -124,6 +124,14 @@ var alterUsersAttributesUniqueConstraints migration.MigrationFunc = func(ctx con
 	}
 	defer tx.Rollback(ctx)
 	_, err = tx.Exec(ctx, "ALTER TABLE platformdb.users_attributes ADD CONSTRAINT users_attributes_uniqueness UNIQUE (user_uid,name);")
+	if err != nil {
+		return
+	}
+	_, err = tx.Exec(ctx, "ALTER TABLE platformdb.users_attributes DROP CONSTRAINT fk_useratt_fk;")
+	if err != nil {
+		return
+	}
+	_, err = tx.Exec(ctx, "ALTER TABLE platformdb.users_attributes ADD CONSTRAINT fk_useratt_fk FOREIGN KEY (user_uid) REFERENCES platformdb.users (uid) ON DELETE CASCADE;")
 	if err != nil {
 		return
 	}

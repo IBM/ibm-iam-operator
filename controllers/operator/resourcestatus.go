@@ -21,6 +21,7 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	zenv1 "github.com/IBM/ibm-iam-operator/apis/zen.cpd.ibm.com/v1"
+	ctrlcommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -286,14 +287,14 @@ func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, 
 		f: getAllRouteStatus,
 	}
 
-	if authentication.Spec.Config.ZenFrontDoor {
+	if authentication.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
 		reqLogger.Info("Zen Front Door is enabled; will check ZenExtension status and skip checking Route status")
 		statusRetrievals = append(statusRetrievals, zenExtensionStatusRetrieval)
-	} else if r.RunningOnOpenShiftCluster() {
+	} else if ctrlcommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient) {
 		reqLogger.Info("Is running on OpenShift; will check Route status")
 		statusRetrievals = append(statusRetrievals, routeStatusRetrieval)
 	} else {
-		reqLogger.Info("Is not running on OpenShift; will skip checking Route status")
+		reqLogger.Info("ZenExtensions and Routes are not available; assuming ingress will be configured manually")
 	}
 
 	kind := "Authentication"

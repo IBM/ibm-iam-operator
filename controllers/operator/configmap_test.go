@@ -253,6 +253,7 @@ var _ = Describe("ConfigMap handling", func() {
 					"im_idprovider_endpoint":    "https://platform-identity-provider.different-ns.svc:4300",
 					"proxy_address":             "cp-console-different-ns.example.ibm.com",
 					"cluster_address":           "cp-console-different-ns.example.ibm.com",
+					"cluster_address_auth":      "cp-console-different-ns.example.ibm.com",
 					"cluster_endpoint":          "https://cp-console-different-ns.example.ibm.com",
 					"cluster_name":              "mycluster",
 					"cluster_router_http_port":  "80",
@@ -268,6 +269,56 @@ var _ = Describe("ConfigMap handling", func() {
 			err = r.Get(ctx, cmKey, observed)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(observed.Data).ToNot(BeNil())
+			Expect(observed.Labels).ToNot(BeNil())
+			Expect(observed.Labels["app"]).To(Equal("auth-idp"))
+			Expect(observed.OwnerReferences).ToNot(BeEmpty())
+			Expect(*observed.OwnerReferences[0].Controller).To(BeTrue())
+		})
+
+		It("updates ibmcloud-cluster-info when cluster_address_auth is not set", func() {
+			globalConfigMap.Data["domain_name"] = "example1.ibm.com"
+			Expect(r.Update(ctx, globalConfigMap)).To(Succeed())
+			ibmcloudClusterInfo = &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ibmcloud-cluster-info",
+					Namespace: "data-ns",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion:         "operator.ibm.com/v1alpha1",
+							Kind:               "Authentication",
+							Name:               "example-authentication",
+							Controller:         ptr.To[bool](true),
+							BlockOwnerDeletion: ptr.To[bool](true),
+						},
+					},
+					Labels: map[string]string{
+						"app": "auth-idp",
+					},
+				},
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "ConfigMap",
+					APIVersion: "v1",
+				},
+				Data: map[string]string{
+					"im_idprovider_endpoint":    "https://platform-identity-provider.data-ns.svc:4300",
+					"proxy_address":             "cp-console-data-ns.example.ibm.com",
+					"cluster_address":           "cp-console-data-ns.example.ibm.com",
+					"cluster_endpoint":          "https://cp-console-data-ns.example.ibm.com",
+					"cluster_name":              "mycluster",
+					"cluster_router_http_port":  "80",
+					"cluster_router_https_port": "443",
+					"im_idmgmt_endpoint":        "https://platform-identity-management.data-ns.svc:4500",
+				},
+			}
+			Expect(r.Create(ctx, ibmcloudClusterInfo)).To(Succeed())
+			result, err := r.handleIBMCloudClusterInfo(ctx, authCR, ibmcloudClusterInfo)
+			cmKey := types.NamespacedName{Name: "ibmcloud-cluster-info", Namespace: "data-ns"}
+			testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
+			observed := &corev1.ConfigMap{}
+			err = r.Get(ctx, cmKey, observed)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(observed.Data).ToNot(BeNil())
+			Expect(observed.Data["cluster_address_auth"]).To(Equal("cp-console-data-ns.example1.ibm.com"))
 			Expect(observed.Labels).ToNot(BeNil())
 			Expect(observed.Labels["app"]).To(Equal("auth-idp"))
 			Expect(observed.OwnerReferences).ToNot(BeEmpty())

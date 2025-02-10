@@ -33,13 +33,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	certmgrv1 "github.com/IBM/ibm-iam-operator/apis/certmanager/v1"
 	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/apis/oidc.security/v1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	zenv1 "github.com/IBM/ibm-iam-operator/apis/zen.cpd.ibm.com/v1"
 	controllercommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	oidcsecuritycontrollers "github.com/IBM/ibm-iam-operator/controllers/oidc.security"
 	operatorcontrollers "github.com/IBM/ibm-iam-operator/controllers/operator"
-	certmgrv1 "github.com/ibm/ibm-cert-manager-operator/apis/cert-manager/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	discovery "k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -54,7 +54,6 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(oidcsecurityv1.AddToScheme(scheme))
-	utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(certmgrv1.AddToScheme(scheme))
 	utilruntime.Must(zenv1.AddToScheme(scheme))
 	// Add the Route scheme if found on the cluster
@@ -67,6 +66,13 @@ func init() {
 	if err != nil {
 		return
 	}
+
+	if controllercommon.ClusterHasOperandRequestAPIResource(dc) {
+		utilruntime.Must(operatorv1alpha1.AddODLMEnabledToScheme(scheme))
+	} else {
+		utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
+	}
+
 	if controllercommon.ClusterHasRouteGroupVersion(dc) {
 		utilruntime.Must(routev1.AddToScheme(scheme))
 	}

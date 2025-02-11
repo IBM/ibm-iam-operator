@@ -143,8 +143,11 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 		if val, ok := currentDeployment.Spec.Template.ObjectMeta.Annotations[bindInfoAnnotation]; ok {
 			authDep.Spec.Template.ObjectMeta.Annotations[bindInfoAnnotation] = val
 		}
-		metaLabels := ctrlCommon.MergeMap(map[string]string{"operator.ibm.com/bindinfoRefresh": "enabled"}, currentDeployment.Labels)
-		metaAnnotations := ctrlCommon.MergeMap(ctrlCommon.GetBindInfoRefreshMap(), currentDeployment.Annotations)
+		metaLabels := ctrlCommon.MergeMaps(nil,
+			currentDeployment.Labels,
+			map[string]string{"operator.ibm.com/bindinfoRefresh": "enabled"},
+			ctrlCommon.GetCommonLabels())
+		metaAnnotations := ctrlCommon.MergeMaps(nil, currentDeployment.Annotations, ctrlCommon.GetBindInfoRefreshMap())
 		currentDeployment.Labels = metaLabels
 		currentDeployment.Annotations = metaAnnotations
 		currentDeployment.Spec = authDep.Spec
@@ -203,8 +206,12 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 		if val, ok := currentManagerDeployment.Spec.Template.ObjectMeta.Annotations[bindInfoAnnotation]; ok {
 			ocwDep.Spec.Template.ObjectMeta.Annotations[bindInfoAnnotation] = val
 		}
-		metaLabels := ctrlCommon.MergeMap(map[string]string{"operator.ibm.com/bindinfoRefresh": "enabled"}, currentManagerDeployment.Labels)
-		metaAnnotations := ctrlCommon.MergeMap(ctrlCommon.GetBindInfoRefreshMap(), currentManagerDeployment.Annotations)
+		metaLabels := ctrlCommon.MergeMaps(nil,
+			currentManagerDeployment.Labels,
+			map[string]string{"operator.ibm.com/bindinfoRefresh": "enabled"},
+			ctrlCommon.GetCommonLabels(),
+		)
+		metaAnnotations := ctrlCommon.MergeMaps(nil, currentManagerDeployment.Annotations, ctrlCommon.GetBindInfoRefreshMap())
 		currentManagerDeployment.Labels = metaLabels
 		currentManagerDeployment.Annotations = metaAnnotations
 		currentManagerDeployment.Spec = ocwDep.Spec
@@ -266,8 +273,11 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 		if val, ok := currentProviderDeployment.Spec.Template.ObjectMeta.Annotations[bindInfoAnnotation]; ok {
 			provDep.Spec.Template.ObjectMeta.Annotations[bindInfoAnnotation] = val
 		}
-		metaLabels := ctrlCommon.MergeMap(map[string]string{"operator.ibm.com/bindinfoRefresh": "enabled"}, currentProviderDeployment.Labels)
-		metaAnnotations := ctrlCommon.MergeMap(ctrlCommon.GetBindInfoRefreshMap(), currentProviderDeployment.Annotations)
+		metaLabels := ctrlCommon.MergeMaps(nil,
+			currentProviderDeployment.Labels,
+			map[string]string{"operator.ibm.com/bindinfoRefresh": "enabled"},
+			ctrlCommon.GetCommonLabels())
+		metaAnnotations := ctrlCommon.MergeMaps(nil, currentProviderDeployment.Annotations, ctrlCommon.GetBindInfoRefreshMap())
 		currentProviderDeployment.Labels = metaLabels
 		currentProviderDeployment.Annotations = metaAnnotations
 		currentProviderDeployment.Spec = provDep.Spec
@@ -329,8 +339,11 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
 
-	metaLabels := common.MergeMap(map[string]string{"app": deployment}, instance.Spec.Labels)
-	metaLabels = common.MergeMap(map[string]string{"operator.ibm.com/bindinfoRefresh": "enabled"}, metaLabels)
+	metaLabels := common.MergeMaps(nil,
+		instance.Spec.Labels,
+		map[string]string{"app": deployment},
+		ctrlCommon.GetCommonLabels(),
+		map[string]string{"operator.ibm.com/bindinfoRefresh": "enabled"})
 	podMetadataLabels := map[string]string{
 		"app":                        deployment,
 		"k8s-app":                    deployment,
@@ -338,7 +351,10 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 		"app.kubernetes.io/instance": "platform-auth-service",
 		"intent":                     "projected",
 	}
-	podLabels := common.MergeMap(podMetadataLabels, instance.Spec.Labels)
+	podLabels := common.MergeMaps(nil,
+		instance.Spec.Labels,
+		podMetadataLabels,
+		ctrlCommon.GetCommonLabels())
 
 	idpDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -489,8 +505,11 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
 
-	metaLabels := common.MergeMap(map[string]string{"app": deployment}, instance.Spec.Labels)
-	metaLabels = common.MergeMap(map[string]string{"operator.ibm.com/bindinfoRefresh": "enabled"}, metaLabels)
+	metaLabels := common.MergeMaps(nil,
+		instance.Spec.Labels,
+		map[string]string{"app": deployment},
+		map[string]string{"operator.ibm.com/bindinfoRefresh": "enabled"},
+		ctrlCommon.GetCommonLabels())
 	podMetadataLabels := map[string]string{
 		"app":                        deployment,
 		"k8s-app":                    deployment,
@@ -498,7 +517,7 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 		"app.kubernetes.io/instance": "platform-identity-provider",
 		"intent":                     "projected",
 	}
-	podLabels := common.MergeMap(podMetadataLabels, instance.Spec.Labels)
+	podLabels := common.MergeMaps(nil, instance.Spec.Labels, podMetadataLabels, ctrlCommon.GetCommonLabels())
 
 	idpDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -649,8 +668,11 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 	ldapCACert := instance.Spec.AuthService.LdapsCACert
 	routerCertSecret := instance.Spec.AuthService.RouterCertSecret
 
-	metaLabels := common.MergeMap(map[string]string{"app": deployment}, instance.Spec.Labels)
-	metaLabels = common.MergeMap(map[string]string{"operator.ibm.com/bindinfoRefresh": "enabled"}, metaLabels)
+	metaLabels := common.MergeMaps(nil,
+		instance.Spec.Labels,
+		map[string]string{"app": deployment},
+		map[string]string{"operator.ibm.com/bindinfoRefresh": "enabled"},
+		ctrlCommon.GetCommonLabels())
 	podMetadataLabels := map[string]string{
 		"app":                        deployment,
 		"k8s-app":                    deployment,
@@ -658,7 +680,7 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 		"app.kubernetes.io/instance": "platform-identity-management",
 		"intent":                     "projected",
 	}
-	podLabels := common.MergeMap(podMetadataLabels, instance.Spec.Labels)
+	podLabels := common.MergeMaps(nil, instance.Spec.Labels, podMetadataLabels, ctrlCommon.GetCommonLabels())
 
 	idpDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{

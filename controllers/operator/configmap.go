@@ -173,6 +173,7 @@ func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctr
 		{
 			Name:     "oauth-client-map",
 			generate: generateOAuthClientConfigMap,
+			update:   updateOAuthClientConfigMap,
 		},
 		{
 			Name:     "registration-script",
@@ -378,6 +379,23 @@ func (u *cmUpdater) CreateOrUpdate(ctx context.Context, cl client.Client, authCR
 	}
 
 	return subreconciler.RequeueWithDelay(defaultLowerWait)
+}
+
+func updateOAuthClientConfigMap(observed, generated *corev1.ConfigMap) (updated bool, err error) {
+	updateFns := []func(*corev1.ConfigMap, *corev1.ConfigMap) bool{
+		updatesValuesWhen(not(observedKeyValueSetTo("MASTER_IP", generated.Data["MASTER_IP"])),
+			"MASTER_IP",
+			"PROXY_IP",
+			"CLUSTER_CA_DOMAIN",
+		),
+		updatesValuesWhen(not(observedKeyValueSetTo("CLUSTER_NAME", generated.Data["CLUSTER_NAME"]))),
+	}
+
+	for _, update := range updateFns {
+		updated = update(observed, generated) || updated
+	}
+
+	return
 }
 
 func updatePlatformAuthIDP(observed, generated *corev1.ConfigMap) (updated bool, err error) {

@@ -7,6 +7,7 @@ metadata:
     app.kubernetes.io/instance: ibm-iam-operator
     app.kubernetes.io/managed-by: ibm-iam-operator
     app.kubernetes.io/name: ibm-iam-operator
+    component-id: {{ .Chart.Name }}
 rules:
 - apiGroups:
   - rbac.authorization.k8s.io

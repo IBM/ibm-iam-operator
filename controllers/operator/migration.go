@@ -209,11 +209,11 @@ func (r *AuthenticationReconciler) handleMongoDBCleanup(ctx context.Context, req
 			return subreconciler.RequeueWithError(err)
 		} else if objUpdated {
 			anyObjUpdated = true
-			reqLogger.Info("Object was finalized",
+			reqLogger.V(1).Info("Object was finalized",
 				"Object.Name", kvp.key.Name,
 				"Object.Namespace", kvp.key.Namespace)
 		} else {
-			reqLogger.Info("Object was not found",
+			reqLogger.V(1).Info("Object was not found",
 				"Object.Name", kvp.key.Name,
 				"Object.Namespace", kvp.key.Namespace)
 		}
@@ -547,6 +547,20 @@ func (r *AuthenticationReconciler) overrideMongoDBBootstrap(ctx context.Context,
 		return subreconciler.ContinueReconciling()
 	}
 
+	// find icp-mongodb-init
+	icpMongoDBInitCMKey := types.NamespacedName{Namespace: req.Namespace, Name: "icp-mongodb-init"}
+	icpMongoDBInitCM := &corev1.ConfigMap{}
+	reqLogger.V(1).Info("Get MongoDB bootstrap ConfigMap",
+		"ConfigMap.Name", icpMongoDBInitCMKey.Name,
+		"ConfigMap.Namespace", icpMongoDBInitCMKey.Namespace)
+	if err = r.Get(ctx, icpMongoDBInitCMKey, icpMongoDBInitCM); k8sErrors.IsNotFound(err) {
+		reqLogger.Info("No MongoDB bootstrap ConfigMap to patch; continuing")
+		return subreconciler.ContinueReconciling()
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to get MongoDB bootstrap ConfigMap")
+		return subreconciler.RequeueWithError(err)
+	}
+
 	// scale down MongoDB Operator
 	mongoDeployKey := types.NamespacedName{Namespace: os.Getenv("POD_NAMESPACE"), Name: "ibm-mongodb-operator"}
 	mongoDeploy := &appsv1.Deployment{}
@@ -563,11 +577,6 @@ func (r *AuthenticationReconciler) overrideMongoDBBootstrap(ctx context.Context,
 	}
 
 	// update icp-mongodb-init ConfigMap .data["on-start.sh"]
-	icpMongoDBInitCMKey := types.NamespacedName{Namespace: req.Namespace, Name: "icp-mongodb-init"}
-	icpMongoDBInitCM := &corev1.ConfigMap{}
-	if err = r.Get(ctx, icpMongoDBInitCMKey, icpMongoDBInitCM); err != nil {
-		return subreconciler.RequeueWithError(err)
-	}
 	currentOnStartScript := icpMongoDBInitCM.Data["on-start.sh"]
 	vals := struct{ Namespace string }{
 		Namespace: authCR.Namespace,
@@ -590,13 +599,16 @@ func (r *AuthenticationReconciler) overrideMongoDBBootstrap(ctx context.Context,
 	}
 
 	// update icp-mongodb StatefulSet .spec.template.metadata.labels
-
 	icpMongoDBStSKey := types.NamespacedName{Name: "icp-mongodb", Namespace: req.Namespace}
 	icpMongoDBStS := &appsv1.StatefulSet{}
-	if err = r.Get(ctx, icpMongoDBStSKey, icpMongoDBStS); err != nil {
+	if err = r.Get(ctx, icpMongoDBStSKey, icpMongoDBStS); k8sErrors.IsNotFound(err) {
+		reqLogger.Info("MongoDB StatefulSet not found; continuing")
+		return subreconciler.ContinueReconciling()
+	} else if err != nil {
 		reqLogger.Error(err, "Failed to get MongoDB StatefulSet")
 		return subreconciler.RequeueWithError(err)
 	}
+
 	if icpMongoDBStS.ObjectMeta.Labels["migrating"] != "true" {
 		icpMongoDBStS.ObjectMeta.Labels["migrating"] = "true"
 		icpMongoDBStS.Spec.Template.Labels["migrating"] = "true"
@@ -608,13 +620,6 @@ func (r *AuthenticationReconciler) overrideMongoDBBootstrap(ctx context.Context,
 		return subreconciler.RequeueWithDelay(time.Second * 3)
 	}
 
-	if err = r.Get(ctx, icpMongoDBStSKey, icpMongoDBStS); k8sErrors.IsNotFound(err) {
-		reqLogger.Info("MongoDB StatefulSet no longer found; skipping wait for Pods")
-		return subreconciler.ContinueReconciling()
-	} else if err != nil {
-		reqLogger.Error(err, "Failed to get MongoDB StatefulSet while waiting for Pods")
-		return subreconciler.RequeueWithError(err)
-	}
 	if icpMongoDBStS.Status.UpdatedReplicas == *icpMongoDBStS.Spec.Replicas &&
 		icpMongoDBStS.Status.AvailableReplicas == *icpMongoDBStS.Spec.Replicas {
 		reqLogger.Info("MongoDB StatefulSet Pods have been updated; proceeding")

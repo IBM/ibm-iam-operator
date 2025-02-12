@@ -1,0 +1,8 @@
+apiVersion: v2
+name: ibm-iam-operator-cluster-scoped-resources
+description: Cluster-scoped Resources for IBM IAM Operator
+type: application
+version: "4.10.0"
+appVersion: "4.10.0"
+sources:
+  - https://github.com/IBM/ibm-iam-operator/

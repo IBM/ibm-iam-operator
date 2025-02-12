@@ -1,0 +1,18 @@
+# imagePullSecret: ibm-entitlement-key
+imagePullPolicy: IfNotPresent
+# imagePullPrefix: icr.io
+cpfs:
+  imageRegistryNamespaceOperator: cpopen
+  imageRegistryNamespaceOperand: cpopen/cpfs
+
+operator:
+  imageTag: "4.10.0" 
+operands:
+  platformIdentityProvider:
+    imageTag: "4.10.0"
+  platformAuthService:
+    imageTag: "4.10.0"
+  platformIdentityManagement:
+    imageTag: "4.10.0"
+  imInitContainer:
+    imageTag: "4.10.0"

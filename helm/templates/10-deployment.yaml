@@ -1,0 +1,290 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/instance: ibm-iam-operator
+    app.kubernetes.io/managed-by: ibm-iam-operator
+    app.kubernetes.io/name: ibm-iam-operator
+    productName: IBM_Cloud_Platform_Common_Services
+  annotations:
+    alm-examples: |
+      [
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "Authentication",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/instance": "ibm-iam-operator",
+              "app.kubernetes.io/managed-by": "ibm-iam-operator",
+              "app.kubernetes.io/name": "ibm-iam-operator"
+            },
+            "name": "example-authentication"
+          },
+          "spec": {
+            "auditService": {
+              "imageName": "auditService no longer used - ignore",
+              "imageRegistry": "auditService no longer used - ignore",
+              "imageTag": "auditService no longer used - ignore"
+            },
+            "authService": {
+              "imageName": "icp-platform-auth",
+              "imageRegistry": "icr.io/cpopen/cpfs",
+              "imageTag": "4.10.0",
+              "ldapsCACert": "platform-auth-ldaps-ca-cert",
+              "resources": {
+                "limits": {
+                  "cpu": "1000m",
+                  "ephemeral-storage": "650Mi",
+                  "memory": "1Gi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "ephemeral-storage": "400Mi",
+                  "memory": "350Mi"
+                }
+              },
+              "routerCertSecret": "saml-auth-secret"
+            },
+            "clientRegistration": {
+              "imageName": "im-initcontainer",
+              "imageRegistry": "icr.io/cpopen/cpfs",
+              "imageTag": "4.10.0",
+              "resources": {
+                "limits": {
+                  "cpu": "1000m",
+                  "memory": "1Gi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "ephemeral-storage": "158Mi",
+                  "memory": "128Mi"
+                }
+              }
+            },
+            "config": {
+              "authUniqueHosts": "internal-ip1 internal-ip2 mycluster.icp",
+              "bootstrapUserId": "kubeadmin",
+              "claimsMap": "name=\"givenName\" family_name=\"givenName\" given_name=\"givenName\" preferred_username=\"displayName\" display_name=\"displayName\"",
+              "claimsSupported": "name,family_name,display_name,given_name,preferred_username",
+              "clusterCADomain": "mycluster.icp",
+              "clusterExternalAddress": "10.0.0.1",
+              "clusterInternalAddress": "10.0.0.1",
+              "clusterName": "mycluster",
+              "defaultAdminPassword": "password",
+              "defaultAdminUser": "cpadmin",
+              "defaultLogin": "",
+              "enableImpersonation": false,
+              "fipsEnabled": true,
+              "ibmCloudSaas": false,
+              "icpPort": 8443,
+              "installType": "fresh",
+              "isOpenshiftEnv": true,
+              "nonceEnabled": true,
+              "oidcIssuerURL": "https://127.0.0.1:443/idauth/oidc/endpoint/OP",
+              "openshiftPort": 443,
+              "preferredLogin": "",
+              "providerIssuerURL": "",
+              "roksEnabled": true,
+              "roksURL": "https://roks.domain.name:443",
+              "roksUserPrefix": "changeme",
+              "saasClientRedirectUrl": "",
+              "scimAdminPassword": "scimpassword",
+              "scimAdminUser": "scimadmin",
+              "scopeClaim": "profile=\"name,family_name,display_name,given_name,preferred_username\"",
+              "wlpClientID": "4444be3a738841016ab76d71b650e836",
+              "wlpClientRegistrationSecret": "f1362ca4d20b8389af2d1ea68042c9af",
+              "wlpClientSecret": "aa73bf39752053bf723d1143fb4cf8a2",
+              "xframeDomain": "",
+              "zenFrontDoor": false
+            },
+            "identityManager": {
+              "imageName": "icp-identity-manager",
+              "imageRegistry": "icr.io/cpopen/cpfs",
+              "imageTag": "4.10.0",
+              "masterNodesList": "10.0.0.1",
+              "resources": {
+                "limits": {
+                  "cpu": "1000m",
+                  "ephemeral-storage": "550Mi",
+                  "memory": "1Gi"
+                },
+                "requests": {
+                  "cpu": "50m",
+                  "ephemeral-storage": "300Mi",
+                  "memory": "150Mi"
+                }
+              }
+            },
+            "identityProvider": {
+              "imageName": "icp-identity-provider",
+              "imageRegistry": "icr.io/cpopen/cpfs",
+              "imageTag": "4.10.0",
+              "resources": {
+                "limits": {
+                  "cpu": "1000m",
+                  "ephemeral-storage": "550Mi",
+                  "memory": "1Gi"
+                },
+                "requests": {
+                  "cpu": "50m",
+                  "ephemeral-storage": "300Mi",
+                  "memory": "150Mi"
+                }
+              }
+            },
+            "initMongodb": {
+              "imageName": "im-initcontainer",
+              "imageRegistry": "icr.io/cpopen/cpfs",
+              "imageTag": "4.10.0",
+              "resources": {
+                "limits": {
+                  "cpu": "100m",
+                  "memory": "128Mi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "ephemeral-storage": "178Mi",
+                  "memory": "128Mi"
+                }
+              }
+            },
+            "operatorVersion": "0.14.1",
+            "replicas": 1
+          }
+        },
+        {
+          "apiVersion": "operator.ibm.com/v1alpha1",
+          "kind": "OperandBindInfo",
+          "metadata": {
+            "name": "ibm-iam-bindinfo"
+          },
+          "spec": {
+            "operand": "ibm-im-operator",
+            "registry": "common-service",
+            "description": "Binding information that should be accessible to iam adopters",
+            "bindings": {
+              "public-oidc-creds": {
+                "secret": "platform-oidc-credentials"
+              },
+              "public-auth-creds": {
+                "secret": "platform-auth-idp-credentials"
+              },
+              "public-scim-creds": {
+                "secret": "platform-auth-scim-credentials"
+              },
+              "public-auth-cert": {
+                "secret": "platform-auth-secret"
+              },
+              "public-cam-secret": {
+                "secret": "oauth-client-secret"
+              },
+              "public-cam-map": {
+                "configmap": "oauth-client-map"
+              },
+              "public-auth-config": {
+                "configmap": "platform-auth-idp"
+              },
+              "public-ibmcloud-config": {
+                "configmap": "ibmcloud-cluster-info"
+              },
+              "public-ibmcloudca-secret": {
+                "secret": "ibmcloud-cluster-ca-cert"
+              }
+            }
+          }
+        }
+      ]
+    packageName: ibm-iam-operator
+  name: ibm-iam-operator
+  namespace: {{.Values.global.operatorNamespace}}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: ibm-iam-operator
+  template:
+    metadata:
+      annotations:
+        productID: 068a62892a1e4db39641342e592daa25
+        productMetric: FREE
+        productName: IBM Cloud Platform Common Services
+      labels:
+        app.kubernetes.io/instance: ibm-iam-operator
+        app.kubernetes.io/managed-by: ibm-iam-operator
+        app.kubernetes.io/name: ibm-iam-operator
+        intent: projected
+        name: ibm-iam-operator
+        productName: IBM_Cloud_Platform_Common_Services
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+                - ppc64le
+                - s390x
+      containers:
+      - command:
+        - ibm-iam-operator
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: OPERATOR_NAME
+          value: ibm-iam-operator
+        - name: ROUTE_HTTP_PORT
+          value: ""
+        - name: ROUTE_HTTPS_PORT
+          value: ""
+        - name: cluster_name
+          value: ""
+        - name: ICP_PLATFORM_AUTH_IMAGE
+          value: "{{ .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperand }}/icp-platform-auth:{{ .Values.operands.platformAuthService.imageTag }}"
+        - name: ICP_IDENTITY_PROVIDER_IMAGE
+          value: "{{ .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperand }}/icp-identity-provider:{{ .Values.operands.platformIdentityProvider.imageTag }}"
+        - name: ICP_IDENTITY_MANAGER_IMAGE
+          value: "{{ .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperand }}/icp-identity-manager:{{ .Values.operands.platformIdentityManagement.imageTag }}"
+        - name: IM_INITCONTAINER_IMAGE
+          value: "{{ .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperand }}/im-initcontainer:{{ .Values.operands.imInitContainer.imageTag }}"
+        - name: WATCH_NAMESPACE
+          valueFrom:
+            configMapKeyRef:
+              name: namespace-scope
+              key: namespaces
+        - name: IMAGE_PULL_SECRET
+          value: {{ .Values.global.imagePullSecret }}
+        image: "{{ .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperator }}/ibm-iam-operator:{{ .Values.operator.imageTag }}"
+        imagePullPolicy: "{{ .Values.imagePullPolicy }}"
+        name: ibm-iam-operator
+        resources:
+          limits:
+            cpu: 25m
+            memory: 320Mi
+          requests:
+            cpu: 20m
+            ephemeral-storage: 256Mi
+            memory: 80Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+      imagePullSecrets:
+      - name: "{{ .Values.global.imagePullSecret }}"
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: ibm-iam-operator

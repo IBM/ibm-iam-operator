@@ -1,3 +1,5 @@
+{{- range $i := .Values.global.tetheredNamespace }}
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -7,7 +9,7 @@ metadata:
     app.kubernetes.io/name: ibm-iam-operator
     component-id: {{ .Chart.Name }}
   name: ibm-iam-operator
-  namespace: {{.Values.global.operatorNamespace}}
+  namespace: {{ $i }}
 rules:
 - apiGroups:
   - route.openshift.io
@@ -245,3 +247,4 @@ rules:
   - patch
   - update
   - watch
+{{- end }}

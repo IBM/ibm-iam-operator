@@ -4,6 +4,10 @@ imagePullPolicy: IfNotPresent
 cpfs:
   imageRegistryNamespaceOperator: cpopen
   imageRegistryNamespaceOperand: cpopen/cpfs
+global:
+  operatorNamespace: operators
+  imagePullPrefix: icr.io
+  tetheredNamespace: []
 
 operator:
   imageTag: "4.10.0" 

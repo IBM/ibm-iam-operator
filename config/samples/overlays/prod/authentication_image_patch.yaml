@@ -1,0 +1,20 @@
+apiVersion: operator.ibm.com/v1alpha1
+kind: Authentication
+metadata:
+  name: example-authentication
+spec:
+  authService:
+    imageRegistry: icr.io/cpopen/cpfs
+    imageTag: 4.10.0
+  clientRegistration:
+    imageRegistry: icr.io/cpopen/cpfs
+    imageTag: 4.10.0
+  identityManager:
+    imageRegistry: icr.io/cpopen/cpfs
+    imageTag: 4.10.0
+  identityProvider:
+    imageRegistry: icr.io/cpopen/cpfs
+    imageTag: 4.10.0
+  initMongodb:
+    imageRegistry: icr.io/cpopen/cpfs
+    imageTag: 4.10.0

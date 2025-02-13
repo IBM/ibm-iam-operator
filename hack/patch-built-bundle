@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+
+# Hack to add in the OperandRequest/OperandBindInfo after bundle validation; bundle validation will fail if they are
+# included in the examples beforehand. alm-examples is a JSON string, which makes it somewhat awkward to deal with in
+# kustomize. Instead, use yq to get the Authentication CR example as a JSON file, merge that example with the
+# OperandRequest and OperandBindInfo examples, and set alm-examples to that merged result.
+
+set -e -u -o pipefail
+
+REPO_ROOT=""
+if command -v realpath &>/dev/null
+then
+  REPO_ROOT="$(realpath $(dirname $0)/..)"
+else
+  REPO_ROOT="$(dirname $0/..)"
+fi
+export LOCALBIN="${REPO_ROOT}/bin"
+YQ="${LOCALBIN}/yq"
+
+# Path to the bundle that needs patching
+POSTFIX="${1:-}"
+BUNDLE_DIR_PATH="${REPO_ROOT}/bundle"
+if [[ -n "${POSTFIX:-}" ]]
+then
+  BUNDLE_DIR_PATH="${BUNDLE_DIR_PATH}-${POSTFIX}"
+fi
+
+CSV_PATH="${BUNDLE_DIR_PATH}/manifests/ibm-iam-operator.clusterserviceversion.yaml"
+
+${YQ} '.metadata.annotations.alm-examples' "${CSV_PATH}" > internal-crs.json
+${YQ} '. += load("./hack/external-crs.json")' internal-crs.json > combined-crs.json
+${YQ} -i '.metadata.annotations.alm-examples = load_str("combined-crs.json")' "${CSV_PATH}"
+# Also need to replace the WATCH_NAMESPACE value that operator-sdk seems to overwrite with a reference to the
+# namespace-scope ConfigMap
+${YQ} -i '.spec.install.spec.deployments[].spec.template.spec.containers[].env |= map(select(.name == "WATCH_NAMESPACE").valueFrom=load("./hack/manager_patch.yaml"))' "${CSV_PATH}"
+# Trying to include relatedImages in the config base leads to it being clobbered by operator-sdk apparently
+${YQ} -i '.spec.relatedImages = load("./hack/relatedimages.yaml")' "${CSV_PATH}"
+rm combined-crs.json internal-crs.json

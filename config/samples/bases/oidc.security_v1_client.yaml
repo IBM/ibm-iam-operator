@@ -1,0 +1,12 @@
+apiVersion: oidc.security.ibm.com/v1
+kind: Client
+metadata:
+  labels:
+    app.kubernetes.io/name: client
+    app.kubernetes.io/instance: client-sample
+    app.kubernetes.io/part-of: ibm-iam-operator-sdkv1
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: ibm-iam-operator-sdkv1
+  name: client-sample
+spec:
+  # TODO(user): Add fields here

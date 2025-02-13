@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#
+# create_dev_overlays creates the kustomize overlays used for creating early Operator bundles in a way that avoids
+# version controlling two separate kustomize overlays.
+
+set -e -u -o pipefail
+
+REPO_ROOT=""
+if command -v realpath &>/dev/null
+then
+  REPO_ROOT="$(realpath $(dirname $0)/..)"
+else
+  REPO_ROOT="$(dirname $0/..)"
+fi
+export LOCALBIN="${REPO_ROOT}/bin"
+
+prod_config_dirs=( $(find "${REPO_ROOT}/config" -type d -name "prod") ) 
+
+echo "Creating any missing dev overlay directories"
+for prod_config_dir in "${prod_config_dirs[@]}"
+do
+  dev_config_dir="$(dirname "${prod_config_dir}")/dev"
+  if [[ -d "${dev_config_dir}" ]]
+  then
+    echo "Overlay directory \"${dev_config_dir}\" already present, skipping"
+    continue
+  fi
+  cp -r "${prod_config_dir}" "${dev_config_dir}"
+  sed -i'.bk' -e 's%/prod%/dev%' "${dev_config_dir}/kustomization.yaml"
+  rm "${dev_config_dir}/kustomization.yaml.bk"
+  echo "Created dev overlay \"${dev_config_dir}/kustomization.yaml\""
+done
+

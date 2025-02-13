@@ -1,0 +1,118 @@
+---
+apiVersion: operator.ibm.com/v1alpha1
+kind: Authentication
+metadata:
+  labels:
+    app.kubernetes.io/instance: ibm-iam-operator
+    app.kubernetes.io/managed-by: ibm-iam-operator
+    app.kubernetes.io/name: ibm-iam-operator
+  name: example-authentication
+spec:
+  auditService:
+    imageName: auditService no longer used - ignore
+    imageRegistry: auditService no longer used - ignore
+    imageTag: auditService no longer used - ignore
+  authService:
+    imageName: icp-platform-auth
+    imageRegistry: quay.io/opencloudio
+    imageTag: 0.0.0
+    ldapsCACert: platform-auth-ldaps-ca-cert
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+        ephemeral-storage: 650Mi
+      requests:
+        cpu: 100m
+        memory: 350Mi
+        ephemeral-storage: 400Mi
+    routerCertSecret: saml-auth-secret
+  clientRegistration:
+    imageName: im-initcontainer
+    imageRegistry: quay.io/opencloudio
+    imageTag: 0.0.0
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+        ephemeral-storage: 158Mi
+  config:
+    authUniqueHosts: internal-ip1 internal-ip2 mycluster.icp
+    clusterCADomain: mycluster.icp
+    clusterExternalAddress: 10.0.0.1
+    clusterInternalAddress: 10.0.0.1
+    clusterName: mycluster
+    defaultAdminPassword: password
+    defaultAdminUser: cpadmin
+    scimAdminPassword: scimpassword
+    scimAdminUser: scimadmin
+    enableImpersonation: false
+    fipsEnabled: true
+    ibmCloudSaas: false
+    icpPort: 8443
+    installType: fresh
+    isOpenshiftEnv: true
+    nonceEnabled: true
+    xframeDomain: ''
+    zenFrontDoor: false
+    preferredLogin: ''
+    defaultLogin: ''
+    bootstrapUserId: kubeadmin
+    providerIssuerURL: ''
+    claimsSupported: name,family_name,display_name,given_name,preferred_username
+    claimsMap: name="givenName" family_name="givenName" given_name="givenName" preferred_username="displayName"
+      display_name="displayName"
+    scopeClaim: profile="name,family_name,display_name,given_name,preferred_username"
+    oidcIssuerURL: https://127.0.0.1:443/idauth/oidc/endpoint/OP
+    openshiftPort: 443
+    roksEnabled: true
+    roksURL: https://roks.domain.name:443
+    roksUserPrefix: changeme
+    saasClientRedirectUrl: ''
+    wlpClientID: 4444be3a738841016ab76d71b650e836
+    wlpClientRegistrationSecret: f1362ca4d20b8389af2d1ea68042c9af
+    wlpClientSecret: aa73bf39752053bf723d1143fb4cf8a2
+  identityManager:
+    imageName: icp-identity-manager
+    imageRegistry: quay.io/opencloudio
+    imageTag: 0.0.0
+    masterNodesList: 10.0.0.1
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+        ephemeral-storage: 550Mi
+      requests:
+        cpu: 50m
+        memory: 150Mi
+        ephemeral-storage: 300Mi
+  identityProvider:
+    imageName: icp-identity-provider
+    imageRegistry: quay.io/opencloudio
+    imageTag: 0.0.0
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+        ephemeral-storage: 550Mi
+      requests:
+        cpu: 50m
+        memory: 150Mi
+        ephemeral-storage: 300Mi
+  initMongodb:
+    imageName: im-initcontainer
+    imageRegistry: quay.io/opencloudio
+    imageTag: 0.0.0
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+        ephemeral-storage: 178Mi
+  operatorVersion: 0.14.1
+  replicas: 1

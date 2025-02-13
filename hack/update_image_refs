@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+#
+
+REPO_ROOT=""
+if command -v realpath &>/dev/null
+then
+  REPO_ROOT="$(realpath $(dirname $0)/..)"
+else
+  REPO_ROOT="$(dirname $0/..)"
+fi
+export LOCALBIN="${REPO_ROOT}/bin"
+
+overlay="${1:-dev}"
+
+function update_tags() {
+  $LOCALBIN/yq -i '.spec.*.imageTag = env(VERSION)' \
+    "${REPO_ROOT}/config/samples/overlays/${overlay}/authentication_image_patch.yaml"
+  $LOCALBIN/yq -i 'with(.[].value ; .value |= sub("([a-zA-Z0-9-./]+):([a-zA-Z0-9-.]+)", "${1}:"+env(VERSION)))' \
+    "${REPO_ROOT}/config/manager/overlays/${overlay}/image_env_vars_patch.yaml"
+  $LOCALBIN/yq -i 'with(.[] | select(.name == "IBM_IAM_OPERATOR_IMAGE") ; .image |= sub("([a-zA-Z0-9-./]+):([a-zA-Z0-9-.]+)", "${1}:"+env(VERSION)))' \
+    "${REPO_ROOT}/hack/relatedimages.yaml"
+  $LOCALBIN/yq -i 'with(.[] | select(.name == "IAM_CUSTOM_HOSTNAME_IMAGE") ; .image |= sub("([a-zA-Z0-9-./]+):([a-zA-Z0-9-.]+)", "${1}:"+env(VERSION)))' \
+    "${REPO_ROOT}/hack/relatedimages.yaml"
+}
+
+function update_names() {
+  $LOCALBIN/yq -i 'with(.[] | select(.path == "/metadata/annotations/containerImage") ; .value |= sub("([a-zA-Z0-9-./]+):([a-zA-Z0-9-.]+)", env(IMAGE_TAG_BASE) + ":${2}"))' \
+    "${REPO_ROOT}/config/manifests/overlays/${overlay}/annotations_patch.yaml"
+  $LOCALBIN/yq -i 'with(.[] | select(.name == "IBM_IAM_OPERATOR_IMAGE") ; .image |= sub("([a-zA-Z0-9-./]+):([a-zA-Z0-9-.]+)", env(IMAGE_TAG_BASE) + ":${2}"))' \
+    "${REPO_ROOT}/hack/relatedimages.yaml"
+}
+
+case "${overlay}" in
+  dev)
+    update_tags
+    update_names
+    ;;
+  prod)
+    update_tags
+    ;;
+  *)
+    >&2 echo "Invalid overlay provided; : dev prod"
+    exit 1
+    ;;
+esac

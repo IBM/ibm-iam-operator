@@ -1,0 +1,12 @@
+- image: icr.io/cpopen/ibm-iam-operator:4.10.0
+  name: IBM_IAM_OPERATOR_IMAGE
+- image: icr.io/cpopen/cpfs/icp-platform-auth:4.10.0
+  name: ICP_PLATFORM_AUTH_IMAGE
+- image: icr.io/cpopen/cpfs/icp-identity-provider:4.10.0
+  name: ICP_IDENTITY_PROVIDER_IMAGE
+- image: icr.io/cpopen/cpfs/icp-identity-manager:4.10.0
+  name: ICP_IDENTITY_MANAGER_IMAGE
+- image: icr.io/cpopen/cpfs/im-initcontainer:4.10.0
+  name: IM_INITCONTAINER_IMAGE
+- image: icr.io/cpopen/cpfs/iam-custom-hostname:4.10.0
+  name: IAM_CUSTOM_HOSTNAME_IMAGE

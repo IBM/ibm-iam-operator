@@ -19,6 +19,11 @@ STATUS=0
 ARCH=$(uname -m)
 OS=$(uname -s)
 VERSION=${CSV_VERSION:-4.10.1}
+if [[ -z "${VERSION}" ]]; then
+  >&2 echo "VERSION environtment variable must be set to a non-empty value"
+  exit 1
+fi
+>>>>>>> 94ea2d4f7e08d174851119624a48a0f2c1af013b
 
 if [[ $ARCH == "x86_64" && $OS == "Linux" ]]; then
     curl -L -o /tmp/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64

@@ -1,0 +1,17 @@
+resources:
+  - ../../bases
+generatorOptions:
+  disableNameSuffixHash: true
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+images:
+  - name: controller
+    newName: icr.io/cpopen/ibm-iam-operator
+    newTag: 4.10.0
+patches:
+  - path: ./image_env_vars_patch.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: ibm-iam-operator

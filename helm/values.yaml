@@ -1,8 +1,13 @@
 # imagePullSecret: ibm-entitlement-key
 imagePullPolicy: IfNotPresent
 # imagePullPrefix: icr.io
-imageRegistryNamespaceOperand: cpopen/cpfs
-imageRegistryNamespaceOperator: cpopen
+cpfs:
+  imageRegistryNamespaceOperator: cpopen
+  imageRegistryNamespaceOperand: cpopen/cpfs
+global:
+  operatorNamespace: operators
+  imagePullPrefix: icr.io
+  tetheredNamespace: []
 
 operator:
   imageTag: "4.10.0" 

@@ -1,4 +1,4 @@
-- image: icr.io/cpopen/ibm-iam-operator:4.10.0
+- image: icr.io/cpopen/ibm-iam-operator:4.10.1
   name: IBM_IAM_OPERATOR_IMAGE
 - image: icr.io/cpopen/cpfs/icp-platform-auth:4.10.0
   name: ICP_PLATFORM_AUTH_IMAGE

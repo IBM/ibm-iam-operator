@@ -5,6 +5,7 @@ metadata:
     app.kubernetes.io/instance: ibm-iam-operator
     app.kubernetes.io/managed-by: ibm-iam-operator
     app.kubernetes.io/name: ibm-iam-operator
+    component-id: {{ .Chart.Name }}
   name: ibm-iam-operator
   namespace: {{.Values.global.operatorNamespace}}
 rules:

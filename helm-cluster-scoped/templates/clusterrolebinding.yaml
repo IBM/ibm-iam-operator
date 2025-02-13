@@ -2,6 +2,8 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: ibm-iam-operator
+  labels:
+    component-id: {{ .Chart.Name }}
 subjects:
 - kind: ServiceAccount
   name: ibm-iam-operator

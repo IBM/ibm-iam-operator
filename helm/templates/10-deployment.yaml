@@ -249,13 +249,13 @@ spec:
         - name: cluster_name
           value: ""
         - name: ICP_PLATFORM_AUTH_IMAGE
-          value: "{{ .Values.global.imagePullPrefix }}/{{ .Values.imageRegistryNamespaceOperand }}/icp-platform-auth:{{ .Values.operands.platformAuthService.imageTag }}"
+          value: "{{ .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperand }}/icp-platform-auth:{{ .Values.operands.platformAuthService.imageTag }}"
         - name: ICP_IDENTITY_PROVIDER_IMAGE
-          value: "{{ .Values.global.imagePullPrefix }}/{{ .Values.imageRegistryNamespaceOperand }}/icp-identity-provider:{{ .Values.operands.platformIdentityProvider.imageTag }}"
+          value: "{{ .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperand }}/icp-identity-provider:{{ .Values.operands.platformIdentityProvider.imageTag }}"
         - name: ICP_IDENTITY_MANAGER_IMAGE
-          value: "{{ .Values.global.imagePullPrefix }}/{{ .Values.imageRegistryNamespaceOperand }}/icp-identity-manager:{{ .Values.operands.platformIdentityManagement.imageTag }}"
+          value: "{{ .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperand }}/icp-identity-manager:{{ .Values.operands.platformIdentityManagement.imageTag }}"
         - name: IM_INITCONTAINER_IMAGE
-          value: "{{ .Values.global.imagePullPrefix }}/{{ .Values.imageRegistryNamespaceOperand }}/im-initcontainer:{{ .Values.operands.imInitContainer.imageTag }}"
+          value: "{{ .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperand }}/im-initcontainer:{{ .Values.operands.imInitContainer.imageTag }}"
         - name: WATCH_NAMESPACE
           valueFrom:
             configMapKeyRef:
@@ -263,7 +263,7 @@ spec:
               key: namespaces
         - name: IMAGE_PULL_SECRET
           value: {{ .Values.global.imagePullSecret }}
-        image: "{{ .Values.global.imagePullPrefix }}/{{ .Values.imageRegistryNamespaceOperator }}/ibm-iam-operator:{{ .Values.operator.imageTag }}"
+        image: "{{ .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperator }}/ibm-iam-operator:{{ .Values.operator.imageTag }}"
         imagePullPolicy: "{{ .Values.imagePullPolicy }}"
         name: ibm-iam-operator
         resources:

@@ -831,5 +831,151 @@ var _ = Describe("ConfigMap handling", func() {
 			}
 			Expect(generated.OwnerReferences).To(ContainElement(expected))
 		})
+
+		It("updates that ConfigMap based upon values in ibmcloud-cluster-info and Authentication CR", func() {
+			fakeObserved := &corev1.ConfigMap{}
+			err := generateOAuthClientConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, fakeObserved)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(fakeObserved.Data).ToNot(BeNil())
+			fakeObserved.Data["MASTER_IP"] = "dummy-address"
+			fakeObserved.Data["CLUSTER_NAME"] = "dummy-name"
+			generated := &corev1.ConfigMap{}
+			err = generateOAuthClientConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)
+			Expect(generated.Data).ToNot(BeNil())
+			Expect(err).ToNot(HaveOccurred())
+			updated, err := updateOAuthClientConfigMap(fakeObserved, generated)
+			Expect(updated).To(BeTrue())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(generated.Data["MASTER_IP"]).To(Equal(ibmcloudClusterInfo.Data["cluster_address"]))
+			Expect(generated.Data["PROXY_IP"]).To(Equal(ibmcloudClusterInfo.Data["proxy_address"]))
+			Expect(generated.Data["CLUSTER_CA_DOMAIN"]).To(Equal(ibmcloudClusterInfo.Data["cluster_address"]))
+			Expect(generated.Data["CLUSTER_NAME"]).To(Equal(authCR.Spec.Config.ClusterName))
+			expected := metav1.OwnerReference{
+				APIVersion:         "operator.ibm.com/v1alpha1",
+				Kind:               "Authentication",
+				Name:               "example-authentication",
+				Controller:         ptr.To[bool](true),
+				UID:                authCR.UID,
+				BlockOwnerDeletion: ptr.To[bool](true),
+			}
+			Expect(generated.OwnerReferences).To(ContainElement(expected))
+		})
+	})
+
+	Describe("registration-script handling", func() {
+		var r *AuthenticationReconciler
+		var authCR *operatorv1alpha1.Authentication
+		var cb fakeclient.ClientBuilder
+		var cl client.WithWatch
+		var scheme *runtime.Scheme
+		var ctx context.Context
+		var globalConfigMap *corev1.ConfigMap
+		var ibmcloudClusterInfo *corev1.ConfigMap
+		BeforeEach(func() {
+			authCR = &operatorv1alpha1.Authentication{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "operator.ibm.com/v1alpha1",
+					Kind:       "Authentication",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "example-authentication",
+					Namespace:       "data-ns",
+					ResourceVersion: trackerAddResourceVersion,
+				},
+				Spec: operatorv1alpha1.AuthenticationSpec{
+					Config: operatorv1alpha1.ConfigSpec{
+						ClusterName:           "mycluster",
+						ClusterCADomain:       "domain.example.com",
+						DefaultAdminUser:      "myadmin",
+						ZenFrontDoor:          true,
+						PreferredLogin:        "ldap",
+						ProviderIssuerURL:     "example.com",
+						ROKSURL:               "",
+						ROKSEnabled:           false,
+						FIPSEnabled:           true,
+						NONCEEnabled:          true,
+						OIDCIssuerURL:         "oidc.example.com",
+						SaasClientRedirectUrl: "saasclient.example.com",
+						ClaimsMap:             "someclaims",
+						ScopeClaim:            "scopeclaimexample",
+						IsOpenshiftEnv:        false,
+					},
+				},
+			}
+			globalConfigMap = &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ibm-cpp-config",
+					Namespace: "data-ns",
+				},
+				Data: map[string]string{
+					"kubernetes_cluster_type": "cncf",
+					"domain_name":             "example.ibm.com",
+				},
+			}
+			ibmcloudClusterInfo = &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ibmcloud-cluster-info",
+					Namespace: "data-ns",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion:         "operator.ibm.com/v1alpha1",
+							Kind:               "Authentication",
+							Name:               "example-authentication",
+							Controller:         ptr.To[bool](true),
+							BlockOwnerDeletion: ptr.To[bool](true),
+						},
+					},
+					Labels: map[string]string{
+						"app": "auth-idp",
+					},
+				},
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "ConfigMap",
+					APIVersion: "v1",
+				},
+				Data: map[string]string{
+					"im_idprovider_endpoint":    "https://platform-identity-provider.data-ns.svc:4300",
+					"proxy_address":             "cp-console-data-ns.example.ibm.com",
+					"cluster_address":           "cp-console-data-ns.example.ibm.com",
+					"cluster_endpoint":          "https://cp-console-data-ns.example.ibm.com",
+					"cluster_name":              "mycluster",
+					"cluster_router_http_port":  "80",
+					"cluster_router_https_port": "443",
+					"im_idmgmt_endpoint":        "https://platform-identity-management.data-ns.svc:4500",
+				},
+			}
+			scheme = runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).To(Succeed())
+			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
+			cb = *fakeclient.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(globalConfigMap, ibmcloudClusterInfo, authCR)
+			cl = cb.Build()
+			dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+			Expect(err).NotTo(HaveOccurred())
+
+			r = &AuthenticationReconciler{
+				Client:          cl,
+				DiscoveryClient: *dc,
+			}
+			ctx = context.Background()
+		})
+
+		It("generates a ConfigMap based upon values in ibmcloud-cluster-info and Authentication CR", func() {
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationScriptConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(generated.Data).ToNot(BeNil())
+			Expect(generated.Data["register-client.sh"]).To(Equal(registerClientScript))
+			expected := metav1.OwnerReference{
+				APIVersion:         "operator.ibm.com/v1alpha1",
+				Kind:               "Authentication",
+				Name:               "example-authentication",
+				Controller:         ptr.To[bool](true),
+				UID:                authCR.UID,
+				BlockOwnerDeletion: ptr.To[bool](true),
+			}
+			Expect(generated.OwnerReferences).To(ContainElement(expected))
+		})
 	})
 })

@@ -27,7 +27,9 @@ then
 fi
 
 CSV_PATH="${BUNDLE_DIR_PATH}/manifests/ibm-iam-operator.clusterserviceversion.yaml"
+ANNOTATIONS_PATH="${BUNDLE_DIR_PATH}/metadata/annotations.yaml"
 
+${YQ} -i '.annotations."com.redhat.openshift.versions" = "v4.12-v4.18"' "${ANNOTATIONS_PATH}"
 ${YQ} '.metadata.annotations.alm-examples' "${CSV_PATH}" > internal-crs.json
 ${YQ} '. += load("./hack/external-crs.json")' internal-crs.json > combined-crs.json
 ${YQ} -i '.metadata.annotations.alm-examples = load_str("combined-crs.json")' "${CSV_PATH}"

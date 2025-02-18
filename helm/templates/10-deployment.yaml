@@ -265,7 +265,7 @@ spec:
               name: namespace-scope
               key: namespaces
         {{- else }}
-          {{- $watchNamespaces := .Values.global.tenantNamespaces | default list -}}
+          {{- $watchNamespaces := .Values.global.tetheredNamespaces | default list -}}
           {{- if .Values.global.instanceNamespace -}}
           {{- $watchNamespaces = append $watchNamespaces .Values.global.instanceNamespace -}}
           {{- end -}}

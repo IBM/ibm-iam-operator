@@ -7,7 +7,7 @@ global:
   imagePullPrefix: icr.io
   imagePullSecret: ibm-entitlement-key
   imagePullPolicy: IfNotPresent
-  tenantNamespaces:
+  tetheredNamespaces:
   - tenant1
   - tenant2
 

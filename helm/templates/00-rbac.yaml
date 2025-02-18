@@ -9,7 +9,7 @@ metadata:
     component-id: {{ .Chart.Name }}
   name: ibm-iam-operator
   namespace: {{ .Values.global.operatorNamespace }}
-{{- $watchNamespaces := .Values.global.tenantNamespaces | default list -}}
+{{- $watchNamespaces := .Values.global.tetheredNamespaces | default list -}}
 {{- if .Values.global.instanceNamespace -}}
 {{- $watchNamespaces = append $watchNamespaces .Values.global.instanceNamespace -}}
 {{- end -}}

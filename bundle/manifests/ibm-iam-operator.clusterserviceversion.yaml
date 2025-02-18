@@ -146,47 +146,6 @@ metadata:
             "operatorVersion": "0.14.1",
             "replicas": 1
           }
-        },
-        {
-          "apiVersion": "operator.ibm.com/v1alpha1",
-          "kind": "OperandBindInfo",
-          "metadata": {
-            "name": "ibm-iam-bindinfo"
-          },
-          "spec": {
-            "operand": "ibm-im-operator",
-            "registry": "common-service",
-            "description": "Binding information that should be accessible to iam adopters",
-            "bindings": {
-              "public-oidc-creds": {
-                "secret": "platform-oidc-credentials"
-              },
-              "public-auth-creds": {
-                "secret": "platform-auth-idp-credentials"
-              },
-              "public-scim-creds": {
-                "secret": "platform-auth-scim-credentials"
-              },
-              "public-auth-cert": {
-                "secret": "platform-auth-secret"
-              },
-              "public-cam-secret": {
-                "secret": "oauth-client-secret"
-              },
-              "public-cam-map": {
-                "configmap": "oauth-client-map"
-              },
-              "public-auth-config": {
-                "configmap": "platform-auth-idp"
-              },
-              "public-ibmcloud-config": {
-                "configmap": "ibmcloud-cluster-info"
-              },
-              "public-ibmcloudca-secret": {
-                "secret": "ibmcloud-cluster-ca-cert"
-              }
-            }
-          }
         }
       ]
     capabilities: Basic Install

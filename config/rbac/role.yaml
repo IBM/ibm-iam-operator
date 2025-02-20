@@ -148,18 +148,8 @@ rules:
 - apiGroups:
   - operator.ibm.com
   resources:
-  - operandbindinfos
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - watch
-  - update
-- apiGroups:
-  - operator.ibm.com
-  resources:
   - operandrequests
+  - operandbindinfos
   verbs:
   - create
   - get

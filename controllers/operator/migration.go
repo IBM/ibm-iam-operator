@@ -564,18 +564,27 @@ func (r *AuthenticationReconciler) overrideMongoDBBootstrap(ctx context.Context,
 	// scale down MongoDB Operator
 	mongoDeployKey := types.NamespacedName{Namespace: os.Getenv("POD_NAMESPACE"), Name: "ibm-mongodb-operator"}
 	mongoDeploy := &appsv1.Deployment{}
-	if err = r.Get(ctx, mongoDeployKey, mongoDeploy); err == nil {
-		if mongoDeploy.Spec.Replicas != nil && *mongoDeploy.Spec.Replicas > 0 {
-			mongoDeploy.Spec.Replicas = ptr.To[int32](0)
-			if err = r.Update(ctx, mongoDeploy); err != nil {
-				return subreconciler.RequeueWithError(err)
-			}
-			return subreconciler.RequeueWithDelay(defaultLowerWait)
+	err = r.Get(ctx, mongoDeployKey, mongoDeploy)
+	if k8sErrors.IsNotFound(err) {
+		// try to find mongodb operator in instance namespace.
+		// in LTSR -> CD Allnamespace upgrade scenario, CS operators and ibm-iam-operator stay in openshift-operators namespace
+		// where as ibm-mongodb-operator stays in instance namespace(ex: ibm-common-services)
+		mongoDeployKey.Namespace = req.Namespace
+		err = r.Get(ctx, mongoDeployKey, mongoDeploy)
+		if err == nil {
+			reqLogger.Info("ibm-mongodb-operator found in instance namespace")
 		}
-	} else if !k8sErrors.IsNotFound(err) {
+	}
+	if err != nil && !k8sErrors.IsNotFound(err) {
 		return subreconciler.RequeueWithError(err)
 	}
-
+	if err == nil && mongoDeploy.Spec.Replicas != nil && *mongoDeploy.Spec.Replicas > 0 {
+		mongoDeploy.Spec.Replicas = ptr.To[int32](0)
+		if err = r.Update(ctx, mongoDeploy); err != nil {
+			return subreconciler.RequeueWithError(err)
+		}
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	}
 	// update icp-mongodb-init ConfigMap .data["on-start.sh"]
 	currentOnStartScript := icpMongoDBInitCM.Data["on-start.sh"]
 	vals := struct{ Namespace string }{

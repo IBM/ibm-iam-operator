@@ -568,7 +568,7 @@ func (r *AuthenticationReconciler) overrideMongoDBBootstrap(ctx context.Context,
 	if k8sErrors.IsNotFound(err) {
 		// try to find mongodb operator in instance namespace.
 		// in LTSR -> CD Allnamespace upgrade scenario, CS operators and ibm-iam-operator stay in openshift-operators namespace
-		// where as ibm-mongodb-operator stays in instance namespace(ex: ibm-common-services)
+		// where as ibm-mongodb-operator stays in instance namespace( ex: ibm-common-services )
 		mongoDeployKey.Namespace = req.Namespace
 		err = r.Get(ctx, mongoDeployKey, mongoDeploy)
 		if err == nil {

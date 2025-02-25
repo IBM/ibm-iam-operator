@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+#
+# update_chart_version updates the helm and helm-cluster-scoped charts with
+# SemVer-compliant metadata.
+# 
+
+set -e -u -o pipefail
+
+REPO_ROOT=""
+if command -v realpath &>/dev/null
+then
+  REPO_ROOT="$(realpath $(dirname $0)/..)"
+else
+  REPO_ROOT="$(dirname $0/..)"
+fi
+export LOCALBIN="${REPO_ROOT}/bin"
+
+
+for f in helm/Chart.yaml helm-cluster-scoped/Chart.yaml; do
+        DATE="$(date '+%Y%m%d.%H%M%S')" $LOCALBIN/yq -i e '(.version | 
+                match("\.([0-9]+)$") | 
+                .captures[0].string | 
+                to_number | 
+                . + 1) as $build | 
+                .version = .appVersion + "+" + env(DATE) + "." + $build' $f
+done

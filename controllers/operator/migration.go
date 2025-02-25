@@ -336,7 +336,7 @@ func (r *AuthenticationReconciler) setMigrationCompleteStatus(ctx context.Contex
 	if err = r.Client.Status().Update(ctx, authCR); err != nil {
 		reqLogger.Info("Failed to set migration success condition on Authentication", "reason", err.Error())
 	} else {
-		reqLogger.Info("Set migration success condition on Authentication", "reason", err.Error())
+		reqLogger.Info("Set migration success condition on Authentication")
 	}
 
 	return subreconciler.RequeueWithDelay(defaultLowerWait)

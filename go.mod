@@ -4,7 +4,6 @@ go 1.23.5
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/ibm/ibm-cert-manager-operator v0.0.0-20220602233809-3a62073266c7
 	github.com/jackc/pgx/v5 v5.5.4
 	github.com/onsi/ginkgo/v2 v2.12.0
 	github.com/onsi/gomega v1.27.10

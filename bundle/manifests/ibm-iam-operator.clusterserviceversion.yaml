@@ -2,7 +2,7 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
   annotations:
-    alm-examples: |
+    alm-examples: |-
       [
         {
           "apiVersion": "operator.ibm.com/v1alpha1",
@@ -146,55 +146,21 @@ metadata:
             "operatorVersion": "0.14.1",
             "replicas": 1
           }
-        },
-        {
-          "apiVersion": "operator.ibm.com/v1alpha1",
-          "kind": "OperandBindInfo",
-          "metadata": {
-            "name": "ibm-iam-bindinfo"
-          },
-          "spec": {
-            "operand": "ibm-im-operator",
-            "registry": "common-service",
-            "description": "Binding information that should be accessible to iam adopters",
-            "bindings": {
-              "public-oidc-creds": {
-                "secret": "platform-oidc-credentials"
-              },
-              "public-auth-creds": {
-                "secret": "platform-auth-idp-credentials"
-              },
-              "public-scim-creds": {
-                "secret": "platform-auth-scim-credentials"
-              },
-              "public-auth-cert": {
-                "secret": "platform-auth-secret"
-              },
-              "public-cam-secret": {
-                "secret": "oauth-client-secret"
-              },
-              "public-cam-map": {
-                "configmap": "oauth-client-map"
-              },
-              "public-auth-config": {
-                "configmap": "platform-auth-idp"
-              },
-              "public-ibmcloud-config": {
-                "configmap": "ibmcloud-cluster-info"
-              },
-              "public-ibmcloudca-secret": {
-                "secret": "ibmcloud-cluster-ca-cert"
-              }
-            }
-          }
         }
       ]
     capabilities: Basic Install
     categories: Security
     certified: "false"
     containerImage: icr.io/cpopen/ibm-iam-operator:4.11.0
-    createdAt: "2025-02-06T15:48:19Z"
+    createdAt: "2025-02-20T00:03:25Z"
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage the lifecycle of IAM services. With this operator, you can simply deploy and upgrade the IAM services
+    features.operators.openshift.io/disconnected: "true"
+    features.operators.openshift.io/fips-compliant: "true"
+    features.operators.openshift.io/proxy-aware: "false"
+    features.operators.openshift.io/tls-profiles: "false"
+    features.operators.openshift.io/token-auth-aws: "false"
+    features.operators.openshift.io/token-auth-azure: "false"
+    features.operators.openshift.io/token-auth-gcp: "false"
     olm.skipRange: <4.11.0
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -514,6 +480,7 @@ spec:
                 - operator.ibm.com
               resources:
                 - operandrequests
+                - operandbindinfos
               verbs:
                 - create
                 - get
@@ -526,6 +493,7 @@ spec:
                 - operator.ibm.com
               resources:
                 - operandrequests/status
+                - operandbindinfos/status
               verbs:
                 - watch
                 - get

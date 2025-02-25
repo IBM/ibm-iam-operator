@@ -123,6 +123,7 @@ func (r *AuthenticationReconciler) handleIBMCloudClusterInfo(ctx context.Context
 			"proxy_address",
 			"cluster_endpoint"),
 		updatesValuesWhen(not(observedKeySet("cluster_address_auth")), "cluster_address_auth"),
+		updatesValuesWhen(not(observedKeySet(IMCrtAuthEP)), IMCrtAuthEP),
 	}
 
 	for _, update := range updateFns {
@@ -797,7 +798,9 @@ func (r *AuthenticationReconciler) generateCNCFClusterInfo(ctx context.Context, 
 
 	zenHost := ""
 	clusterAddress := strings.Join([]string{strings.Join([]string{"cp-console", authCR.Namespace}, "-"), domainName}, ".")
+	imCertAuthAddress := strings.Join([]string{strings.Join([]string{IMCrtAuthRouteName, authCR.Namespace}, "-"), domainName}, ".")
 	clusterEndpoint := "https://" + clusterAddress
+	imCertAuthEP := "https://" + imCertAuthAddress
 	clusterAddressAuth := clusterAddress
 	if authCR.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
 		zenHost, err = r.getZenHost(ctx, authCR)
@@ -818,6 +821,7 @@ func (r *AuthenticationReconciler) generateCNCFClusterInfo(ctx context.Context, 
 		},
 		Data: map[string]string{
 			ClusterAddr:            clusterAddress,
+			IMCrtAuthEP:            imCertAuthEP,
 			"cluster_address_auth": clusterAddressAuth,
 			ClusterEP:              clusterEndpoint,
 			RouteHTTPPort:          rhttpPort,
@@ -853,20 +857,24 @@ func (r *AuthenticationReconciler) generateOCPClusterInfo(ctx context.Context, a
 		return
 	}
 
-	var domainName, proxyDomainName string
+	var domainName, certAuthDomainName, proxyDomainName string
 	multipleauthCRRouteName := strings.Join([]string{"cp-console", authCR.Namespace}, "-")
+	multipleCertAuthRouteName := strings.Join([]string{IMCrtAuthRouteName, authCR.Namespace}, "-")
 	multipleauthCRProxyRouteName := strings.Join([]string{"cp-proxy", authCR.Namespace}, "-")
 	if authCR.Spec.Config.OnPremMultipleDeploy {
 		domainName = strings.Join([]string{multipleauthCRRouteName, baseDomain}, ".")
+		certAuthDomainName = strings.Join([]string{multipleCertAuthRouteName, baseDomain}, ".")
 		proxyDomainName = strings.Join([]string{multipleauthCRProxyRouteName, baseDomain}, ".")
 	} else {
 		domainName = strings.Join([]string{"cp-console", baseDomain}, ".")
+		certAuthDomainName = strings.Join([]string{IMCrtAuthRouteName, baseDomain}, ".")
 		proxyDomainName = strings.Join([]string{"cp-proxy", baseDomain}, ".")
 	}
 
 	zenHost := ""
 	clusterAddress := domainName
 	clusterEndpoint := "https://" + clusterAddress
+	imCertAuthEndpoint := "https://" + certAuthDomainName
 	clusterAddressAuth := clusterAddress
 	if authCR.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
 		zenHost, err = r.getZenHost(ctx, authCR)
@@ -890,6 +898,7 @@ func (r *AuthenticationReconciler) generateOCPClusterInfo(ctx context.Context, a
 		},
 		Data: map[string]string{
 			ClusterAddr:            clusterAddress,
+			IMCrtAuthEP:            imCertAuthEndpoint,
 			"cluster_address_auth": clusterAddressAuth,
 			ClusterEP:              clusterEndpoint,
 			RouteHTTPPort:          rhttpPort,

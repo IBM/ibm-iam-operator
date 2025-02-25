@@ -5,13 +5,13 @@ imageRegistryNamespaceOperand: cpopen/cpfs
 imageRegistryNamespaceOperator: cpopen
 
 operator:
-  imageTag: "4.10.0" 
+  imageTag: "4.11.0" 
 operands:
   platformIdentityProvider:
-    imageTag: "4.10.0"
+    imageTag: "4.11.0"
   platformAuthService:
-    imageTag: "4.10.0"
+    imageTag: "4.11.0"
   platformIdentityManagement:
-    imageTag: "4.10.0"
+    imageTag: "4.11.0"
   imInitContainer:
-    imageTag: "4.10.0"
+    imageTag: "4.11.0"

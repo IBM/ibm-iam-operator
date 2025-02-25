@@ -671,6 +671,45 @@ var _ = Describe("ConfigMap handling", func() {
 			}
 		})
 
+		It("sets fields when the values do not match the expected value", func() {
+			updateOnNotUpToDate := []struct {
+				primaryKey string
+				keys       []string
+			}{
+				{
+					"PREFERRED_LOGIN",
+					[]string{"PREFERRED_LOGIN"},
+				},
+				{
+					"DEFAULT_LOGIN",
+					[]string{"DEFAULT_LOGIN"},
+				},
+			}
+
+			setDummyData := func(pkey string, keys []string, o *corev1.ConfigMap) {
+				dummyValue := "dummy"
+				for _, k := range keys {
+					o.Data[k] = dummyValue
+				}
+			}
+			for _, test := range updateOnNotUpToDate {
+				observed := getObserved()
+				generated := &corev1.ConfigMap{}
+				err := generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)
+				Expect(err).NotTo(HaveOccurred())
+				updated, err = updatePlatformAuthIDP(observed, generated)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(updated).To(BeFalse())
+				setDummyData(test.primaryKey, test.keys, observed)
+				updated, err = updatePlatformAuthIDP(observed, generated)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(updated).To(BeTrue())
+				for _, k := range test.keys {
+					Expect(observed.Data[k]).To(Equal(generated.Data[k]))
+				}
+			}
+		})
+
 		It("replaces fields using 127.0.0.1 with the Service domain", func() {
 			updateWhenLocalhostUsed := []string{
 				"IDENTITY_MGMT_URL",

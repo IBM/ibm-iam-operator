@@ -305,6 +305,9 @@ test: manifests generate fmt vet envtest ## Run tests.
 update-version: manifests kustomize yq ## Update the Operator SemVer across the project.
 	./hack/update_operator_version
 
+.PHONY: update-chart-versions
+update-chart-versions: yq ## Update helm chart versions
+	./hack/update_chart_version
 
 ##@ Build
 

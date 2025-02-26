@@ -130,7 +130,7 @@ func convertToLibertyFormat(memory string) string {
 
 }
 
-func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authServiceImage string) corev1.Container {
+func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authServiceImage string, icpConsoleURL string) corev1.Container {
 
 	resources := instance.Spec.AuthService.Resources
 
@@ -275,9 +275,13 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 				},
 			},
 		},
+		{
+			Name:  "MASTER_HOST",
+			Value: icpConsoleURL,
+		},
 	}
 
-	idpEnvVarList := []string{"NODE_ENV", "MASTER_HOST", "IDENTITY_PROVIDER_URL", "HTTP_ONLY", "SESSION_TIMEOUT", "LDAP_RECURSIVE_SEARCH", "LDAP_ATTR_CACHE_SIZE", "LDAP_ATTR_CACHE_TIMEOUT", "LDAP_ATTR_CACHE_ENABLED", "LDAP_ATTR_CACHE_SIZELIMIT",
+	idpEnvVarList := []string{"NODE_ENV", "IDENTITY_PROVIDER_URL", "HTTP_ONLY", "SESSION_TIMEOUT", "LDAP_RECURSIVE_SEARCH", "LDAP_ATTR_CACHE_SIZE", "LDAP_ATTR_CACHE_TIMEOUT", "LDAP_ATTR_CACHE_ENABLED", "LDAP_ATTR_CACHE_SIZELIMIT",
 		"LDAP_SEARCH_CACHE_SIZE", "LDAP_SEARCH_CACHE_TIMEOUT", "LDAP_CTX_POOL_INITSIZE", "LDAP_CTX_POOL_MAXSIZE", "LDAP_CTX_POOL_TIMEOUT", "LDAP_CTX_POOL_WAITTIME", "LDAP_CTX_POOL_PREFERREDSIZE", "IDENTITY_PROVIDER_URL", "IDENTITY_MGMT_URL", "LDAP_SEARCH_CACHE_ENABLED", "LDAP_SEARCH_CACHE_SIZELIMIT", "IDTOKEN_LIFETIME", "IBMID_CLIENT_ID", "IBMID_CLIENT_ISSUER",
 		"SAML_NAMEID_FORMAT", "FIPS_ENABLED", "LOGJAM_DHKEYSIZE_2048_BITS_ENABLED", "LOG_LEVEL_AUTHSVC", "LIBERTY_DEBUG_ENABLED", "NONCE_ENABLED", "CLAIMS_SUPPORTED", "CLAIMS_MAP", "SCOPE_CLAIM", "OIDC_ISSUER_URL",
 		"DB_CONNECT_TIMEOUT", "DB_IDLE_TIMEOUT", "DB_CONNECT_MAX_RETRIES", "DB_POOL_MIN_SIZE", "DB_POOL_MAX_SIZE", "DB_SSL_MODE"}
@@ -1129,9 +1133,9 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 
 }
 
-func buildContainers(instance *operatorv1alpha1.Authentication, authServiceImage string) []corev1.Container {
+func buildContainers(instance *operatorv1alpha1.Authentication, authServiceImage string, icpConsoleURL string) []corev1.Container {
 
-	authServiceContainer := buildAuthServiceContainer(instance, authServiceImage)
+	authServiceContainer := buildAuthServiceContainer(instance, authServiceImage, icpConsoleURL)
 	//identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId)
 	//identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL)
 

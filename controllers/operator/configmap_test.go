@@ -548,29 +548,8 @@ var _ = Describe("ConfigMap handling", func() {
 					[]string{"LDAP_RECURSIVE_SEARCH"},
 				},
 				{
-					"CLAIMS_SUPPORTED",
-					[]string{
-						"CLAIMS_SUPPORTED",
-						"CLAIMS_MAP",
-						"SCOPE_CLAIM",
-						"BOOTSTRAP_USERID",
-					},
-				},
-				{
 					"DEFAULT_LOGIN",
 					[]string{"DEFAULT_LOGIN"},
-				},
-				{
-					"PROVIDER_ISSUER_URL",
-					[]string{
-						"PROVIDER_ISSUER_URL",
-					},
-				},
-				{
-					"PREFERRED_LOGIN",
-					[]string{
-						"PREFERRED_LOGIN",
-					},
 				},
 				{
 					"DB_CONNECT_TIMEOUT",
@@ -654,7 +633,9 @@ var _ = Describe("ConfigMap handling", func() {
 			}
 
 			for _, test := range updateOnNotSetKeys {
-				observed := getObserved()
+				observed := &corev1.ConfigMap{}
+				Expect(generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, observed)).
+					To(Succeed())
 				generated := &corev1.ConfigMap{}
 				err := generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)
 				Expect(err).NotTo(HaveOccurred())
@@ -677,10 +658,6 @@ var _ = Describe("ConfigMap handling", func() {
 				keys       []string
 			}{
 				{
-					"PREFERRED_LOGIN",
-					[]string{"PREFERRED_LOGIN"},
-				},
-				{
 					"DEFAULT_LOGIN",
 					[]string{"DEFAULT_LOGIN"},
 				},
@@ -693,7 +670,9 @@ var _ = Describe("ConfigMap handling", func() {
 				}
 			}
 			for _, test := range updateOnNotUpToDate {
-				observed := getObserved()
+				observed := &corev1.ConfigMap{}
+				Expect(generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, observed)).
+					To(Succeed())
 				generated := &corev1.ConfigMap{}
 				err := generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)
 				Expect(err).NotTo(HaveOccurred())
@@ -733,7 +712,9 @@ var _ = Describe("ConfigMap handling", func() {
 		})
 
 		It("replaces value in OS_TOKEN_LENGTH only when it is set to 45", func() {
-			observed := getObserved()
+			observed := &corev1.ConfigMap{}
+			Expect(generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, observed)).
+				To(Succeed())
 			// Set the keys in observed to contain localhost IP
 			k := "OS_TOKEN_LENGTH"
 			observed.Data[k] = "24"
@@ -749,6 +730,45 @@ var _ = Describe("ConfigMap handling", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(updated).To(BeTrue())
 			Expect(observed.Data[k]).To(Equal(generated.Data[k]))
+		})
+
+		It("always replaces certain values if they differ", func() {
+			updateAlways := []string{
+				"ROKS_URL",
+				"ROKS_USER_PREFIX",
+				"ROKS_ENABLED",
+				"BOOTSTRAP_USERID",
+				"CLAIMS_SUPPORTED",
+				"CLAIMS_MAP",
+				"SCOPE_CLAIM",
+				"NONCE_ENABLED",
+				"PREFERRED_LOGIN",
+				"OIDC_ISSUER_URL",
+				"PROVIDER_ISSUER_URL",
+				"CLUSTER_NAME",
+			}
+
+			setDummyData := func(k string, o *corev1.ConfigMap) {
+				dummyValue := "dummy"
+				o.Data[k] = dummyValue
+			}
+			for _, test := range updateAlways {
+				observed := getObserved()
+				Expect(generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, observed)).
+					To(Succeed())
+				generated := &corev1.ConfigMap{}
+				err := generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)
+				Expect(err).NotTo(HaveOccurred())
+				updated, err = updatePlatformAuthIDP(observed, generated)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(updated).To(BeFalse())
+				setDummyData(test, observed)
+				Expect(observed.Data[test]).To(Equal("dummy"))
+				updated, err = updatePlatformAuthIDP(observed, generated)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(updated).To(BeTrue())
+				Expect(observed.Data[test]).To(Equal(generated.Data[test]))
+			}
 		})
 	})
 

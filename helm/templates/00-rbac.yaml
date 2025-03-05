@@ -168,6 +168,7 @@ rules:
   - operator.ibm.com
   resources:
   - operandrequests
+  - operandbindinfos
   verbs:
   - create
   - get
@@ -180,6 +181,7 @@ rules:
   - operator.ibm.com
   resources:
   - operandrequests/status
+  - operandbindinfos/status
   verbs:
   - watch
   - get

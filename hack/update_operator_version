@@ -65,4 +65,8 @@ $LOCALBIN/yq -i '.spec.*.imageTag = env(VERSION)' \
   "${REPO_ROOT}/config/samples/overlays/prod/authentication_image_patch.yaml"
 cp "${REPO_ROOT}/config/samples/overlays/prod/authentication_image_patch.yaml" "${REPO_ROOT}/config/samples/overlays/dev/authentication_image_patch.yaml"
 
+echo "Update chart versions"
+$LOCALBIN/yq -i '.appVersion = env(VERSION), .version = env(VERSION)' "${REPO_ROOT}/helm/Chart.yaml"
+$LOCALBIN/yq -i '.appVersion = env(VERSION), .version = env(VERSION)' "${REPO_ROOT}/helm-cluster-scoped/Chart.yaml"
+
 echo "Done"

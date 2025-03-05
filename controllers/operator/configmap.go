@@ -388,7 +388,7 @@ func (u *cmUpdater) CreateOrUpdate(ctx context.Context, cl client.Client, authCR
 
 func updatePlatformAuthIDP(observed, generated *corev1.ConfigMap) (updated bool, err error) {
 	updateFns := []func(*corev1.ConfigMap, *corev1.ConfigMap) bool{
-		updatesAlways("ROKS_URL", "ROKS_USER_PREFIX"),
+		updatesAlways("ROKS_URL", "ROKS_USER_PREFIX", "ROKS_ENABLED"),
 		updatesValuesWhen(observedKeyValueSetTo("OS_TOKEN_LENGTH", "45"),
 			"OS_TOKEN_LENGTH"),
 		updatesValuesWhen(observedKeyValueContains("IDENTITY_MGMT_URL", "127.0.0.1"),

@@ -280,6 +280,12 @@ func updatesValuesWhen(matches matcherFunc, keys ...string) (fn func(*corev1.Con
 	}
 }
 
+func updatesAlways(keys ...string) (fn func(*corev1.ConfigMap, *corev1.ConfigMap) bool) {
+	return func(observed, updates *corev1.ConfigMap) bool {
+		return updateFields(observed, updates, keys...)
+	}
+}
+
 func replaceOIDCClientRegistrationJob(ctx context.Context, cl client.Client, authCR *operatorv1alpha1.Authentication) (err error) {
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -382,6 +388,7 @@ func (u *cmUpdater) CreateOrUpdate(ctx context.Context, cl client.Client, authCR
 
 func updatePlatformAuthIDP(observed, generated *corev1.ConfigMap) (updated bool, err error) {
 	updateFns := []func(*corev1.ConfigMap, *corev1.ConfigMap) bool{
+		updatesAlways("ROKS_URL"),
 		updatesValuesWhen(observedKeyValueSetTo("OS_TOKEN_LENGTH", "45"),
 			"OS_TOKEN_LENGTH"),
 		updatesValuesWhen(observedKeyValueContains("IDENTITY_MGMT_URL", "127.0.0.1"),
@@ -442,10 +449,6 @@ func updatePlatformAuthIDP(observed, generated *corev1.ConfigMap) (updated bool,
 			"LDAP_CTX_POOL_PREFERREDSIZE"),
 	}
 
-	if v, ok := generated.Data["ROKS_URL"]; ok {
-		updateFns = append(updateFns, updatesValuesWhen(
-			not(observedKeyValueSetTo("ROKS_URL", v)), "ROKS_URL"))
-	}
 	if v, ok := generated.Data["IS_OPENSHIFT_ENV"]; ok {
 		updateFns = append(updateFns, updatesValuesWhen(
 			not(observedKeyValueSetTo("IS_OPENSHIFT_ENV", v)), "IS_OPENSHIFT_ENV"))
@@ -500,6 +503,8 @@ func generateAuthIdpConfigMap(ctx context.Context, cl client.Client, authCR *ope
 	var desiredRoksUrl string
 	if authCR.Spec.Config.ROKSEnabled && !isOSEnv {
 		reqLogger.Info(".spec.config.roksEnabled is set to true, but workload does not appear to be running on OpenShift; disabling in ConfigMap")
+	} else if authCR.Spec.Config.ROKSEnabled && authCR.Spec.Config.ROKSURL != "https://roks.domain.name:443" {
+		desiredRoksUrl = authCR.Spec.Config.ROKSURL
 	} else if authCR.Spec.Config.ROKSEnabled {
 		if desiredRoksUrl, err = readROKSURL(ctx); err != nil {
 			reqLogger.Error(err, "Failed to get issuer URL")

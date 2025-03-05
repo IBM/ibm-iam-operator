@@ -101,6 +101,7 @@ func generateCertificateObject(instance *operatorv1alpha1.Authentication, scheme
 		"app.kubernetes.io/instance":   "ibm-iam-operator",
 		"app.kubernetes.io/managed-by": "ibm-iam-operator",
 		"app.kubernetes.io/name":       certificateData[certificateName]["cn"],
+		"manage-cert-rotation":         "yes",
 	}
 
 	certificate := &certmgrv1.Certificate{

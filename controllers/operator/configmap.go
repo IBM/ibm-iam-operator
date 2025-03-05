@@ -388,7 +388,15 @@ func (u *cmUpdater) CreateOrUpdate(ctx context.Context, cl client.Client, authCR
 
 func updatePlatformAuthIDP(observed, generated *corev1.ConfigMap) (updated bool, err error) {
 	updateFns := []func(*corev1.ConfigMap, *corev1.ConfigMap) bool{
-		updatesAlways("ROKS_URL", "ROKS_USER_PREFIX", "ROKS_ENABLED", "BOOTSTRAP_USERID"),
+		updatesAlways(
+			"ROKS_URL",
+			"ROKS_USER_PREFIX",
+			"ROKS_ENABLED",
+			"BOOTSTRAP_USERID",
+			"CLAIMS_SUPPORTED",
+			"CLAIMS_MAP",
+			"SCOPE_CLAIM",
+		),
 		updatesValuesWhen(observedKeyValueSetTo("OS_TOKEN_LENGTH", "45"),
 			"OS_TOKEN_LENGTH"),
 		updatesValuesWhen(observedKeyValueContains("IDENTITY_MGMT_URL", "127.0.0.1"),
@@ -404,11 +412,6 @@ func updatePlatformAuthIDP(observed, generated *corev1.ConfigMap) (updated bool,
 			"IDENTITY_PROVIDER_URL"),
 		updatesValuesWhen(not(observedKeySet("LDAP_RECURSIVE_SEARCH")),
 			"LDAP_RECURSIVE_SEARCH"),
-		updatesValuesWhen(not(observedKeySet("CLAIMS_SUPPORTED")),
-			"CLAIMS_SUPPORTED",
-			"CLAIMS_MAP",
-			"SCOPE_CLAIM",
-			"BOOTSTRAP_USERID"),
 		updatesValuesWhen(not(observedKeySet("PROVIDER_ISSUER_URL")),
 			"PROVIDER_ISSUER_URL"),
 		updatesValuesWhen(not(observedKeyValueSetTo("PREFERRED_LOGIN", generated.Data["PREFERRED_LOGIN"])),

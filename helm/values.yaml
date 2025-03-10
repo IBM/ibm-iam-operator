@@ -1,17 +1,30 @@
-# imagePullSecret: ibm-entitlement-key
-imagePullPolicy: IfNotPresent
-# imagePullPrefix: icr.io
-imageRegistryNamespaceOperand: cpopen/cpfs
-imageRegistryNamespaceOperator: cpopen
+cpfs:
+  imageRegistryNamespaceOperator: cpopen
+  imageRegistryNamespaceOperand: cpopen/cpfs
+global:
+  operatorNamespace: operators
+  instanceNamespace: instance
+  imagePullPrefix: icr.io
+  imagePullSecret: ibm-entitlement-key
+  imagePullPolicy: IfNotPresent
+  tetheredNamespaces:
+  - tenant1
+  - tenant2
+
+# Enabling this sets WATCH_NAMESPACE to look for namespace-scope ConfigMap for
+# the list of namespaces. Disabling generates the comma-separated list based upon
+# namespaces defined in the operatorNamespace, instanceNamespace, and tenantNamespaces
+# variables.
+nssEnabled: false
 
 operator:
-  imageTag: "4.10.0" 
+  imageTag: "4.11.0" 
 operands:
   platformIdentityProvider:
-    imageTag: "4.10.0"
+    imageTag: "4.11.0"
   platformAuthService:
-    imageTag: "4.10.0"
+    imageTag: "4.11.0"
   platformIdentityManagement:
-    imageTag: "4.10.0"
+    imageTag: "4.11.0"
   imInitContainer:
-    imageTag: "4.10.0"
+    imageTag: "4.11.0"

@@ -702,9 +702,13 @@ var _ = Describe("Route handling", func() {
 		})
 
 		hasAllValidRoutes := func(routes *routev1.RouteList) {
-			Expect(routes.Items).To(HaveLen(7))
+			Expect(routes.Items).To(HaveLen(8))
 			for _, route := range routes.Items {
-				Expect(route.Spec.Host).To(Equal(clusterInfoConfigMap.Data["cluster_address"]))
+				if route.Name == IMCrtAuthRouteName {
+					Expect(route.Spec.Host).To(Equal(strings.Join([]string{IMCrtAuthRoutePrefix, clusterInfoConfigMap.Data["cluster_address"]}, "-")))
+				} else {
+					Expect(route.Spec.Host).To(Equal(clusterInfoConfigMap.Data["cluster_address"]))
+				}
 				for k, v := range commonRouteAnnotations {
 					Expect(route.Annotations).To(HaveKeyWithValue(k, v))
 				}
@@ -753,6 +757,11 @@ var _ = Describe("Route handling", func() {
 					Expect(route.Spec.TLS.DestinationCACertificate).To(Equal(string(platformAuthSecretSecret.Data["ca.crt"])))
 					Expect(route.Annotations).To(HaveKeyWithValue("haproxy.router.openshift.io/balance", "source"))
 					Expect(route.Annotations).To(HaveKeyWithValue("haproxy.router.openshift.io/rewrite-target", "/ibm/api/social-login"))
+				case IMCrtAuthRouteName:
+					Expect(route.Spec.Port).To(Equal(&routev1.RoutePort{TargetPort: intstr.FromInt(9443)}))
+					Expect(route.Spec.To.Name).To(Equal(PlatformAuthServiceName))
+					Expect(route.Spec.TLS.Termination).To(Equal(routev1.TLSTerminationPassthrough))
+					Expect(route.Annotations).To(HaveKeyWithValue("haproxy.router.openshift.io/balance", "source"))
 				}
 			}
 		}

@@ -20,6 +20,8 @@ const (
 	// ClusterConfigName ... ibmcloud-cluster-info
 	ClusterAddr          string = "cluster_address"
 	ClusterEP            string = "cluster_endpoint"
+	IMCrtAuthRouteName   string = "im-certauth-passthrough"
+	IMCrtAuthRoutePrefix string = "passthrough"
 	RouteHTTPPort        string = "cluster_router_http_port"
 	RouteHTTPSPort       string = "cluster_router_https_port"
 	RouteHTTPPortValue   string = "80"

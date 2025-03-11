@@ -316,6 +316,21 @@ func MergeMap(in map[string]string, mergeMap map[string]string) map[string]strin
 	return mergeMap
 }
 
+func MergeMaps(dst map[string]string, srcs ...map[string]string) map[string]string {
+	if dst == nil {
+		dst = make(map[string]string)
+	}
+	if len(srcs) < 1 {
+		return dst
+	}
+	for _, src := range srcs {
+		for k, v := range src {
+			dst[k] = v
+		}
+	}
+	return dst
+}
+
 func GetBindInfoRefreshMap() map[string]string {
 	return map[string]string{
 		"bindinfoRefresh/configmap": DatastoreEDBCMName,
@@ -368,4 +383,13 @@ func RemoveString(slice []string, s string) (result []string) {
 		result = append(result, item)
 	}
 	return
+}
+
+// GetCommonLabels sets Kubernetes' recommended labels for the given object.  It
+// returns true if any labels were changed, false otherwise.
+func GetCommonLabels() (l map[string]string) {
+	return map[string]string{
+		"app.kubernetes.io/part-of":    "im",
+		"app.kubernetes.io/managed-by": "ibm-iam-operator",
+	}
 }

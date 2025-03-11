@@ -25,11 +25,13 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -41,6 +43,7 @@ import (
 	oidcsecuritycontrollers "github.com/IBM/ibm-iam-operator/controllers/oidc.security"
 	operatorcontrollers "github.com/IBM/ibm-iam-operator/controllers/operator"
 	routev1 "github.com/openshift/api/route/v1"
+	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	//+kubebuilder:scaffold:imports
@@ -129,7 +132,24 @@ func main() {
 		}
 
 		cacheOptions := cache.Options{
-			DefaultNamespaces: defaultNamespaces,
+			DefaultNamespaces:    defaultNamespaces,
+			DefaultLabelSelector: labels.Everything(),
+			ByObject: map[client.Object]cache.ByObject{
+				&corev1.Secret{}: {Label: labels.SelectorFromSet(map[string]string{
+					"app.kubernetes.io/managed-by": "ibm-iam-operator",
+				})},
+			},
+		}
+
+		mgrOptions.Cache = cacheOptions
+	} else {
+		cacheOptions := cache.Options{
+			DefaultLabelSelector: labels.Everything(),
+			ByObject: map[client.Object]cache.ByObject{
+				&corev1.Secret{}: {Label: labels.SelectorFromSet(map[string]string{
+					"app.kubernetes.io/managed-by": "ibm-iam-operator",
+				})},
+			},
 		}
 
 		mgrOptions.Cache = cacheOptions

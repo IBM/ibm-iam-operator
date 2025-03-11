@@ -22,6 +22,7 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/controllers/common"
+	ctrlcommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -93,12 +94,15 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 	image := common.GetImageRef("IM_INITCONTAINER_IMAGE")
 	resources := instance.Spec.ClientRegistration.Resources
 
-	metaLabels := common.MergeMap(map[string]string{"app": jobName}, instance.Spec.Labels)
+	metaLabels := common.MergeMaps(nil,
+		instance.Spec.Labels,
+		map[string]string{"app": jobName},
+		ctrlcommon.GetCommonLabels())
 	podMetaLabels := map[string]string{
 		"app":                        jobName,
 		"app.kubernetes.io/instance": "oidc-client-registration",
 	}
-	podLabels := common.MergeMap(podMetaLabels, instance.Spec.Labels)
+	podLabels := common.MergeMaps(nil, instance.Spec.Labels, podMetaLabels, ctrlcommon.GetCommonLabels())
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{
 			Limits: map[corev1.ResourceName]resource.Quantity{

@@ -383,13 +383,8 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return subreconciler.Evaluate(result, err)
 	}
 
-	// Check if this Deployment already exists and create it if it doesn't
-	currentDeployment := &appsv1.Deployment{}
-	currentProviderDeployment := &appsv1.Deployment{}
-	currentManagerDeployment := &appsv1.Deployment{}
-	err = r.handleDeployment(instance, currentDeployment, currentProviderDeployment, currentManagerDeployment, &needToRequeue)
-	if err != nil {
-		return
+	if subResult, err := r.handleDeployments(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
 	}
 
 	if needsAuditServiceDummyDataReset(instance) {

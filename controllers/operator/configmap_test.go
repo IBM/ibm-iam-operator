@@ -634,10 +634,15 @@ var _ = Describe("ConfigMap handling", func() {
 
 			for _, test := range updateOnNotSetKeys {
 				observed := &corev1.ConfigMap{}
-				Expect(generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, observed)).
+				u := &cmUpdater{
+					Client:              r.Client,
+					authCR:              authCR,
+					ibmCloudClusterInfo: ibmcloudClusterInfo,
+				}
+				Expect(generateAuthIdpConfigMap(ctx, u, observed)).
 					To(Succeed())
 				generated := &corev1.ConfigMap{}
-				err := generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)
+				err := generateAuthIdpConfigMap(ctx, u, generated)
 				Expect(err).NotTo(HaveOccurred())
 				updated, err = updatePlatformAuthIDP(observed, generated)
 				Expect(err).ToNot(HaveOccurred())
@@ -671,10 +676,15 @@ var _ = Describe("ConfigMap handling", func() {
 			}
 			for _, test := range updateOnNotUpToDate {
 				observed := &corev1.ConfigMap{}
-				Expect(generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, observed)).
+				u := &cmUpdater{
+					Client:              r.Client,
+					authCR:              authCR,
+					ibmCloudClusterInfo: ibmcloudClusterInfo,
+				}
+				Expect(generateAuthIdpConfigMap(ctx, u, observed)).
 					To(Succeed())
 				generated := &corev1.ConfigMap{}
-				err := generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)
+				err := generateAuthIdpConfigMap(ctx, u, generated)
 				Expect(err).NotTo(HaveOccurred())
 				updated, err = updatePlatformAuthIDP(observed, generated)
 				Expect(err).ToNot(HaveOccurred())
@@ -702,7 +712,12 @@ var _ = Describe("ConfigMap handling", func() {
 				// Set the keys in observed to contain localhost IP
 				observed.Data[k] = "https://127.0.0.1:12345"
 				generated := &corev1.ConfigMap{}
-				Expect(generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)).
+				updater := &cmUpdater{
+					Client:              r.Client,
+					authCR:              authCR,
+					ibmCloudClusterInfo: ibmcloudClusterInfo,
+				}
+				Expect(generateAuthIdpConfigMap(ctx, updater, generated)).
 					To(Succeed())
 				updated, err := updatePlatformAuthIDP(observed, generated)
 				Expect(err).NotTo(HaveOccurred())
@@ -713,13 +728,23 @@ var _ = Describe("ConfigMap handling", func() {
 
 		It("replaces value in OS_TOKEN_LENGTH only when it is set to 45", func() {
 			observed := &corev1.ConfigMap{}
-			Expect(generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, observed)).
+			u := &cmUpdater{
+				Client:              r.Client,
+				authCR:              authCR,
+				ibmCloudClusterInfo: ibmcloudClusterInfo,
+			}
+			Expect(generateAuthIdpConfigMap(ctx, u, observed)).
 				To(Succeed())
 			// Set the keys in observed to contain localhost IP
 			k := "OS_TOKEN_LENGTH"
 			observed.Data[k] = "24"
 			generated := &corev1.ConfigMap{}
-			Expect(generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)).
+			updater := &cmUpdater{
+				Client:              r.Client,
+				authCR:              authCR,
+				ibmCloudClusterInfo: ibmcloudClusterInfo,
+			}
+			Expect(generateAuthIdpConfigMap(ctx, updater, generated)).
 				To(Succeed())
 			updated, err := updatePlatformAuthIDP(observed, generated)
 			Expect(err).NotTo(HaveOccurred())
@@ -754,10 +779,16 @@ var _ = Describe("ConfigMap handling", func() {
 			}
 			for _, test := range updateAlways {
 				observed := getObserved()
-				Expect(generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, observed)).
+				u := &cmUpdater{
+					authCR:              authCR,
+					Client:              r.Client,
+					ibmCloudClusterInfo: ibmcloudClusterInfo,
+					Name:                "platform-auth-idp",
+				}
+				Expect(generateAuthIdpConfigMap(ctx, u, observed)).
 					To(Succeed())
 				generated := &corev1.ConfigMap{}
-				err := generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)
+				err := generateAuthIdpConfigMap(ctx, u, generated)
 				Expect(err).NotTo(HaveOccurred())
 				updated, err = updatePlatformAuthIDP(observed, generated)
 				Expect(err).ToNot(HaveOccurred())
@@ -872,7 +903,12 @@ var _ = Describe("ConfigMap handling", func() {
 		})
 		It("generates a ConfigMap based upon values in ibmcloud-cluster-info and Authentication CR", func() {
 			generated := &corev1.ConfigMap{}
-			err := generateOAuthClientConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)
+			updater := &cmUpdater{
+				Client:              r.Client,
+				authCR:              authCR,
+				ibmCloudClusterInfo: ibmcloudClusterInfo,
+			}
+			err := generateOAuthClientConfigMap(ctx, updater, generated)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(generated.Data).ToNot(BeNil())
 			Expect(generated.Data["MASTER_IP"]).To(Equal(ibmcloudClusterInfo.Data["cluster_address"]))
@@ -893,13 +929,19 @@ var _ = Describe("ConfigMap handling", func() {
 
 		It("updates that ConfigMap based upon values in ibmcloud-cluster-info and Authentication CR", func() {
 			fakeObserved := &corev1.ConfigMap{}
-			err := generateOAuthClientConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, fakeObserved)
+
+			updater := &cmUpdater{
+				Client:              r.Client,
+				authCR:              authCR,
+				ibmCloudClusterInfo: ibmcloudClusterInfo,
+			}
+			err := generateOAuthClientConfigMap(ctx, updater, fakeObserved)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(fakeObserved.Data).ToNot(BeNil())
 			fakeObserved.Data["MASTER_IP"] = "dummy-address"
 			fakeObserved.Data["CLUSTER_NAME"] = "dummy-name"
 			generated := &corev1.ConfigMap{}
-			err = generateOAuthClientConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)
+			err = generateOAuthClientConfigMap(ctx, updater, generated)
 			Expect(generated.Data).ToNot(BeNil())
 			Expect(err).ToNot(HaveOccurred())
 			updated, err := updateOAuthClientConfigMap(fakeObserved, generated)
@@ -1022,7 +1064,12 @@ var _ = Describe("ConfigMap handling", func() {
 
 		It("generates a ConfigMap based upon values in ibmcloud-cluster-info and Authentication CR", func() {
 			generated := &corev1.ConfigMap{}
-			err := generateRegistrationScriptConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)
+			updater := &cmUpdater{
+				Client:              r.Client,
+				authCR:              authCR,
+				ibmCloudClusterInfo: ibmcloudClusterInfo,
+			}
+			err := generateRegistrationScriptConfigMap(ctx, updater, generated)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(generated.Data).ToNot(BeNil())
 			Expect(generated.Data["register-client.sh"]).To(Equal(registerClientScript))

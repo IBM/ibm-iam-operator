@@ -23,7 +23,11 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"time"
 
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+
+	"github.com/opdev/subreconciler"
 	osconfigv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	userv1 "github.com/openshift/api/user/v1"
@@ -392,4 +396,75 @@ func GetCommonLabels() (l map[string]string) {
 		"app.kubernetes.io/part-of":    "im",
 		"app.kubernetes.io/managed-by": "ibm-iam-operator",
 	}
+}
+
+// DefaultLowerWait is used in instances where a requeue is needed quickly, regardless of previous requeues
+var DefaultLowerWait time.Duration = 5 * time.Millisecond
+
+// ObjectUpdater provides an interface for creating or updating an object based upon observed cluster state
+type ObjectUpdater interface {
+	client.Client
+	ObjectName() string
+	ObjectNamespace() string
+	ObjectKind() string
+	Generate(context.Context, client.Object) error
+	GetEmptyObject() client.Object
+	Modify(client.Object, client.Object) (bool, error)
+	OnChange(context.Context) error
+}
+
+type Validator interface {
+	Validate() error
+}
+
+func CreateOrUpdate(ctx context.Context, u ObjectUpdater) (result *ctrl.Result, err error) {
+	if validator, ok := u.(Validator); ok {
+		if err = validator.Validate(); err != nil {
+			return subreconciler.RequeueWithError(err)
+		}
+	}
+	reqLogger := logf.FromContext(ctx).WithValues("Object.Namespace", u.ObjectNamespace(), "Object.Kind", u.ObjectKind(), "Object.Name", u.ObjectName())
+	var observed client.Object = u.GetEmptyObject()
+	var generated client.Object = u.GetEmptyObject()
+	if err = u.Generate(ctx, generated); err != nil {
+		return subreconciler.RequeueWithError(err)
+	}
+	objKey := types.NamespacedName{Name: u.ObjectName(), Namespace: u.ObjectNamespace()}
+	if err = u.Get(ctx, objKey, observed); k8sErrors.IsNotFound(err) {
+		if err := u.Create(ctx, generated); k8sErrors.IsAlreadyExists(err) {
+			reqLogger.Info("Object was found while creating")
+			return subreconciler.RequeueWithDelay(DefaultLowerWait)
+		} else if err != nil {
+			reqLogger.Info("Object could not be created for an unexpected reason", "msg", err.Error())
+			return subreconciler.RequeueWithDelay(DefaultLowerWait)
+		}
+		reqLogger.Info("Object created")
+		if err = u.OnChange(ctx); err != nil {
+			reqLogger.Info("Error occurred while performing post-create work", "reason", err.Error())
+		}
+		return subreconciler.RequeueWithDelay(DefaultLowerWait)
+	}
+
+	modified := false
+	modified, err = u.Modify(observed, generated)
+	if err != nil {
+		reqLogger.Info("An issue was encountered while trying to identify necessary updates", "reason", err.Error())
+		return subreconciler.RequeueWithError(err)
+	} else if !modified {
+		reqLogger.Info("No updates needed")
+		return subreconciler.ContinueReconciling()
+	}
+
+	reqLogger.Info("Updates found; updating the Object")
+	if err = u.Update(ctx, observed); err != nil {
+		reqLogger.Info("Failed to update Object", "msg", err.Error())
+		return subreconciler.RequeueWithDelay(DefaultLowerWait)
+	}
+
+	reqLogger.Info("Object updated successfully")
+	if err = u.OnChange(ctx); err != nil {
+		reqLogger.Info("Error occurred while performing post-update work", "reason", err.Error())
+	}
+
+	return subreconciler.RequeueWithDelay(DefaultLowerWait)
 }

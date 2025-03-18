@@ -184,6 +184,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 				} else {
 					newConfigMap = functionList[index](instance, r.Scheme)
 					if configMapList[index] == "platform-auth-idp" {
+						newConfigMap.Data["MASTER_HOST"] = icpConsoleURL
 						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL == "https://roks.domain.name:443" { //we enable it by default
 							reqLogger.Info("Create platform-auth-idp Configmap roks settings", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 							issuer, err := readROKSURL(instance)
@@ -263,6 +264,12 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.Scheme)
 					currentConfigMap.Data["PREFERRED_LOGIN"] = newConfigMap.Data["PREFERRED_LOGIN"]
+					cmUpdateRequired = true
+				}
+				if _, keyExists := currentConfigMap.Data["MASTER_HOST"]; !keyExists {
+					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					newConfigMap = functionList[index](instance, r.Scheme)
+					currentConfigMap.Data["MASTER_HOST"] = newConfigMap.Data["MASTER_HOST"]
 					cmUpdateRequired = true
 				}
 				if _, keyExists := currentConfigMap.Data["DB_CONNECT_TIMEOUT"]; !keyExists {

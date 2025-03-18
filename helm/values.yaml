@@ -13,12 +13,6 @@ global:
   - tenant1
   - tenant2
 
-# Enabling this sets WATCH_NAMESPACE to look for namespace-scope ConfigMap for
-# the list of namespaces. Disabling generates the comma-separated list based upon
-# namespaces defined in the operatorNamespace, instanceNamespace, and tenantNamespaces
-# variables.
-nssEnabled: false
-
 operator:
   imageTag: "4.11.0" 
 operands:

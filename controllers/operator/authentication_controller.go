@@ -342,6 +342,10 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return subreconciler.Evaluate(subResult, err)
 	}
 
+	if subResult, err := r.handleOperandBindInfo(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
+
 	// Check if this Job already exists and create it if it doesn't
 	currentJob := &batchv1.Job{}
 	err = r.handleJob(instance, currentJob, &needToRequeue)
@@ -428,6 +432,9 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	if ctrlcommon.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
 		authCtrl.Owns(&operatorv1alpha1.OperandRequest{})
+	}
+	if ctrlcommon.ClusterHasOperandBindInfoAPIResource(&r.DiscoveryClient) {
+		authCtrl.Owns(&operatorv1alpha1.OperandBindInfo{})
 	}
 
 	productCMPred := predicate.Funcs{

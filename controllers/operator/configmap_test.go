@@ -471,7 +471,7 @@ var _ = Describe("ConfigMap handling", func() {
 					"IDENTITY_AUTH_DIRECTORY_URL":        "https://platform-auth-service:3100",
 					"IDENTITY_PROVIDER_URL":              "https://platform-identity-provider:4300",
 					"IDENTITY_MGMT_URL":                  "https://platform-identity-management:4500",
-					"MASTER_HOST":                        authCR.Spec.Config.ClusterCADomain,
+					"MASTER_HOST":                        ibmcloudClusterInfo.Data["cluster_address"],
 					"NODE_ENV":                           "production",
 					"AUDIT_ENABLED_IDPROVIDER":           "false",
 					"AUDIT_ENABLED_IDMGMT":               "false",

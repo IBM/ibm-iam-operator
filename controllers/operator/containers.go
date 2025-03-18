@@ -625,7 +625,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		{
 			Name:  "IAM_OIDC_TOKEN_SERVICE_URL",
 			Value: "https://platform-auth-service:9443/iam",
-		}
+		},
 	}
 
 	idpEnvVarList := []string{"NODE_ENV", "LOG_LEVEL_IDPROVIDER", "LOG_LEVEL_MW", "PROVIDER_ISSUER_URL", "MASTER_HOST",

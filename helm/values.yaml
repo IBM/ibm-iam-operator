@@ -1,6 +1,8 @@
 cpfs:
   imageRegistryNamespaceOperator: cpopen
   imageRegistryNamespaceOperand: cpopen/cpfs
+  labels:
+
 global:
   operatorNamespace: operators
   instanceNamespace: instance

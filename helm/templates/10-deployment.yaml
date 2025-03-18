@@ -213,7 +213,6 @@ spec:
         app.kubernetes.io/instance: ibm-iam-operator
         app.kubernetes.io/managed-by: ibm-iam-operator
         app.kubernetes.io/name: ibm-iam-operator
-        intent: projected
         name: ibm-iam-operator
         productName: IBM_Cloud_Platform_Common_Services
     spec:
@@ -258,21 +257,13 @@ spec:
           value: {{ .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperand }}/im-initcontainer:{{ .Values.operands.imInitContainer.imageTag }}
         - name: IMAGE_PULL_SECRET
           value: {{ .Values.global.imagePullSecret }}
-        {{- if .Values.nssEnabled }}
-        - name: WATCH_NAMESPACE
-          valueFrom:
-            configMapKeyRef:
-              name: namespace-scope
-              key: namespaces
-        {{- else }}
-          {{- $watchNamespaces := .Values.global.tetheredNamespaces | default list -}}
-          {{- if .Values.global.instanceNamespace -}}
-          {{- $watchNamespaces = append $watchNamespaces .Values.global.instanceNamespace -}}
-          {{- end -}}
-          {{- $watchNamespaces = prepend $watchNamespaces .Values.global.operatorNamespace }}
+        {{- $watchNamespaces := .Values.global.tetheredNamespaces | default list -}}
+        {{- if .Values.global.instanceNamespace -}}
+        {{- $watchNamespaces = append $watchNamespaces .Values.global.instanceNamespace -}}
+        {{- end -}}
+        {{- $watchNamespaces = prepend $watchNamespaces .Values.global.operatorNamespace }}
         - name: WATCH_NAMESPACE
           value: {{ uniq $watchNamespaces | join "," | quote }}
-        {{- end }}
         image: {{ .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperator }}/ibm-iam-operator:{{ .Values.operator.imageTag }}
         imagePullPolicy: {{ .Values.global.imagePullPolicy }}
         name: ibm-iam-operator

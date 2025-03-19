@@ -173,6 +173,7 @@ func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctr
 		{
 			Name:     "oauth-client-map",
 			generate: generateOAuthClientConfigMap,
+			update:   updateOAuthClientConfigMap,
 		},
 		{
 			Name:     "registration-script",
@@ -380,6 +381,23 @@ func (u *cmUpdater) CreateOrUpdate(ctx context.Context, cl client.Client, authCR
 	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
+func updateOAuthClientConfigMap(observed, generated *corev1.ConfigMap) (updated bool, err error) {
+	updateFns := []func(*corev1.ConfigMap, *corev1.ConfigMap) bool{
+		updatesValuesWhen(not(observedKeyValueSetTo("MASTER_IP", generated.Data["MASTER_IP"])),
+			"MASTER_IP",
+			"PROXY_IP",
+			"CLUSTER_CA_DOMAIN",
+		),
+		updatesValuesWhen(not(observedKeyValueSetTo("CLUSTER_NAME", generated.Data["CLUSTER_NAME"]))),
+	}
+
+	for _, update := range updateFns {
+		updated = update(observed, generated) || updated
+	}
+
+	return
+}
+
 func updatePlatformAuthIDP(observed, generated *corev1.ConfigMap) (updated bool, err error) {
 	updateFns := []func(*corev1.ConfigMap, *corev1.ConfigMap) bool{
 		updatesValuesWhen(observedKeyValueSetTo("OS_TOKEN_LENGTH", "45"),
@@ -408,6 +426,8 @@ func updatePlatformAuthIDP(observed, generated *corev1.ConfigMap) (updated bool,
 			"PREFERRED_LOGIN"),
 		updatesValuesWhen(not(observedKeyValueSetTo("DEFAULT_LOGIN", generated.Data["DEFAULT_LOGIN"])),
 			"DEFAULT_LOGIN"),
+		updatesValuesWhen(not(observedKeyValueSetTo("MASTER_HOST", generated.Data["MASTER_HOST"])),
+			"MASTER_HOST"),
 		updatesValuesWhen(not(observedKeySet("DB_CONNECT_TIMEOUT")),
 			"DB_CONNECT_TIMEOUT",
 			"DB_IDLE_TIMEOUT",
@@ -525,7 +545,7 @@ func generateAuthIdpConfigMap(ctx context.Context, cl client.Client, authCR *ope
 			"IDENTITY_AUTH_DIRECTORY_URL":        "https://platform-auth-service:3100",
 			"IDENTITY_PROVIDER_URL":              "https://platform-identity-provider:4300",
 			"IDENTITY_MGMT_URL":                  "https://platform-identity-management:4500",
-			"MASTER_HOST":                        authCR.Spec.Config.ClusterCADomain,
+			"MASTER_HOST":                        ibmcloudClusterInfo.Data["cluster_address"],
 			"NODE_ENV":                           "production",
 			"AUDIT_ENABLED_IDPROVIDER":           "false",
 			"AUDIT_ENABLED_IDMGMT":               "false",

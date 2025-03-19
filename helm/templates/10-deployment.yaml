@@ -267,7 +267,8 @@ spec:
         {{- $watchNamespaces = prepend $watchNamespaces .Values.global.operatorNamespace }}
         - name: WATCH_NAMESPACE
           value: {{ uniq $watchNamespaces | join "," | quote }}
-        image: {{ .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperator }}/ibm-iam-operator:{{ .Values.operator.imageTag }}
+        {{- end }}
+        image: {{ .Values.cpfs.imagePullPrefix | default .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperator }}/ibm-iam-operator:{{ .Values.operator.imageTag }}
         imagePullPolicy: {{ .Values.global.imagePullPolicy }}
         name: ibm-iam-operator
         resources:

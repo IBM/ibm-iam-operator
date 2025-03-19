@@ -49,6 +49,7 @@ func (r *AuthenticationReconciler) handleCertificates(ctx context.Context, req c
 	certificateSubreconcilers := []subreconciler.Fn{
 		r.removeV1Alpha1Certs(authCR, certificateFieldsList),
 		r.createV1CertificatesIfNotPresent(authCR, certificateFieldsList),
+		r.addLabelIfMissing(certificateFieldsList),
 	}
 	reqLogger.Info("Reconciling Certificates")
 	fnCtx := ctrl.LoggerInto(ctx, reqLogger)
@@ -251,12 +252,69 @@ func (r *AuthenticationReconciler) createV1CertificateIfNotPresent(authCR *opera
 	}
 }
 
+// addLabelIfMissing adds "manage-cert-rotation": "yes" label to the certificate if not exist
+func (r *AuthenticationReconciler) addLabelIfMissing(fieldsList []*reconcileCertificateFields) (fn subreconciler.Fn) {
+	return func(ctx context.Context) (result *ctrl.Result, err error) {
+		reqLogger := ctrl.LoggerFrom(ctx)
+
+		allV1CertReconcilers := make([]subreconciler.Fn, 0)
+		for _, fields := range fieldsList {
+			allV1CertReconcilers = append(allV1CertReconcilers, r.updateCertWithLabel(fields))
+		}
+		results := []*ctrl.Result{}
+		errs := []error{}
+		for _, reconcileV1Cert := range allV1CertReconcilers {
+			result, err = reconcileV1Cert(ctx)
+			results = append(results, result)
+			errs = append(errs, err)
+		}
+
+		result, err = ctrlcommon.ReduceSubreconcilerResultsAndErrors(results, errs)
+		if subreconciler.ShouldContinue(result, err) {
+			reqLogger.Info("No certificates to be labeled")
+		} else if subreconciler.ShouldRequeue(result, err) && err == nil {
+			reqLogger.Info("Certificates were labeled; requeueing")
+		} else if err != nil {
+			reqLogger.Info("Encountered an issue while trying to label certificates")
+		}
+
+		return
+	}
+}
+
+func (r *AuthenticationReconciler) updateCertWithLabel(fields *reconcileCertificateFields) subreconciler.Fn {
+	return func(ctx context.Context) (result *ctrl.Result, err error) {
+		reqLogger := ctrl.LoggerFrom(ctx, "Certificate.Name", fields.Name, "Certificate.Namespace", fields.Namespace)
+		cert := &certmgrv1.Certificate{}
+		err = r.Get(ctx, fields.NamespacedName, cert)
+		if err == nil {
+			certRotationKey := "manage-cert-rotation"
+			if _, exists := cert.Labels[certRotationKey]; !exists {
+				reqLogger.Info("Updating Certificate with label")
+				cert.Labels[certRotationKey] = "yes"
+				err = r.Update(ctx, cert)
+				if err != nil {
+					reqLogger.Error(err, "Failed to update Certificate with label")
+					return subreconciler.RequeueWithError(err)
+				}
+				// Certificate label updated successfully - return and requeue
+				return subreconciler.RequeueWithDelay(defaultLowerWait)
+			}
+			return subreconciler.ContinueReconciling()
+		} else {
+			reqLogger.Error(err, "Failed to get Certificate for labelling")
+			return subreconciler.RequeueWithError(err)
+		}
+	}
+}
+
 func (r *AuthenticationReconciler) generateCertificateObject(authCR *operatorv1alpha1.Authentication, fields *reconcileCertificateFields) *certmgrv1.Certificate {
 	metaLabels := map[string]string{
 		"app":                          fields.CommonName,
 		"app.kubernetes.io/instance":   "ibm-iam-operator",
 		"app.kubernetes.io/managed-by": "ibm-iam-operator",
 		"app.kubernetes.io/name":       fields.CommonName,
+		"manage-cert-rotation":         "yes",
 	}
 
 	certificate := &certmgrv1.Certificate{

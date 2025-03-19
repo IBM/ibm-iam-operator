@@ -22,6 +22,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	myerr "errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -267,7 +268,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 					currentConfigMap.Data["PREFERRED_LOGIN"] = newConfigMap.Data["PREFERRED_LOGIN"]
 					cmUpdateRequired = true
 				}
-				if _, keyExists := currentConfigMap.Data["MASTER_HOST"]; !keyExists {
+				if _, keyExists := currentConfigMap.Data["MASTER_HOST"]; keyExists {
 					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					newConfigMap = functionList[index](instance, r.Scheme)
 					currentConfigMap.Data["MASTER_HOST"] = newConfigMap.Data["MASTER_HOST"]
@@ -512,8 +513,8 @@ type registrationJSONData struct {
 func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	isPublicCloud := isPublicCloud(r.Client, instance.Namespace, "ibmcloud-cluster-info")
-	clusterAddress := getClusterAddress(r.Client, instance.Namespace, "ibmcloud-cluster-info")
-	if strings.EqualFold(clusterAddress, "") {
+	clusterAddress, err := getClusterAddress(r.Client, instance.Namespace, "ibmcloud-cluster-info")
+	if clusterAddress == "" || len(clusterAddress) == 0 {
 		clusterAddress = instance.Spec.Config.ClusterCADomain
 	}
 	bootStrapUserId := instance.Spec.Config.BootstrapUserId
@@ -942,7 +943,7 @@ func isPublicCloud(client client.Client, namespace string, configMap string) boo
 }
 
 // Check if hosted on IBM Cloud
-func getClusterAddress(client client.Client, namespace string, configMap string) string {
+func getClusterAddress(client client.Client, namespace string, configMap string) (string, error) {
 	currentConfigMap := &corev1.ConfigMap{}
 	err := client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: namespace}, currentConfigMap)
 	if err != nil {
@@ -950,9 +951,9 @@ func getClusterAddress(client client.Client, namespace string, configMap string)
 	} else {
 		host := currentConfigMap.Data["cluster_address"]
 		log.Info("Fetched cluster address from configmap", host)
-		return host
+		return host, nil
 	}
-	return ""
+	return "", myerr.New(fmt.Sprint("failed to fetch the cluster address:"))
 }
 
 func readROKSURL(instance *operatorv1alpha1.Authentication) (string, error) {

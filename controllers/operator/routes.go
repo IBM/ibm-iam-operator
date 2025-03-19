@@ -572,12 +572,6 @@ func (r *AuthenticationReconciler) newRoute(authCR *operatorv1alpha1.Authenticat
 			Termination:                   routev1.TLSTerminationPassthrough,
 			InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
 		}
-	} else {
-		// Edge route (if RoutePath is present)
-		route.Spec.TLS = &routev1.TLSConfig{
-			Termination:                   routev1.TLSTerminationEdge,
-			InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
-		}
 	}
 
 	err := controllerutil.SetControllerReference(authCR, route, r.Client.Scheme())

@@ -511,6 +511,10 @@ type registrationJSONData struct {
 func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	isPublicCloud := isPublicCloud(r.Client, instance.Namespace, "ibmcloud-cluster-info")
+	clusterAddress := getClusterAddress(r.Client, instance.Namespace, "ibmcloud-cluster-info")
+	if strings.EqualFold(clusterAddress, "") {
+		clusterAddress = instance.Spec.Config.ClusterCADomain
+	}
 	bootStrapUserId := instance.Spec.Config.BootstrapUserId
 	roksUserPrefix := instance.Spec.Config.ROKSUserPrefix
 	if len(bootStrapUserId) > 0 && strings.EqualFold(bootStrapUserId, "kubeadmin") && isPublicCloud {
@@ -533,7 +537,7 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 			"IDENTITY_AUTH_DIRECTORY_URL":        "https://platform-auth-service:3100",
 			"IDENTITY_PROVIDER_URL":              "https://platform-identity-provider:4300",
 			"IDENTITY_MGMT_URL":                  "https://platform-identity-management:4500",
-			"MASTER_HOST":                        instance.Spec.Config.ClusterCADomain,
+			"MASTER_HOST":                        clusterAddress,
 			"NODE_ENV":                           "production",
 			"AUDIT_ENABLED_IDPROVIDER":           "false",
 			"AUDIT_ENABLED_IDMGMT":               "false",
@@ -934,6 +938,20 @@ func isPublicCloud(client client.Client, namespace string, configMap string) boo
 		return strings.HasSuffix(host, "cloud.ibm.com")
 	}
 	return false
+}
+
+// Check if hosted on IBM Cloud
+func getClusterAddress(client client.Client, namespace string, configMap string) string {
+	currentConfigMap := &corev1.ConfigMap{}
+	err := client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: namespace}, currentConfigMap)
+	if err != nil {
+		log.Info("Error getting configmap", configMap)
+		return ""
+	} else if err == nil {
+		host := currentConfigMap.Data["cluster_address"]
+		return host
+	}
+	return ""
 }
 
 func readROKSURL(instance *operatorv1alpha1.Authentication) (string, error) {

@@ -22,7 +22,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
-	myerr "errors"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -38,7 +38,7 @@ import (
 	"gopkg.in/yaml.v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -67,7 +67,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 	reqLogger.Info("Query global cm", "Configmap.Namespace", instance.Namespace, "ConfigMap.Name", globalConfigMapName)
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: globalConfigMapName, Namespace: instance.Namespace}, globalConfigMap)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) {
 			reqLogger.Error(err, "The configmap ", globalConfigMapName, " is not created yet")
 			return
 		}
@@ -87,7 +87,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 	// Reconcile ibmcloud-cluster-info configmap if not created already
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: "ibmcloud-cluster-info", Namespace: instance.Namespace}, currentConfigMap)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) {
 			reqLogger.Info("Configmap is not found ", "Configmap.Namespace", instance.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
 			reqLogger.Info("Going to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", "ibmcloud-cluster-info")
 			newConfigMap = r.ibmcloudClusterInfoConfigMap(r.Client, instance, r.RunningOnOpenShiftCluster(), domainName, r.Scheme)
@@ -145,7 +145,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 	proxyConfigMap := &corev1.ConfigMap{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: proxyConfigMapName, Namespace: instance.Namespace}, proxyConfigMap)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) {
 			reqLogger.Error(err, "The configmap ", proxyConfigMapName, " is not created yet")
 			return
 		}
@@ -172,7 +172,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 	for index, configMap := range configMapList {
 		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: instance.Namespace}, currentConfigMap)
 		if err != nil {
-			if errors.IsNotFound(err) {
+			if k8serrors.IsNotFound(err) {
 				// Define a new ConfigMap
 				if configMapList[index] == "registration-json" {
 					newConfigMap = registrationJsonConfigMap(instance, wlpClientID, wlpClientSecret, icpConsoleURL, r.Scheme)
@@ -473,7 +473,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 							},
 						}
 						if err = r.Client.Delete(context.TODO(), job); err != nil {
-							if errors.IsNotFound(err) {
+							if k8serrors.IsNotFound(err) {
 								reqLogger.Info("Job not found on cluster; continuing", "Job.Name", "oidc-client-registration")
 								return nil
 							}
@@ -823,7 +823,7 @@ func (r *AuthenticationReconciler) ibmcloudClusterInfoConfigMap(client client.Cl
 				}
 			}
 		} else {
-			if !errors.IsNotFound(errGet) {
+			if !k8serrors.IsNotFound(errGet) {
 				reqLogger.Error(errGet, "Failed to READ openshift ingress cluster config")
 			}
 		}
@@ -957,7 +957,7 @@ func getClusterAddress(client client.Client, namespace string, configMap string)
 		log.Info("Fetched cluster address from configmap", host)
 		return host, nil
 	}
-	return "", myerr.New(fmt.Sprint("failed to fetch the cluster address"))
+	return "", errors.New(fmt.Sprint("failed to fetch the cluster address"))
 }
 
 func readROKSURL(instance *operatorv1alpha1.Authentication) (string, error) {

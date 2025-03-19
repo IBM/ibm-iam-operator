@@ -513,7 +513,11 @@ type registrationJSONData struct {
 func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme) *corev1.ConfigMap {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	isPublicCloud := isPublicCloud(r.Client, instance.Namespace, "ibmcloud-cluster-info")
-	clusterAddress, err := getClusterAddress(r.Client, instance.Namespace, "ibmcloud-cluster-info")
+	clusterAddress, cerr := getClusterAddress(r.Client, instance.Namespace, "ibmcloud-cluster-info")
+	if cerr != nil {
+		reqLogger.Error(cerr, "Failed to fetch the cluster_address from the ibmcloud-cluster-info ConfigMap")
+		return nil
+	}
 	if clusterAddress == "" || len(clusterAddress) == 0 {
 		clusterAddress = instance.Spec.Config.ClusterCADomain
 	}
@@ -953,7 +957,7 @@ func getClusterAddress(client client.Client, namespace string, configMap string)
 		log.Info("Fetched cluster address from configmap", host)
 		return host, nil
 	}
-	return "", myerr.New(fmt.Sprint("failed to fetch the cluster address:"))
+	return "", myerr.New(fmt.Sprint("failed to fetch the cluster address"))
 }
 
 func readROKSURL(instance *operatorv1alpha1.Authentication) (string, error) {

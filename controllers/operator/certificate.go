@@ -271,11 +271,11 @@ func (r *AuthenticationReconciler) addLabelIfMissing(fieldsList []*reconcileCert
 
 		result, err = ctrlcommon.ReduceSubreconcilerResultsAndErrors(results, errs)
 		if subreconciler.ShouldContinue(result, err) {
-			reqLogger.Info("No v1 Certificates to create for IM")
+			reqLogger.Info("No certificates to be labeled")
 		} else if subreconciler.ShouldRequeue(result, err) && err == nil {
-			reqLogger.Info("v1 Certificates were created; requeueing")
+			reqLogger.Info("Certificates were labeled; requeueing")
 		} else if err != nil {
-			reqLogger.Info("Encountered an issue while trying to create v1 Certificates for IM")
+			reqLogger.Info("Encountered an issue while trying to label certificates")
 		}
 
 		return
@@ -289,7 +289,6 @@ func (r *AuthenticationReconciler) updateCertWithLabel(fields *reconcileCertific
 		err = r.Get(ctx, fields.NamespacedName, cert)
 		if err == nil {
 			certRotationKey := "manage-cert-rotation"
-			cert.Labels[certRotationKey] = "yes"
 			if _, exists := cert.Labels[certRotationKey]; !exists {
 				reqLogger.Info("Updating Certificate with label")
 				cert.Labels[certRotationKey] = "yes"
@@ -303,7 +302,7 @@ func (r *AuthenticationReconciler) updateCertWithLabel(fields *reconcileCertific
 			}
 			return subreconciler.ContinueReconciling()
 		} else {
-			reqLogger.Error(err, "Failed to get Certificate")
+			reqLogger.Error(err, "Failed to get Certificate for labelling")
 			return subreconciler.RequeueWithError(err)
 		}
 	}

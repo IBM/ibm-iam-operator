@@ -185,6 +185,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 					newConfigMap = functionList[index](instance, r.Scheme)
 					if configMapList[index] == "platform-auth-idp" {
 						newConfigMap.Data["MASTER_HOST"] = icpConsoleURL
+						reqLogger.Info("Updating master host in auth-idp configmap", "Configmap.Namespace", currentConfigMap.Namespace, "icpConsoleURL", icpConsoleURL)
 						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL == "https://roks.domain.name:443" { //we enable it by default
 							reqLogger.Info("Create platform-auth-idp Configmap roks settings", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 							issuer, err := readROKSURL(instance)
@@ -946,10 +947,8 @@ func getClusterAddress(client client.Client, namespace string, configMap string)
 	err := client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: namespace}, currentConfigMap)
 	if err != nil {
 		log.Info("Error getting configmap", configMap)
-		return ""
-	} else if err == nil {
-		host := currentConfigMap.Data["cluster_address"]
-		return host
+	} else {
+		return currentConfigMap.Data["cluster_address"]
 	}
 	return ""
 }

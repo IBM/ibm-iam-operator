@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/opdev/subreconciler"
 	routev1 "github.com/openshift/api/route/v1"
@@ -292,6 +293,15 @@ func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.A
 				ServiceName:       PlatformAuthServiceName,
 				DestinationCAcert: platformAuthCert,
 			},
+			IMCrtAuthRouteName: {
+				Annotations: map[string]string{
+					"haproxy.router.openshift.io/balance": "source",
+				},
+				Name:        IMCrtAuthRouteName,
+				RouteHost:   strings.Join([]string{IMCrtAuthRoutePrefix, routeHost}, "-"),
+				RoutePort:   9443,
+				ServiceName: PlatformAuthServiceName,
+			},
 		}
 
 		for _, routeFields := range *allRoutesFields {
@@ -321,6 +331,10 @@ func (r *AuthenticationReconciler) reconcileRoute(authCR *operatorv1alpha1.Authe
 
 func (r *AuthenticationReconciler) ensureRouteDoesNotExist(ctx context.Context, authCR *operatorv1alpha1.Authentication, fields *reconcileRouteFields) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx)
+	if fields.Name == IMCrtAuthRouteName {
+		//do not delete certAuth route
+		return subreconciler.ContinueReconciling()
+	}
 	reqLogger.Info("Determined Route should not exist; removing if present")
 	observedRoute := &routev1.Route{}
 	err = r.Get(ctx, types.NamespacedName{Name: fields.Name, Namespace: authCR.Namespace}, observedRoute)
@@ -518,7 +532,7 @@ func (r *AuthenticationReconciler) newRoute(authCR *operatorv1alpha1.Authenticat
 	weight := int32(100)
 
 	commonLabel := map[string]string{"app": "im"}
-	routeLabels := ctrlcommon.MergeMap(commonLabel, authCR.Spec.Labels)
+	routeLabels := ctrlcommon.MergeMaps(nil, authCR.Spec.Labels, commonLabel, ctrlcommon.GetCommonLabels())
 
 	route := &routev1.Route{
 		TypeMeta: metav1.TypeMeta{
@@ -554,6 +568,12 @@ func (r *AuthenticationReconciler) newRoute(authCR *operatorv1alpha1.Authenticat
 			Termination:                   routev1.TLSTerminationReencrypt,
 			InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
 			DestinationCACertificate:      string(fields.DestinationCAcert),
+		}
+	} else if fields.RoutePath == "" {
+		// Passthrough route (if RoutePath is empty)
+		route.Spec.TLS = &routev1.TLSConfig{
+			Termination:                   routev1.TLSTerminationPassthrough,
+			InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
 		}
 	}
 

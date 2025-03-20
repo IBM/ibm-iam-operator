@@ -18,6 +18,7 @@ package oidcsecurity
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"strconv"
 	"strings"
@@ -283,6 +284,16 @@ func (r *ClientReconciler) ensureSecretAndClientIdSet(ctx context.Context, req c
 			return subreconciler.RequeueWithError(err)
 		}
 		reqLogger.Info("Successfully created Secret for Client", "secretName", clientCR.Spec.Secret)
+		return subreconciler.Requeue()
+	}
+
+	labels := common.MergeMaps(nil, secret.Labels, common.GetCommonLabels())
+	if !maps.Equal(secret.Labels, labels) {
+		secret.Labels = labels
+		if err = r.Update(ctx, secret); err != nil {
+			reqLogger.Error(err, "Failed to add missing labels")
+			return subreconciler.RequeueWithError(err)
+		}
 		return subreconciler.Requeue()
 	}
 
@@ -748,10 +759,10 @@ func getClientCredsFromSecret(secret *corev1.Secret) (clientCreds *ClientCredent
 
 func (r *ClientReconciler) createNewSecretForClient(ctx context.Context, client *oidcsecurityv1.Client) (*corev1.Secret, error) {
 	reqLogger := logf.FromContext(ctx, "Request.Namespace", client.Namespace, "client.Name", client.Name)
-	labels := map[string]string{
+	labels := common.MergeMaps(nil, map[string]string{
 		"app.kubernetes.io/managed-by":          "OIDCClientRegistration.oidc.security.ibm.com",
 		"client.oidc.security.ibm.com/owned-by": client.Name,
-	}
+	}, common.GetCommonLabels())
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

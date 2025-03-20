@@ -1,3 +1,25 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/instance: ibm-iam-operator
+    app.kubernetes.io/managed-by: ibm-iam-operator
+    app.kubernetes.io/name: ibm-iam-operator
+    component-id: {{ .Chart.Name }}
+    {{- with .Values.cpfs.labels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  name: ibm-iam-operator
+  namespace: {{ .Values.global.operatorNamespace }}
+{{- $watchNamespaces := .Values.global.tetheredNamespaces | default list -}}
+{{- if .Values.global.instanceNamespace -}}
+{{- $watchNamespaces = append $watchNamespaces .Values.global.instanceNamespace -}}
+{{- end -}}
+{{- $watchNamespaces = prepend $watchNamespaces .Values.global.operatorNamespace -}}
+{{- $labels := .Values.cpfs.labels }}
+{{- range $namespace := $watchNamespaces | uniq }}
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -5,8 +27,12 @@ metadata:
     app.kubernetes.io/instance: ibm-iam-operator
     app.kubernetes.io/managed-by: ibm-iam-operator
     app.kubernetes.io/name: ibm-iam-operator
+    component-id: {{ $.Chart.Name }}
+    {{- with $labels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
   name: ibm-iam-operator
-  namespace: {{.Values.global.operatorNamespace}}
+  namespace: {{ $namespace }}
 rules:
 - apiGroups:
   - route.openshift.io
@@ -149,6 +175,7 @@ rules:
   - operator.ibm.com
   resources:
   - operandrequests
+  - operandbindinfos
   verbs:
   - create
   - get
@@ -161,6 +188,7 @@ rules:
   - operator.ibm.com
   resources:
   - operandrequests/status
+  - operandbindinfos/status
   verbs:
   - watch
   - get
@@ -244,3 +272,26 @@ rules:
   - patch
   - update
   - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/instance: ibm-iam-operator
+    app.kubernetes.io/managed-by: ibm-iam-operator
+    app.kubernetes.io/name: ibm-iam-operator
+    component-id: {{ $.Chart.Name }}
+    {{- with $labels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  name: ibm-iam-operator
+  namespace: {{ $namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ibm-iam-operator
+subjects:
+- kind: ServiceAccount
+  name: ibm-iam-operator
+  namespace: {{ $.Values.global.operatorNamespace }}
+{{- end }}

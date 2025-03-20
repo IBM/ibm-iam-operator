@@ -5,6 +5,10 @@ metadata:
     app.kubernetes.io/instance: ibm-iam-operator
     app.kubernetes.io/managed-by: ibm-iam-operator
     app.kubernetes.io/name: ibm-iam-operator
+    component-id: {{ .Chart.Name }}
+    {{- with .Values.cpfs.labels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
     productName: IBM_Cloud_Platform_Common_Services
   annotations:
     alm-examples: |
@@ -196,7 +200,7 @@ metadata:
       ]
     packageName: ibm-iam-operator
   name: ibm-iam-operator
-  namespace: {{.Values.global.operatorNamespace}}
+  namespace: {{ .Values.global.operatorNamespace }}
 spec:
   replicas: 1
   selector:
@@ -212,7 +216,6 @@ spec:
         app.kubernetes.io/instance: ibm-iam-operator
         app.kubernetes.io/managed-by: ibm-iam-operator
         app.kubernetes.io/name: ibm-iam-operator
-        intent: projected
         name: ibm-iam-operator
         productName: IBM_Cloud_Platform_Common_Services
     spec:
@@ -248,22 +251,24 @@ spec:
         - name: cluster_name
           value: ""
         - name: ICP_PLATFORM_AUTH_IMAGE
-          value: "{{ .Values.global.imagePullPrefix }}/{{ .Values.imageRegistryNamespaceOperand }}/icp-platform-auth:{{ .Values.operands.platformAuthService.imageTag }}"
+          value: {{ .Values.cpfs.imagePullPrefix | default .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperand }}/icp-platform-auth:{{ .Values.operands.platformAuthService.imageTag }}
         - name: ICP_IDENTITY_PROVIDER_IMAGE
-          value: "{{ .Values.global.imagePullPrefix }}/{{ .Values.imageRegistryNamespaceOperand }}/icp-identity-provider:{{ .Values.operands.platformIdentityProvider.imageTag }}"
+          value: {{ .Values.cpfs.imagePullPrefix | default .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperand }}/icp-identity-provider:{{ .Values.operands.platformIdentityProvider.imageTag }}
         - name: ICP_IDENTITY_MANAGER_IMAGE
-          value: "{{ .Values.global.imagePullPrefix }}/{{ .Values.imageRegistryNamespaceOperand }}/icp-identity-manager:{{ .Values.operands.platformIdentityManagement.imageTag }}"
+          value: {{ .Values.cpfs.imagePullPrefix | default .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperand }}/icp-identity-manager:{{ .Values.operands.platformIdentityManagement.imageTag }}
         - name: IM_INITCONTAINER_IMAGE
-          value: "{{ .Values.global.imagePullPrefix }}/{{ .Values.imageRegistryNamespaceOperand }}/im-initcontainer:{{ .Values.operands.imInitContainer.imageTag }}"
-        - name: WATCH_NAMESPACE
-          valueFrom:
-            configMapKeyRef:
-              name: namespace-scope
-              key: namespaces
+          value: {{ .Values.cpfs.imagePullPrefix | default .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperand }}/im-initcontainer:{{ .Values.operands.imInitContainer.imageTag }}
         - name: IMAGE_PULL_SECRET
           value: {{ .Values.global.imagePullSecret }}
-        image: "{{ .Values.global.imagePullPrefix }}/{{ .Values.imageRegistryNamespaceOperator }}/ibm-iam-operator:{{ .Values.operator.imageTag }}"
-        imagePullPolicy: "{{ .Values.imagePullPolicy }}"
+        {{- $watchNamespaces := .Values.global.tetheredNamespaces | default list -}}
+        {{- if .Values.global.instanceNamespace -}}
+        {{- $watchNamespaces = append $watchNamespaces .Values.global.instanceNamespace -}}
+        {{- end -}}
+        {{- $watchNamespaces = prepend $watchNamespaces .Values.global.operatorNamespace }}
+        - name: WATCH_NAMESPACE
+          value: {{ uniq $watchNamespaces | join "," | quote }}
+        image: {{ .Values.cpfs.imagePullPrefix | default .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperator }}/ibm-iam-operator:{{ .Values.operator.imageTag }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
         name: ibm-iam-operator
         resources:
           limits:
@@ -283,7 +288,7 @@ spec:
           seccompProfile:
             type: RuntimeDefault
       imagePullSecrets:
-      - name: "{{ .Values.global.imagePullSecret }}"
+      - name: {{ .Values.global.imagePullSecret }}
       securityContext:
         seccompProfile:
           type: RuntimeDefault

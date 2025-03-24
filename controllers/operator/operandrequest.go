@@ -286,6 +286,10 @@ func (r *AuthenticationReconciler) createEDBShareClaim(ctx context.Context, req 
 		},
 	}
 	unstructuredObj := &unstructured.Unstructured{Object: unstructuredCS}
+	if err = controllerutil.SetControllerReference(authCR, unstructuredObj, r.Client.Scheme()); err != nil {
+		reqLogger.Error(err, "Failed to set owner for ConfigMap")
+		return subreconciler.RequeueWithError(err)
+	}
 
 	if err = r.Create(context.TODO(), unstructuredObj); k8sErrors.IsAlreadyExists(err) {
 		// CommonService already exists from a previous reconcile

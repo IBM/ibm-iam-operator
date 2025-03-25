@@ -766,21 +766,19 @@ func getHostFromDummyRoute(ctx context.Context, cl client.Client, authCR *operat
 	if err = controllerutil.SetControllerReference(authCR, dummyRoute, cl.Scheme()); err != nil {
 		return
 	}
-	dummyKey := types.NamespacedName{Name: "domain-test", Namespace: authCR.Namespace}
 	if err = cl.Create(ctx, dummyRoute); err != nil && !k8sErrors.IsAlreadyExists(err) {
 		return
 	}
-	if err = cl.Get(ctx, dummyKey, dummyRoute); err != nil {
-		return
-	}
 	reqLogger.Info("Got dummy route", "spec", dummyRoute.Spec)
+
+	host = dummyRoute.Spec.Host
 
 	if err = cl.Delete(ctx, dummyRoute); err != nil && !k8sErrors.IsNotFound(err) {
 		reqLogger.Error(err, "Failed to delete dummy Route")
 		return "", err
 	}
 
-	return dummyRoute.Spec.Host, nil
+	return
 }
 
 func (r *AuthenticationReconciler) getDomain(ctx context.Context, authCR *operatorv1alpha1.Authentication) (domain string, err error) {

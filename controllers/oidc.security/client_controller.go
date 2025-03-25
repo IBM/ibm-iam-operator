@@ -76,8 +76,18 @@ var log = logf.Log.WithName(controllerName)
 // ClientReconciler reconciles a Client object
 type ClientReconciler struct {
 	runtimeClient.Client
+	Reader   runtimeClient.Reader
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
+}
+
+// Get first tries to GET the object from the cache; if this fails, it attempts
+// a GET from the API server directly.
+func (r *ClientReconciler) Get(ctx context.Context, objkey runtimeClient.ObjectKey, obj runtimeClient.Object) (err error) {
+	if err = r.Client.Get(ctx, objkey, obj); k8sErrors.IsNotFound(err) {
+		return r.Reader.Get(ctx, objkey, obj)
+	}
+	return
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -329,7 +339,7 @@ func (r *ClientReconciler) processOidcRegistration(ctx context.Context, req ctrl
 	}
 
 	config := &AuthenticationConfig{}
-	err = GetConfig(ctx, &r.Client, config)
+	err = GetConfig(ctx, r, config)
 	if err != nil {
 		reqLogger.Error(err, "Failed to gather Authentication configuration")
 		return subreconciler.RequeueWithError(err)
@@ -479,7 +489,7 @@ func (r *ClientReconciler) processZenRegistration(ctx context.Context, req ctrl.
 	}
 
 	config := &AuthenticationConfig{}
-	err = GetConfig(ctx, &r.Client, config)
+	err = GetConfig(ctx, r, config)
 	if err != nil {
 		reqLogger.Error(err, "Failed to gather Authentication configuration")
 		return subreconciler.RequeueWithError(err)
@@ -635,7 +645,7 @@ func (r *ClientReconciler) finalizeClient(ctx context.Context, req ctrl.Request)
 	}
 
 	config := &AuthenticationConfig{}
-	err = GetConfig(ctx, &r.Client, config)
+	err = GetConfig(ctx, r, config)
 	if err != nil {
 		reqLogger.Error(err, "Failed to gather Authentication configuration")
 		return subreconciler.RequeueWithError(err)

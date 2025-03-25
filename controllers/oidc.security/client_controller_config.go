@@ -24,7 +24,6 @@ import (
 	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // AuthenticationConfig collects relevant Authentication configuration from Secrets and ConfigMaps and provides that
@@ -280,15 +279,15 @@ func (c AuthenticationConfig) GetCSCATLSKey() (value []byte, err error) {
 	return c.getConfigValue(key)
 }
 
-func GetConfig(ctx context.Context, k8sClient *client.Client, config *AuthenticationConfig) (err error) {
-	servicesNamespace, err := ctrlCommon.GetServicesNamespace(ctx, k8sClient)
+func GetConfig(ctx context.Context, r *ClientReconciler, config *AuthenticationConfig) (err error) {
+	servicesNamespace, err := ctrlCommon.GetServicesNamespace(ctx, &r.Client)
 	if err != nil {
 		return fmt.Errorf("failed to get ConfigMap: %w", err)
 	}
 	config.ApplyAuthenticationNamespace(servicesNamespace)
 
 	configMap := &corev1.ConfigMap{}
-	err = (*k8sClient).Get(ctx, types.NamespacedName{Name: PlatformAuthIDPConfigMapName, Namespace: servicesNamespace}, configMap)
+	err = r.Get(ctx, types.NamespacedName{Name: PlatformAuthIDPConfigMapName, Namespace: servicesNamespace}, configMap)
 	if err != nil {
 		return fmt.Errorf("client failed to GET ConfigMap: %w", err)
 	}
@@ -298,7 +297,7 @@ func GetConfig(ctx context.Context, k8sClient *client.Client, config *Authentica
 	}
 
 	platformAuthIDPCredentialsSecret := &corev1.Secret{}
-	err = (*k8sClient).Get(ctx, types.NamespacedName{Name: PlatformAuthIDPCredentialsSecretName, Namespace: servicesNamespace}, platformAuthIDPCredentialsSecret)
+	err = r.Get(ctx, types.NamespacedName{Name: PlatformAuthIDPCredentialsSecretName, Namespace: servicesNamespace}, platformAuthIDPCredentialsSecret)
 	if err != nil {
 		return
 	}
@@ -308,7 +307,7 @@ func GetConfig(ctx context.Context, k8sClient *client.Client, config *Authentica
 	}
 
 	platformOIDCCredentialsSecret := &corev1.Secret{}
-	err = (*k8sClient).Get(ctx, types.NamespacedName{Name: PlatformOIDCCredentialsSecretName, Namespace: servicesNamespace}, platformOIDCCredentialsSecret)
+	err = r.Get(ctx, types.NamespacedName{Name: PlatformOIDCCredentialsSecretName, Namespace: servicesNamespace}, platformOIDCCredentialsSecret)
 	if err != nil {
 		return
 	}
@@ -318,7 +317,7 @@ func GetConfig(ctx context.Context, k8sClient *client.Client, config *Authentica
 	}
 
 	csCACertificateSecret := &corev1.Secret{}
-	err = (*k8sClient).Get(ctx, types.NamespacedName{Name: CSCACertificateSecretName, Namespace: servicesNamespace}, csCACertificateSecret)
+	err = r.Get(ctx, types.NamespacedName{Name: CSCACertificateSecretName, Namespace: servicesNamespace}, csCACertificateSecret)
 	if err != nil {
 		return
 	}

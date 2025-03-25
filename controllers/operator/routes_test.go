@@ -79,6 +79,7 @@ var _ = Describe("Route handling", func() {
 
 			r = &AuthenticationReconciler{
 				Client:          cl,
+				Reader:          cl,
 				DiscoveryClient: *dc,
 			}
 			ctx = context.Background()
@@ -99,6 +100,9 @@ var _ = Describe("Route handling", func() {
 		It("will produce a function that signals to requeue with an error when an unexpected error occurs", func() {
 			rFailing := &AuthenticationReconciler{
 				Client: &testutil.FakeTimeoutClient{
+					Client: cl,
+				},
+				Reader: &testutil.FakeTimeoutClient{
 					Client: cl,
 				},
 			}
@@ -140,6 +144,7 @@ var _ = Describe("Route handling", func() {
 			cl = cb.Build()
 			r = &AuthenticationReconciler{
 				Client: cl,
+				Reader: cl,
 			}
 			ctx = context.Background()
 		})
@@ -194,6 +199,7 @@ var _ = Describe("Route handling", func() {
 			cl = cb.Build()
 			r = &AuthenticationReconciler{
 				Client: cl,
+				Reader: cl,
 			}
 			ctx = context.Background()
 		})
@@ -253,6 +259,7 @@ var _ = Describe("Route handling", func() {
 			cl = cb.Build()
 			r = &AuthenticationReconciler{
 				Client: cl,
+				Reader: cl,
 			}
 			ctx = context.Background()
 		})
@@ -293,6 +300,9 @@ var _ = Describe("Route handling", func() {
 			}
 			rFailing := &AuthenticationReconciler{
 				Client: &testutil.FakeTimeoutClient{
+					Client: cl,
+				},
+				Reader: &testutil.FakeTimeoutClient{
 					Client: cl,
 				},
 			}
@@ -338,6 +348,7 @@ var _ = Describe("Route handling", func() {
 			cl = cb.Build()
 			r = &AuthenticationReconciler{
 				Client: cl,
+				Reader: cl,
 			}
 			ctx = context.Background()
 			wlpClientID = ""
@@ -359,6 +370,9 @@ var _ = Describe("Route handling", func() {
 		It("will produce a function that signals to requeue with an error when the ConfigMap is not changed successfully", func() {
 			rFailing := &AuthenticationReconciler{
 				Client: &testutil.FakeTimeoutClient{
+					Client: cl,
+				},
+				Reader: &testutil.FakeTimeoutClient{
 					Client: cl,
 				},
 			}
@@ -428,6 +442,7 @@ var _ = Describe("Route handling", func() {
 			cl = cb.Build()
 			r = &AuthenticationReconciler{
 				Client: cl,
+				Reader: cl,
 			}
 			ctx = context.Background()
 
@@ -453,6 +468,9 @@ var _ = Describe("Route handling", func() {
 			certificate := []byte{}
 			rFailing := &AuthenticationReconciler{
 				Client: &testutil.FakeTimeoutClient{
+					Client: cl,
+				},
+				Reader: &testutil.FakeTimeoutClient{
 					Client: cl,
 				},
 			}
@@ -538,6 +556,7 @@ var _ = Describe("Route handling", func() {
 			cl = cb.Build()
 			r = &AuthenticationReconciler{
 				Client: cl,
+				Reader: cl,
 			}
 			clusterAddress = ""
 		})
@@ -563,6 +582,9 @@ var _ = Describe("Route handling", func() {
 			Expect(err).ToNot(HaveOccurred())
 			rFailing := &AuthenticationReconciler{
 				Client: &testutil.FakeTimeoutClient{
+					Client: cl,
+				},
+				Reader: &testutil.FakeTimeoutClient{
 					Client: cl,
 				},
 			}
@@ -697,6 +719,7 @@ var _ = Describe("Route handling", func() {
 
 			r = &AuthenticationReconciler{
 				Client:          cl,
+				Reader:          cl,
 				DiscoveryClient: *dc,
 			}
 		})
@@ -1012,6 +1035,7 @@ var _ = Describe("Route handling", func() {
 			Expect(resources).To(BeNil())
 			r = &AuthenticationReconciler{
 				Client:          cl,
+				Reader:          cl,
 				DiscoveryClient: *dc,
 			}
 			result, err := r.handleRoutes(ctx,

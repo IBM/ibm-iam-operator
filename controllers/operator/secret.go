@@ -94,7 +94,7 @@ func (r *AuthenticationReconciler) handleSecret(instance *operatorv1alpha1.Authe
 	var err error
 
 	for secret := range secretData {
-		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: secret, Namespace: instance.Namespace}, currentSecret)
+		err = r.Get(context.TODO(), types.NamespacedName{Name: secret, Namespace: instance.Namespace}, currentSecret)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				// Define a new Secret
@@ -189,7 +189,7 @@ func (r *AuthenticationReconciler) waitForSecret(instance *operatorv1alpha1.Auth
 	s := &corev1.Secret{}
 
 	err := wait.PollImmediateUntil(2*time.Second, func() (done bool, err error) {
-		if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: instance.Namespace}, s); err != nil {
+		if err := r.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: instance.Namespace}, s); err != nil {
 			return false, nil
 		}
 		return true, nil
@@ -243,7 +243,7 @@ func (r *AuthenticationReconciler) createClusterCACert(i *operatorv1alpha1.Authe
 
 	// Confirm that the secret, ibmcloud-cluster-ca-cert, is created by IM-Operator before further usage
 	current := &corev1.Secret{}
-	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: i.Namespace}, current)
+	err = r.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: i.Namespace}, current)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get existing secret")
 		return

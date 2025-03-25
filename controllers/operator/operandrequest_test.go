@@ -117,6 +117,7 @@ var _ = Describe("OperandRequest handling", func() {
 				cl = cb.Build()
 				r = &AuthenticationReconciler{
 					Client: cl,
+					Reader: cl,
 				}
 			})
 			It("should add the embedded EDB entry to the list of Operands", func() {
@@ -207,6 +208,9 @@ var _ = Describe("OperandRequest handling", func() {
 			It("should NOT add the embedded EDB entry to the list of Operands", func() {
 				rFailing := &AuthenticationReconciler{
 					Client: &fakeTimeoutClient{
+						Client: cl,
+					},
+					Reader: &fakeTimeoutClient{
 						Client: cl,
 					},
 				}
@@ -354,6 +358,7 @@ var _ = Describe("OperandRequest handling", func() {
 			cl = cb.Build()
 			r = &AuthenticationReconciler{
 				Client: cl,
+				Reader: cl,
 			}
 		})
 		It("returns false when IS_EMBEDDED is not set", func() {
@@ -395,6 +400,9 @@ var _ = Describe("OperandRequest handling", func() {
 		It("returns an error when an unexpected error is encountered", func() {
 			rFailing := &AuthenticationReconciler{
 				Client: &fakeTimeoutClient{
+					Client: cl,
+				},
+				Reader: &fakeTimeoutClient{
 					Client: cl,
 				},
 			}

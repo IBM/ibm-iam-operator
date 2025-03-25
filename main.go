@@ -157,6 +157,7 @@ func main() {
 
 	clientReconciler := &oidcsecuritycontrollers.ClientReconciler{
 		Client:   mgr.GetClient(),
+		Reader:   mgr.GetAPIReader(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor(clientControllerName),
 	}
@@ -172,6 +173,7 @@ func main() {
 	}
 	if err = (&operatorcontrollers.AuthenticationReconciler{
 		Client:          mgr.GetClient(),
+		Reader:          mgr.GetAPIReader(),
 		DiscoveryClient: *dc,
 		Scheme:          mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {

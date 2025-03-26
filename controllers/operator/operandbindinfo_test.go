@@ -76,6 +76,7 @@ var _ = Describe("OperandBindInfo handling", func() {
 
 			r = &AuthenticationReconciler{
 				Client:          cl,
+				Reader:          cl,
 				DiscoveryClient: *dc,
 			}
 			ctx = context.Background()

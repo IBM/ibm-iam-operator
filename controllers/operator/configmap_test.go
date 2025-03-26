@@ -62,6 +62,7 @@ var _ = Describe("ConfigMap handling", func() {
 
 			r = &AuthenticationReconciler{
 				Client:          cl,
+				Reader:          cl,
 				DiscoveryClient: *dc,
 			}
 			ctx = context.Background()
@@ -137,6 +138,7 @@ var _ = Describe("ConfigMap handling", func() {
 
 			r = &AuthenticationReconciler{
 				Client:          cl,
+				Reader:          cl,
 				DiscoveryClient: *dc,
 			}
 			ctx = context.Background()
@@ -421,6 +423,7 @@ var _ = Describe("ConfigMap handling", func() {
 
 			r = &AuthenticationReconciler{
 				Client:          cl,
+				Reader:          cl,
 				DiscoveryClient: *dc,
 			}
 			ctx = context.Background()
@@ -866,6 +869,7 @@ var _ = Describe("ConfigMap handling", func() {
 
 			r = &AuthenticationReconciler{
 				Client:          cl,
+				Reader:          cl,
 				DiscoveryClient: *dc,
 			}
 			ctx = context.Background()
@@ -1015,6 +1019,7 @@ var _ = Describe("ConfigMap handling", func() {
 
 			r = &AuthenticationReconciler{
 				Client:          cl,
+				Reader:          cl,
 				DiscoveryClient: *dc,
 			}
 			ctx = context.Background()

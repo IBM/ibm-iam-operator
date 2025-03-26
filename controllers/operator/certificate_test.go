@@ -77,6 +77,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 
 		r = &AuthenticationReconciler{
 			Client:          cl,
+			Reader:          cl,
 			DiscoveryClient: *dc,
 		}
 		ctx = context.Background()
@@ -211,6 +212,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 		It("will produce a function that signals to requeue with an error when an unexpected error occurs", func() {
 			rFailing := &AuthenticationReconciler{
 				Client:          testutil.NewFakeTimeoutClient(cl),
+				Reader:          testutil.NewFakeTimeoutClient(cl),
 				DiscoveryClient: *dc,
 			}
 			fieldsList := generateCertificateFieldsList(authCR)
@@ -374,6 +376,9 @@ var _ = Describe("Certificate handling", Ordered, func() {
 				Client: &testutil.FakeTimeoutClient{
 					Client: cl,
 				},
+				Reader: &testutil.FakeTimeoutClient{
+					Client: cl,
+				},
 				DiscoveryClient: *dc,
 			}
 			remainingCertsCount := 4
@@ -529,6 +534,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 			timeoutClient.GetAllowed = true
 			rFailing := &AuthenticationReconciler{
 				Client:          timeoutClient,
+				Reader:          timeoutClient,
 				DiscoveryClient: *dc,
 			}
 			for _, fields := range fieldsList {
@@ -703,6 +709,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 			timeoutClient.GetAllowed = true
 			rFailing := &AuthenticationReconciler{
 				Client:          timeoutClient,
+				Reader:          timeoutClient,
 				DiscoveryClient: *dc,
 			}
 			fn := rFailing.createV1CertificatesIfNotPresent(authCR, fieldsList)

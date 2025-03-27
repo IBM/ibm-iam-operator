@@ -942,7 +942,7 @@ func getClusterAddress(client client.Client, namespace string, configMap string)
 		log.Info("Error getting configmap", "ConfigMap.Name", configMap, "ConfigMap.Namespace", namespace)
 	} else {
 		host := currentConfigMap.Data["cluster_address"]
-		log.Info("Fetched cluster address from configmap", "found host value ", host)
+		log.Info("Fetched cluster address from configmap", " with cluster_address value ", host)
 		return host, nil
 	}
 	return "", errors.New(fmt.Sprint("failed to fetch the cluster address"))

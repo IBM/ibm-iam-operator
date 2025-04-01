@@ -48,6 +48,9 @@ func generateSecretData(instance *operatorv1alpha1.Authentication, wlpClientID s
 		"platform-auth-ldaps-ca-cert": {
 			"certificate": []byte(""),
 		},
+		"im-cert-auth-certificates": {
+			"data": []byte(""),
+		},
 		"platform-auth-idp-credentials": {
 			"admin_username": []byte(instance.Spec.Config.DefaultAdminUser),
 			"admin_password": []byte(adminPassword),

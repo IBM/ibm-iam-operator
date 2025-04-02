@@ -272,11 +272,6 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 					currentConfigMap.Data["MASTER_HOST"] = newConfigMap.Data["MASTER_HOST"]
 					cmUpdateRequired = true
 				}
-				if val, keyExists := currentConfigMap.Data["MASTER_HOST_ALT"]; !keyExists || val != newConfigMap.Data["MASTER_HOST_ALT"] {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["MASTER_HOST_ALT"] = newConfigMap.Data["MASTER_HOST_ALT"]
-					cmUpdateRequired = true
-				}
 				if _, keyExists := currentConfigMap.Data["DB_CONNECT_TIMEOUT"]; !keyExists {
 					reqLogger.Info("Updating an existing Configmap with connection pooling information", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					currentConfigMap.Data["DB_CONNECT_TIMEOUT"] = newConfigMap.Data["DB_CONNECT_TIMEOUT"]

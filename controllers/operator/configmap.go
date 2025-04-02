@@ -272,6 +272,11 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 					currentConfigMap.Data["MASTER_HOST"] = newConfigMap.Data["MASTER_HOST"]
 					cmUpdateRequired = true
 				}
+				if val, keyExists := currentConfigMap.Data["MASTER_HOST_ALT"]; !keyExists || val != newConfigMap.Data["MASTER_HOST_ALT"] {
+					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					currentConfigMap.Data["MASTER_HOST_ALT"] = newConfigMap.Data["MASTER_HOST_ALT"]
+					cmUpdateRequired = true
+				}
 				if _, keyExists := currentConfigMap.Data["DB_CONNECT_TIMEOUT"]; !keyExists {
 					reqLogger.Info("Updating an existing Configmap with connection pooling information", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					currentConfigMap.Data["DB_CONNECT_TIMEOUT"] = newConfigMap.Data["DB_CONNECT_TIMEOUT"]
@@ -532,6 +537,7 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 			"IDENTITY_PROVIDER_URL":              "https://platform-identity-provider:4300",
 			"IDENTITY_MGMT_URL":                  "https://platform-identity-management:4500",
 			"MASTER_HOST":                        clusterAddress,
+			"MASTER_HOST_ALT":                    clusterAddress,
 			"NODE_ENV":                           "production",
 			"AUDIT_ENABLED_IDPROVIDER":           "false",
 			"AUDIT_ENABLED_IDMGMT":               "false",

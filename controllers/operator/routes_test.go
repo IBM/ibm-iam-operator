@@ -861,10 +861,6 @@ var _ = Describe("Route handling", func() {
 			Expect(routes.Items).To(HaveLen(1))
 			Expect(routes.Items[0].Name).To(Equal(IMCrtAuthRouteName))
 		})
-		/*for _, route := range routes.Items {
-		if route.Name == IMCrtAuthRouteName {
-			Expect(routes.Items[1].Name).To(Equal(IMCrtAuthRouteName))
-		}*/
 
 		It("updates all Routes when differences are found and requeues", func() {
 			createDummyRoutes()

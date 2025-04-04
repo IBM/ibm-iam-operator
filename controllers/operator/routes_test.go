@@ -858,7 +858,8 @@ var _ = Describe("Route handling", func() {
 			}
 			err = r.List(ctx, routes, listOpts...)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(routes.Items).To(HaveLen(0))
+			Expect(routes.Items).To(HaveLen(1))
+			Expect(routes.Items[0].Name).To(Equal(IMCrtAuthRouteName))
 		})
 
 		It("updates all Routes when differences are found and requeues", func() {

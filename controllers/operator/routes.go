@@ -321,8 +321,10 @@ func (r *AuthenticationReconciler) reconcileRoute(authCR *operatorv1alpha1.Authe
 		reqLogger.Info("Reconciling route", "annotations", fields.Annotations, "routeHost", fields.RouteHost, "routePath", fields.RoutePath)
 
 		fCtx := logf.IntoContext(ctx, reqLogger)
-		if shouldNotHaveRoutes(authCR, &r.DiscoveryClient) {
-			return r.ensureRouteDoesNotExist(fCtx, authCR, fields)
+		if fields.Name != IMCrtAuthRouteName {
+			if shouldNotHaveRoutes(authCR, &r.DiscoveryClient) {
+				return r.ensureRouteDoesNotExist(fCtx, authCR, fields)
+			}
 		}
 
 		return r.ensureRouteExists(fCtx, authCR, fields)
@@ -331,10 +333,6 @@ func (r *AuthenticationReconciler) reconcileRoute(authCR *operatorv1alpha1.Authe
 
 func (r *AuthenticationReconciler) ensureRouteDoesNotExist(ctx context.Context, authCR *operatorv1alpha1.Authentication, fields *reconcileRouteFields) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx)
-	if fields.Name == IMCrtAuthRouteName {
-		//do not delete certAuth route
-		return subreconciler.ContinueReconciling()
-	}
 	reqLogger.Info("Determined Route should not exist; removing if present")
 	observedRoute := &routev1.Route{}
 	err = r.Get(ctx, types.NamespacedName{Name: fields.Name, Namespace: authCR.Namespace}, observedRoute)

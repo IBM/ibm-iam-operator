@@ -28,7 +28,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -110,6 +112,21 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 		reqLogger.Info("SAAS tenant configmap was created", "Updating service_crn_id from configmap", saasTenantConfigMapName)
 		saasServiceIdCrn = saasTenantConfigMap.Data["service_crn_id"]
 	}
+	// check if autoscaling is enabled or not by reading commonservice CR named common-service
+	// Fetch CommonService CR
+	gvk := schema.GroupVersionKind{
+		Group:   "operator.ibm.com",
+		Version: "v3",
+		Kind:    "CommonService",
+	}
+	commonService := &unstructured.Unstructured{}
+	commonService.SetGroupVersionKind(gvk)
+	namespace := instance.Namespace
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: "common-service", Namespace: namespace}, commonService)
+	if err != nil {
+		return err
+	}
+	autoScaleEnabled, _, err := unstructured.NestedBool(commonService.Object, "spec", "autoScaleConfig")
 
 	// Check if this Deployment already exists
 	deployment := "platform-auth-service"
@@ -125,6 +142,9 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 			reqLogger.Info("SAAS tenant configmap was found", "Creating provider deployment with value from configmap", saasTenantConfigMapName)
 			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", currentDeployment)
 			newDeployment := generateDeploymentObject(instance, r.Scheme, deployment, icpConsoleURL, saasServiceIdCrn, imagePullSecret)
+			if autoScaleEnabled {
+				newDeployment.Spec.Replicas = nil // let HPA control the scaling
+			}
 			err = r.Client.Create(context.TODO(), newDeployment)
 			if err != nil {
 				return err
@@ -158,6 +178,9 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 		currentDeployment.Labels = metaLabels
 		currentDeployment.Annotations = metaAnnotations
 		currentDeployment.Spec = authDep.Spec
+		if autoScaleEnabled {
+			currentDeployment.Spec.Replicas = nil // let HPA control the scaling
+		}
 		err = r.Client.Update(context.TODO(), currentDeployment)
 		if err != nil {
 			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentDeployment.Namespace, "Deployment.Name", currentDeployment.Name)

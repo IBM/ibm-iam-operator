@@ -3,4 +3,4 @@
   value: <4.5.12
 - op: add
   path: "/metadata/annotations/containerImage"
-  value: icr.io/cpopen/ibm-iam-operator:4.5.11
+  value: icr.io/cpopen/ibm-iam-operator:4.5.12

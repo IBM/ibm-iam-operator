@@ -187,6 +187,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 						return err
 					}
 					if configMapList[index] == "platform-auth-idp" {
+						newConfigMap.Data["MASTER_PATH"] = "/idauth"
 						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL == "https://roks.domain.name:443" { //we enable it by default
 							reqLogger.Info("Create platform-auth-idp Configmap roks settings", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 							issuer, err := readROKSURL(instance)

@@ -219,12 +219,12 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, instance *o
 		},
 		"saml-ui-callback": {
 			Annotations: map[string]string{
-				"haproxy.router.openshift.io/balance":        "source",
-				"haproxy.router.openshift.io/rewrite-target": "/ibm/saml20/defaultSP/acs",
+				"haproxy.router.openshift.io/balance": "source",
+				//"haproxy.router.openshift.io/rewrite-target": "/ibm/saml20/defaultSP",
 			},
 			Name:              "saml-ui-callback",
 			RouteHost:         routeHost,
-			RoutePath:         "/ibm/saml20/defaultSP/acs",
+			RoutePath:         "/ibm/saml20/defaultSP",
 			RoutePort:         9443,
 			ServiceName:       PlatformAuthServiceName,
 			DestinationCAcert: platformAuthCert,

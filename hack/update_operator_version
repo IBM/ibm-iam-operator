@@ -30,9 +30,9 @@ export PRODUCTION_IMAGE="${CPOPEN_LOCATION}/ibm-iam-operator"
 
 
 echo "Update the version.go"
-current_version="$(grep 'Version =' "${REPO_ROOT}/version/version.go" | cut -f2 -d\")" 
-sed s/$current_version/$VERSION/ $REPO_ROOT/version/version.go > $REPO_ROOT/version/version.go.new
-mv $REPO_ROOT/version/version.go.new $REPO_ROOT/version/version.go
+current_version="$(grep 'Version =' "${REPO_ROOT}/internal/version/version.go" | cut -f2 -d\")" 
+sed s/$current_version/$VERSION/ $REPO_ROOT/internal/version/version.go > $REPO_ROOT/internal/version/version.go.new
+mv $REPO_ROOT/internal/version/version.go.new $REPO_ROOT/internal/version/version.go
 
 
 echo "Update the containerImage and olm.skipRange annotations in dev and patch"

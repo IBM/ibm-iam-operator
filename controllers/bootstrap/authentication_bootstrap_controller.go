@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"strconv"
 
-	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
-	ctrlcommon "github.com/IBM/ibm-iam-operator/controllers/common"
-	"github.com/IBM/ibm-iam-operator/version"
+	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
+	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
+	"github.com/IBM/ibm-iam-operator/internal/version"
 	"github.com/opdev/subreconciler"
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"

@@ -143,7 +143,7 @@ VERSION="${NEW_VERSION:-}" make update-version
 ```
 
 This will update all image tags, the production kustomize overlays, and the
-version set in [version.go](./version/version.go) with the SemVer value of
+version set in [version.go](./internal/version/version.go) with the SemVer value of
 `VERSION`.  After this target completes successfully, you should also run 
 `make bundle` to update the latest production bundle with these new version
 values.

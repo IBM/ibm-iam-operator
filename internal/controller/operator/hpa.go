@@ -32,7 +32,7 @@ import (
 )
 
 func (r *AuthenticationReconciler) handleHPAs(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleHPAs")
+	reqLogger := logf.FromContext(ctx)
 	hpaCtx := logf.IntoContext(ctx, reqLogger)
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(hpaCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {

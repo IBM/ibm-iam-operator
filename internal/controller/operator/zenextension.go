@@ -44,10 +44,7 @@ type ZenExtensionWithSpec struct {
 
 // handleZenExtension manages the generation of the ZenExtension when iam behind the zen front door is requested
 func (r *AuthenticationReconciler) handleZenFrontDoor(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	subLogger := logf.FromContext(ctx).WithValues(
-		"subreconciler", "handleZenFrontDoor",
-		"ZenExtension.Name", ImZenExtName,
-		"ZenExtension.Namespace", req.Namespace)
+	subLogger := logf.FromContext(ctx)
 	subCtx := logf.IntoContext(ctx, subLogger)
 
 	authCR := &operatorv1alpha1.Authentication{}
@@ -84,8 +81,8 @@ func (zs *ZenExtensionWithSpec) ToUnstructured(s *runtime.Scheme) (u *unstructur
 
 func (r *AuthenticationReconciler) removeZenExtension(authCR *operatorv1alpha1.Authentication) common.SecondaryReconcilerFn {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		reqLogger := logf.FromContext(ctx)
-		reqLogger.Info("Removing ZenExtension")
+		log := logf.FromContext(ctx, "ZenExtension.Name", ImZenExtName)
+		log.Info("Removing ZenExtension")
 		observedZenExt := &zenv1.ZenExtension{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ImZenExtName,
@@ -94,17 +91,17 @@ func (r *AuthenticationReconciler) removeZenExtension(authCR *operatorv1alpha1.A
 		}
 		//Delete the existing zen extension
 		if err = r.Delete(ctx, observedZenExt); k8sErrors.IsNotFound(err) {
-			reqLogger.Info("ZenExtension not found; no deletion needed")
+			log.Info("ZenExtension not found; no deletion needed")
 			return subreconciler.ContinueReconciling()
 		} else if meta.IsNoMatchError(err) {
-			reqLogger.Info("Could not delete the ZenExtension because the resource does not appear to be supported on this cluster")
-			reqLogger.Info("Skipping ZenExtension deletion")
+			log.Info("Could not delete the ZenExtension because the resource does not appear to be supported on this cluster")
+			log.Info("Skipping ZenExtension deletion")
 			return subreconciler.ContinueReconciling()
 		} else if err != nil {
-			reqLogger.Info("Failed to delete the ZenExtension due to an unexpected error", "err", err.Error())
+			log.Info("Failed to delete the ZenExtension due to an unexpected error", "err", err.Error())
 			return subreconciler.RequeueWithError(err)
 		}
-		reqLogger.Info("Zen front door deleted successfully")
+		log.Info("Zen front door deleted successfully")
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
 }

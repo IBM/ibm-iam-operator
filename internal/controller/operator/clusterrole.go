@@ -26,26 +26,31 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 func (r *AuthenticationReconciler) handleClusterRoles(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := log.WithValues("subreconciler", "handleClusterRoles")
+	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
 
-	canCreateClusterRoles, err := r.hasAPIAccess(ctx, "", rbacv1.SchemeGroupVersion.Group, "clusterroles", []string{"create"})
+	canCreateClusterRoles, err := r.hasAPIAccess(debugCtx, "", rbacv1.SchemeGroupVersion.Group, "clusterroles", []string{"create"})
 	if !canCreateClusterRoles {
-		reqLogger.Info("The Operator's ServiceAccount does not have the necessary accesses to create the ClusterRole; skipping")
+		log.Info("The Operator's ServiceAccount does not have the necessary accesses to create the ClusterRole; skipping")
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {
+		log.Error(err, "Failed to determine whether the Operator's ServiceAccount has the necessary accesses to create the ClusterRole")
 		return subreconciler.RequeueWithError(err)
 	}
 
 	if !ctrlcommon.ClusterHasOpenShiftUserGroupVersion(&r.DiscoveryClient) {
-		reqLogger.Info("user.openshift.io/v1 was not found on the cluster; skipping")
+		log.Info("user.openshift.io/v1 was not found on the cluster; skipping")
 		return subreconciler.ContinueReconciling()
 	}
 
 	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		log.Error(err, "Failed to get the Authentication")
 		return
 	}
 
@@ -62,14 +67,14 @@ func (r *AuthenticationReconciler) handleClusterRoles(ctx context.Context, req c
 			},
 		},
 	}
-	reqLogger = reqLogger.WithValues("ClusterRole.Name", operandClusterRole.Name)
+	log = log.WithValues("ClusterRole.Name", operandClusterRole.Name)
 	if err := r.Create(ctx, operandClusterRole); k8sErrors.IsAlreadyExists(err) {
-		reqLogger.Info("ClusterRole already exists; continuing")
+		log.Info("ClusterRole already exists; continuing")
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {
-		reqLogger.Info("Encountered an unexpected error while trying to create ClusterRole", "error", err.Error())
+		log.Info("Encountered an unexpected error while trying to create ClusterRole", "error", err.Error())
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
-	reqLogger.Info("ClusterRole created")
+	log.Info("ClusterRole created successfully")
 	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }

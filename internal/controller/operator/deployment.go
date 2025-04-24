@@ -47,7 +47,7 @@ const AuditTLSSecretName string = "audit-tls"
 const IMAuditTLSVolume string = "audit-volume"
 
 func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleDeployments")
+	reqLogger := logf.FromContext(ctx)
 	deployCtx := logf.IntoContext(ctx, reqLogger)
 
 	authCR := &operatorv1alpha1.Authentication{}

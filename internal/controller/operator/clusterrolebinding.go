@@ -33,19 +33,19 @@ import (
 // handleClusterRoleBindings creates a ClusterRoleBinding that binds the ibm-iam-operand-restricted ClusterRole to the
 // ibm-iam-operand-restricted ServiceAccount in the services namespace for this Authentication instance.
 func (r *AuthenticationReconciler) handleClusterRoleBindings(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleClusterRoleBindings")
-	reqLogger.Info("Ensure that the ClusterRoleBinding is created")
+	log := logf.FromContext(ctx)
+	log.Info("Ensure that the ClusterRoleBinding is created")
 
 	canCreateCRB, err := r.hasAPIAccess(ctx, "", rbacv1.SchemeGroupVersion.Group, "clusterrolebindings", []string{"create"})
 	if !canCreateCRB {
-		reqLogger.Info("The Operator's ServiceAccount does not have the necessary accesses to create the ClusterRoleBinding; skipping")
+		log.Info("The Operator's ServiceAccount does not have the necessary accesses to create the ClusterRoleBinding; skipping")
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
 
 	if !ctrlcommon.ClusterHasOpenShiftUserGroupVersion(&r.DiscoveryClient) {
-		reqLogger.Info("user.openshift.io/v1 was not found on the cluster; skipping")
+		log.Info("user.openshift.io/v1 was not found on the cluster; skipping")
 		return subreconciler.ContinueReconciling()
 	}
 
@@ -78,14 +78,14 @@ func (r *AuthenticationReconciler) handleClusterRoleBindings(ctx context.Context
 		},
 	}
 
-	reqLogger = reqLogger.WithValues("ClusterRoleBinding.Name", name)
+	log = log.WithValues("ClusterRoleBinding.Name", name)
 	if err = r.Create(ctx, operandCRB); k8sErrors.IsAlreadyExists(err) {
-		reqLogger.Info("ClusterRoleBinding already exists, continuing")
+		log.Info("ClusterRoleBinding already exists, continuing")
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to create ClusterRoleBinding")
+		log.Error(err, "Failed to create ClusterRoleBinding")
 		return subreconciler.RequeueWithError(err)
 	}
-	reqLogger.Info("Created ClusterRoleBinding successfully")
+	log.Info("Created ClusterRoleBinding successfully")
 	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }

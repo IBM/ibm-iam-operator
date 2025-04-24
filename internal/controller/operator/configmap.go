@@ -56,7 +56,7 @@ const URL_PREFIX = "URL_PREFIX"
 // handleConfigMaps is a subreconciler.FnWithRequest that handles the
 // reconciliation of all ConfigMaps created for a given Authentication.
 func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleConfigMaps")
+	reqLogger := logf.FromContext(ctx)
 	cmCtx := logf.IntoContext(ctx, reqLogger)
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
@@ -153,7 +153,7 @@ func getCNCFDomain(ctx context.Context, cl client.Client, authCR *operatorv1alph
 
 // handleIBMCloudClusterInfo creates the ibmcloud-cluster-info configmap if not created already
 func (r *AuthenticationReconciler) handleIBMCloudClusterInfo(ctx context.Context, authCR *operatorv1alpha1.Authentication, observed *corev1.ConfigMap) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("ConfigMap.Namespace", authCR.Namespace, "ConfigMap.Name", common.IBMCloudClusterInfoCMName)
+	reqLogger := logf.FromContext(ctx).WithValues("ConfigMap.Name", common.IBMCloudClusterInfoCMName)
 	generated := &corev1.ConfigMap{}
 	if err = r.generateIBMCloudClusterInfoConfigMap(ctx, authCR, generated); err != nil {
 		return subreconciler.RequeueWithError(err)

@@ -20,23 +20,36 @@ import (
 	"context"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
+	"github.com/opdev/subreconciler"
 	rbacv1 "k8s.io/api/rbac/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-func (r *AuthenticationReconciler) createRole(instance *operatorv1alpha1.Authentication) {
-
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	// Define a new Role
-	operandRole := r.iamOperandRole(instance)
-	reqLogger.Info("Creating ibm-iam-operand-restricted role")
-	err := r.Client.Create(context.TODO(), operandRole)
-	if err != nil {
-		reqLogger.Info("Failed to create ibm-iam-operand-restricted role or its already present")
+func (r *AuthenticationReconciler) createRole(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	log := logf.FromContext(ctx, "Role.Name", "ibm-iam-operand-restricted")
+	log.Info("Ensure Role is created")
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
 	}
+	// Define a new Role
+	operandRole := r.iamOperandRole(authCR)
+	err = r.Client.Create(ctx, operandRole)
+	if k8sErrors.IsAlreadyExists(err) {
+		log.Info("Role is already present")
+		return subreconciler.ContinueReconciling()
+	} else if err != nil {
+		log.Error(err, "Failed to create Role")
+		return subreconciler.RequeueWithError(err)
+	}
+	log.Info("Role created successfully")
 	// Role created successfully - return and requeue
-
+	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
+
 func (r *AuthenticationReconciler) iamOperandRole(instance *operatorv1alpha1.Authentication) *rbacv1.Role {
 
 	// reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)

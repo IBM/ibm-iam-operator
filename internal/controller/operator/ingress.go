@@ -20,67 +20,68 @@ import (
 	"context"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
+	"github.com/IBM/ibm-iam-operator/internal/controller/common"
+	"github.com/opdev/subreconciler"
+	routev1 "github.com/openshift/api/route/v1"
 	netv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-var ingressList []string = []string{
-	"ibmid-ui-callback",
-	"id-mgmt",
-	"idmgmt-v2-api",
-	"platform-auth",
-	"platform-id-provider",
-	"platform-login",
-	"platform-oidc-block",
-	"platform-oidc",
-	"saml-ui-callback",
-	"version-idmgmt",
-	"social-login-callback",
-}
-
-func (r *AuthenticationReconciler) ReconcileRemoveIngresses(ctx context.Context, instance *operatorv1alpha1.Authentication, needToRequeue *bool) {
-	reqLogger := log.WithValues("func", "ReconcileRemoveIngresses")
-
-	//No error checking as we will just make a best attempt to remove the legacy ingresses
-	//Do not fail based on inability to delete the ingresses
-	//TODO Add ingress names here
-	for _, iname := range ingressList {
-		err := r.DeleteIngress(ctx, iname, instance.Namespace, needToRequeue)
-		if err != nil {
-			reqLogger.Info("Failed to delete legacy ingress " + iname)
-		}
-	}
-}
-
-func (r *AuthenticationReconciler) DeleteIngress(ctx context.Context, ingressName string, ingressNS string, needToRequeue *bool) error {
-	reqLogger := log.WithValues("func", "deleteIngress", "Name", ingressName, "Namespace", ingressNS)
-
-	ingress := &netv1.Ingress{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      ingressName,
-			Namespace: ingressNS,
-		},
+func (r *AuthenticationReconciler) removeIngresses(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	log := logf.FromContext(ctx)
+	log.Info("Ensure all Ingresses are deleted when Routes are supported")
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
 	}
 
-	err := r.Client.Get(ctx, types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace}, ingress)
-	if err != nil {
+	if !common.ClusterHasRouteGroupVersion(&r.DiscoveryClient) {
+		log.Info("GVK is not available on cluster; leaving Ingresses in place", "Kind", "Route", "Group", routev1.GroupVersion.Group, "Version", routev1.GroupVersion.Version)
+		return subreconciler.ContinueReconciling()
+	}
+
+	subRec := common.NewLazySubreconcilers(
+		r.removeIngress("ibmid-ui-callback", req.Namespace),
+		r.removeIngress("id-mgmt", req.Namespace),
+		r.removeIngress("idmgmt-v2-api", req.Namespace),
+		r.removeIngress("platform-auth", req.Namespace),
+		r.removeIngress("platform-id-provider", req.Namespace),
+		r.removeIngress("platform-login", req.Namespace),
+		r.removeIngress("platform-oidc-block", req.Namespace),
+		r.removeIngress("platform-oidc", req.Namespace),
+		r.removeIngress("saml-ui-callback", req.Namespace),
+		r.removeIngress("version-idmgmt", req.Namespace),
+		r.removeIngress("social-login-callback", req.Namespace),
+	)
+
+	return subRec.Reconcile(ctx)
+}
+
+func (r *AuthenticationReconciler) removeIngress(name string, namespace string) common.SecondaryReconcilerFn {
+	return func(ctx context.Context) (result *ctrl.Result, err error) {
+		log := logf.FromContext(ctx, "Ingress.Name", name)
+
+		ingress := &netv1.Ingress{}
+		err = r.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, ingress)
 		if errors.IsNotFound(err) {
-			return nil
+			log.Info("Ingress not found; continuing")
+			return subreconciler.ContinueReconciling()
+		} else if err != nil {
+			log.Error(err, "Failed to get Ingress")
+			return subreconciler.RequeueWithError(err)
 		}
-		reqLogger.Error(err, "Failed to get legacy ingress")
-		return err
-	}
 
-	// Delete ingress if found
-	err = r.Client.Delete(ctx, ingress)
-	if err != nil {
-		reqLogger.Error(err, "Failed to delete legacy ingress")
-		return err
-	}
+		// Delete ingress if found
+		err = r.Delete(ctx, ingress)
+		if err != nil {
+			log.Error(err, "Failed to delete Ingress")
+			return subreconciler.RequeueWithError(err)
+		}
 
-	reqLogger.Info("Deleted legacy ingress")
-	*needToRequeue = true
-	return nil
+		log.Info("Deleted Ingress")
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	}
 }

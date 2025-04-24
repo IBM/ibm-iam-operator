@@ -18,9 +18,9 @@ package operator
 
 import (
 	"context"
+	"reflect"
 
 	"fmt"
-	"reflect"
 	"sync"
 	"time"
 
@@ -218,14 +218,6 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	needToRequeue := false
 
 	reconcileCtx := logf.IntoContext(ctx, reqLogger)
-	// Set default result
-	result = ctrl.Result{}
-	// Set Requeue to true if requeue is needed at end of reconcile loop
-	defer func() {
-		if needToRequeue {
-			result.Requeue = true
-		}
-	}()
 
 	reqLogger.Info("Reconciling Authentication")
 
@@ -262,63 +254,44 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return
 	}
 
+	originalAuthCR := instance.DeepCopy()
 	// Be sure to update status before returning if Authentication is found (but only if the Authentication hasn't
 	// already been updated, e.g. finalizer update
 	defer func() {
+		if needToRequeue {
+			result.Requeue = true
+		}
+		err = r.setAuthenticationStatus(ctx, instance)
+		if reflect.DeepEqual(originalAuthCR.Status, instance.Status) {
+			goto statuslog
+		}
 		reqLogger.Info("Update status before finishing loop.")
-		if reflect.DeepEqual(instance.Status, operatorv1alpha1.AuthenticationStatus{}) {
-			instance.Status = operatorv1alpha1.AuthenticationStatus{
-				Nodes: []string{},
-			}
-		}
-		currentServiceStatus := r.getCurrentServiceStatus(ctx, r.Client, instance)
-		if !reflect.DeepEqual(currentServiceStatus, instance.Status.Service) {
-			instance.Status.Service = currentServiceStatus
-			reqLogger.Info("Current status does not reflect current state; updating")
-		}
-		statusUpdateErr := r.Client.Status().Update(ctx, instance)
-		if statusUpdateErr != nil {
-			reqLogger.Error(statusUpdateErr, "Failed to update status; trying again")
-			currentInstance := &operatorv1alpha1.Authentication{}
-			r.Client.Get(ctx, req.NamespacedName, currentInstance)
-			currentInstance.Status.Service = currentServiceStatus
-			statusUpdateErr = r.Client.Status().Update(ctx, currentInstance)
-			if statusUpdateErr != nil {
-				reqLogger.Error(statusUpdateErr, "Retry failed; returning error")
-				return
-			}
+		if err = r.Client.Status().Update(ctx, instance); err != nil {
+			reqLogger.Error(err, "Failed to update status")
 		} else {
 			reqLogger.Info("Updated status")
 		}
-		reqLogger.V(1).Info("Final result", "result", result, "err", err)
+	statuslog:
+		reqLogger.Info("Reconciliation complete")
 	}()
 
 	var subResult *ctrl.Result
 	if subResult, err = r.addMongoMigrationFinalizers(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-		reqLogger.V(1).Info("Should halt or requeue after addMongoMigrationFinalizers", "result", result, "err", err)
-		result, err = subreconciler.Evaluate(subResult, err)
-		return
+		return subreconciler.Evaluate(subResult, err)
 	}
 
 	if subResult, err = r.overrideMongoDBBootstrap(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-		reqLogger.V(1).Info("Should halt or requeue after overrideMongoDBBootstrap", "result", result, "err", err)
-		result, err = subreconciler.Evaluate(subResult, err)
-		return
+		return subreconciler.Evaluate(subResult, err)
 	}
 
 	if subResult, err = r.handleOperandRequest(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-		reqLogger.V(1).Info("Should halt or requeue after handleOperandRequest", "result", result, "err", err)
-		result, err = subreconciler.Evaluate(subResult, err)
-		return
+		return subreconciler.Evaluate(subResult, err)
 	}
 
 	if subResult, err = r.createEDBShareClaim(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-		reqLogger.V(1).Info("Should halt or requeue after createEDBShareClaim", "result", result, "err", err)
-		result, err = subreconciler.Evaluate(subResult, err)
-		return
+		return subreconciler.Evaluate(subResult, err)
 	}
 
-	// Check if this Certificate already exists and create it if it doesn't
 	reqLogger.Info("Creating ibm-iam-operand-restricted serviceaccount")
 	currentSA := &corev1.ServiceAccount{}
 	err = r.createSA(instance, currentSA, &needToRequeue)
@@ -389,7 +362,6 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	if result, err := r.handleMongoDBCleanup(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
-		reqLogger.V(1).Info("Should halt or requeue after handleMongoDBCleanup", "result", result, "err", err)
 		return subreconciler.Evaluate(result, err)
 	}
 
@@ -418,7 +390,7 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return subreconciler.Evaluate(subResult, err)
 	}
 
-	return
+	return subreconciler.Evaluate(subreconciler.DoNotRequeue())
 }
 
 // SetupWithManager sets up the controller with the Manager.

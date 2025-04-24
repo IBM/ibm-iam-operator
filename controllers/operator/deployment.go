@@ -19,7 +19,6 @@ package operator
 import (
 	"context"
 	"os"
-	"reflect"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/controllers/common"
@@ -30,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -165,18 +163,6 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 		}
 	}
 
-	podList := &corev1.PodList{}
-	listOpts := []client.ListOption{
-		client.InNamespace(instance.Namespace),
-		client.MatchingLabels(map[string]string{"k8s-app": deployment}),
-	}
-	if err = r.Client.List(context.TODO(), podList, listOpts...); err != nil {
-		reqLogger.Error(err, "Failed to list pods", "Authentication.Namespace", instance.Namespace, "Authentication.Name", deployment)
-		return err
-	}
-	reqLogger.Info("CS??? get pod names")
-	podNames := getPodNames(podList.Items)
-
 	// Deployment already exists - don't requeue
 	reqLogger.Info("Skip reconcile: Deployment already exists", "Deployment.Namespace", instance.Namespace, "Deployment.Name", deployment)
 
@@ -227,21 +213,6 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 			reqLogger.Error(err, "Failed to update an existing Deployment", "Deployment.Namespace", currentManagerDeployment.Namespace, "Deployment.Name", currentManagerDeployment.Name)
 			return err
 		}
-	}
-
-	podListMgr := &corev1.PodList{}
-	listOptsMgr := []client.ListOption{
-		client.InNamespace(instance.Namespace),
-		client.MatchingLabels(map[string]string{"k8s-app": managerDeployment}),
-	}
-	if err = r.Client.List(context.TODO(), podListMgr, listOptsMgr...); err != nil {
-		reqLogger.Error(err, "Failed to list pods", "Authentication.Namespace", instance.Namespace, "Authentication.Name", managerDeployment)
-		return err
-	}
-	reqLogger.Info("CS??? get pod names")
-	podNamesMgr := getPodNames(podListMgr.Items)
-	for _, pod := range podNamesMgr {
-		podNames = append(podNames, pod)
 	}
 
 	// Deployment already exists - don't requeue
@@ -295,46 +266,10 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 		}
 	}
 
-	podListProv := &corev1.PodList{}
-	listOptsProv := []client.ListOption{
-		client.InNamespace(instance.Namespace),
-		client.MatchingLabels(map[string]string{"k8s-app": providerDeployment}),
-	}
-	if err = r.Client.List(context.TODO(), podListProv, listOptsProv...); err != nil {
-		reqLogger.Error(err, "Failed to list pods", "Authentication.Namespace", instance.Namespace, "Authentication.Name", providerDeployment)
-		return err
-	}
-	reqLogger.Info("CS??? get pod names")
-	podNamesProv := getPodNames(podListProv.Items)
-	for _, pod := range podNamesProv {
-		podNames = append(podNames, pod)
-	}
-	// Deployment already exists - don't requeue
-	reqLogger.Info("Final pod names", "Pod names:", podNames)
-	// Update status.Nodes if needed
-	if !reflect.DeepEqual(podNames, instance.Status.Nodes) {
-		instance.Status.Nodes = podNames
-		reqLogger.Info("CS??? put pod names in status")
-		err := r.Client.Status().Update(context.TODO(), instance)
-		if err != nil {
-			reqLogger.Error(err, "Failed to update Authentication status")
-			return err
-		}
-	}
 	// Deployment already exists - don't requeue
 	reqLogger.Info("Skip reconcile: Provider deployment already exists", "Deployment.Namespace", instance.Namespace, "Deployment.Name", providerDeployment)
 	return nil
 
-}
-
-func getPodNames(pods []corev1.Pod) []string {
-	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
-	var podNames []string
-	for _, pod := range pods {
-		podNames = append(podNames, pod.Name)
-		reqLogger.Info("CS??? pod name=" + pod.Name)
-	}
-	return podNames
 }
 
 func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string, saasCrnId string, imagePullSecret string) *appsv1.Deployment {

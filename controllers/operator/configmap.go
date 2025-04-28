@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/discovery"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -339,6 +340,18 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 					currentConfigMap.Data["LDAP_CTX_POOL_PREFERREDSIZE"] = newConfigMap.Data["LDAP_CTX_POOL_PREFERREDSIZE"]
 					cmUpdateRequired = true
 				}
+				// Indicates an upgrade from a previous
+				if _, keyExists := currentConfigMap.Data["MASTER_PATH"]; !keyExists {
+					req := ctrl.Request{NamespacedName: types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}}
+					var path string
+					path, err = r.getMasterPath(context.Background(), req)
+					if err != nil {
+						reqLogger.Error(err, "Failed to determine if a SAML connection already exists")
+						return
+					}
+					currentConfigMap.Data["MASTER_PATH"] = path
+					cmUpdateRequired = true
+				}
 				_, keyExists := currentConfigMap.Data["IS_OPENSHIFT_ENV"]
 				if keyExists {
 					reqLogger.Info("Current configmap", "Current Value", currentConfigMap.Data["IS_OPENSHIFT_ENV"])
@@ -517,6 +530,10 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 	if isPublicCloud {
 		roksUserPrefix = "IAM#"
 	}
+
+	// Set the path for SAML connections
+	masterPath := "/idauth"
+
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-auth-idp",
@@ -532,6 +549,7 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 			"IDENTITY_PROVIDER_URL":              "https://platform-identity-provider:4300",
 			"IDENTITY_MGMT_URL":                  "https://platform-identity-management:4500",
 			"MASTER_HOST":                        clusterAddress,
+			"MASTER_PATH":                        masterPath,
 			"NODE_ENV":                           "production",
 			"AUDIT_ENABLED_IDPROVIDER":           "false",
 			"AUDIT_ENABLED_IDMGMT":               "false",
@@ -999,4 +1017,23 @@ func readROKSURL(instance *operatorv1alpha1.Authentication) (string, error) {
 		return "", err
 	}
 	return issuer, nil
+}
+
+func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, req ctrl.Request) (path string, err error) {
+	p, err := r.getPostgresDB(ctx, req)
+	if err != nil {
+		return
+	}
+	var has bool
+	if err = p.Connect(ctx); err != nil {
+		return
+	}
+	defer p.Disconnect(ctx)
+
+	if has, err = p.HasSAML(ctx); err != nil {
+		return
+	} else if has {
+		return "", err
+	}
+	return "/idauth", nil
 }

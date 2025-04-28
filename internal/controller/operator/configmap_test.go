@@ -240,6 +240,7 @@ var _ = Describe("ConfigMap handling", func() {
 			ibmcloudClusterInfoCopy := ibmcloudClusterInfo.DeepCopy()
 			Expect(r.Create(ctx, ibmcloudClusterInfo)).To(Succeed())
 			result, err := r.handleIBMCloudClusterInfo(ctx, authCR, ibmcloudClusterInfo)
+			Expect(err).ToNot(HaveOccurred())
 			cmKey := types.NamespacedName{Name: "ibmcloud-cluster-info", Namespace: "data-ns"}
 			observed := &corev1.ConfigMap{}
 			err = r.Get(ctx, cmKey, observed)

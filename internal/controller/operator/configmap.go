@@ -340,6 +340,8 @@ func updatePlatformAuthIDP(_ ctrlcommon.SecondaryReconciler, _ context.Context, 
 			"LDAP_CTX_POOL_TIMEOUT",
 			"LDAP_CTX_POOL_WAITTIME",
 			"LDAP_CTX_POOL_PREFERREDSIZE"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("MASTER_HOST")),
+			"MASTER_HOST"),
 	}
 
 	if v, ok := generated.Data["IS_OPENSHIFT_ENV"]; ok {
@@ -432,6 +434,9 @@ func generateAuthIdpConfigMap(clusterInfo *corev1.ConfigMap) ctrlcommon.Generate
 			}
 		}
 
+		// Set the path for SAML connections
+		masterPath := "/idauth"
+
 		*generated = corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      s.GetName(),
@@ -447,6 +452,7 @@ func generateAuthIdpConfigMap(clusterInfo *corev1.ConfigMap) ctrlcommon.Generate
 				"IDENTITY_PROVIDER_URL":              "https://platform-identity-provider:4300",
 				"IDENTITY_MGMT_URL":                  "https://platform-identity-management:4500",
 				"MASTER_HOST":                        clusterInfo.Data["cluster_address"],
+				"MASTER_PATH":                        masterPath,
 				"NODE_ENV":                           "production",
 				"ENABLE_JIT_EXTRA_ATTR":              "false",
 				"AUDIT_ENABLED_IDPROVIDER":           "false",
@@ -989,4 +995,23 @@ func readROKSURL(ctx context.Context) (issuer string, err error) {
 	issuer = result["issuer"].(string)
 
 	return issuer, nil
+}
+
+func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, req ctrl.Request) (path string, err error) {
+	p, err := r.getPostgresDB(ctx, req)
+	if err != nil {
+		return
+	}
+	var has bool
+	if err = p.Connect(ctx); err != nil {
+		return
+	}
+	defer p.Disconnect(ctx)
+
+	if has, err = p.HasSAML(ctx); err != nil {
+		return
+	} else if has {
+		return "", err
+	}
+	return "/idauth", nil
 }

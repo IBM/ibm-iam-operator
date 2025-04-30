@@ -517,13 +517,13 @@ var _ = DescribeTable("RowDataToAnyMap", func(r RowData, expected map[string]any
 		&Changelog{
 			ID:          5,
 			Name:        "TestChange",
-			IMVersion:   "4.11.0",
+			IMVersion:   "4.12.0",
 			InstallTime: &pgtype.Timestamptz{},
 		},
 		map[string]any{
 			"id":           5,
 			"name":         "TestChange",
-			"im_version":   "4.11.0",
+			"im_version":   "4.12.0",
 			"install_time": &pgtype.Timestamptz{},
 		}),
 	Entry("on OauthToken",

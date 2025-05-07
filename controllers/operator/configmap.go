@@ -537,10 +537,7 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 			"IDENTITY_PROVIDER_URL":              "https://platform-identity-provider:4300",
 			"IDENTITY_MGMT_URL":                  "https://platform-identity-management:4500",
 			"MASTER_HOST":                        clusterAddress,
-<<<<<<< HEAD
 			"MASTER_PATH":                        "/idauth",
-=======
->>>>>>> c9f8326 ([SC2] - update master host using platform-auth-idp configmap (#995))
 			"NODE_ENV":                           "production",
 			"AUDIT_ENABLED_IDPROVIDER":           "false",
 			"AUDIT_ENABLED_IDMGMT":               "false",
@@ -948,17 +945,10 @@ func getClusterAddress(client client.Client, namespace string, configMap string)
 	currentConfigMap := &corev1.ConfigMap{}
 	err := client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: namespace}, currentConfigMap)
 	if err != nil {
-<<<<<<< HEAD
 		log.Info("Error getting configmap", "ConfigMap.Name", configMap, "ConfigMap.Namespace", namespace)
 	} else {
 		host := currentConfigMap.Data["cluster_address"]
 		log.Info("Fetched cluster address from configmap", "cluster_address", host)
-=======
-		log.Info("Error getting configmap", configMap)
-	} else {
-		host := currentConfigMap.Data["cluster_address"]
-		log.Info("Fetched cluster address from configmap", host)
->>>>>>> c9f8326 ([SC2] - update master host using platform-auth-idp configmap (#995))
 		return host, nil
 	}
 	return "", errors.New(fmt.Sprint("failed to fetch the cluster address"))

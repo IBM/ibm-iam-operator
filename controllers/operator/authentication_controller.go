@@ -178,11 +178,21 @@ func needsAuditServiceDummyDataReset(a *operatorv1alpha1.Authentication) bool {
 // AuthenticationReconciler reconciles a Authentication object
 type AuthenticationReconciler struct {
 	client.Client
-	DiscoveryClient discovery.DiscoveryClient
+	Reader          client.Reader
 	Scheme          *runtime.Scheme
+	DiscoveryClient discovery.DiscoveryClient
 	Mutex           sync.Mutex
 	clusterType     ctrlcommon.ClusterType
 	dbSetupChan     chan *migration.Result
+}
+
+// GetFromCacheOrAPI first tries to GET the object from the cache; if this
+// fails, it attempts a GET from the API server directly.
+func (r *AuthenticationReconciler) Get(ctx context.Context, objkey client.ObjectKey, obj client.Object) (err error) {
+	if err = r.Client.Get(ctx, objkey, obj); k8sErrors.IsNotFound(err) {
+		return r.Reader.Get(ctx, objkey, obj)
+	}
+	return
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to

@@ -931,7 +931,7 @@ func isPublicCloud(client client.Client, namespace string, configMap string) boo
 	currentConfigMap := &corev1.ConfigMap{}
 	err := client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: namespace}, currentConfigMap)
 	if err != nil {
-		log.Info("Error getting configmap", configMap)
+		log.Info("Error getting configmap", "ConfigMap.Name", configMap, "ConfigMap.Namespace", namespace)
 		return false
 	} else if err == nil {
 		host := currentConfigMap.Data["cluster_kube_apiserver_host"]
@@ -945,10 +945,10 @@ func getClusterAddress(client client.Client, namespace string, configMap string)
 	currentConfigMap := &corev1.ConfigMap{}
 	err := client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: namespace}, currentConfigMap)
 	if err != nil {
-		log.Info("Error getting configmap", configMap)
+		log.Info("Error getting configmap", "ConfigMap.Name", configMap, "ConfigMap.Namespace", namespace)
 	} else {
 		host := currentConfigMap.Data["cluster_address"]
-		log.Info("Fetched cluster address from configmap", host)
+		log.Info("Fetched cluster address from configmap", "cluster_address", host)
 		return host, nil
 	}
 	return "", errors.New(fmt.Sprint("failed to fetch the cluster address"))

@@ -18,6 +18,7 @@ package operator
 
 import (
 	"context"
+	"maps"
 	"reflect"
 	"time"
 
@@ -93,7 +94,7 @@ func (r *AuthenticationReconciler) handleSecret(instance *operatorv1alpha1.Authe
 	var err error
 
 	for secret := range secretData {
-		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: secret, Namespace: instance.Namespace}, currentSecret)
+		err = r.Get(context.TODO(), types.NamespacedName{Name: secret, Namespace: instance.Namespace}, currentSecret)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				// Define a new Secret
@@ -112,6 +113,11 @@ func (r *AuthenticationReconciler) handleSecret(instance *operatorv1alpha1.Authe
 			}
 		} else {
 			secretUpdateRequired := false
+			generatedLabels := ctrlCommon.MergeMaps(nil, currentSecret.Labels, ctrlCommon.GetCommonLabels())
+			if !maps.Equal(generatedLabels, currentSecret.Labels) {
+				currentSecret.Labels = generatedLabels
+				secretUpdateRequired = true
+			}
 			if secret == "platform-auth-idp-encryption" {
 				if _, keyExists := currentSecret.Data["ENCRYPTION_IV"]; !keyExists {
 					reqLogger.Info("Updating an existing Secret", "Secret.Namespace", currentSecret.Namespace, "Secret.Name", currentSecret.Name)
@@ -155,10 +161,12 @@ func (r *AuthenticationReconciler) handleSecret(instance *operatorv1alpha1.Authe
 
 func generateSecretObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, secretName string, secretData map[string][]byte) *corev1.Secret {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name, "Secret.Name", secretName)
+	labels := ctrlCommon.MergeMaps(nil, ctrlCommon.GetCommonLabels())
 	newSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: instance.Namespace,
+			Labels:    labels,
 		},
 		Type: corev1.SecretTypeOpaque,
 		Data: secretData,
@@ -181,7 +189,7 @@ func (r *AuthenticationReconciler) waitForSecret(instance *operatorv1alpha1.Auth
 	s := &corev1.Secret{}
 
 	err := wait.PollImmediateUntil(2*time.Second, func() (done bool, err error) {
-		if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: instance.Namespace}, s); err != nil {
+		if err := r.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: instance.Namespace}, s); err != nil {
 			return false, nil
 		}
 		return true, nil
@@ -196,14 +204,16 @@ func (r *AuthenticationReconciler) createClusterCACert(i *operatorv1alpha1.Authe
 	reqLogger := log.WithValues("Instance.Namespace", i.Namespace, "Instance.Name", i.Name, "Secret.Name", secretName)
 
 	// create ibmcloud-cluster-ca-cert
-	labels := map[string]string{
-		"app":                          "platform-auth-service",
-		"component":                    "platform-auth-service",
-		"app.kubernetes.io/component":  "platform-auth-service",
-		"app.kubernetes.io/name":       "platform-auth-service",
-		"app.kubernetes.io/instance":   "platform-auth-service",
-		"app.kubernetes.io/managed-by": "",
-	}
+	labels := ctrlCommon.MergeMaps(nil,
+		map[string]string{
+			"app":                          "platform-auth-service",
+			"component":                    "platform-auth-service",
+			"app.kubernetes.io/component":  "platform-auth-service",
+			"app.kubernetes.io/name":       "platform-auth-service",
+			"app.kubernetes.io/instance":   "platform-auth-service",
+			"app.kubernetes.io/managed-by": "",
+		},
+		ctrlCommon.GetCommonLabels())
 	clusterSecret := &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "Secret",
@@ -233,7 +243,7 @@ func (r *AuthenticationReconciler) createClusterCACert(i *operatorv1alpha1.Authe
 
 	// Confirm that the secret, ibmcloud-cluster-ca-cert, is created by IM-Operator before further usage
 	current := &corev1.Secret{}
-	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: i.Namespace}, current)
+	err = r.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: i.Namespace}, current)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get existing secret")
 		return

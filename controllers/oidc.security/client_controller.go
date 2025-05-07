@@ -18,6 +18,7 @@ package oidcsecurity
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"strconv"
 	"strings"
@@ -75,8 +76,18 @@ var log = logf.Log.WithName(controllerName)
 // ClientReconciler reconciles a Client object
 type ClientReconciler struct {
 	runtimeClient.Client
+	Reader   runtimeClient.Reader
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
+}
+
+// Get first tries to GET the object from the cache; if this fails, it attempts
+// a GET from the API server directly.
+func (r *ClientReconciler) Get(ctx context.Context, objkey runtimeClient.ObjectKey, obj runtimeClient.Object) (err error) {
+	if err = r.Client.Get(ctx, objkey, obj); k8sErrors.IsNotFound(err) {
+		return r.Reader.Get(ctx, objkey, obj)
+	}
+	return
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -286,6 +297,16 @@ func (r *ClientReconciler) ensureSecretAndClientIdSet(ctx context.Context, req c
 		return subreconciler.Requeue()
 	}
 
+	labels := common.MergeMaps(nil, secret.Labels, common.GetCommonLabels())
+	if !maps.Equal(secret.Labels, labels) {
+		secret.Labels = labels
+		if err = r.Update(ctx, secret); err != nil {
+			reqLogger.Error(err, "Failed to add missing labels")
+			return subreconciler.RequeueWithError(err)
+		}
+		return subreconciler.Requeue()
+	}
+
 	secretClientId := string(secret.Data["CLIENT_ID"])
 	if clientCR.Spec.ClientId != secretClientId {
 		clientCR.Spec.ClientId = string(secret.Data["CLIENT_ID"])
@@ -318,7 +339,7 @@ func (r *ClientReconciler) processOidcRegistration(ctx context.Context, req ctrl
 	}
 
 	config := &AuthenticationConfig{}
-	err = GetConfig(ctx, &r.Client, config)
+	err = GetConfig(ctx, r, config)
 	if err != nil {
 		reqLogger.Error(err, "Failed to gather Authentication configuration")
 		return subreconciler.RequeueWithError(err)
@@ -468,7 +489,7 @@ func (r *ClientReconciler) processZenRegistration(ctx context.Context, req ctrl.
 	}
 
 	config := &AuthenticationConfig{}
-	err = GetConfig(ctx, &r.Client, config)
+	err = GetConfig(ctx, r, config)
 	if err != nil {
 		reqLogger.Error(err, "Failed to gather Authentication configuration")
 		return subreconciler.RequeueWithError(err)
@@ -624,7 +645,7 @@ func (r *ClientReconciler) finalizeClient(ctx context.Context, req ctrl.Request)
 	}
 
 	config := &AuthenticationConfig{}
-	err = GetConfig(ctx, &r.Client, config)
+	err = GetConfig(ctx, r, config)
 	if err != nil {
 		reqLogger.Error(err, "Failed to gather Authentication configuration")
 		return subreconciler.RequeueWithError(err)
@@ -748,10 +769,10 @@ func getClientCredsFromSecret(secret *corev1.Secret) (clientCreds *ClientCredent
 
 func (r *ClientReconciler) createNewSecretForClient(ctx context.Context, client *oidcsecurityv1.Client) (*corev1.Secret, error) {
 	reqLogger := logf.FromContext(ctx, "Request.Namespace", client.Namespace, "client.Name", client.Name)
-	labels := map[string]string{
+	labels := common.MergeMaps(nil, map[string]string{
 		"app.kubernetes.io/managed-by":          "OIDCClientRegistration.oidc.security.ibm.com",
 		"client.oidc.security.ibm.com/owned-by": client.Name,
-	}
+	}, common.GetCommonLabels())
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

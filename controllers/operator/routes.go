@@ -56,7 +56,7 @@ func (r *AuthenticationReconciler) getCertificateForService(ctx context.Context,
 		err = fmt.Errorf("service %q does not have a certificate secret managed by this controller", serviceName)
 		return
 	}
-	err = r.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: instance.Namespace}, secret)
+	err = r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: instance.Namespace}, secret)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			reqLogger.Info("unable to get route destination certificate, secret does exist. Requeue and try again", "secretName", secretName)
@@ -124,7 +124,7 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, instance *o
 
 	PlatformOIDCCredentialsSecretName := "platform-oidc-credentials"
 	secret := &corev1.Secret{}
-	err = r.Client.Get(ctx, types.NamespacedName{Name: PlatformOIDCCredentialsSecretName, Namespace: instance.Namespace}, secret)
+	err = r.Get(ctx, types.NamespacedName{Name: PlatformOIDCCredentialsSecretName, Namespace: instance.Namespace}, secret)
 
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -460,7 +460,7 @@ func (r *AuthenticationReconciler) newRoute(instance *operatorv1alpha1.Authentic
 	weight := int32(100)
 
 	commonLabel := map[string]string{"app": "im"}
-	routeLabels := common.MergeMap(commonLabel, instance.Spec.Labels)
+	routeLabels := common.MergeMaps(nil, instance.Spec.Labels, commonLabel, common.GetCommonLabels())
 
 	route := &routev1.Route{
 		TypeMeta: metav1.TypeMeta{

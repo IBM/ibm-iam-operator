@@ -9,6 +9,7 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	zenv1 "github.com/IBM/ibm-iam-operator/apis/zen.cpd.ibm.com/v1"
+	ctrlcommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	testutil "github.com/IBM/ibm-iam-operator/testing"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -78,8 +79,10 @@ var _ = Describe("Route handling", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			r = &AuthenticationReconciler{
-				Client:          cl,
-				Reader:          cl,
+				Client: &ctrlcommon.FallbackClient{
+					Client: cl,
+					Reader: cl,
+				},
 				DiscoveryClient: *dc,
 			}
 			ctx = context.Background()
@@ -99,11 +102,13 @@ var _ = Describe("Route handling", func() {
 		})
 		It("will produce a function that signals to requeue with an error when an unexpected error occurs", func() {
 			rFailing := &AuthenticationReconciler{
-				Client: &testutil.FakeTimeoutClient{
-					Client: cl,
-				},
-				Reader: &testutil.FakeTimeoutClient{
-					Client: cl,
+				Client: &ctrlcommon.FallbackClient{
+					Client: &testutil.FakeTimeoutClient{
+						Client: cl,
+					},
+					Reader: &testutil.FakeTimeoutClient{
+						Client: cl,
+					},
 				},
 			}
 			fn := rFailing.getClusterInfoConfigMap(authCR, cm)
@@ -143,8 +148,10 @@ var _ = Describe("Route handling", func() {
 				WithObjects(clusterInfoConfigMap, authCR)
 			cl = cb.Build()
 			r = &AuthenticationReconciler{
-				Client: cl,
-				Reader: cl,
+				Client: &ctrlcommon.FallbackClient{
+					Client: cl,
+					Reader: cl,
+				},
 			}
 			ctx = context.Background()
 		})
@@ -198,8 +205,10 @@ var _ = Describe("Route handling", func() {
 				WithObjects(clusterInfoConfigMap, authCR)
 			cl = cb.Build()
 			r = &AuthenticationReconciler{
-				Client: cl,
-				Reader: cl,
+				Client: &ctrlcommon.FallbackClient{
+					Client: cl,
+					Reader: cl,
+				},
 			}
 			ctx = context.Background()
 		})
@@ -258,8 +267,10 @@ var _ = Describe("Route handling", func() {
 				WithObjects(clusterInfoConfigMap, authCR)
 			cl = cb.Build()
 			r = &AuthenticationReconciler{
-				Client: cl,
-				Reader: cl,
+				Client: &ctrlcommon.FallbackClient{
+					Client: cl,
+					Reader: cl,
+				},
 			}
 			ctx = context.Background()
 		})
@@ -299,11 +310,13 @@ var _ = Describe("Route handling", func() {
 				"an_extra_field":       "an_extra_value",
 			}
 			rFailing := &AuthenticationReconciler{
-				Client: &testutil.FakeTimeoutClient{
-					Client: cl,
-				},
-				Reader: &testutil.FakeTimeoutClient{
-					Client: cl,
+				Client: &ctrlcommon.FallbackClient{
+					Client: &testutil.FakeTimeoutClient{
+						Client: cl,
+					},
+					Reader: &testutil.FakeTimeoutClient{
+						Client: cl,
+					},
 				},
 			}
 			fn := rFailing.ensureConfigMapHasEqualFields(authCR, fields, cm)
@@ -347,8 +360,10 @@ var _ = Describe("Route handling", func() {
 				WithObjects(platformOIDCCredentialsSecret, authCR)
 			cl = cb.Build()
 			r = &AuthenticationReconciler{
-				Client: cl,
-				Reader: cl,
+				Client: &ctrlcommon.FallbackClient{
+					Client: cl,
+					Reader: cl,
+				},
 			}
 			ctx = context.Background()
 			wlpClientID = ""
@@ -369,11 +384,13 @@ var _ = Describe("Route handling", func() {
 		})
 		It("will produce a function that signals to requeue with an error when the ConfigMap is not changed successfully", func() {
 			rFailing := &AuthenticationReconciler{
-				Client: &testutil.FakeTimeoutClient{
-					Client: cl,
-				},
-				Reader: &testutil.FakeTimeoutClient{
-					Client: cl,
+				Client: &ctrlcommon.FallbackClient{
+					Client: &testutil.FakeTimeoutClient{
+						Client: cl,
+					},
+					Reader: &testutil.FakeTimeoutClient{
+						Client: cl,
+					},
 				},
 			}
 			fn := rFailing.getWlpClientID(authCR, &wlpClientID)
@@ -441,8 +458,10 @@ var _ = Describe("Route handling", func() {
 				)
 			cl = cb.Build()
 			r = &AuthenticationReconciler{
-				Client: cl,
-				Reader: cl,
+				Client: &ctrlcommon.FallbackClient{
+					Client: cl,
+					Reader: cl,
+				},
 			}
 			ctx = context.Background()
 
@@ -467,11 +486,14 @@ var _ = Describe("Route handling", func() {
 		testFailedCertRetrieval := func(serviceName string) {
 			certificate := []byte{}
 			rFailing := &AuthenticationReconciler{
-				Client: &testutil.FakeTimeoutClient{
-					Client: cl,
-				},
-				Reader: &testutil.FakeTimeoutClient{
-					Client: cl,
+				Client: &ctrlcommon.FallbackClient{
+
+					Client: &testutil.FakeTimeoutClient{
+						Client: cl,
+					},
+					Reader: &testutil.FakeTimeoutClient{
+						Client: cl,
+					},
 				},
 			}
 			fn := rFailing.getCertificateForService(serviceName, authCR, &certificate)
@@ -555,8 +577,10 @@ var _ = Describe("Route handling", func() {
 				WithObjects(clusterInfoConfigMap, authCR)
 			cl = cb.Build()
 			r = &AuthenticationReconciler{
-				Client: cl,
-				Reader: cl,
+				Client: &ctrlcommon.FallbackClient{
+					Client: cl,
+					Reader: cl,
+				},
 			}
 			clusterAddress = ""
 		})
@@ -581,11 +605,14 @@ var _ = Describe("Route handling", func() {
 			err := r.Delete(ctx, clusterInfoConfigMap)
 			Expect(err).ToNot(HaveOccurred())
 			rFailing := &AuthenticationReconciler{
-				Client: &testutil.FakeTimeoutClient{
-					Client: cl,
-				},
-				Reader: &testutil.FakeTimeoutClient{
-					Client: cl,
+				Client: &ctrlcommon.FallbackClient{
+
+					Client: &testutil.FakeTimeoutClient{
+						Client: cl,
+					},
+					Reader: &testutil.FakeTimeoutClient{
+						Client: cl,
+					},
 				},
 			}
 			fn := rFailing.getClusterAddress(authCR, &clusterAddress)
@@ -718,8 +745,10 @@ var _ = Describe("Route handling", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			r = &AuthenticationReconciler{
-				Client:          cl,
-				Reader:          cl,
+				Client: &ctrlcommon.FallbackClient{
+					Client: cl,
+					Reader: cl,
+				},
 				DiscoveryClient: *dc,
 			}
 		})
@@ -1035,8 +1064,10 @@ var _ = Describe("Route handling", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(resources).To(BeNil())
 			r = &AuthenticationReconciler{
-				Client:          cl,
-				Reader:          cl,
+				Client: &ctrlcommon.FallbackClient{
+					Client: cl,
+					Reader: cl,
+				},
 				DiscoveryClient: *dc,
 			}
 			result, err := r.handleRoutes(ctx,

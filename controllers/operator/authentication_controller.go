@@ -90,10 +90,6 @@ var opreqWait time.Duration = 100 * time.Millisecond
 // defaultLowerWait is used in instances where a requeue is needed quickly, regardless of previous requeues
 var defaultLowerWait time.Duration = 5 * time.Millisecond
 
-var rule = `^([a-z0-9]){32,}$`
-var wlpClientID = ctrlcommon.GenerateRandomString(rule)
-var wlpClientSecret = ctrlcommon.GenerateRandomString(rule)
-
 // finalizerName is the finalizer appended to the Authentication CR
 var finalizerName = "authentication.operator.ibm.com"
 
@@ -186,21 +182,12 @@ func needsAuditServiceDummyDataReset(a *operatorv1alpha1.Authentication) bool {
 // AuthenticationReconciler reconciles a Authentication object
 type AuthenticationReconciler struct {
 	client.Client
-	Reader          client.Reader
 	Scheme          *runtime.Scheme
 	DiscoveryClient discovery.DiscoveryClient
 	Mutex           sync.Mutex
 	clusterType     ctrlcommon.ClusterType
 	dbSetupChan     chan *migration.Result
-}
-
-// GetFromCacheOrAPI first tries to GET the object from the cache; if this
-// fails, it attempts a GET from the API server directly.
-func (r *AuthenticationReconciler) Get(ctx context.Context, objkey client.ObjectKey, obj client.Object) (err error) {
-	if err = r.Client.Get(ctx, objkey, obj); k8sErrors.IsNotFound(err) {
-		return r.Reader.Get(ctx, objkey, obj)
-	}
-	return
+	needsRollout    bool
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -315,10 +302,8 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	// Check if this Secret already exists and create it if it doesn't
-	currentSecret := &corev1.Secret{}
-	err = r.handleSecret(instance, wlpClientID, wlpClientSecret, currentSecret, &needToRequeue)
-	if err != nil {
-		return
+	if subResult, err = r.handleSecrets(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
 	}
 
 	if subResult, err := r.handleConfigMaps(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
@@ -365,13 +350,8 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return subreconciler.Evaluate(result, err)
 	}
 
-	// Check if this Deployment already exists and create it if it doesn't
-	currentDeployment := &appsv1.Deployment{}
-	currentProviderDeployment := &appsv1.Deployment{}
-	currentManagerDeployment := &appsv1.Deployment{}
-	err = r.handleDeployment(instance, currentDeployment, currentProviderDeployment, currentManagerDeployment, &needToRequeue)
-	if err != nil {
-		return
+	if subResult, err := r.handleDeployments(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
 	}
 
 	if needsAuditServiceDummyDataReset(instance) {

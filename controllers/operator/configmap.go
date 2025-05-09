@@ -19,9 +19,11 @@ package operator
 import (
 	"bytes"
 	"context"
+	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -45,6 +47,80 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+const AnnotationSHA1Sum string = "authentication.operator.ibm.com/sha1sum"
+
+// handleConfigMaps is a subreconciler.FnWithRequest that handles the
+// reconciliation of all ConfigMaps created for a given Authentication.
+func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleConfigMaps")
+	cmCtx := logf.IntoContext(ctx, reqLogger)
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+
+	// Ensure that the ibmcloud-cluster-info configmap is created
+	ibmCloudClusterInfoCM := &corev1.ConfigMap{}
+
+	var subresult *ctrl.Result
+	subresult, err = r.handleIBMCloudClusterInfo(cmCtx, authCR, ibmCloudClusterInfoCM)
+	if subreconciler.ShouldHaltOrRequeue(subresult, err) {
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	}
+
+	builders := []*ctrlcommon.SecondaryReconcilerBuilder[*corev1.ConfigMap]{
+		ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+			WithName("platform-auth-idp").
+			WithGenerateFns(generateAuthIdpConfigMap(ibmCloudClusterInfoCM)).
+			WithModifyFns(updatePlatformAuthIDP).
+			WithOnWriteFns(signalNeedRolloutFn[*corev1.ConfigMap](r)),
+		ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+			WithName("registration-json").
+			WithGenerateFns(generateRegistrationJsonConfigMap(ibmCloudClusterInfoCM)).
+			WithModifyFns(updateRegistrationJSON).
+			WithOnWriteFns(replaceOIDCClientRegistrationJob),
+		ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+			WithName("oauth-client-map").
+			WithGenerateFns(generateOAuthClientConfigMap(ibmCloudClusterInfoCM)).
+			WithModifyFns(updateOAuthClientConfigMap),
+		ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+			WithName("registration-script").
+			WithGenerateFns(generateRegistrationScriptConfigMap()),
+	}
+
+	subRecs := []ctrlcommon.SecondaryReconciler{}
+	for i := range builders {
+		subRecs = append(subRecs, builders[i].
+			WithNamespace(authCR.Namespace).
+			WithPrimary(authCR).
+			WithClient(r.Client).
+			MustBuild())
+	}
+
+	subresults := []*ctrl.Result{}
+	errs := []error{}
+	for _, subRec := range subRecs {
+		subresult, err = subRec.Reconcile(cmCtx)
+		subresults = append(subresults, subresult)
+		errs = append(errs, err)
+	}
+
+	return ctrlcommon.ReduceSubreconcilerResultsAndErrors(subresults, errs)
+}
+
+// getConfigMapDataSHA1Sum calculates the SHA1 of the `.data` field.
+func getConfigMapDataSHA1Sum(cm *corev1.ConfigMap) (sha string, err error) {
+	var dataBytes []byte
+	if cm.Data == nil {
+		return "", errors.New("no .data defined on ConfigMap")
+	}
+	if dataBytes, err = json.Marshal(cm.Data); err != nil {
+		return "", err
+	}
+	dataSHA := sha1.Sum(dataBytes)
+	return fmt.Sprintf("%x", dataSHA[:]), nil
+}
 
 // getCNCFDomain returns the CNCF domain name set in the global ConfigMap, if
 // present. Returns an error when the ConfigMap is not found and returns an
@@ -117,12 +193,12 @@ func (r *AuthenticationReconciler) handleIBMCloudClusterInfo(ctx context.Context
 	}
 
 	updateFns := []func(*corev1.ConfigMap, *corev1.ConfigMap) bool{
-		updatesValuesWhen(and(zenFrontDoorEnabled(authCR), not(observedKeyValueSetTo("cluster_address", generated.Data["cluster_address"]))),
+		updatesValuesWhen(and(zenFrontDoorEnabled[*corev1.ConfigMap](authCR), not(observedKeyValueSetTo[*corev1.ConfigMap]("cluster_address", generated.Data["cluster_address"]))),
 			"cluster_address",
 			"cluster_address_auth",
 			"proxy_address",
 			"cluster_endpoint"),
-		updatesValuesWhen(not(observedKeySet("cluster_address_auth")), "cluster_address_auth"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("cluster_address_auth")), "cluster_address_auth"),
 	}
 
 	for _, update := range updateFns {
@@ -143,164 +219,20 @@ func (r *AuthenticationReconciler) handleIBMCloudClusterInfo(ctx context.Context
 	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
-func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return
-	}
-
-	// Ensure that the ibmcloud-cluster-info configmap is created
-	ibmCloudClusterInfoCM := &corev1.ConfigMap{}
-
-	var subresult *ctrl.Result
-	subresult, err = r.handleIBMCloudClusterInfo(ctx, authCR, ibmCloudClusterInfoCM)
-	if subreconciler.ShouldHaltOrRequeue(subresult, err) {
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
-
-	cmUpdaters := []*cmUpdater{
-		{
-			Name:     "platform-auth-idp",
-			generate: generateAuthIdpConfigMap,
-			update:   updatePlatformAuthIDP,
-		},
-		{
-			Name:     "registration-json",
-			generate: generateRegistrationJsonConfigMap,
-			update:   updateRegistrationJSON,
-			onChange: replaceOIDCClientRegistrationJob,
-		},
-		{
-			Name:     "oauth-client-map",
-			generate: generateOAuthClientConfigMap,
-			update:   updateOAuthClientConfigMap,
-		},
-		{
-			Name:     "registration-script",
-			generate: generateRegistrationScriptConfigMap,
-		},
-	}
-
-	subresults := []*ctrl.Result{}
-	errs := []error{}
-	for _, updater := range cmUpdaters {
-		subresult, err = updater.CreateOrUpdate(ctx, r.Client, authCR, ibmCloudClusterInfoCM)
-		subresults = append(subresults, subresult)
-		errs = append(errs, err)
-	}
-
-	return ctrlcommon.ReduceSubreconcilerResultsAndErrors(subresults, errs)
-}
-
-func updateFields(observed, update *corev1.ConfigMap, keys ...string) (updated bool) {
-	for _, key := range keys {
-		observedVal, ok := observed.Data[key]
-		updateVal := update.Data[key]
-		if !ok || observedVal != updateVal {
-			observed.Data[key] = updateVal
-			updated = true
-		}
-	}
-	return
-}
-
-type matcherFunc func(*corev1.ConfigMap) bool
-
-func observedKeySet(key string) matcherFunc {
-	return func(observed *corev1.ConfigMap) bool {
-		_, ok := observed.Data[key]
-		return ok
-	}
-}
-
-func observedKeyValueSetTo(key, value string) matcherFunc {
-	return func(observed *corev1.ConfigMap) bool {
-		observedValue, ok := observed.Data[key]
-		if ok && value == observedValue {
-			return true
-		}
-		return false
-	}
-}
-
-func zenFrontDoorEnabled(authCR *operatorv1alpha1.Authentication) matcherFunc {
-	return func(observed *corev1.ConfigMap) bool {
-		return authCR.Spec.Config.ZenFrontDoor
-	}
-}
-
-func not(isMatch matcherFunc) matcherFunc {
-	return func(observed *corev1.ConfigMap) bool {
-		return !isMatch(observed)
-	}
-}
-
-func and(matchers ...matcherFunc) matcherFunc {
-	return func(observed *corev1.ConfigMap) (matches bool) {
-		if len(matchers) == 0 {
-			return false
-		}
-		matches = true
-		for _, isMatch := range matchers {
-			if !isMatch(observed) {
-				return false
-			}
-		}
-		return
-	}
-}
-
-func or(matchers ...matcherFunc) matcherFunc {
-	return func(observed *corev1.ConfigMap) (matches bool) {
-		matches = false
-		for _, isMatch := range matchers {
-			if isMatch(observed) {
-				return true
-			}
-		}
-		return
-	}
-}
-
-func observedKeyValueContains(key, value string) matcherFunc {
-	return func(observed *corev1.ConfigMap) bool {
-		observedValue, ok := observed.Data[key]
-		if ok && strings.Contains(observedValue, value) {
-			return true
-		}
-		return false
-	}
-}
-
-func updatesValuesWhen(matches matcherFunc, keys ...string) (fn func(*corev1.ConfigMap, *corev1.ConfigMap) bool) {
-	return func(observed, updates *corev1.ConfigMap) bool {
-		if matches(observed) {
-			return updateFields(observed, updates, keys...)
-		}
-		return false
-	}
-}
-
-func updatesAlways(keys ...string) (fn func(*corev1.ConfigMap, *corev1.ConfigMap) bool) {
-	return func(observed, updates *corev1.ConfigMap) bool {
-		return updateFields(observed, updates, keys...)
-	}
-}
-
-func replaceOIDCClientRegistrationJob(ctx context.Context, cl client.Client, authCR *operatorv1alpha1.Authentication) (err error) {
+func replaceOIDCClientRegistrationJob(s ctrlcommon.SecondaryReconciler, ctx context.Context) (err error) {
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "oidc-client-registration",
-			Namespace: authCR.Namespace,
+			Namespace: s.GetNamespace(),
 		},
 	}
-	if err = cl.Delete(ctx, job); k8sErrors.IsNotFound(err) {
+	if err = s.GetClient().Delete(ctx, job); k8sErrors.IsNotFound(err) {
 		return nil
 	}
 	return
 }
 
-func updateRegistrationJSON(observed, generated *corev1.ConfigMap) (updated bool, err error) {
+func updateRegistrationJSON(_ ctrlcommon.SecondaryReconciler, ctx context.Context, observed, generated *corev1.ConfigMap) (updated bool, err error) {
 	observedJSON := &registrationJSONData{}
 	if err = json.Unmarshal([]byte(observed.Data["platform-oidc-registration.json"]), observedJSON); err != nil {
 		return
@@ -325,76 +257,14 @@ func updateRegistrationJSON(observed, generated *corev1.ConfigMap) (updated bool
 	return
 }
 
-type cmUpdater struct {
-	Name     string
-	generate func(context.Context, client.Client, *operatorv1alpha1.Authentication, *corev1.ConfigMap, *corev1.ConfigMap) error
-	update   func(*corev1.ConfigMap, *corev1.ConfigMap) (bool, error)
-	onChange func(context.Context, client.Client, *operatorv1alpha1.Authentication) error
-}
-
-func (u *cmUpdater) CreateOrUpdate(ctx context.Context, cl client.Client, authCR *operatorv1alpha1.Authentication, ibmcloudClusterInfo *corev1.ConfigMap) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("ConfigMap.Namespace", authCR.Namespace, "ConfigMap.Name", u.Name)
-	observed := &corev1.ConfigMap{}
-	generated := &corev1.ConfigMap{}
-	if err = u.generate(ctx, cl, authCR, ibmcloudClusterInfo, generated); err != nil {
-		return subreconciler.RequeueWithError(err)
-	}
-	cmKey := types.NamespacedName{Name: u.Name, Namespace: authCR.Namespace}
-	if err = cl.Get(ctx, cmKey, observed); k8sErrors.IsNotFound(err) {
-		if err := cl.Create(ctx, generated); k8sErrors.IsAlreadyExists(err) {
-			reqLogger.Info("ConfigMap was found while creating")
-			return subreconciler.RequeueWithDelay(defaultLowerWait)
-		} else if err != nil {
-			reqLogger.Info("ConfigMap could not be created for an unexpected reason", "msg", err.Error())
-			return subreconciler.RequeueWithDelay(defaultLowerWait)
-		}
-		reqLogger.Info("ConfigMap created")
-		if u.onChange == nil {
-			return subreconciler.RequeueWithDelay(defaultLowerWait)
-		}
-
-		if err = u.onChange(ctx, cl, authCR); err != nil {
-			reqLogger.Info("Error occurred while performing post-update work", "reason", err.Error())
-		}
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
-
-	if u.update == nil {
-		return subreconciler.ContinueReconciling()
-	}
-	updated := false
-	updated, err = u.update(observed, generated)
-	if err != nil {
-		return subreconciler.RequeueWithError(err)
-	} else if !updated {
-		return subreconciler.ContinueReconciling()
-	}
-
-	if err = cl.Update(ctx, observed); err != nil {
-		reqLogger.Info("Failed to update Configmap", "msg", err.Error())
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
-
-	reqLogger.Info("ConfigMap updated successfully")
-	if u.onChange == nil {
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
-
-	if err = u.onChange(ctx, cl, authCR); err != nil {
-		reqLogger.Info("Error occurred while performing post-update work", "reason", err.Error())
-	}
-
-	return subreconciler.RequeueWithDelay(defaultLowerWait)
-}
-
-func updateOAuthClientConfigMap(observed, generated *corev1.ConfigMap) (updated bool, err error) {
+func updateOAuthClientConfigMap(_ ctrlcommon.SecondaryReconciler, _ context.Context, observed, generated *corev1.ConfigMap) (updated bool, err error) {
 	updateFns := []func(*corev1.ConfigMap, *corev1.ConfigMap) bool{
-		updatesValuesWhen(not(observedKeyValueSetTo("MASTER_IP", generated.Data["MASTER_IP"])),
+		updatesValuesWhen(not(observedKeyValueSetTo[*corev1.ConfigMap]("MASTER_IP", generated.Data["MASTER_IP"])),
 			"MASTER_IP",
 			"PROXY_IP",
 			"CLUSTER_CA_DOMAIN",
 		),
-		updatesValuesWhen(not(observedKeyValueSetTo("CLUSTER_NAME", generated.Data["CLUSTER_NAME"]))),
+		updatesValuesWhen(not(observedKeyValueSetTo[*corev1.ConfigMap]("CLUSTER_NAME", generated.Data["CLUSTER_NAME"]))),
 	}
 
 	for _, update := range updateFns {
@@ -404,9 +274,9 @@ func updateOAuthClientConfigMap(observed, generated *corev1.ConfigMap) (updated 
 	return
 }
 
-func updatePlatformAuthIDP(observed, generated *corev1.ConfigMap) (updated bool, err error) {
+func updatePlatformAuthIDP(_ ctrlcommon.SecondaryReconciler, _ context.Context, observed, generated *corev1.ConfigMap) (updated bool, err error) {
 	updateFns := []func(*corev1.ConfigMap, *corev1.ConfigMap) bool{
-		updatesAlways(
+		updatesAlways[*corev1.ConfigMap](
 			"ROKS_URL",
 			"ROKS_USER_PREFIX",
 			"ROKS_ENABLED",
@@ -420,52 +290,52 @@ func updatePlatformAuthIDP(observed, generated *corev1.ConfigMap) (updated bool,
 			"PROVIDER_ISSUER_URL",
 			"CLUSTER_NAME",
 		),
-		updatesValuesWhen(observedKeyValueSetTo("OS_TOKEN_LENGTH", "45"),
+		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("OS_TOKEN_LENGTH", "45"),
 			"OS_TOKEN_LENGTH"),
-		updatesValuesWhen(observedKeyValueContains("IDENTITY_MGMT_URL", "127.0.0.1"),
+		updatesValuesWhen(observedKeyValueContains[*corev1.ConfigMap]("IDENTITY_MGMT_URL", "127.0.0.1"),
 			"IDENTITY_MGMT_URL"),
 		updatesValuesWhen(
-			observedKeyValueContains("BASE_OIDC_URL", "127.0.0.1"),
+			observedKeyValueContains[*corev1.ConfigMap]("BASE_OIDC_URL", "127.0.0.1"),
 			"BASE_OIDC_URL"),
 		updatesValuesWhen(
-			observedKeyValueContains("IDENTITY_AUTH_DIRECTORY_URL", "127.0.0.1"),
+			observedKeyValueContains[*corev1.ConfigMap]("IDENTITY_AUTH_DIRECTORY_URL", "127.0.0.1"),
 			"IDENTITY_AUTH_DIRECTORY_URL"),
 		updatesValuesWhen(
-			observedKeyValueContains("IDENTITY_PROVIDER_URL", "127.0.0.1"),
+			observedKeyValueContains[*corev1.ConfigMap]("IDENTITY_PROVIDER_URL", "127.0.0.1"),
 			"IDENTITY_PROVIDER_URL"),
-		updatesValuesWhen(not(observedKeySet("LDAP_RECURSIVE_SEARCH")),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("LDAP_RECURSIVE_SEARCH")),
 			"LDAP_RECURSIVE_SEARCH"),
-		updatesValuesWhen(not(observedKeyValueSetTo("DEFAULT_LOGIN", generated.Data["DEFAULT_LOGIN"])),
+		updatesValuesWhen(not(observedKeyValueSetTo[*corev1.ConfigMap]("DEFAULT_LOGIN", generated.Data["DEFAULT_LOGIN"])),
 			"DEFAULT_LOGIN"),
-		updatesValuesWhen(not(observedKeyValueSetTo("MASTER_HOST", generated.Data["MASTER_HOST"])),
+		updatesValuesWhen(not(observedKeyValueSetTo[*corev1.ConfigMap]("MASTER_HOST", generated.Data["MASTER_HOST"])),
 			"MASTER_HOST"),
-		updatesValuesWhen(not(observedKeySet("DB_CONNECT_TIMEOUT")),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("DB_CONNECT_TIMEOUT")),
 			"DB_CONNECT_TIMEOUT",
 			"DB_IDLE_TIMEOUT",
 			"DB_CONNECT_MAX_RETRIES",
 			"DB_POOL_MIN_SIZE",
 			"DB_POOL_MAX_SIZE",
 			"SEQL_LOGGING"),
-		updatesValuesWhen(not(observedKeySet("DB_SSL_MODE")),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("DB_SSL_MODE")),
 			"DB_SSL_MODE"),
-		updatesValuesWhen(not(observedKeySet("SCIM_LDAP_ATTRIBUTES_MAPPING")),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("SCIM_LDAP_ATTRIBUTES_MAPPING")),
 			"SCIM_LDAP_ATTRIBUTES_MAPPING",
 			"SCIM_LDAP_SEARCH_SIZE_LIMIT",
 			"SCIM_LDAP_SEARCH_TIME_LIMIT",
 			"SCIM_ASYNC_PARALLEL_LIMIT",
 			"SCIM_GET_DISPLAY_FOR_GROUP_USERS"),
-		updatesValuesWhen(not(observedKeySet("SCIM_AUTH_CACHE_MAX_SIZE")),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("SCIM_AUTH_CACHE_MAX_SIZE")),
 			"SCIM_AUTH_CACHE_MAX_SIZE"),
-		updatesValuesWhen(not(observedKeySet("SCIM_AUTH_CACHE_TTL_VALUE")),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("SCIM_AUTH_CACHE_TTL_VALUE")),
 			"SCIM_AUTH_CACHE_TTL_VALUE"),
-		updatesValuesWhen(not(observedKeySet("AUTH_SVC_LDAP_CONFIG_TIMEOUT")),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("AUTH_SVC_LDAP_CONFIG_TIMEOUT")),
 			"AUTH_SVC_LDAP_CONFIG_TIMEOUT"),
-		updatesValuesWhen(not(observedKeySet("IBM_CLOUD_SAAS")),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("IBM_CLOUD_SAAS")),
 			"IBM_CLOUD_SAAS",
 			"SAAS_CLIENT_REDIRECT_URL"),
-		updatesValuesWhen(not(observedKeySet("ATTR_MAPPING_FROM_CONFIG")),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("ATTR_MAPPING_FROM_CONFIG")),
 			"ATTR_MAPPING_FROM_CONFIG"),
-		updatesValuesWhen(not(observedKeySet("LDAP_CTX_POOL_INITSIZE")),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("LDAP_CTX_POOL_INITSIZE")),
 			"LDAP_CTX_POOL_INITSIZE",
 			"LDAP_CTX_POOL_MAXSIZE",
 			"LDAP_CTX_POOL_TIMEOUT",
@@ -475,11 +345,128 @@ func updatePlatformAuthIDP(observed, generated *corev1.ConfigMap) (updated bool,
 
 	if v, ok := generated.Data["IS_OPENSHIFT_ENV"]; ok {
 		updateFns = append(updateFns, updatesValuesWhen(
-			not(observedKeyValueSetTo("IS_OPENSHIFT_ENV", v)), "IS_OPENSHIFT_ENV"))
+			not(observedKeyValueSetTo[*corev1.ConfigMap]("IS_OPENSHIFT_ENV", v)), "IS_OPENSHIFT_ENV"))
 	}
 
 	for _, update := range updateFns {
 		updated = update(observed, generated) || updated
+	}
+
+	beforeSum := observed.Annotations[AnnotationSHA1Sum]
+	afterSum, err := getConfigMapDataSHA1Sum(observed)
+	if err != nil {
+		return false, err
+	}
+
+	if observed.Annotations == nil {
+		observed.Annotations = map[string]string{
+			AnnotationSHA1Sum: afterSum,
+		}
+		return true, nil
+	}
+
+	if beforeSum != afterSum {
+		observed.Annotations[AnnotationSHA1Sum] = afterSum
+		updated = true
+	}
+
+	return
+}
+
+func updatePlatformAuthIDPSSA(_ ctrlcommon.SecondaryReconciler, _ context.Context, observed, generated *corev1.ConfigMap) (updated bool, err error) {
+	updateFns := []func(*corev1.ConfigMap, *corev1.ConfigMap) bool{
+		updatesAlways[*corev1.ConfigMap](
+			"ROKS_URL",
+			"ROKS_USER_PREFIX",
+			"ROKS_ENABLED",
+			"BOOTSTRAP_USERID",
+			"CLAIMS_SUPPORTED",
+			"CLAIMS_MAP",
+			"SCOPE_CLAIM",
+			"NONCE_ENABLED",
+			"PREFERRED_LOGIN",
+			"OIDC_ISSUER_URL",
+			"PROVIDER_ISSUER_URL",
+			"CLUSTER_NAME",
+		),
+		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("OS_TOKEN_LENGTH", "45"),
+			"OS_TOKEN_LENGTH"),
+		updatesValuesWhen(observedKeyValueContains[*corev1.ConfigMap]("IDENTITY_MGMT_URL", "127.0.0.1"),
+			"IDENTITY_MGMT_URL"),
+		updatesValuesWhen(
+			observedKeyValueContains[*corev1.ConfigMap]("BASE_OIDC_URL", "127.0.0.1"),
+			"BASE_OIDC_URL"),
+		updatesValuesWhen(
+			observedKeyValueContains[*corev1.ConfigMap]("IDENTITY_AUTH_DIRECTORY_URL", "127.0.0.1"),
+			"IDENTITY_AUTH_DIRECTORY_URL"),
+		updatesValuesWhen(
+			observedKeyValueContains[*corev1.ConfigMap]("IDENTITY_PROVIDER_URL", "127.0.0.1"),
+			"IDENTITY_PROVIDER_URL"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("LDAP_RECURSIVE_SEARCH")),
+			"LDAP_RECURSIVE_SEARCH"),
+		updatesValuesWhen(not(observedKeyValueSetTo[*corev1.ConfigMap]("DEFAULT_LOGIN", generated.Data["DEFAULT_LOGIN"])),
+			"DEFAULT_LOGIN"),
+		updatesValuesWhen(not(observedKeyValueSetTo[*corev1.ConfigMap]("MASTER_HOST", generated.Data["MASTER_HOST"])),
+			"MASTER_HOST"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("DB_CONNECT_TIMEOUT")),
+			"DB_CONNECT_TIMEOUT",
+			"DB_IDLE_TIMEOUT",
+			"DB_CONNECT_MAX_RETRIES",
+			"DB_POOL_MIN_SIZE",
+			"DB_POOL_MAX_SIZE",
+			"SEQL_LOGGING"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("DB_SSL_MODE")),
+			"DB_SSL_MODE"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("SCIM_LDAP_ATTRIBUTES_MAPPING")),
+			"SCIM_LDAP_ATTRIBUTES_MAPPING",
+			"SCIM_LDAP_SEARCH_SIZE_LIMIT",
+			"SCIM_LDAP_SEARCH_TIME_LIMIT",
+			"SCIM_ASYNC_PARALLEL_LIMIT",
+			"SCIM_GET_DISPLAY_FOR_GROUP_USERS"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("SCIM_AUTH_CACHE_MAX_SIZE")),
+			"SCIM_AUTH_CACHE_MAX_SIZE"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("SCIM_AUTH_CACHE_TTL_VALUE")),
+			"SCIM_AUTH_CACHE_TTL_VALUE"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("AUTH_SVC_LDAP_CONFIG_TIMEOUT")),
+			"AUTH_SVC_LDAP_CONFIG_TIMEOUT"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("IBM_CLOUD_SAAS")),
+			"IBM_CLOUD_SAAS",
+			"SAAS_CLIENT_REDIRECT_URL"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("ATTR_MAPPING_FROM_CONFIG")),
+			"ATTR_MAPPING_FROM_CONFIG"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("LDAP_CTX_POOL_INITSIZE")),
+			"LDAP_CTX_POOL_INITSIZE",
+			"LDAP_CTX_POOL_MAXSIZE",
+			"LDAP_CTX_POOL_TIMEOUT",
+			"LDAP_CTX_POOL_WAITTIME",
+			"LDAP_CTX_POOL_PREFERREDSIZE"),
+	}
+
+	if v, ok := generated.Data["IS_OPENSHIFT_ENV"]; ok {
+		updateFns = append(updateFns, updatesValuesWhen(
+			not(observedKeyValueSetTo[*corev1.ConfigMap]("IS_OPENSHIFT_ENV", v)), "IS_OPENSHIFT_ENV"))
+	}
+
+	for _, update := range updateFns {
+		updated = update(observed, generated) || updated
+	}
+
+	beforeSum := observed.Annotations[AnnotationSHA1Sum]
+	afterSum, err := getConfigMapDataSHA1Sum(observed)
+	if err != nil {
+		return false, err
+	}
+
+	if observed.Annotations == nil {
+		observed.Annotations = map[string]string{
+			AnnotationSHA1Sum: afterSum,
+		}
+		return true, nil
+	}
+
+	if beforeSum != afterSum {
+		observed.Annotations[AnnotationSHA1Sum] = afterSum
+		updated = true
 	}
 
 	return
@@ -502,248 +489,269 @@ type registrationJSONData struct {
 	RedirectURIs            []string `json:"redirect_uris"`
 }
 
-func generateAuthIdpConfigMap(ctx context.Context, cl client.Client, authCR *operatorv1alpha1.Authentication, ibmcloudClusterInfo, generated *corev1.ConfigMap) (err error) {
-	reqLogger := logf.FromContext(ctx)
-	onIBMCloud, _ := isHostedOnIBMCloud(ctx, cl, authCR.Namespace)
+func generateAuthIdpConfigMap(clusterInfo *corev1.ConfigMap) ctrlcommon.GenerateFn[*corev1.ConfigMap] {
+	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, generated *corev1.ConfigMap) (err error) {
+		reqLogger := logf.FromContext(ctx)
+		authCR, ok := s.GetPrimary().(*operatorv1alpha1.Authentication)
+		if !ok {
+			return fmt.Errorf("unexpected primary resource")
+		}
+		onIBMCloud, _ := isHostedOnIBMCloud(ctx, s.GetClient(), authCR.Namespace)
 
-	bootStrapUserId := authCR.Spec.Config.BootstrapUserId
-	if len(bootStrapUserId) > 0 && strings.EqualFold(bootStrapUserId, "kubeadmin") && onIBMCloud {
-		bootStrapUserId = ""
-	}
+		bootStrapUserId := authCR.Spec.Config.BootstrapUserId
+		if len(bootStrapUserId) > 0 && strings.EqualFold(bootStrapUserId, "kubeadmin") && onIBMCloud {
+			bootStrapUserId = ""
+		}
 
-	roksUserPrefix := authCR.Spec.Config.ROKSUserPrefix
-	if onIBMCloud || (authCR.Spec.Config.ROKSEnabled && roksUserPrefix == "changeme") {
-		roksUserPrefix = "IAM#"
-	}
+		roksUserPrefix := authCR.Spec.Config.ROKSUserPrefix
+		if onIBMCloud || (authCR.Spec.Config.ROKSEnabled && roksUserPrefix == "changeme") {
+			roksUserPrefix = "IAM#"
+		}
 
-	var isOSEnv bool
-	if domainName, err := getCNCFDomain(ctx, cl, authCR); err != nil {
-		reqLogger.Info("Could not retrieve cluster configuration; requeueing", "reason", err.Error())
-		return err
-	} else {
-		isOSEnv = domainName == ""
-	}
+		var isOSEnv bool
+		if domainName, err := getCNCFDomain(ctx, s.GetClient(), authCR); err != nil {
+			reqLogger.Info("Could not retrieve cluster configuration; requeueing", "reason", err.Error())
+			return err
+		} else {
+			isOSEnv = domainName == ""
+		}
 
-	var desiredRoksUrl string
-	if authCR.Spec.Config.ROKSEnabled && !isOSEnv {
-		reqLogger.Info(".spec.config.roksEnabled is set to true, but workload does not appear to be running on OpenShift; disabling in ConfigMap")
-	} else if authCR.Spec.Config.ROKSEnabled && authCR.Spec.Config.ROKSURL != "https://roks.domain.name:443" {
-		desiredRoksUrl = authCR.Spec.Config.ROKSURL
-	} else if authCR.Spec.Config.ROKSEnabled {
-		if desiredRoksUrl, err = readROKSURL(ctx); err != nil {
-			reqLogger.Error(err, "Failed to get issuer URL")
-			return
-		} else if len(desiredRoksUrl) == 0 {
-			reqLogger.Error(err, "Failed to get issuer URL")
-			err = fmt.Errorf("issuer URL is empty")
+		var desiredRoksUrl string
+		if authCR.Spec.Config.ROKSEnabled && !isOSEnv {
+			reqLogger.Info(".spec.config.roksEnabled is set to true, but workload does not appear to be running on OpenShift; disabling in ConfigMap")
+		} else if authCR.Spec.Config.ROKSEnabled && authCR.Spec.Config.ROKSURL != "https://roks.domain.name:443" {
+			desiredRoksUrl = authCR.Spec.Config.ROKSURL
+		} else if authCR.Spec.Config.ROKSEnabled {
+			if desiredRoksUrl, err = readROKSURL(ctx); err != nil {
+				reqLogger.Error(err, "Failed to get issuer URL")
+				return
+			} else if len(desiredRoksUrl) == 0 {
+				reqLogger.Error(err, "Failed to get issuer URL")
+				err = fmt.Errorf("issuer URL is empty")
+				return
+			}
+		}
+
+		*generated = corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      s.GetName(),
+				Namespace: s.GetNamespace(),
+				Labels:    map[string]string{"app": "platform-auth-service"},
+			},
+			Data: map[string]string{
+				"BASE_AUTH_URL":                      "/v1",
+				"BASE_OIDC_URL":                      "https://platform-auth-service:9443/oidc/endpoint/OP",
+				"CLUSTER_NAME":                       authCR.Spec.Config.ClusterName,
+				"HTTP_ONLY":                          "false",
+				"IDENTITY_AUTH_DIRECTORY_URL":        "https://platform-auth-service:3100",
+				"IDENTITY_PROVIDER_URL":              "https://platform-identity-provider:4300",
+				"IDENTITY_MGMT_URL":                  "https://platform-identity-management:4500",
+				"MASTER_HOST":                        clusterInfo.Data["cluster_address"],
+				"NODE_ENV":                           "production",
+				"AUDIT_ENABLED_IDPROVIDER":           "false",
+				"AUDIT_ENABLED_IDMGMT":               "false",
+				"AUDIT_DETAIL":                       "false",
+				"LOG_LEVEL_IDPROVIDER":               "info",
+				"LOG_LEVEL_AUTHSVC":                  "info",
+				"LOG_LEVEL_IDMGMT":                   "info",
+				"LOG_LEVEL_MW":                       "info",
+				"IDTOKEN_LIFETIME":                   "12h",
+				"SESSION_TIMEOUT":                    "43200",
+				"OIDC_ISSUER_URL":                    authCR.Spec.Config.OIDCIssuerURL,
+				"PDP_REDIS_CACHE_DEFAULT_TTL":        "600",
+				"FIPS_ENABLED":                       strconv.FormatBool(authCR.Spec.Config.FIPSEnabled),
+				"NONCE_ENABLED":                      strconv.FormatBool(authCR.Spec.Config.NONCEEnabled),
+				"ROKS_ENABLED":                       strconv.FormatBool(authCR.Spec.Config.ROKSEnabled && isOSEnv),
+				"IBM_CLOUD_SAAS":                     strconv.FormatBool(authCR.Spec.Config.IBMCloudSaas),
+				"ATTR_MAPPING_FROM_CONFIG":           strconv.FormatBool(authCR.Spec.Config.AttrMappingFromConfig),
+				"SAAS_CLIENT_REDIRECT_URL":           authCR.Spec.Config.SaasClientRedirectUrl,
+				"ROKS_URL":                           desiredRoksUrl,
+				"ROKS_USER_PREFIX":                   roksUserPrefix,
+				"CLAIMS_SUPPORTED":                   authCR.Spec.Config.ClaimsSupported,
+				"CLAIMS_MAP":                         authCR.Spec.Config.ClaimsMap,
+				"SCOPE_CLAIM":                        authCR.Spec.Config.ScopeClaim,
+				"BOOTSTRAP_USERID":                   bootStrapUserId,
+				"PROVIDER_ISSUER_URL":                authCR.Spec.Config.ProviderIssuerURL,
+				"PREFERRED_LOGIN":                    authCR.Spec.Config.PreferredLogin,
+				"DEFAULT_LOGIN":                      authCR.Spec.Config.DefaultLogin,
+				"LIBERTY_TOKEN_LENGTH":               "1024",
+				"OS_TOKEN_LENGTH":                    "51",
+				"LIBERTY_DEBUG_ENABLED":              "false",
+				"LOGJAM_DHKEYSIZE_2048_BITS_ENABLED": "true",
+				"LDAP_RECURSIVE_SEARCH":              "true",
+				"AUTH_SVC_LDAP_CONFIG_TIMEOUT":       "25",
+				"LDAP_ATTR_CACHE_SIZE":               "2000",
+				"LDAP_ATTR_CACHE_TIMEOUT":            "1200s",
+				"LDAP_ATTR_CACHE_ENABLED":            "true",
+				"LDAP_ATTR_CACHE_SIZELIMIT":          "2000",
+				"LDAP_SEARCH_CACHE_SIZE":             "2000",
+				"LDAP_SEARCH_CACHE_TIMEOUT":          "1200s",
+				"LDAP_SEARCH_CACHE_ENABLED":          "true",
+				"LDAP_SEARCH_CACHE_SIZELIMIT":        "2000",
+				"IGNORE_LDAP_FILTERS_VALIDATION":     "false",
+				"LDAP_SEARCH_EXCLUDE_WILDCARD_CHARS": "false",
+				"LDAP_SEARCH_SIZE_LIMIT":             "50",
+				"LDAP_SEARCH_TIME_LIMIT":             "10",
+				"LDAP_SEARCH_CN_ATTR_ONLY":           "false",
+				"LDAP_SEARCH_ID_ATTR_ONLY":           "false",
+				"LDAP_CTX_POOL_INITSIZE":             "10",
+				"LDAP_CTX_POOL_MAXSIZE":              "50",
+				"LDAP_CTX_POOL_TIMEOUT":              "30s",
+				"LDAP_CTX_POOL_WAITTIME":             "60s",
+				"LDAP_CTX_POOL_PREFERREDSIZE":        "10",
+				"IBMID_CLIENT_ID":                    "d3c8d1cf59a77cf73df35b073dfc1dc8",
+				"IBMID_CLIENT_ISSUER":                "idaas.iam.ibm.com",
+				"IBMID_PROFILE_URL":                  "https://w3-dev.api.ibm.com/profilemgmt/test/ibmidprofileait/v2/users",
+				"IBMID_PROFILE_CLIENT_ID":            "1c36586c-cf48-4bce-9b9b-1a0480cc798b",
+				"IBMID_PROFILE_FIELDS":               "displayName,name,emails",
+				"SAML_NAMEID_FORMAT":                 "unspecified",
+				"DB_CONNECT_TIMEOUT":                 "60000",
+				"DB_IDLE_TIMEOUT":                    "20000",
+				"DB_CONNECT_MAX_RETRIES":             "5",
+				"DB_POOL_MIN_SIZE":                   "5",
+				"DB_POOL_MAX_SIZE":                   "15",
+				"DB_SSL_MODE":                        "require",
+				"SEQL_LOGGING":                       "false",
+				"SCIM_LDAP_SEARCH_SIZE_LIMIT":        "4500",
+				"SCIM_LDAP_SEARCH_TIME_LIMIT":        "10",
+				"SCIM_ASYNC_PARALLEL_LIMIT":          "100",
+				"SCIM_GET_DISPLAY_FOR_GROUP_USERS":   "true",
+				"SCIM_AUTH_CACHE_MAX_SIZE":           "1000",
+				"SCIM_AUTH_CACHE_TTL_VALUE":          "60",
+				"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
+				"IS_OPENSHIFT_ENV":                   strconv.FormatBool(isOSEnv),
+			},
+		}
+
+		// Set Authentication authCR as the owner and controller of the ConfigMap
+		if err = controllerutil.SetControllerReference(authCR, generated, s.GetClient().Scheme()); err != nil {
+			reqLogger.Error(err, "Failed to set owner for ConfigMap")
 			return
 		}
-	}
 
-	*generated = corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "platform-auth-idp",
-			Namespace: authCR.Namespace,
-			Labels:    map[string]string{"app": "platform-auth-service"},
-		},
-		Data: map[string]string{
-			"BASE_AUTH_URL":                      "/v1",
-			"BASE_OIDC_URL":                      "https://platform-auth-service:9443/oidc/endpoint/OP",
-			"CLUSTER_NAME":                       authCR.Spec.Config.ClusterName,
-			"HTTP_ONLY":                          "false",
-			"IDENTITY_AUTH_DIRECTORY_URL":        "https://platform-auth-service:3100",
-			"IDENTITY_PROVIDER_URL":              "https://platform-identity-provider:4300",
-			"IDENTITY_MGMT_URL":                  "https://platform-identity-management:4500",
-			"MASTER_HOST":                        ibmcloudClusterInfo.Data["cluster_address"],
-			"NODE_ENV":                           "production",
-			"AUDIT_ENABLED_IDPROVIDER":           "false",
-			"AUDIT_ENABLED_IDMGMT":               "false",
-			"AUDIT_DETAIL":                       "false",
-			"LOG_LEVEL_IDPROVIDER":               "info",
-			"LOG_LEVEL_AUTHSVC":                  "info",
-			"LOG_LEVEL_IDMGMT":                   "info",
-			"LOG_LEVEL_MW":                       "info",
-			"IDTOKEN_LIFETIME":                   "12h",
-			"SESSION_TIMEOUT":                    "43200",
-			"OIDC_ISSUER_URL":                    authCR.Spec.Config.OIDCIssuerURL,
-			"PDP_REDIS_CACHE_DEFAULT_TTL":        "600",
-			"FIPS_ENABLED":                       strconv.FormatBool(authCR.Spec.Config.FIPSEnabled),
-			"NONCE_ENABLED":                      strconv.FormatBool(authCR.Spec.Config.NONCEEnabled),
-			"ROKS_ENABLED":                       strconv.FormatBool(authCR.Spec.Config.ROKSEnabled && isOSEnv),
-			"IBM_CLOUD_SAAS":                     strconv.FormatBool(authCR.Spec.Config.IBMCloudSaas),
-			"ATTR_MAPPING_FROM_CONFIG":           strconv.FormatBool(authCR.Spec.Config.AttrMappingFromConfig),
-			"SAAS_CLIENT_REDIRECT_URL":           authCR.Spec.Config.SaasClientRedirectUrl,
-			"ROKS_URL":                           desiredRoksUrl,
-			"ROKS_USER_PREFIX":                   roksUserPrefix,
-			"CLAIMS_SUPPORTED":                   authCR.Spec.Config.ClaimsSupported,
-			"CLAIMS_MAP":                         authCR.Spec.Config.ClaimsMap,
-			"SCOPE_CLAIM":                        authCR.Spec.Config.ScopeClaim,
-			"BOOTSTRAP_USERID":                   bootStrapUserId,
-			"PROVIDER_ISSUER_URL":                authCR.Spec.Config.ProviderIssuerURL,
-			"PREFERRED_LOGIN":                    authCR.Spec.Config.PreferredLogin,
-			"DEFAULT_LOGIN":                      authCR.Spec.Config.DefaultLogin,
-			"LIBERTY_TOKEN_LENGTH":               "1024",
-			"OS_TOKEN_LENGTH":                    "51",
-			"LIBERTY_DEBUG_ENABLED":              "false",
-			"LOGJAM_DHKEYSIZE_2048_BITS_ENABLED": "true",
-			"LDAP_RECURSIVE_SEARCH":              "true",
-			"AUTH_SVC_LDAP_CONFIG_TIMEOUT":       "25",
-			"LDAP_ATTR_CACHE_SIZE":               "2000",
-			"LDAP_ATTR_CACHE_TIMEOUT":            "1200s",
-			"LDAP_ATTR_CACHE_ENABLED":            "true",
-			"LDAP_ATTR_CACHE_SIZELIMIT":          "2000",
-			"LDAP_SEARCH_CACHE_SIZE":             "2000",
-			"LDAP_SEARCH_CACHE_TIMEOUT":          "1200s",
-			"LDAP_SEARCH_CACHE_ENABLED":          "true",
-			"LDAP_SEARCH_CACHE_SIZELIMIT":        "2000",
-			"IGNORE_LDAP_FILTERS_VALIDATION":     "false",
-			"LDAP_SEARCH_EXCLUDE_WILDCARD_CHARS": "false",
-			"LDAP_SEARCH_SIZE_LIMIT":             "50",
-			"LDAP_SEARCH_TIME_LIMIT":             "10",
-			"LDAP_SEARCH_CN_ATTR_ONLY":           "false",
-			"LDAP_SEARCH_ID_ATTR_ONLY":           "false",
-			"LDAP_CTX_POOL_INITSIZE":             "10",
-			"LDAP_CTX_POOL_MAXSIZE":              "50",
-			"LDAP_CTX_POOL_TIMEOUT":              "30s",
-			"LDAP_CTX_POOL_WAITTIME":             "60s",
-			"LDAP_CTX_POOL_PREFERREDSIZE":        "10",
-			"IBMID_CLIENT_ID":                    "d3c8d1cf59a77cf73df35b073dfc1dc8",
-			"IBMID_CLIENT_ISSUER":                "idaas.iam.ibm.com",
-			"IBMID_PROFILE_URL":                  "https://w3-dev.api.ibm.com/profilemgmt/test/ibmidprofileait/v2/users",
-			"IBMID_PROFILE_CLIENT_ID":            "1c36586c-cf48-4bce-9b9b-1a0480cc798b",
-			"IBMID_PROFILE_FIELDS":               "displayName,name,emails",
-			"SAML_NAMEID_FORMAT":                 "unspecified",
-			"DB_CONNECT_TIMEOUT":                 "60000",
-			"DB_IDLE_TIMEOUT":                    "20000",
-			"DB_CONNECT_MAX_RETRIES":             "5",
-			"DB_POOL_MIN_SIZE":                   "5",
-			"DB_POOL_MAX_SIZE":                   "15",
-			"DB_SSL_MODE":                        "require",
-			"SEQL_LOGGING":                       "false",
-			"SCIM_LDAP_SEARCH_SIZE_LIMIT":        "4500",
-			"SCIM_LDAP_SEARCH_TIME_LIMIT":        "10",
-			"SCIM_ASYNC_PARALLEL_LIMIT":          "100",
-			"SCIM_GET_DISPLAY_FOR_GROUP_USERS":   "true",
-			"SCIM_AUTH_CACHE_MAX_SIZE":           "1000",
-			"SCIM_AUTH_CACHE_TTL_VALUE":          "60",
-			"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
-			"IS_OPENSHIFT_ENV":                   strconv.FormatBool(isOSEnv),
-		},
+		return
 	}
+}
 
-	// Set Authentication authCR as the owner and controller of the ConfigMap
-	if err = controllerutil.SetControllerReference(authCR, generated, cl.Scheme()); err != nil {
-		reqLogger.Error(err, "Failed to set owner for ConfigMap")
+func generateRegistrationJsonConfigMap(clusterInfo *corev1.ConfigMap) ctrlcommon.GenerateFn[*corev1.ConfigMap] {
+	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, generated *corev1.ConfigMap) (err error) {
+		reqLogger := logf.FromContext(ctx)
+		authCR, ok := s.GetPrimary().(*operatorv1alpha1.Authentication)
+		if !ok {
+			return fmt.Errorf("unexpected primary resource")
+		}
+
+		// Calculate the ICP Registration Console URI(s)
+		icpRegistrationConsoleURIs := []string{}
+		const apiRegistrationPath = "/auth/liberty/callback"
+		icpConsoleURL := clusterInfo.Data["cluster_address"]
+		icpRegistrationConsoleURIs = append(icpRegistrationConsoleURIs, strings.Join([]string{"https://", icpConsoleURL, apiRegistrationPath}, ""))
+		parseConsoleURL := strings.Split(icpConsoleURL, ":")
+		// If the console URI is using port 443, a copy of the URI without the port number needs to be included as well
+		// so that both URIs with and without the port number work
+		if len(parseConsoleURL) > 1 && parseConsoleURL[1] == "443" {
+			icpRegistrationConsoleURIs = append(icpRegistrationConsoleURIs, strings.Join([]string{"https://", parseConsoleURL[0], apiRegistrationPath}, ""))
+		}
+
+		platformOIDCCredentials := &corev1.Secret{}
+		objectKey := types.NamespacedName{Name: "platform-oidc-credentials", Namespace: authCR.Namespace}
+		if err = s.GetClient().Get(ctx, objectKey, platformOIDCCredentials); err != nil {
+			reqLogger.Error(err, "Failed to get Secret for registration-json update")
+			return
+		}
+
+		observedWLPClientID := string(platformOIDCCredentials.Data["WLP_CLIENT_ID"][:])
+		observedWLPClientSecret := string(platformOIDCCredentials.Data["WLP_CLIENT_SECRET"][:])
+
+		type tmpRegistrationJsonVals struct {
+			WLPClientID, WLPClientSecret, ICPConsoleURL string
+			ICPRegistrationConsoleURIs                  []string
+		}
+		vals := tmpRegistrationJsonVals{
+			WLPClientID:                observedWLPClientID,
+			WLPClientSecret:            observedWLPClientSecret,
+			ICPConsoleURL:              icpConsoleURL,
+			ICPRegistrationConsoleURIs: icpRegistrationConsoleURIs,
+		}
+		registrationJsonTpl := template.Must(template.New("registrationJson").Parse(registrationJson))
+		var registrationJsonBytes bytes.Buffer
+		if err = registrationJsonTpl.Execute(&registrationJsonBytes, vals); err != nil {
+			reqLogger.Error(err, "Failed to execute registrationJson template")
+			return
+		}
+
+		*generated = corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      s.GetName(),
+				Namespace: s.GetNamespace(),
+				Labels:    map[string]string{"app": "platform-auth-service"},
+			},
+			Data: map[string]string{
+				"platform-oidc-registration.json": registrationJsonBytes.String(),
+			},
+		}
+
+		// Set Authentication authCR as the owner and controller of the ConfigMap
+		if err = controllerutil.SetControllerReference(authCR, generated, s.GetClient().Scheme()); err != nil {
+			reqLogger.Error(err, "Failed to set owner for ConfigMap")
+		}
+		return
+	}
+}
+
+func generateRegistrationScriptConfigMap() ctrlcommon.GenerateFn[*corev1.ConfigMap] {
+	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, generated *corev1.ConfigMap) (err error) {
+		reqLogger := logf.FromContext(ctx)
+
+		*generated = corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      s.GetName(),
+				Namespace: s.GetNamespace(),
+				Labels:    map[string]string{"app": "platform-auth-service"},
+			},
+			Data: map[string]string{
+				"register-client.sh": registerClientScript,
+			},
+		}
+
+		// Set Authentication authCR as the owner and controller of the ConfigMap
+		if err = controllerutil.SetControllerReference(s.GetPrimary(), generated, s.GetClient().Scheme()); err != nil {
+			reqLogger.Error(err, "Failed to set owner for ConfigMap")
+		}
 		return
 	}
 
-	return
 }
 
-func generateRegistrationJsonConfigMap(ctx context.Context, cl client.Client, authCR *operatorv1alpha1.Authentication, ibmcloudClusterInfo, generated *corev1.ConfigMap) (err error) {
-	reqLogger := logf.FromContext(ctx)
+func generateOAuthClientConfigMap(clusterInfo *corev1.ConfigMap) ctrlcommon.GenerateFn[*corev1.ConfigMap] {
+	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, generated *corev1.ConfigMap) (err error) {
+		reqLogger := logf.FromContext(ctx)
+		icpConsoleURL := clusterInfo.Data["cluster_address"]
+		icpProxyURL := clusterInfo.Data["proxy_address"]
+		authCR, ok := s.GetPrimary().(*operatorv1alpha1.Authentication)
+		if !ok {
+			return fmt.Errorf("unexpected primary value")
+		}
+		*generated = corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      s.GetName(),
+				Namespace: s.GetNamespace(),
+				Labels:    map[string]string{"app": "platform-auth-service"},
+			},
+			Data: map[string]string{
+				"MASTER_IP":         icpConsoleURL,
+				"PROXY_IP":          icpProxyURL,
+				"CLUSTER_CA_DOMAIN": icpConsoleURL,
+				"CLUSTER_NAME":      authCR.Spec.Config.ClusterName,
+			},
+		}
 
-	// Calculate the ICP Registration Console URI(s)
-	icpRegistrationConsoleURIs := []string{}
-	const apiRegistrationPath = "/auth/liberty/callback"
-	icpConsoleURL := ibmcloudClusterInfo.Data["cluster_address"]
-	icpRegistrationConsoleURIs = append(icpRegistrationConsoleURIs, strings.Join([]string{"https://", icpConsoleURL, apiRegistrationPath}, ""))
-	parseConsoleURL := strings.Split(icpConsoleURL, ":")
-	// If the console URI is using port 443, a copy of the URI without the port number needs to be included as well
-	// so that both URIs with and without the port number work
-	if len(parseConsoleURL) > 1 && parseConsoleURL[1] == "443" {
-		icpRegistrationConsoleURIs = append(icpRegistrationConsoleURIs, strings.Join([]string{"https://", parseConsoleURL[0], apiRegistrationPath}, ""))
-	}
-
-	platformOIDCCredentials := &corev1.Secret{}
-	objectKey := types.NamespacedName{Name: "platform-oidc-credentials", Namespace: authCR.Namespace}
-	if err = cl.Get(ctx, objectKey, platformOIDCCredentials); err != nil {
-		reqLogger.Error(err, "Failed to get Secret for registration-json update")
+		// Set Authentication authCR as the owner and controller of the ConfigMap
+		if err = controllerutil.SetControllerReference(authCR, generated, s.GetClient().Scheme()); err != nil {
+			reqLogger.Error(err, "Failed to set owner for ConfigMap")
+		}
 		return
 	}
-
-	observedWLPClientID := string(platformOIDCCredentials.Data["WLP_CLIENT_ID"][:])
-	observedWLPClientSecret := string(platformOIDCCredentials.Data["WLP_CLIENT_SECRET"][:])
-
-	type tmpRegistrationJsonVals struct {
-		WLPClientID, WLPClientSecret, ICPConsoleURL string
-		ICPRegistrationConsoleURIs                  []string
-	}
-	vals := tmpRegistrationJsonVals{
-		WLPClientID:                observedWLPClientID,
-		WLPClientSecret:            observedWLPClientSecret,
-		ICPConsoleURL:              icpConsoleURL,
-		ICPRegistrationConsoleURIs: icpRegistrationConsoleURIs,
-	}
-	registrationJsonTpl := template.Must(template.New("registrationJson").Parse(registrationJson))
-	var registrationJsonBytes bytes.Buffer
-	if err = registrationJsonTpl.Execute(&registrationJsonBytes, vals); err != nil {
-		reqLogger.Error(err, "Failed to execute registrationJson template")
-		return
-	}
-
-	*generated = corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "registration-json",
-			Namespace: authCR.Namespace,
-			Labels:    map[string]string{"app": "platform-auth-service"},
-		},
-		Data: map[string]string{
-			"platform-oidc-registration.json": registrationJsonBytes.String(),
-		},
-	}
-
-	// Set Authentication authCR as the owner and controller of the ConfigMap
-	if err = controllerutil.SetControllerReference(authCR, generated, cl.Scheme()); err != nil {
-		reqLogger.Error(err, "Failed to set owner for ConfigMap")
-	}
-	return
-}
-
-func generateRegistrationScriptConfigMap(ctx context.Context, cl client.Client, authCR *operatorv1alpha1.Authentication, ibmcloudClusterInfo, generated *corev1.ConfigMap) (err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("ConfigMap.Namespace", authCR.Namespace, "ConfigMap.Name", "registration-script")
-	*generated = corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "registration-script",
-			Namespace: authCR.Namespace,
-			Labels:    map[string]string{"app": "platform-auth-service"},
-		},
-		Data: map[string]string{
-			"register-client.sh": registerClientScript,
-		},
-	}
-
-	// Set Authentication authCR as the owner and controller of the ConfigMap
-	if err = controllerutil.SetControllerReference(authCR, generated, cl.Scheme()); err != nil {
-		reqLogger.Error(err, "Failed to set owner for ConfigMap")
-	}
-	return
-
-}
-
-func generateOAuthClientConfigMap(ctx context.Context, cl client.Client, authCR *operatorv1alpha1.Authentication, ibmcloudClusterInfo, generated *corev1.ConfigMap) (err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("ConfigMap.Namespace", authCR.Namespace, "ConfigMap.Name", "oauth-client-map")
-	icpConsoleURL := ibmcloudClusterInfo.Data["cluster_address"]
-	icpProxyURL := ibmcloudClusterInfo.Data["proxy_address"]
-	*generated = corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "oauth-client-map",
-			Namespace: authCR.Namespace,
-			Labels:    map[string]string{"app": "platform-auth-service"},
-		},
-		Data: map[string]string{
-			"MASTER_IP":         icpConsoleURL,
-			"PROXY_IP":          icpProxyURL,
-			"CLUSTER_CA_DOMAIN": icpConsoleURL,
-			"CLUSTER_NAME":      authCR.Spec.Config.ClusterName,
-		},
-	}
-
-	// Set Authentication authCR as the owner and controller of the ConfigMap
-	if err = controllerutil.SetControllerReference(authCR, generated, cl.Scheme()); err != nil {
-		reqLogger.Error(err, "Failed to set owner for ConfigMap")
-	}
-	return
 }
 
 func getHostFromDummyRoute(ctx context.Context, cl client.Client, authCR *operatorv1alpha1.Authentication) (host string, err error) {

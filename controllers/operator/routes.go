@@ -27,7 +27,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/discovery"
@@ -634,12 +633,7 @@ func (r *AuthenticationReconciler) getClusterInfoConfigMap(authCR *operatorv1alp
 func (r *AuthenticationReconciler) verifyConfigMapHasCorrectOwnership(authCR *operatorv1alpha1.Authentication, cm *corev1.ConfigMap) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		reqLogger := logf.FromContext(ctx)
-		gvk := schema.GroupVersionKind{
-			Kind:    "Authentication",
-			Group:   "operator.ibm.com",
-			Version: "v1alpha1",
-		}
-		if !ctrlcommon.IsOwnerOf(gvk, authCR, cm) {
+		if !ctrlcommon.IsOwnerOf(r.Client.Scheme(), authCR, cm) {
 			reqLogger.Info("ConfigMap is not owned by this Authentication",
 				"ConfigMap.Name", cm.Name,
 				"ConfigMap.Namespace", cm.Namespace)

@@ -17,7 +17,6 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -76,8 +75,10 @@ var _ = Describe("Certificate handling", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		r = &AuthenticationReconciler{
-			Client:          cl,
-			Reader:          cl,
+			Client: &ctrlcommon.FallbackClient{
+				Client: cl,
+				Reader: cl,
+			},
 			DiscoveryClient: *dc,
 		}
 		ctx = context.Background()
@@ -211,8 +212,10 @@ var _ = Describe("Certificate handling", Ordered, func() {
 
 		It("will produce a function that signals to requeue with an error when an unexpected error occurs", func() {
 			rFailing := &AuthenticationReconciler{
-				Client:          testutil.NewFakeTimeoutClient(cl),
-				Reader:          testutil.NewFakeTimeoutClient(cl),
+				Client: &ctrlcommon.FallbackClient{
+					Client: testutil.NewFakeTimeoutClient(cl),
+					Reader: testutil.NewFakeTimeoutClient(cl),
+				},
 				DiscoveryClient: *dc,
 			}
 			fieldsList := generateCertificateFieldsList(authCR)
@@ -373,11 +376,13 @@ var _ = Describe("Certificate handling", Ordered, func() {
 
 		It("will produce a function that signals to requeue with an error when an unexpected error occurs", func() {
 			rFailing := &AuthenticationReconciler{
-				Client: &testutil.FakeTimeoutClient{
-					Client: cl,
-				},
-				Reader: &testutil.FakeTimeoutClient{
-					Client: cl,
+				Client: &ctrlcommon.FallbackClient{
+					Client: &testutil.FakeTimeoutClient{
+						Client: cl,
+					},
+					Reader: &testutil.FakeTimeoutClient{
+						Client: cl,
+					},
 				},
 				DiscoveryClient: *dc,
 			}
@@ -516,12 +521,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 				Expect(cert.Spec.IssuerRef.Kind).To(Equal(certmgrv1.IssuerKind))
 				Expect(*cert.Spec.Duration).To(Equal(metav1.Duration{Duration: 9552 * time.Hour}))
 				Expect(*cert.Spec.RenewBefore).To(Equal(metav1.Duration{Duration: 2880 * time.Hour}))
-				gvk := schema.GroupVersionKind{
-					Kind:    "Authentication",
-					Group:   "operator.ibm.com",
-					Version: "v1alpha1",
-				}
-				Expect(ctrlcommon.IsControllerOf(gvk, authCR, cert)).To(BeTrue())
+				Expect(ctrlcommon.IsControllerOf(scheme, authCR, cert)).To(BeTrue())
 			}
 		})
 
@@ -533,8 +533,10 @@ var _ = Describe("Certificate handling", Ordered, func() {
 			// Allowing Get gets to part of function that attempts to create a new Certificate
 			timeoutClient.GetAllowed = true
 			rFailing := &AuthenticationReconciler{
-				Client:          timeoutClient,
-				Reader:          timeoutClient,
+				Client: &ctrlcommon.FallbackClient{
+					Client: timeoutClient,
+					Reader: timeoutClient,
+				},
 				DiscoveryClient: *dc,
 			}
 			for _, fields := range fieldsList {
@@ -692,12 +694,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 				Expect(cert.Spec.IssuerRef.Kind).To(Equal(certmgrv1.IssuerKind))
 				Expect(*cert.Spec.Duration).To(Equal(metav1.Duration{Duration: 9552 * time.Hour}))
 				Expect(*cert.Spec.RenewBefore).To(Equal(metav1.Duration{Duration: 2880 * time.Hour}))
-				gvk := schema.GroupVersionKind{
-					Kind:    "Authentication",
-					Group:   "operator.ibm.com",
-					Version: "v1alpha1",
-				}
-				Expect(ctrlcommon.IsControllerOf(gvk, authCR, cert)).To(BeTrue())
+				Expect(ctrlcommon.IsControllerOf(scheme, authCR, cert)).To(BeTrue())
 			}
 		})
 
@@ -708,8 +705,10 @@ var _ = Describe("Certificate handling", Ordered, func() {
 			// Allowing Get gets to part of function that attempts to create a new Certificate
 			timeoutClient.GetAllowed = true
 			rFailing := &AuthenticationReconciler{
-				Client:          timeoutClient,
-				Reader:          timeoutClient,
+				Client: &ctrlcommon.FallbackClient{
+					Client: timeoutClient,
+					Reader: timeoutClient,
+				},
 				DiscoveryClient: *dc,
 			}
 			fn := rFailing.createV1CertificatesIfNotPresent(authCR, fieldsList)

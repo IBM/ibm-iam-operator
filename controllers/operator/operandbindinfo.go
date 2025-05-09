@@ -26,7 +26,6 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -78,12 +77,7 @@ func (r *AuthenticationReconciler) handleOperandBindInfo(ctx context.Context, re
 		updated = true
 	}
 
-	gvk := schema.GroupVersionKind{
-		Kind:    "Authentication",
-		Group:   "operator.ibm.com",
-		Version: "v1alpha1",
-	}
-	if !ctrlcommon.IsOwnerOf(gvk, authCR, observed) {
+	if !ctrlcommon.IsOwnerOf(r.Client.Scheme(), authCR, observed) {
 		if err = controllerutil.SetOwnerReference(authCR, observed, r.Client.Scheme()); err != nil {
 			reqLogger.Error(err, "Failed to set owner reference on OperandBindInfo")
 			return subreconciler.RequeueWithError(err)

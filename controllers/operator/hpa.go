@@ -1,0 +1,278 @@
+//
+// Copyright 2025 IBM Corporation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package operator
+
+import (
+	"context"
+	"fmt"
+
+	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
+	"github.com/IBM/ibm-iam-operator/controllers/common"
+	ctrlcommon "github.com/IBM/ibm-iam-operator/controllers/common"
+	"github.com/opdev/subreconciler"
+	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+)
+
+func (r *AuthenticationReconciler) handleHPAs(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleHPAs")
+	hpaCtx := logf.IntoContext(ctx, reqLogger)
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(hpaCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+	deployments := []string{"platform-auth-service", "platform-identity-provider", "platform-identity-management"}
+
+	// Fetch CommonService CR
+	gvk := schema.GroupVersionKind{
+		Group:   "operator.ibm.com",
+		Version: "v3",
+		Kind:    "CommonService",
+	}
+	commonService := &unstructured.Unstructured{}
+	commonService.SetGroupVersionKind(gvk)
+	authCRNS := authCR.Namespace
+	err = r.Get(hpaCtx, types.NamespacedName{Name: "common-service", Namespace: authCRNS}, commonService)
+	if err != nil {
+		return
+	}
+	autoScaleEnabled, _, err := unstructured.NestedBool(commonService.Object, "spec", "autoScaleConfig")
+	if err != nil {
+		return
+	}
+
+	size, found, err := unstructured.NestedString(commonService.Object, "spec", "size")
+	if err != nil || !found {
+		return
+	}
+	if autoScaleEnabled {
+		// Creating HPA - remove replicas from Deployment
+		subRecs := []ctrlcommon.SecondaryReconciler{}
+		results := []*ctrl.Result{}
+		errs := []error{}
+
+		for _, deployName := range deployments {
+			if err := r.UpdateDeploymentReplicas(hpaCtx, deployName, authCRNS, true, 0); err == nil {
+				// Determine minimum replicas based on size
+				var minReplicas int32
+				switch size {
+				case "small", "starterset":
+					minReplicas = 1
+				default:
+					minReplicas = 2
+				}
+
+				// Build the HPA reconciler
+				builder := ctrlcommon.NewSecondaryReconcilerBuilder[*autoscalingv2.HorizontalPodAutoscaler]().
+					WithName(deployName + "-hpa").
+					WithGenerateFns(r.generateHPAObject(authCR, hpaCtx, authCRNS, deployName, minReplicas))
+
+				subRecs = append(subRecs, builder.
+					WithNamespace(authCRNS).
+					WithPrimary(authCR).
+					WithClient(r.Client).
+					MustBuild())
+			}
+		}
+
+		for _, subRec := range subRecs {
+			subResult, subErr := subRec.Reconcile(hpaCtx)
+			results = append(results, subResult)
+			errs = append(errs, subErr)
+		}
+
+		result, err = common.ReduceSubreconcilerResultsAndErrors(results, errs)
+		if err == nil {
+			r.needsRollout = false
+		}
+		if subreconciler.ShouldRequeue(result, err) {
+			reqLogger.Info("Cluster state has been modified; requeueing")
+			return
+		}
+		return subreconciler.ContinueReconciling()
+	} else {
+		// HPA is disabled - delete any existing HPA and set fixed replicas
+		for _, deployName := range deployments {
+			hpa := &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      deployName + "-hpa",
+					Namespace: authCRNS,
+				},
+			}
+			err := r.Get(ctx, types.NamespacedName{Name: deployName + "-hpa", Namespace: authCRNS}, hpa)
+			if err == nil {
+				reqLogger.Info("Deleting existing HPAs")
+				if err := r.Delete(ctx, hpa); err == nil {
+					var fixedReplicas int32
+					if size == "small" || size == "starterset" {
+						fixedReplicas = 1
+					} else {
+						fixedReplicas = 3
+					}
+					// Update Deployment with fixed replicas
+					if err := r.UpdateDeploymentReplicas(ctx, deployName, authCRNS, false, fixedReplicas); err != nil {
+						return subreconciler.RequeueWithError(err)
+					}
+				}
+			} else if !errors.IsNotFound(err) {
+				return subreconciler.RequeueWithDelay(defaultLowerWait)
+			}
+		}
+	}
+	return
+}
+
+func (r *AuthenticationReconciler) generateHPAObject(instance *operatorv1alpha1.Authentication, ctx context.Context, namespace string, deploymentName string, minReplicas int32) ctrlcommon.GenerateFn[*autoscalingv2.HorizontalPodAutoscaler] {
+	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, hpa *autoscalingv2.HorizontalPodAutoscaler) (err error) {
+		reqLogger := logf.FromContext(ctx)
+
+		// Fetch Deployment
+		deploy := &appsv1.Deployment{}
+		err = r.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: namespace}, deploy)
+		if err != nil {
+			reqLogger.Error(err, "Failed to fetch Deployment", "DeploymentName", deploymentName)
+			return
+		}
+
+		// Extract memory and CPU requests and limits
+		if len(deploy.Spec.Template.Spec.Containers) == 0 {
+			err = fmt.Errorf("Deployment %s has no containers", deploymentName)
+			reqLogger.Error(err, "Deployment has no containers")
+			return
+		}
+
+		container := deploy.Spec.Template.Spec.Containers[0]
+		currentReplicas := deploy.Spec.Replicas
+		maxReplicas := 2*(*currentReplicas) + 1
+
+		memRequest := container.Resources.Requests.Memory().Value()
+		memLimit := container.Resources.Limits.Memory().Value()
+		cpuRequest := container.Resources.Requests.Cpu().MilliValue()
+		cpuLimit := container.Resources.Limits.Cpu().MilliValue()
+
+		// Compute average utilization
+		avgUtilMem := calculateUtilization(memRequest, memLimit)
+		avgUtilCPU := calculateUtilization(cpuRequest, cpuLimit)
+
+		// Define HPA
+		*hpa = autoscalingv2.HorizontalPodAutoscaler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      deploymentName + "-hpa",
+				Namespace: namespace,
+				Labels:    instance.Labels,
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: instance.APIVersion,
+						Kind:       instance.Kind,
+						Name:       instance.Name,
+						UID:        instance.UID,
+					},
+				},
+			},
+			Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+				ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+					APIVersion: "apps/v1",
+					Kind:       "Deployment",
+					Name:       deploymentName,
+				},
+				MinReplicas: &minReplicas,
+				MaxReplicas: maxReplicas,
+				Metrics: []autoscalingv2.MetricSpec{
+					{
+						Type: autoscalingv2.ResourceMetricSourceType,
+						Resource: &autoscalingv2.ResourceMetricSource{
+							Name: "memory",
+							Target: autoscalingv2.MetricTarget{
+								Type:               autoscalingv2.UtilizationMetricType,
+								AverageUtilization: &avgUtilMem,
+							},
+						},
+					},
+					{
+						Type: autoscalingv2.ResourceMetricSourceType,
+						Resource: &autoscalingv2.ResourceMetricSource{
+							Name: "cpu",
+							Target: autoscalingv2.MetricTarget{
+								Type:               autoscalingv2.UtilizationMetricType,
+								AverageUtilization: &avgUtilCPU,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		// Set owner reference for garbage collection
+		err = controllerutil.SetControllerReference(instance, hpa, s.GetClient().Scheme())
+		if err != nil {
+			reqLogger.Error(err, "Failed to set owner reference for HPA")
+			return
+		}
+
+		return nil
+	}
+}
+
+func calculateUtilization(request int64, limit int64) int32 {
+	utilizationRatio := (float64(limit) / float64(request)) * 100
+
+	if utilizationRatio < 130 {
+		return 90
+	}
+	return int32((float64(limit) * 0.7 / float64(request)) * 100)
+}
+
+func (r *AuthenticationReconciler) UpdateDeploymentReplicas(ctx context.Context, deploymentName, namespace string, autoScaleEnabled bool, fixedReplicas int32) error {
+
+	reqLogger := logf.FromContext(ctx)
+	deploy := &appsv1.Deployment{}
+	err := r.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: namespace}, deploy)
+	if err != nil {
+		return err
+	}
+
+	if autoScaleEnabled {
+		// Remove deployment replicas to nil to let HPA control scaling
+		if deploy.Spec.Replicas != nil {
+			deploy.Spec.Replicas = nil
+			if err := r.Update(ctx, deploy); err != nil {
+				reqLogger.Error(err, "failed to update deployment to remove replicas")
+				return err
+			}
+		}
+	} else {
+		// Update only if the existing replica count is different
+		if deploy.Spec.Replicas == nil || *deploy.Spec.Replicas != fixedReplicas {
+			deploy.Spec.Replicas = &fixedReplicas
+			if err := r.Update(ctx, deploy); err != nil {
+				reqLogger.Error(err, "failed to update deployment with fixed replicas")
+				return err
+			}
+		} else {
+			reqLogger.Info("Deployment already has the correct replicas")
+		}
+	}
+
+	return nil
+}

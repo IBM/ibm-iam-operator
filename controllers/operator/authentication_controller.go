@@ -18,22 +18,21 @@ package operator
 
 import (
 	"context"
-	"reflect"
 
 	"fmt"
 	"sync"
 	"time"
 
-	certmgr "github.com/IBM/ibm-iam-operator/apis/certmanager/v1"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	"github.com/IBM/ibm-iam-operator/database/migration"
+	"github.com/IBM/ibm-iam-operator/version"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	net "k8s.io/api/networking/v1"
+	netv1 "k8s.io/api/networking/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -50,6 +49,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	certmgr "github.com/IBM/ibm-iam-operator/apis/certmanager/v1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	zenv1 "github.com/IBM/ibm-iam-operator/apis/zen.cpd.ibm.com/v1"
 	"github.com/opdev/subreconciler"
@@ -170,16 +170,6 @@ func (r *AuthenticationReconciler) removeFinalizer(ctx context.Context, finalize
 	return
 }
 
-// needsAuditServiceDummyDataReset compares the state in an Authentication's .spec.auditService and returns whether it
-// needs to be overwritten with dummy data.
-func needsAuditServiceDummyDataReset(a *operatorv1alpha1.Authentication) bool {
-	return a.Spec.AuditService.ImageName != operatorv1alpha1.AuditServiceIgnoreString ||
-		a.Spec.AuditService.ImageRegistry != operatorv1alpha1.AuditServiceIgnoreString ||
-		a.Spec.AuditService.ImageTag != operatorv1alpha1.AuditServiceIgnoreString ||
-		a.Spec.AuditService.SyslogTlsPath != "" ||
-		a.Spec.AuditService.Resources != nil
-}
-
 // AuthenticationReconciler reconciles a Authentication object
 type AuthenticationReconciler struct {
 	client.Client
@@ -242,25 +232,36 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return
 	}
 
-	originalAuthCR := instance.DeepCopy()
-	// Be sure to update status before returning if Authentication is found (but only if the Authentication hasn't
-	// already been updated, e.g. finalizer update
+	// Be sure to update status before returning
 	defer func() {
-		if needToRequeue {
-			result.Requeue = true
-		}
-		err = r.setAuthenticationStatus(ctx, instance)
-		if reflect.DeepEqual(originalAuthCR.Status, instance.Status) {
+		observed := &operatorv1alpha1.Authentication{}
+		modified := false
+		if subResult, err := r.getLatestAuthentication(ctx, req, observed); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+			reqLogger.Info("Could not get Authentication before service status update")
+			result = *subResult
 			goto statuslog
 		}
-		reqLogger.Info("Update status before finishing loop.")
-		if err = r.Client.Status().Update(ctx, instance); err != nil {
+		if needToRequeue {
+			reqLogger.Info("Previous subreconcilers indicate a need to requeue")
+			result.Requeue = true
+		}
+		modified, err = r.setAuthenticationStatus(ctx, observed)
+		if !modified {
+			reqLogger.Info("No new status changes needed")
+			goto statuslog
+		}
+		reqLogger.Info("Status updates found; update status before finishing loop.")
+		if err = r.Client.Status().Update(ctx, observed); err != nil {
 			reqLogger.Error(err, "Failed to update status")
 		} else {
 			reqLogger.Info("Updated status")
 		}
 	statuslog:
-		reqLogger.Info("Reconciliation complete")
+		if subreconciler.ShouldRequeue(&result, err) {
+			reqLogger.Info("Reconciliation incomplete; requeueing", "result", result, "err", err)
+		} else {
+			reqLogger.Info("Reconciliation complete", "result", result, "err", err)
+		}
 	}()
 
 	var subResult *ctrl.Result
@@ -355,14 +356,6 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return subreconciler.Evaluate(subResult, err)
 	}
 
-	if needsAuditServiceDummyDataReset(instance) {
-		instance.SetRequiredDummyData()
-		err = r.Update(ctx, instance)
-		if err != nil {
-			return
-		}
-	}
-
 	if subResult, err := r.handleZenFrontDoor(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
 	}
@@ -382,27 +375,27 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	authCtrl := ctrl.NewControllerManagedBy(mgr).
-		Owns(&corev1.ConfigMap{}).
-		Owns(&corev1.Secret{}).
-		Owns(&certmgr.Certificate{}).
-		Owns(&batchv1.Job{}).
-		Owns(&corev1.Service{}).
-		Owns(&net.Ingress{}).
-		Owns(&appsv1.Deployment{}).
-		Owns(&autoscalingv2.HorizontalPodAutoscaler{})
+		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
+		Watches(&corev1.Secret{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
+		Watches(&certmgr.Certificate{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
+		Watches(&batchv1.Job{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
+		Watches(&corev1.Service{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
+		Watches(&netv1.Ingress{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
+		Watches(&appsv1.Deployment{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
+		Watches(&autoscalingv2.HorizontalPodAutoscaler{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
 
 	//Add routes
 	if ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
-		authCtrl.Owns(&routev1.Route{})
+		authCtrl.Watches(&routev1.Route{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
 	}
 	if ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
-		authCtrl.Owns(&zenv1.ZenExtension{})
+		authCtrl.Watches(&zenv1.ZenExtension{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
 	}
 	if ctrlcommon.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
-		authCtrl.Owns(&operatorv1alpha1.OperandRequest{})
+		authCtrl.Watches(&operatorv1alpha1.OperandRequest{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
 	}
 	if ctrlcommon.ClusterHasOperandBindInfoAPIResource(&r.DiscoveryClient) {
-		authCtrl.Owns(&operatorv1alpha1.OperandBindInfo{})
+		authCtrl.Watches(&operatorv1alpha1.OperandBindInfo{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
 	}
 
 	productCMPred := predicate.Funcs{
@@ -438,7 +431,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	authCtrl.Watches(&corev1.ConfigMap{},
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
-			authCR, _ := ctrlcommon.GetAuthentication(ctx, &r.Client)
+			authCR, _ := ctrlcommon.GetAuthentication(ctx, r.Client)
 			if authCR == nil {
 				return
 			}
@@ -450,7 +443,12 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			}
 		}), builder.WithPredicates(predicate.Or(globalCMPred, productCMPred)),
 	)
-	return authCtrl.For(&operatorv1alpha1.Authentication{}).
+	bootstrappedPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
+		return o.GetLabels()[ctrlcommon.ManagerVersionLabel] == version.Version
+	})
+
+	authCtrl.Watches(&operatorv1alpha1.Authentication{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(bootstrappedPred))
+	return authCtrl.Named("controller_authentication").
 		Complete(r)
 }
 

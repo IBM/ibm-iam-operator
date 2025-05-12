@@ -280,6 +280,7 @@ func updatePlatformAuthIDP(_ ctrlcommon.SecondaryReconciler, _ context.Context, 
 			"ROKS_URL",
 			"ROKS_USER_PREFIX",
 			"ROKS_ENABLED",
+			"DEFAULT_LOGIN",
 			"BOOTSTRAP_USERID",
 			"CLAIMS_SUPPORTED",
 			"CLAIMS_MAP",
@@ -289,6 +290,10 @@ func updatePlatformAuthIDP(_ ctrlcommon.SecondaryReconciler, _ context.Context, 
 			"OIDC_ISSUER_URL",
 			"PROVIDER_ISSUER_URL",
 			"CLUSTER_NAME",
+			"FIPS_ENABLED",
+			"IBM_CLOUD_SAAS",
+			"SAAS_CLIENT_REDIRECT_URL",
+			"ATTR_MAPPING_FROM_CONFIG",
 		),
 		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("OS_TOKEN_LENGTH", "45"),
 			"OS_TOKEN_LENGTH"),
@@ -305,8 +310,6 @@ func updatePlatformAuthIDP(_ ctrlcommon.SecondaryReconciler, _ context.Context, 
 			"IDENTITY_PROVIDER_URL"),
 		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("LDAP_RECURSIVE_SEARCH")),
 			"LDAP_RECURSIVE_SEARCH"),
-		updatesValuesWhen(not(observedKeyValueSetTo[*corev1.ConfigMap]("DEFAULT_LOGIN", generated.Data["DEFAULT_LOGIN"])),
-			"DEFAULT_LOGIN"),
 		updatesValuesWhen(not(observedKeyValueSetTo[*corev1.ConfigMap]("MASTER_HOST", generated.Data["MASTER_HOST"])),
 			"MASTER_HOST"),
 		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("DB_CONNECT_TIMEOUT")),
@@ -330,110 +333,6 @@ func updatePlatformAuthIDP(_ ctrlcommon.SecondaryReconciler, _ context.Context, 
 			"SCIM_AUTH_CACHE_TTL_VALUE"),
 		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("AUTH_SVC_LDAP_CONFIG_TIMEOUT")),
 			"AUTH_SVC_LDAP_CONFIG_TIMEOUT"),
-		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("IBM_CLOUD_SAAS")),
-			"IBM_CLOUD_SAAS",
-			"SAAS_CLIENT_REDIRECT_URL"),
-		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("ATTR_MAPPING_FROM_CONFIG")),
-			"ATTR_MAPPING_FROM_CONFIG"),
-		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("LDAP_CTX_POOL_INITSIZE")),
-			"LDAP_CTX_POOL_INITSIZE",
-			"LDAP_CTX_POOL_MAXSIZE",
-			"LDAP_CTX_POOL_TIMEOUT",
-			"LDAP_CTX_POOL_WAITTIME",
-			"LDAP_CTX_POOL_PREFERREDSIZE"),
-	}
-
-	if v, ok := generated.Data["IS_OPENSHIFT_ENV"]; ok {
-		updateFns = append(updateFns, updatesValuesWhen(
-			not(observedKeyValueSetTo[*corev1.ConfigMap]("IS_OPENSHIFT_ENV", v)), "IS_OPENSHIFT_ENV"))
-	}
-
-	for _, update := range updateFns {
-		updated = update(observed, generated) || updated
-	}
-
-	beforeSum := observed.Annotations[AnnotationSHA1Sum]
-	afterSum, err := getConfigMapDataSHA1Sum(observed)
-	if err != nil {
-		return false, err
-	}
-
-	if observed.Annotations == nil {
-		observed.Annotations = map[string]string{
-			AnnotationSHA1Sum: afterSum,
-		}
-		return true, nil
-	}
-
-	if beforeSum != afterSum {
-		observed.Annotations[AnnotationSHA1Sum] = afterSum
-		updated = true
-	}
-
-	return
-}
-
-func updatePlatformAuthIDPSSA(_ ctrlcommon.SecondaryReconciler, _ context.Context, observed, generated *corev1.ConfigMap) (updated bool, err error) {
-	updateFns := []func(*corev1.ConfigMap, *corev1.ConfigMap) bool{
-		updatesAlways[*corev1.ConfigMap](
-			"ROKS_URL",
-			"ROKS_USER_PREFIX",
-			"ROKS_ENABLED",
-			"BOOTSTRAP_USERID",
-			"CLAIMS_SUPPORTED",
-			"CLAIMS_MAP",
-			"SCOPE_CLAIM",
-			"NONCE_ENABLED",
-			"PREFERRED_LOGIN",
-			"OIDC_ISSUER_URL",
-			"PROVIDER_ISSUER_URL",
-			"CLUSTER_NAME",
-		),
-		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("OS_TOKEN_LENGTH", "45"),
-			"OS_TOKEN_LENGTH"),
-		updatesValuesWhen(observedKeyValueContains[*corev1.ConfigMap]("IDENTITY_MGMT_URL", "127.0.0.1"),
-			"IDENTITY_MGMT_URL"),
-		updatesValuesWhen(
-			observedKeyValueContains[*corev1.ConfigMap]("BASE_OIDC_URL", "127.0.0.1"),
-			"BASE_OIDC_URL"),
-		updatesValuesWhen(
-			observedKeyValueContains[*corev1.ConfigMap]("IDENTITY_AUTH_DIRECTORY_URL", "127.0.0.1"),
-			"IDENTITY_AUTH_DIRECTORY_URL"),
-		updatesValuesWhen(
-			observedKeyValueContains[*corev1.ConfigMap]("IDENTITY_PROVIDER_URL", "127.0.0.1"),
-			"IDENTITY_PROVIDER_URL"),
-		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("LDAP_RECURSIVE_SEARCH")),
-			"LDAP_RECURSIVE_SEARCH"),
-		updatesValuesWhen(not(observedKeyValueSetTo[*corev1.ConfigMap]("DEFAULT_LOGIN", generated.Data["DEFAULT_LOGIN"])),
-			"DEFAULT_LOGIN"),
-		updatesValuesWhen(not(observedKeyValueSetTo[*corev1.ConfigMap]("MASTER_HOST", generated.Data["MASTER_HOST"])),
-			"MASTER_HOST"),
-		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("DB_CONNECT_TIMEOUT")),
-			"DB_CONNECT_TIMEOUT",
-			"DB_IDLE_TIMEOUT",
-			"DB_CONNECT_MAX_RETRIES",
-			"DB_POOL_MIN_SIZE",
-			"DB_POOL_MAX_SIZE",
-			"SEQL_LOGGING"),
-		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("DB_SSL_MODE")),
-			"DB_SSL_MODE"),
-		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("SCIM_LDAP_ATTRIBUTES_MAPPING")),
-			"SCIM_LDAP_ATTRIBUTES_MAPPING",
-			"SCIM_LDAP_SEARCH_SIZE_LIMIT",
-			"SCIM_LDAP_SEARCH_TIME_LIMIT",
-			"SCIM_ASYNC_PARALLEL_LIMIT",
-			"SCIM_GET_DISPLAY_FOR_GROUP_USERS"),
-		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("SCIM_AUTH_CACHE_MAX_SIZE")),
-			"SCIM_AUTH_CACHE_MAX_SIZE"),
-		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("SCIM_AUTH_CACHE_TTL_VALUE")),
-			"SCIM_AUTH_CACHE_TTL_VALUE"),
-		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("AUTH_SVC_LDAP_CONFIG_TIMEOUT")),
-			"AUTH_SVC_LDAP_CONFIG_TIMEOUT"),
-		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("IBM_CLOUD_SAAS")),
-			"IBM_CLOUD_SAAS",
-			"SAAS_CLIENT_REDIRECT_URL"),
-		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("ATTR_MAPPING_FROM_CONFIG")),
-			"ATTR_MAPPING_FROM_CONFIG"),
 		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("LDAP_CTX_POOL_INITSIZE")),
 			"LDAP_CTX_POOL_INITSIZE",
 			"LDAP_CTX_POOL_MAXSIZE",

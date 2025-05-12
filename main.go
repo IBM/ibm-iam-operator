@@ -39,6 +39,7 @@ import (
 	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/apis/oidc.security/v1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	zenv1 "github.com/IBM/ibm-iam-operator/apis/zen.cpd.ibm.com/v1"
+	bootstrapcontrollers "github.com/IBM/ibm-iam-operator/controllers/bootstrap"
 	controllercommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	oidcsecuritycontrollers "github.com/IBM/ibm-iam-operator/controllers/oidc.security"
 	operatorcontrollers "github.com/IBM/ibm-iam-operator/controllers/operator"
@@ -160,6 +161,14 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+
+	if err = (&bootstrapcontrollers.BootstrapReconciler{
+		Client: mgr.GetClient(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Authentication")
+		os.Exit(1)
+	}
+
 	const clientControllerName = "controller_oidc_client"
 
 	clientReconciler := &oidcsecuritycontrollers.ClientReconciler{

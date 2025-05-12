@@ -232,7 +232,7 @@ func (r *ClientReconciler) invokeClientRegistrationAPI(ctx context.Context, clie
 // return whatever matching Secret exists in the cluster and cache it for future use.
 func (r *ClientReconciler) getCSCACertificateSecret(ctx context.Context) (secret *corev1.Secret, err error) {
 	secret = &corev1.Secret{}
-	servicesNamespace, err := common.GetServicesNamespace(ctx, &r.Client)
+	servicesNamespace, err := common.GetServicesNamespace(ctx, r.Client)
 	if err != nil {
 		return
 	}

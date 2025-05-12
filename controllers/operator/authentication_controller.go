@@ -19,6 +19,7 @@ package operator
 import (
 	"context"
 	"reflect"
+	"strconv"
 
 	"fmt"
 	"sync"
@@ -27,6 +28,7 @@ import (
 	certmgr "github.com/IBM/ibm-iam-operator/apis/certmanager/v1"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	"github.com/IBM/ibm-iam-operator/database/migration"
+	"github.com/IBM/ibm-iam-operator/version"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -241,6 +243,10 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return
 	}
 
+	if subResult, err := r.makeAuthenticationCorrections(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
+
 	originalAuthCR := instance.DeepCopy()
 	// Be sure to update status before returning if Authentication is found (but only if the Authentication hasn't
 	// already been updated, e.g. finalizer update
@@ -354,14 +360,6 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return subreconciler.Evaluate(subResult, err)
 	}
 
-	if needsAuditServiceDummyDataReset(instance) {
-		instance.SetRequiredDummyData()
-		err = r.Update(ctx, instance)
-		if err != nil {
-			return
-		}
-	}
-
 	if subResult, err := r.handleZenFrontDoor(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
 	}
@@ -432,7 +430,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	authCtrl.Watches(&corev1.ConfigMap{},
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
-			authCR, _ := ctrlcommon.GetAuthentication(ctx, &r.Client)
+			authCR, _ := ctrlcommon.GetAuthentication(ctx, r.Client)
 			if authCR == nil {
 				return
 			}
@@ -490,4 +488,81 @@ func (r *AuthenticationReconciler) hasAPIAccess(ctx context.Context, namespace s
 
 	reqLogger.Info("Operator ServiceAccount is authorized")
 	return true, nil
+}
+
+const OperatorVersionLabel string = "authentication.operator.ibm.com/manager-version"
+
+// makeAuthenticationCorrections handles changes that need to happen to the Authentication CR for compatibility reasons.
+func (r *AuthenticationReconciler) makeAuthenticationCorrections(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+	if authCR.Labels[OperatorVersionLabel] == version.Version {
+		return subreconciler.ContinueReconciling()
+	}
+
+	if needsAuditServiceDummyDataReset(authCR) {
+		authCR.SetRequiredDummyData()
+	}
+
+	if err = r.writeConfigurationsToAuthenticationCR(ctx, authCR); err != nil {
+		return subreconciler.RequeueWithError(err)
+	}
+
+	authCR.Labels[OperatorVersionLabel] = version.Version
+
+	err = r.Update(ctx, authCR)
+	if err != nil {
+		return subreconciler.RequeueWithError(err)
+	}
+
+	// Because this change is happening to the Authentication CR directly, we skip requeueing
+	return subreconciler.DoNotRequeue()
+}
+
+// writeConfigurationsToAuthenticationCR copies values from the
+// platform-auth-idp ConfigMap to the Authentication CR.
+func (r *AuthenticationReconciler) writeConfigurationsToAuthenticationCR(ctx context.Context, authCR *operatorv1alpha1.Authentication) (err error) {
+	platformAuthIDPCM := &corev1.ConfigMap{}
+	if err = r.Get(ctx, types.NamespacedName{Name: "platform-auth-idp", Namespace: authCR.Namespace}, platformAuthIDPCM); k8sErrors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to get ConfigMap: %w", err)
+	}
+	keys := map[string]any{
+		"ROKS_URL":            &authCR.Spec.Config.ROKSURL,
+		"ROKS_USER_PREFIX":    &authCR.Spec.Config.ROKSUserPrefix,
+		"ROKS_ENABLED":        &authCR.Spec.Config.ROKSEnabled,
+		"BOOTSTRAP_USERID":    &authCR.Spec.Config.BootstrapUserId,
+		"CLAIMS_SUPPORTED":    &authCR.Spec.Config.ClaimsSupported,
+		"CLAIMS_MAP":          &authCR.Spec.Config.ClaimsMap,
+		"DEFAULT_LOGIN":       &authCR.Spec.Config.DefaultLogin,
+		"SCOPE_CLAIM":         &authCR.Spec.Config.ScopeClaim,
+		"NONCE_ENABLED":       &authCR.Spec.Config.NONCEEnabled,
+		"PREFERRED_LOGIN":     &authCR.Spec.Config.PreferredLogin,
+		"OIDC_ISSUER_URL":     &authCR.Spec.Config.OIDCIssuerURL,
+		"PROVIDER_ISSUER_URL": &authCR.Spec.Config.ProviderIssuerURL,
+		"CLUSTER_NAME":        &authCR.Spec.Config.ClusterName,
+	}
+
+	for key, crField := range keys {
+		cmValue, ok := platformAuthIDPCM.Data[key]
+		if !ok {
+			continue
+		}
+		switch crValue := crField.(type) {
+		case *string:
+			if *crValue != cmValue {
+				*crValue = cmValue
+			}
+		case *bool:
+			cmValueBool, _ := strconv.ParseBool(cmValue)
+			if *crValue != cmValueBool {
+				*crValue = cmValueBool
+			}
+		}
+	}
+
+	return
 }

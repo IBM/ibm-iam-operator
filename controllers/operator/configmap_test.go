@@ -2,9 +2,11 @@ package operator
 
 import (
 	"context"
+	"reflect"
 	"strconv"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
+	ctrlcommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	testutil "github.com/IBM/ibm-iam-operator/testing"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -15,8 +17,41 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+type objectUpdater[T client.Object] struct {
+	name   string
+	kind   string
+	authCR *operatorv1alpha1.Authentication
+	client.Client
+}
+
+func (d objectUpdater[T]) GetEmptyObject() client.Object {
+	rType := reflect.TypeFor[T]().Elem()
+	return reflect.New(rType).Interface().(T)
+}
+
+func (d objectUpdater[T]) GetKind() string {
+	return d.kind
+}
+
+func (d objectUpdater[T]) GetName() string {
+	return d.name
+}
+
+func (d objectUpdater[T]) GetNamespace() string {
+	return d.authCR.Namespace
+}
+
+func (d objectUpdater[T]) GetClient() client.Client {
+	return d.Client
+}
+
+func ref[T any](x T) *T {
+	return &x
+}
 
 var _ = Describe("ConfigMap handling", func() {
 
@@ -61,8 +96,10 @@ var _ = Describe("ConfigMap handling", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			r = &AuthenticationReconciler{
-				Client:          cl,
-				Reader:          cl,
+				Client: &ctrlcommon.FallbackClient{
+					Client: cl,
+					Reader: cl,
+				},
 				DiscoveryClient: *dc,
 			}
 			ctx = context.Background()
@@ -92,6 +129,16 @@ var _ = Describe("ConfigMap handling", func() {
 			dn, err := getCNCFDomain(ctx, r.Client, authCR)
 			Expect(dn).To(Equal(""))
 			Expect(err).To(HaveOccurred())
+		})
+		It("objectDetails", func() {
+			d := objectUpdater[*corev1.Secret]{
+				authCR: authCR,
+				name:   "name",
+			}
+			_, ok := d.GetEmptyObject().(*corev1.Secret)
+			Expect(ok).To(BeTrue())
+			_, ok = d.GetEmptyObject().(*corev1.ConfigMap)
+			Expect(ok).To(BeFalse())
 		})
 	})
 
@@ -137,8 +184,10 @@ var _ = Describe("ConfigMap handling", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			r = &AuthenticationReconciler{
-				Client:          cl,
-				Reader:          cl,
+				Client: &ctrlcommon.FallbackClient{
+					Client: cl,
+					Reader: cl,
+				},
 				DiscoveryClient: *dc,
 			}
 			ctx = context.Background()
@@ -163,8 +212,8 @@ var _ = Describe("ConfigMap handling", func() {
 							APIVersion:         "operator.ibm.com/v1alpha1",
 							Kind:               "Authentication",
 							Name:               "example-authentication",
-							Controller:         ptr.To[bool](true),
-							BlockOwnerDeletion: ptr.To[bool](true),
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
 						},
 					},
 					Labels: map[string]string{
@@ -329,7 +378,6 @@ var _ = Describe("ConfigMap handling", func() {
 	})
 
 	Describe("platform-auth-idp handling", func() {
-		var r *AuthenticationReconciler
 		var authCR *operatorv1alpha1.Authentication
 		var cb fakeclient.ClientBuilder
 		var cl client.WithWatch
@@ -388,8 +436,8 @@ var _ = Describe("ConfigMap handling", func() {
 							APIVersion:         "operator.ibm.com/v1alpha1",
 							Kind:               "Authentication",
 							Name:               "example-authentication",
-							Controller:         ptr.To[bool](true),
-							BlockOwnerDeletion: ptr.To[bool](true),
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
 						},
 					},
 					Labels: map[string]string{
@@ -418,14 +466,16 @@ var _ = Describe("ConfigMap handling", func() {
 				WithScheme(scheme).
 				WithObjects(globalConfigMap, ibmcloudClusterInfo, authCR)
 			cl = cb.Build()
-			dc, err := discovery.NewDiscoveryClientForConfig(cfg)
-			Expect(err).NotTo(HaveOccurred())
+			//dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+			//Expect(err).NotTo(HaveOccurred())
 
-			r = &AuthenticationReconciler{
-				Client:          cl,
-				Reader:          cl,
-				DiscoveryClient: *dc,
-			}
+			//r = &AuthenticationReconciler{
+			//	Client: &ctrlcommon.FallbackClient{
+			//		Client: cl,
+			//		Reader: cl,
+			//	},
+			//	DiscoveryClient: *dc,
+			//}
 			ctx = context.Background()
 		})
 
@@ -635,18 +685,23 @@ var _ = Describe("ConfigMap handling", func() {
 				}
 			}
 
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
 			for _, test := range updateOnNotSetKeys {
 				observed := &corev1.ConfigMap{}
-				Expect(generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, observed)).
+				Expect(generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, observed)).
 					To(Succeed())
 				generated := &corev1.ConfigMap{}
-				err := generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)
+				err := generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
 				Expect(err).NotTo(HaveOccurred())
-				updated, err = updatePlatformAuthIDP(observed, generated)
+				updated, err = updatePlatformAuthIDP(resource, ctx, observed, generated)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(updated).To(BeFalse())
+				Expect(updated).To(BeTrue()) // Update happens due to SHA change
 				setDummyData(test.primaryKey, test.keys, observed)
-				updated, err = updatePlatformAuthIDP(observed, generated)
+				updated, err = updatePlatformAuthIDP(resource, ctx, observed, generated)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(updated).To(BeTrue())
 				for _, k := range test.keys {
@@ -672,18 +727,23 @@ var _ = Describe("ConfigMap handling", func() {
 					o.Data[k] = dummyValue
 				}
 			}
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
 			for _, test := range updateOnNotUpToDate {
 				observed := &corev1.ConfigMap{}
-				Expect(generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, observed)).
+				Expect(generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, observed)).
 					To(Succeed())
 				generated := &corev1.ConfigMap{}
-				err := generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)
+				err := generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
 				Expect(err).NotTo(HaveOccurred())
-				updated, err = updatePlatformAuthIDP(observed, generated)
+				updated, err = updatePlatformAuthIDP(resource, ctx, observed, generated)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(updated).To(BeFalse())
+				Expect(updated).To(BeTrue()) // Update happens due to SHA change
 				setDummyData(test.primaryKey, test.keys, observed)
-				updated, err = updatePlatformAuthIDP(observed, generated)
+				updated, err = updatePlatformAuthIDP(resource, ctx, observed, generated)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(updated).To(BeTrue())
 				for _, k := range test.keys {
@@ -700,14 +760,19 @@ var _ = Describe("ConfigMap handling", func() {
 				"IDENTITY_PROVIDER_URL",
 			}
 
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
 			for _, k := range updateWhenLocalhostUsed {
 				observed := getObserved()
 				// Set the keys in observed to contain localhost IP
 				observed.Data[k] = "https://127.0.0.1:12345"
 				generated := &corev1.ConfigMap{}
-				Expect(generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)).
+				Expect(generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).
 					To(Succeed())
-				updated, err := updatePlatformAuthIDP(observed, generated)
+				updated, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(updated).To(BeTrue())
 				Expect(observed.Data[k]).To(Equal(generated.Data[k]))
@@ -716,20 +781,25 @@ var _ = Describe("ConfigMap handling", func() {
 
 		It("replaces value in OS_TOKEN_LENGTH only when it is set to 45", func() {
 			observed := &corev1.ConfigMap{}
-			Expect(generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, observed)).
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+			Expect(generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, observed)).
 				To(Succeed())
 			// Set the keys in observed to contain localhost IP
 			k := "OS_TOKEN_LENGTH"
 			observed.Data[k] = "24"
 			generated := &corev1.ConfigMap{}
-			Expect(generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)).
+			Expect(generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).
 				To(Succeed())
-			updated, err := updatePlatformAuthIDP(observed, generated)
+			updated, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(updated).To(BeFalse())
+			Expect(updated).To(BeTrue()) // Update happens due to SHA change
 			Expect(observed.Data[k]).NotTo(Equal(generated.Data[k]))
 			observed.Data[k] = "45"
-			updated, err = updatePlatformAuthIDP(observed, generated)
+			updated, err = updatePlatformAuthIDP(resource, ctx, observed, generated)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(updated).To(BeTrue())
 			Expect(observed.Data[k]).To(Equal(generated.Data[k]))
@@ -755,19 +825,24 @@ var _ = Describe("ConfigMap handling", func() {
 				dummyValue := "dummy"
 				o.Data[k] = dummyValue
 			}
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
 			for _, test := range updateAlways {
 				observed := getObserved()
-				Expect(generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, observed)).
+				Expect(generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, observed)).
 					To(Succeed())
 				generated := &corev1.ConfigMap{}
-				err := generateAuthIdpConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)
-				Expect(err).NotTo(HaveOccurred())
-				updated, err = updatePlatformAuthIDP(observed, generated)
+				Expect(generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).
+					To(Succeed())
+				updated, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(updated).To(BeFalse())
+				Expect(updated).To(BeTrue()) // Update happens due to SHA change
 				setDummyData(test, observed)
 				Expect(observed.Data[test]).To(Equal("dummy"))
-				updated, err = updatePlatformAuthIDP(observed, generated)
+				updated, err = updatePlatformAuthIDP(resource, ctx, observed, generated)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(updated).To(BeTrue())
 				Expect(observed.Data[test]).To(Equal(generated.Data[test]))
@@ -776,7 +851,6 @@ var _ = Describe("ConfigMap handling", func() {
 	})
 
 	Describe("oauth-client-map handling", func() {
-		var r *AuthenticationReconciler
 		var authCR *operatorv1alpha1.Authentication
 		var cb fakeclient.ClientBuilder
 		var cl client.WithWatch
@@ -864,19 +938,35 @@ var _ = Describe("ConfigMap handling", func() {
 				WithScheme(scheme).
 				WithObjects(globalConfigMap, ibmcloudClusterInfo, authCR)
 			cl = cb.Build()
-			dc, err := discovery.NewDiscoveryClientForConfig(cfg)
-			Expect(err).NotTo(HaveOccurred())
+			//dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+			//Expect(err).NotTo(HaveOccurred())
 
-			r = &AuthenticationReconciler{
-				Client:          cl,
-				Reader:          cl,
-				DiscoveryClient: *dc,
-			}
+			//r = &AuthenticationReconciler{
+			//	Client: &ctrlcommon.FallbackClient{
+			//		Client: cl,
+			//		Reader: cl,
+			//	},
+			//	DiscoveryClient: *dc,
+			//}
 			ctx = context.Background()
+		})
+		It("Test apiutil.GVKForObject", func() {
+			o := &corev1.ConfigMap{}
+			gvk, err := apiutil.GVKForObject(o, scheme)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(gvk.Kind).To(Equal("ConfigMap"))
+			authGVK, err := apiutil.GVKForObject(authCR, scheme)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(authGVK.Kind).To(Equal("Authentication"))
 		})
 		It("generates a ConfigMap based upon values in ibmcloud-cluster-info and Authentication CR", func() {
 			generated := &corev1.ConfigMap{}
-			err := generateOAuthClientConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("oauth-client-map").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+			err := generateOAuthClientConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(generated.Data).ToNot(BeNil())
 			Expect(generated.Data["MASTER_IP"]).To(Equal(ibmcloudClusterInfo.Data["cluster_address"]))
@@ -897,16 +987,22 @@ var _ = Describe("ConfigMap handling", func() {
 
 		It("updates that ConfigMap based upon values in ibmcloud-cluster-info and Authentication CR", func() {
 			fakeObserved := &corev1.ConfigMap{}
-			err := generateOAuthClientConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, fakeObserved)
+
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("oauth-client-map").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+			err := generateOAuthClientConfigMap(ibmcloudClusterInfo)(resource, ctx, fakeObserved)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(fakeObserved.Data).ToNot(BeNil())
 			fakeObserved.Data["MASTER_IP"] = "dummy-address"
 			fakeObserved.Data["CLUSTER_NAME"] = "dummy-name"
 			generated := &corev1.ConfigMap{}
-			err = generateOAuthClientConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)
+			err = generateOAuthClientConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
 			Expect(generated.Data).ToNot(BeNil())
 			Expect(err).ToNot(HaveOccurred())
-			updated, err := updateOAuthClientConfigMap(fakeObserved, generated)
+			updated, err := updateOAuthClientConfigMap(resource, ctx, fakeObserved, generated)
 			Expect(updated).To(BeTrue())
 			Expect(err).ToNot(HaveOccurred())
 			Expect(generated.Data["MASTER_IP"]).To(Equal(ibmcloudClusterInfo.Data["cluster_address"]))
@@ -926,7 +1022,6 @@ var _ = Describe("ConfigMap handling", func() {
 	})
 
 	Describe("registration-script handling", func() {
-		var r *AuthenticationReconciler
 		var authCR *operatorv1alpha1.Authentication
 		var cb fakeclient.ClientBuilder
 		var cl client.WithWatch
@@ -1014,20 +1109,27 @@ var _ = Describe("ConfigMap handling", func() {
 				WithScheme(scheme).
 				WithObjects(globalConfigMap, ibmcloudClusterInfo, authCR)
 			cl = cb.Build()
-			dc, err := discovery.NewDiscoveryClientForConfig(cfg)
-			Expect(err).NotTo(HaveOccurred())
+			//dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+			//Expect(err).NotTo(HaveOccurred())
 
-			r = &AuthenticationReconciler{
-				Client:          cl,
-				Reader:          cl,
-				DiscoveryClient: *dc,
-			}
+			//r = &AuthenticationReconciler{
+			//	Client: &ctrlcommon.FallbackClient{
+			//		Client: cl,
+			//		Reader: cl,
+			//	},
+			//	DiscoveryClient: *dc,
+			//}
 			ctx = context.Background()
 		})
 
 		It("generates a ConfigMap based upon values in ibmcloud-cluster-info and Authentication CR", func() {
 			generated := &corev1.ConfigMap{}
-			err := generateRegistrationScriptConfigMap(ctx, r.Client, authCR, ibmcloudClusterInfo, generated)
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-script").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+			err := generateRegistrationScriptConfigMap()(resource, ctx, generated)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(generated.Data).ToNot(BeNil())
 			Expect(generated.Data["register-client.sh"]).To(Equal(registerClientScript))
@@ -1042,4 +1144,73 @@ var _ = Describe("ConfigMap handling", func() {
 			Expect(generated.OwnerReferences).To(ContainElement(expected))
 		})
 	})
+	DescribeTable("getConfigMapDataSHA1Sum",
+		func(cm1, cm2 *corev1.ConfigMap, success1, success2, match bool) {
+			digest1, err := getConfigMapDataSHA1Sum(cm1)
+			if !success1 {
+				Expect(err).To(HaveOccurred())
+				Expect(digest1).To(BeEmpty())
+				return
+			} else {
+				Expect(err).ToNot(HaveOccurred())
+				Expect(digest1).ToNot(BeEmpty())
+			}
+			digest2, err := getConfigMapDataSHA1Sum(cm2)
+			if !success2 {
+				Expect(err).To(HaveOccurred())
+				Expect(digest2).To(BeEmpty())
+			} else {
+				Expect(err).ToNot(HaveOccurred())
+				Expect(digest2).ToNot(BeEmpty())
+			}
+			if !success1 || !success2 {
+				return
+			}
+
+			if match {
+				Expect(digest1).To(Equal(digest2))
+				return
+			}
+			Expect(digest1).ToNot(Equal(digest2))
+		},
+		Entry("example 1", &corev1.ConfigMap{}, nil, false, false, false),
+		Entry("example 2",
+			&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "one"}, Data: map[string]string{}},
+			&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "two"}, Data: map[string]string{}},
+			true, true, true),
+		Entry("example 3",
+			&corev1.ConfigMap{
+				Data: map[string]string{
+					"key1": "value1",
+				},
+			},
+			&corev1.ConfigMap{
+				Data: map[string]string{
+					"key1": "value1",
+				},
+			}, true, true, true),
+		Entry("example 4",
+			&corev1.ConfigMap{
+				Data: map[string]string{
+					"key1": "value1",
+				},
+			},
+			&corev1.ConfigMap{
+				Data: map[string]string{
+					"key2": "value2",
+				},
+			}, true, true, false),
+		Entry("example 4",
+			&corev1.ConfigMap{
+				Data: map[string]string{
+					"key1": "value1",
+				},
+			},
+			&corev1.ConfigMap{
+				Data: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+				},
+			}, true, true, false),
+	)
 })

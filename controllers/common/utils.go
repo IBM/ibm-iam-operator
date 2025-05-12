@@ -23,6 +23,9 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"time"
+
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	osconfigv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
@@ -365,7 +368,7 @@ func ReduceSubreconcilerResultsAndErrors(results []*ctrl.Result, errs []error) (
 	return
 }
 
-// Helper functions to check and remove string from a slice of strings.
+// Returns whether the string slice contains the provided string.
 func ContainsString(slice []string, s string) bool {
 	for _, item := range slice {
 		if item == s {
@@ -375,6 +378,7 @@ func ContainsString(slice []string, s string) bool {
 	return false
 }
 
+// Returns a copy of the provided string slice without the specified string.
 func RemoveString(slice []string, s string) (result []string) {
 	for _, item := range slice {
 		if item == s {
@@ -392,4 +396,23 @@ func GetCommonLabels() (l map[string]string) {
 		"app.kubernetes.io/part-of":    "im",
 		"app.kubernetes.io/managed-by": "ibm-iam-operator",
 	}
+}
+
+// DefaultLowerWait is used in instances where a requeue is needed quickly, regardless of previous requeues
+var DefaultLowerWait time.Duration = 5 * time.Millisecond
+
+// FallbackClient implements client.Client, but will specifically read directly
+// from the API server instead of the cache when a cache miss happens on an
+// attempt to GET a particular object. Useful when there is a need to work
+// around the cache's filters.
+type FallbackClient struct {
+	client.Client
+	Reader client.Reader
+}
+
+func (f *FallbackClient) Get(ctx context.Context, objkey client.ObjectKey, obj client.Object, opts ...client.GetOption) (err error) {
+	if err = f.Client.Get(ctx, objkey, obj, opts...); k8sErrors.IsNotFound(err) {
+		return f.Reader.Get(ctx, objkey, obj, opts...)
+	}
+	return
 }

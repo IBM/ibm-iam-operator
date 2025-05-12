@@ -180,8 +180,10 @@ func main() {
 	}
 
 	if err = (&operatorcontrollers.AuthenticationReconciler{
-		Client:          mgr.GetClient(),
-		Reader:          mgr.GetAPIReader(),
+		Client: &controllercommon.FallbackClient{
+			Client: mgr.GetClient(),
+			Reader: mgr.GetAPIReader(),
+		},
 		DiscoveryClient: *dc,
 		Scheme:          mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {

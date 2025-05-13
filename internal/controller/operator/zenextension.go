@@ -69,15 +69,6 @@ location /idprovider/ {
   proxy_buffers   4 256k;
   proxy_read_timeout 180s;
 }
-location /login {
-  proxy_set_header Host $host;
-  proxy_set_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
-  proxy_pass https://platform-identity-provider.%[1]s.svc:4300/;
-  proxy_buffer_size   256k;
-  proxy_buffers   4 256k;
-  proxy_read_timeout 180s;
-  rewrite /login /v1/auth/authorize?client_id=%s&redirect_uri=https://%s/auth/liberty/callback&response_type=code&scope=openid+email+profile&orig=/login  break;
-}
 location /oidc {
   proxy_set_header Host $host;
   proxy_set_header Strict-Transport-Security "max-age=31536000; includeSubDomains";

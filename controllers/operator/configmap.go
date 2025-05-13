@@ -834,7 +834,7 @@ func (r *AuthenticationReconciler) generateCNCFClusterInfo(ctx context.Context, 
 	clusterAddress := strings.Join([]string{strings.Join([]string{"cp-console", authCR.Namespace}, "-"), domainName}, ".")
 	clusterEndpoint := "https://" + clusterAddress
 	clusterAddressAuth := clusterAddress
-	if authCR.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
+	if shouldUseCPDHost(authCR, &r.DiscoveryClient) {
 		zenHost, err = r.getZenHost(ctx, authCR)
 		if err == nil {
 			clusterAddressAuth = zenHost
@@ -903,7 +903,7 @@ func (r *AuthenticationReconciler) generateOCPClusterInfo(ctx context.Context, a
 	clusterAddress := domainName
 	clusterEndpoint := "https://" + clusterAddress
 	clusterAddressAuth := clusterAddress
-	if authCR.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
+	if shouldUseCPDHost(authCR, &r.DiscoveryClient) {
 		zenHost, err = r.getZenHost(ctx, authCR)
 		if err == nil {
 			clusterAddressAuth = zenHost

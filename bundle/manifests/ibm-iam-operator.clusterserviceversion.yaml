@@ -352,14 +352,14 @@ spec:
                       - name: ROUTE_HTTPS_PORT
                       - name: cluster_name
                       - name: ICP_PLATFORM_AUTH_IMAGE
-                        value: icr.io/cpopen/cpfs/icp-platform-auth:4.5.12
+                        value: icr.io/cpopen/cpfs/icp-platform-auth:4.5.13
                       - name: ICP_IDENTITY_PROVIDER_IMAGE
-                        value: icr.io/cpopen/cpfs/icp-identity-provider:4.5.12
+                        value: icr.io/cpopen/cpfs/icp-identity-provider:4.5.13
                       - name: ICP_IDENTITY_MANAGER_IMAGE
-                        value: icr.io/cpopen/cpfs/icp-identity-manager:4.5.12
+                        value: icr.io/cpopen/cpfs/icp-identity-manager:4.5.13
                       - name: IM_INITCONTAINER_IMAGE
-                        value: icr.io/cpopen/cpfs/im-initcontainer:4.5.12
-                    image: icr.io/cpopen/ibm-iam-operator:4.5.12
+                        value: icr.io/cpopen/cpfs/im-initcontainer:4.5.13
+                    image: icr.io/cpopen/ibm-iam-operator:4.5.13
                     imagePullPolicy: IfNotPresent
                     name: ibm-iam-operator
                     resources:

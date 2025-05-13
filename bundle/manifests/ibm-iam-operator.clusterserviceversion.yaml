@@ -190,10 +190,10 @@ metadata:
     capabilities: Basic Install
     categories: Security
     certified: "false"
-    containerImage: icr.io/cpopen/ibm-iam-operator:4.5.12
+    containerImage: icr.io/cpopen/ibm-iam-operator:4.5.13
     createdAt: "2024-11-11T18:03:12Z"
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage the lifecycle of IAM services. With this operator, you can simply deploy and upgrade the IAM services
-    olm.skipRange: <4.5.12
+    olm.skipRange: <4.5.13
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/IBM/ibm-iam-operator
@@ -203,7 +203,7 @@ metadata:
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
     operatorframework.io/os.linux: supported
-  name: ibm-iam-operator.v4.5.12
+  name: ibm-iam-operator.v4.5.13
   namespace: placeholder
 spec:
   apiservicedefinitions: {}

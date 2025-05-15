@@ -252,7 +252,7 @@ func (r *AuthenticationReconciler) createV1CertificateIfNotPresent(authCR *opera
 	}
 }
 
-// addLabelIfMissing adds "manage-cert-rotation": "yes" label to the certificate if not exist
+// addLabelIfMissing adds "manage-cert-rotation": "true" label to the certificate if not exist
 func (r *AuthenticationReconciler) addLabelIfMissing(fieldsList []*reconcileCertificateFields) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		reqLogger := ctrl.LoggerFrom(ctx)
@@ -289,9 +289,10 @@ func (r *AuthenticationReconciler) updateCertWithLabel(fields *reconcileCertific
 		err = r.Get(ctx, fields.NamespacedName, cert)
 		if err == nil {
 			certRotationKey := "manage-cert-rotation"
-			if _, exists := cert.Labels[certRotationKey]; !exists {
-				reqLogger.Info("Updating Certificate with label")
-				cert.Labels[certRotationKey] = "yes"
+			labelValue, exists := cert.Labels[certRotationKey]
+			if !exists || labelValue == "yes" {
+				reqLogger.Info("Updating Certificate with label manage-cert-rotation: true")
+				cert.Labels[certRotationKey] = "true"
 				err = r.Update(ctx, cert)
 				if err != nil {
 					reqLogger.Error(err, "Failed to update Certificate with label")

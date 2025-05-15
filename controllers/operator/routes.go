@@ -93,7 +93,7 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Re
 // traffic.
 func (r *AuthenticationReconciler) checkForZenFrontDoor(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx)
-	if shouldHaveRoutes(authCR, &r.DiscoveryClient) {
+	if shouldNotUseCPDHost(authCR, &r.DiscoveryClient) {
 		reqLogger.Info("IM Routes will be created")
 		return subreconciler.ContinueReconciling()
 	}
@@ -320,35 +320,8 @@ func (r *AuthenticationReconciler) reconcileRoute(authCR *operatorv1alpha1.Authe
 		reqLogger.Info("Reconciling route", "annotations", fields.Annotations, "routeHost", fields.RouteHost, "routePath", fields.RoutePath)
 
 		fCtx := logf.IntoContext(ctx, reqLogger)
-		if fields.Name != IMCrtAuthRouteName {
-			if shouldNotHaveRoutes(authCR, &r.DiscoveryClient) {
-				return r.ensureRouteDoesNotExist(fCtx, authCR, fields)
-			}
-		}
-
 		return r.ensureRouteExists(fCtx, authCR, fields)
 	}
-}
-
-func (r *AuthenticationReconciler) ensureRouteDoesNotExist(ctx context.Context, authCR *operatorv1alpha1.Authentication, fields *reconcileRouteFields) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	reqLogger.Info("Determined Route should not exist; removing if present")
-	observedRoute := &routev1.Route{}
-	err = r.Get(ctx, types.NamespacedName{Name: fields.Name, Namespace: authCR.Namespace}, observedRoute)
-	if k8sErrors.IsNotFound(err) {
-		return subreconciler.ContinueReconciling()
-	} else if err != nil {
-		reqLogger.Error(err, "Failed to get existing route for reconciliation")
-		return subreconciler.RequeueWithError(err)
-	}
-	err = r.Delete(ctx, observedRoute)
-	if err != nil {
-		reqLogger.Error(err, "Failed to delete the Route")
-		return subreconciler.RequeueWithError(err)
-	}
-	reqLogger.Info("Successfully deleted the Route")
-
-	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
 func (r *AuthenticationReconciler) ensureRouteExists(ctx context.Context, authCR *operatorv1alpha1.Authentication, fields *reconcileRouteFields) (result *ctrl.Result, err error) {
@@ -436,12 +409,12 @@ func (r *AuthenticationReconciler) ensureRouteExists(ctx context.Context, authCR
 	return subreconciler.ContinueReconciling()
 }
 
-func shouldNotHaveRoutes(authCR *operatorv1alpha1.Authentication, dc *discovery.DiscoveryClient) bool {
+func shouldUseCPDHost(authCR *operatorv1alpha1.Authentication, dc *discovery.DiscoveryClient) bool {
 	return authCR.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(dc)
 }
 
-func shouldHaveRoutes(authCR *operatorv1alpha1.Authentication, dc *discovery.DiscoveryClient) bool {
-	return !shouldNotHaveRoutes(authCR, dc)
+func shouldNotUseCPDHost(authCR *operatorv1alpha1.Authentication, dc *discovery.DiscoveryClient) bool {
+	return !shouldUseCPDHost(authCR, dc)
 }
 
 // Use DeepEqual to determine if 2 routes are equal.
@@ -588,6 +561,9 @@ func (r *AuthenticationReconciler) getClusterAddress(authCR *operatorv1alpha1.Au
 		clusterInfoConfigMap := &corev1.ConfigMap{}
 
 		clusterAddressFieldName := "cluster_address"
+		if shouldUseCPDHost(authCR, &r.DiscoveryClient) {
+			clusterAddressFieldName = "cluster_address_auth"
+		}
 
 		fns := []subreconciler.Fn{
 			r.getClusterInfoConfigMap(authCR, clusterInfoConfigMap),

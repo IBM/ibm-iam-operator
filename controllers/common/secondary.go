@@ -23,8 +23,6 @@ import (
 
 	"github.com/opdev/subreconciler"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -33,6 +31,11 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+// Generator is an interface that wraps the Generate method.
+//
+// It takes a context assumed to be scoped to the current reconcile loop and a
+// client.Object that is the recipient of the new object state. It returns an
+// error if something goes wrong over the course of performing this operation.
 type Generator interface {
 	Generate(context.Context, client.Object) error
 }
@@ -43,6 +46,20 @@ type Generator interface {
 // controller logic.
 type GenerateFn[T client.Object] func(SecondaryReconciler, context.Context, T) error
 
+// Modifier is an interface that wraps the Modify method.
+//
+// It takes a context assumed to be scoped to the current reconcile loop and two
+// client.Object arguments - the first should be the observed object that
+// represents what is on the cluster currently, and the second is what the
+// reconciler determines should be installed on the cluster instead.
+//
+// If there are relevant differences between the two objects, the first is
+// updated with the values from the second so that they are now the same in
+// those relevant ways.
+//
+// Returns an bool representing whether a change was made to the first
+// client.Object as well as an error if something goes wrong over the course of
+// performing this operation.
 type Modifier interface {
 	Modify(context.Context, client.Object, client.Object) (bool, error)
 }
@@ -54,6 +71,12 @@ type Modifier interface {
 // itself.
 type ModifyFn[T client.Object] func(SecondaryReconciler, context.Context, T, T) (bool, error)
 
+// WriteResponder is an interface that wraps the OnWrite method.
+//
+// It takes a context assumed to be scoped to the current reconcile loop and
+// performs any work that needs to be done after a write is performed.
+//
+// Returns an error if something goes wrong.
 type WriteResponder interface {
 	OnWrite(context.Context) error
 }
@@ -114,32 +137,42 @@ type secondaryReconciler[T client.Object] struct {
 	onWrite       OnWriteFn[T]            // function that is run after a write is made to this secondary object
 }
 
+// GetName returns the name of the secondary object.
 func (s *secondaryReconciler[T]) GetName() string {
 	return s.name
 }
 
+// GetNamespace returns the namespace of the secondary object.
 func (s *secondaryReconciler[T]) GetNamespace() string {
 	return s.namespace
 }
 
+// GetEmptyObject returns an empty object of the same GVK as the secondary
+// object.
 func (s *secondaryReconciler[T]) GetEmptyObject() client.Object {
 	rType := reflect.TypeFor[T]().Elem()
 	return reflect.New(rType).Interface().(T)
 }
 
+// GetKind returns the kind of the secondary object.
 func (s *secondaryReconciler[T]) GetKind() string {
 	gvk, _ := apiutil.GVKForObject(s.GetEmptyObject(), s.Scheme())
 	return gvk.Kind
 }
 
+// GetPrimary returns the primary object that triggers this secondary object's
+// reconciliation.
 func (s *secondaryReconciler[T]) GetPrimary() client.Object {
 	return s.primary
 }
 
+// GetClient returns the client used for reconciling the secondary object.
 func (s *secondaryReconciler[T]) GetClient() client.Client {
 	return s.Client
 }
 
+// Generate creates a new instance of the secondary object with values derived
+// from the secondaryReconciler's settings.
 func (s *secondaryReconciler[T]) Generate(ctx context.Context, obj client.Object) (err error) {
 	objT, ok := obj.(T)
 	if !ok {
@@ -151,6 +184,10 @@ func (s *secondaryReconciler[T]) Generate(ctx context.Context, obj client.Object
 	return s.generate(s, ctx, objT)
 }
 
+// Modify compares observed and generated, and, if there are relevant
+// qualities that differ between them, observed is updated to match generated in
+// those qualities. Returns a boolean for whether observed was updated and an
+// error if an error was encountered while attempting this operation.
 func (s *secondaryReconciler[T]) Modify(ctx context.Context, observed, generated client.Object) (modified bool, err error) {
 	if s.modify == nil {
 		return
@@ -171,6 +208,8 @@ func (s *secondaryReconciler[T]) Modify(ctx context.Context, observed, generated
 	return s.modify(s, ctx, observedT, generatedT)
 }
 
+// OnWrite is a function that is executed when any write is made to the cluster,
+// e.g. an object is created or updated.
 func (s *secondaryReconciler[T]) OnWrite(ctx context.Context) (err error) {
 	if s.onWrite == nil {
 		return
@@ -178,6 +217,8 @@ func (s *secondaryReconciler[T]) OnWrite(ctx context.Context) (err error) {
 	return s.onWrite(s, ctx)
 }
 
+// Reconcile performs reconciliation related to the creation or modification of
+// the secondary object that the secondaryReconciler is targeted for.
 func (s *secondaryReconciler[T]) Reconcile(ctx context.Context) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx, "Object.Namespace", s.GetNamespace(), "Object.Kind", s.GetKind(), "Object.Name", s.GetName())
 	debugLogger := logf.FromContext(ctx, "Object.Namespace", s.GetNamespace(), "Object.Kind", s.GetKind(), "Object.Name", s.GetName()).V(1)
@@ -214,15 +255,8 @@ func (s *secondaryReconciler[T]) Reconcile(ctx context.Context) (result *ctrl.Re
 		return subreconciler.ContinueReconciling()
 	}
 
-	u := &unstructured.Unstructured{}
-	u.Object, err = runtime.DefaultUnstructuredConverter.ToUnstructured(observed)
-	if err != nil {
-		reqLogger.Info("Failed to convert Object to unstructured", "reason", err.Error())
-		return subreconciler.RequeueWithError(err)
-	}
-
 	reqLogger.Info("Updates found; updating the Object")
-	if err = s.Update(ctx, u); err != nil {
+	if err = s.Update(ctx, observed); err != nil {
 		reqLogger.Info("Failed to update Object", "msg", err.Error())
 		return subreconciler.RequeueWithDelay(DefaultLowerWait)
 	}
@@ -239,12 +273,16 @@ type SecondaryReconcilerBuilder[T client.Object] struct {
 	s *secondaryReconciler[T]
 }
 
+// NewSecondaryReconcilerBuilder creates a new builder for a SecondaryReconciler.
 func NewSecondaryReconcilerBuilder[T client.Object]() *SecondaryReconcilerBuilder[T] {
 	return &SecondaryReconcilerBuilder[T]{
 		s: &secondaryReconciler[T]{},
 	}
 }
 
+// Build creates a new SecondaryReconciler using the configurations supplied by
+// other builder functions. Returns an error if no client or GVK is configured
+// on the SecondaryReconciler.
 func (b *SecondaryReconcilerBuilder[T]) Build() (*secondaryReconciler[T], error) {
 	if b.s.Client == nil {
 		return nil, fmt.Errorf("failed to build secondary reconciler: no client defined")
@@ -257,6 +295,9 @@ func (b *SecondaryReconcilerBuilder[T]) Build() (*secondaryReconciler[T], error)
 	return b.s, nil
 }
 
+// MustBuild creates a new SecondaryReconciler using the configurations supplied
+// by other builder functions. Panics if a client or GVK is not configured on
+// the SecondaryReconciler.
 func (b *SecondaryReconcilerBuilder[T]) MustBuild() *secondaryReconciler[T] {
 	if b.s.Client == nil {
 		panic("failed to build secondary reconciler: no client defined")
@@ -269,21 +310,29 @@ func (b *SecondaryReconcilerBuilder[T]) MustBuild() *secondaryReconciler[T] {
 	return b.s
 }
 
+// WithName sets the name of the secondary object that the
+// SecondaryReconciler is targeting.
 func (b *SecondaryReconcilerBuilder[T]) WithName(name string) *SecondaryReconcilerBuilder[T] {
 	b.s.name = name
 	return b
 }
 
+// WithName sets the namespace of the secondary object that the
+// SecondaryReconciler is targeting.
 func (b *SecondaryReconcilerBuilder[T]) WithNamespace(namespace string) *SecondaryReconcilerBuilder[T] {
 	b.s.namespace = namespace
 	return b
 }
 
+// WithPrimary sets the primary object for the secondary object that the
+// SecondaryReconciler is targeting.
 func (b *SecondaryReconcilerBuilder[T]) WithPrimary(primary client.Object) *SecondaryReconcilerBuilder[T] {
 	b.s.primary = primary
 	return b
 }
 
+// WithClient sets the client to be used for interacting with the cluster while
+// reconciling the secondary object.
 func (b *SecondaryReconcilerBuilder[T]) WithClient(cl client.Client) *SecondaryReconcilerBuilder[T] {
 	b.s.Client = cl
 	return b
@@ -343,10 +392,12 @@ type SecondaryReconcilerFn subreconciler.Fn
 
 var _ Subreconciler = SecondaryReconcilerFn(func(ctx context.Context) (result *ctrl.Result, err error) { return })
 
+// Reconcile implements Subreconciler.
 func (f SecondaryReconcilerFn) Reconcile(ctx context.Context) (result *ctrl.Result, err error) {
 	return f(ctx)
 }
 
+// NewSecondaryReconcilerFn creates a new SecondaryReconcilerFn from a subreconciler.FnWithRequest.
 func NewSecondaryReconcilerFn(req ctrl.Request, fn subreconciler.FnWithRequest) SecondaryReconcilerFn {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		return fn(ctx, req)

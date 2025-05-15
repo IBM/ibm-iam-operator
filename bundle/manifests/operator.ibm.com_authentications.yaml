@@ -125,6 +125,9 @@ spec:
                 - ldapsCACert
                 - routerCertSecret
                 type: object
+              autoScaleConfig:
+                description: AutoScaleConfig is a boolean to enable or disable HPA
+                type: boolean
               clientRegistration:
                 properties:
                   imageName:
@@ -402,9 +405,6 @@ spec:
               replicas:
                 format: int32
                 type: integer
-              autoScaleConfig:
-                description: AutoScaleConfig is a boolean to enable or disable HPA
-                type: boolean
             required:
             - auditService
             - authService

@@ -127,7 +127,7 @@ func (r *ClientReconciler) confirmAuthenticationIsReady(ctx context.Context, req
 	reqLogger.Info("Confirm that Authentication CR for IM is ready before reconciling Client")
 
 	var authCR *operatorv1alpha1.Authentication
-	if authCR, err = common.GetAuthentication(ctx, &r.Client); err != nil {
+	if authCR, err = common.GetAuthentication(ctx, r.Client); err != nil {
 		reqLogger.Info("Failed to get the Authentication for this install of IM", "reason", err.Error())
 		return subreconciler.RequeueWithDelay(wait.Jitter(baseAuthenticationWaitTime, 1.0))
 	}
@@ -429,7 +429,7 @@ func (r *ClientReconciler) annotateServiceAccount(ctx context.Context, req ctrl.
 	}
 
 	sAccName := "ibm-iam-operand-restricted"
-	sAccNamespace, err := common.GetServicesNamespace(ctx, &r.Client)
+	sAccNamespace, err := common.GetServicesNamespace(ctx, r.Client)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
@@ -824,7 +824,7 @@ func (r *ClientReconciler) removeAnnotationFromSA(ctx context.Context, req ctrl.
 	}
 
 	sAccName := "ibm-iam-operand-restricted"
-	sAccNamespace, err := common.GetServicesNamespace(ctx, &r.Client)
+	sAccNamespace, err := common.GetServicesNamespace(ctx, r.Client)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get services namespace")
 		return subreconciler.RequeueWithError(err)

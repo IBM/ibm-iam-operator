@@ -7,6 +7,7 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 
+	ctrlcommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	testutil "github.com/IBM/ibm-iam-operator/testing"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -77,8 +78,10 @@ var _ = Describe("OperandRequest handling", func() {
 					WithScheme(scheme)
 				cl = cb.Build()
 				r = &AuthenticationReconciler{
-					Client: cl,
-					Reader: cl,
+					Client: &ctrlcommon.FallbackClient{
+						Client: cl,
+						Reader: cl,
+					},
 				}
 			})
 			It("should add the embedded EDB entry to the list of Operands", func() {
@@ -168,11 +171,13 @@ var _ = Describe("OperandRequest handling", func() {
 
 			It("should NOT add the embedded EDB entry to the list of Operands", func() {
 				rFailing := &AuthenticationReconciler{
-					Client: &testutil.FakeTimeoutClient{
-						Client: cl,
-					},
-					Reader: &testutil.FakeTimeoutClient{
-						Client: cl,
+					Client: &ctrlcommon.FallbackClient{
+						Client: &testutil.FakeTimeoutClient{
+							Client: cl,
+						},
+						Reader: &testutil.FakeTimeoutClient{
+							Client: cl,
+						},
 					},
 				}
 				By("failing to get the ConfigMap for some reason")
@@ -318,8 +323,10 @@ var _ = Describe("OperandRequest handling", func() {
 				WithRuntimeObjects(cm, authCR)
 			cl = cb.Build()
 			r = &AuthenticationReconciler{
-				Client: cl,
-				Reader: cl,
+				Client: &ctrlcommon.FallbackClient{
+					Client: cl,
+					Reader: cl,
+				},
 			}
 		})
 		It("returns false when IS_EMBEDDED is not set", func() {
@@ -360,11 +367,13 @@ var _ = Describe("OperandRequest handling", func() {
 		})
 		It("returns an error when an unexpected error is encountered", func() {
 			rFailing := &AuthenticationReconciler{
-				Client: &testutil.FakeTimeoutClient{
-					Client: cl,
-				},
-				Reader: &testutil.FakeTimeoutClient{
-					Client: cl,
+				Client: &ctrlcommon.FallbackClient{
+					Client: &testutil.FakeTimeoutClient{
+						Client: cl,
+					},
+					Reader: &testutil.FakeTimeoutClient{
+						Client: cl,
+					},
 				},
 			}
 			isExternal, err := rFailing.isConfiguredForExternalEDB(context.Background(), authCR)

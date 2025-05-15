@@ -69,4 +69,7 @@ echo "Update chart versions"
 $LOCALBIN/yq -i '.appVersion = env(VERSION), .version = env(VERSION)' "${REPO_ROOT}/helm/Chart.yaml"
 $LOCALBIN/yq -i '.appVersion = env(VERSION), .version = env(VERSION)' "${REPO_ROOT}/helm-cluster-scoped/Chart.yaml"
 
+echo "Making the bundle"
+make bundle
+
 echo "Done"

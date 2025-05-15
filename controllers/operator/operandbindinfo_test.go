@@ -28,7 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -75,8 +74,10 @@ var _ = Describe("OperandBindInfo handling", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			r = &AuthenticationReconciler{
-				Client:          cl,
-				Reader:          cl,
+				Client: &ctrlcommon.FallbackClient{
+					Client: cl,
+					Reader: cl,
+				},
 				DiscoveryClient: *dc,
 			}
 			ctx = context.Background()
@@ -99,12 +100,7 @@ var _ = Describe("OperandBindInfo handling", func() {
 			generated := &operatorv1alpha1.OperandBindInfo{}
 			Expect(generateOperandBindInfo(authCR, r.Client.Scheme(), generated)).To(Succeed())
 			Expect(observed.Spec).To(Equal(generated.Spec))
-			gvk := schema.GroupVersionKind{
-				Kind:    "Authentication",
-				Group:   "operator.ibm.com",
-				Version: "v1alpha1",
-			}
-			Expect(ctrlcommon.IsOwnerOf(gvk, authCR, observed)).To(BeTrue())
+			Expect(ctrlcommon.IsOwnerOf(r.Client.Scheme(), authCR, observed)).To(BeTrue())
 		})
 
 		It("should continue reconciling if the OperandBindInfo is already there", func() {
@@ -145,12 +141,7 @@ var _ = Describe("OperandBindInfo handling", func() {
 			bindInfoKey := types.NamespacedName{Name: bindInfoName, Namespace: authCR.Namespace}
 			err = r.Get(ctx, bindInfoKey, observed)
 			Expect(err).ToNot(HaveOccurred())
-			gvk := schema.GroupVersionKind{
-				Kind:    "Authentication",
-				Group:   "operator.ibm.com",
-				Version: "v1alpha1",
-			}
-			Expect(ctrlcommon.IsOwnerOf(gvk, authCR, observed)).To(BeTrue())
+			Expect(ctrlcommon.IsOwnerOf(r.Client.Scheme(), authCR, observed)).To(BeTrue())
 		})
 
 		It("should update the OperandBindInfo if the spec differs", func() {
@@ -181,12 +172,7 @@ var _ = Describe("OperandBindInfo handling", func() {
 			err = r.Get(ctx, bindInfoKey, observed)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(observed.Spec).To(Equal(generated.Spec))
-			gvk := schema.GroupVersionKind{
-				Kind:    "Authentication",
-				Group:   "operator.ibm.com",
-				Version: "v1alpha1",
-			}
-			Expect(ctrlcommon.IsOwnerOf(gvk, authCR, observed)).To(BeTrue())
+			Expect(ctrlcommon.IsOwnerOf(r.Client.Scheme(), authCR, observed)).To(BeTrue())
 		})
 	})
 })

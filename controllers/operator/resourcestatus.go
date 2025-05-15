@@ -18,6 +18,8 @@ package operator
 
 import (
 	"context"
+	"reflect"
+	"slices"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	zenv1 "github.com/IBM/ibm-iam-operator/apis/zen.cpd.ibm.com/v1"
@@ -40,6 +42,50 @@ const (
 	ResourceReadyState    string = "Ready"
 	ResourceNotReadyState string = "NotReady"
 )
+
+func (r *AuthenticationReconciler) setAuthenticationStatus(ctx context.Context, authCR *operatorv1alpha1.Authentication) (modified bool, err error) {
+	authCRCopy := authCR.DeepCopy()
+	nodes, err := r.getNodesStatus(ctx, authCR)
+	if len(authCR.Status.Nodes) == 0 || !slices.Equal(authCR.Status.Nodes, nodes) {
+		authCR.Status.Nodes = nodes
+	}
+	authCR.Status.Service = r.getCurrentServiceStatus(ctx, r.Client, authCR)
+	if !reflect.DeepEqual(authCR.Status, authCRCopy.Status) {
+		modified = true
+	}
+	return
+}
+
+// getNodesStatus returns a sorted list of IM Pods that is written to the Authentication CR's .status.nodes.
+func (r *AuthenticationReconciler) getNodesStatus(ctx context.Context, authCR *operatorv1alpha1.Authentication) (nodes []string, err error) {
+	log := logf.FromContext(ctx)
+	appNames := []string{"platform-auth-service", "platform-identity-management", "platform-identity-provider"}
+	nodes = []string{}
+	for _, appName := range appNames {
+		podList := &corev1.PodList{}
+		listOptsProv := []client.ListOption{
+			client.InNamespace(authCR.Namespace),
+			client.MatchingLabels(map[string]string{"k8s-app": appName}),
+		}
+		if err = r.Client.List(ctx, podList, listOptsProv...); err != nil {
+			log.Info("Failed to list pods by label and namespace", "k8s-app", appName, "namespace", authCR.Namespace)
+			return
+		}
+		nodes = append(nodes, getPodNames(podList.Items)...)
+	}
+	slices.Sort(nodes)
+	return
+}
+
+func getPodNames(pods []corev1.Pod) []string {
+	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
+	var podNames []string
+	for _, pod := range pods {
+		podNames = append(podNames, pod.Name)
+		reqLogger.Info("CS??? pod name=" + pod.Name)
+	}
+	return podNames
+}
 
 func getServiceStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
 	reqLogger := logf.FromContext(ctx).WithName("getServiceStatus").V(1)

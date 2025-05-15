@@ -20,9 +20,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
+	"time"
+
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	osconfigv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
@@ -64,7 +66,7 @@ var _ fmt.Stringer = OpenShift
 
 // GetClusterType attempts to determine whether the Operator is running on Openshift versus a CNCF cluster. Exits in the
 // event that the cluster config can't be obtained to make queries or if the watch namespace can't be obtained.
-func GetClusterType(ctx context.Context, k8sClient *client.Client, cmName string) (clusterType ClusterType, err error) {
+func GetClusterType(ctx context.Context, k8sClient client.Client, cmName string) (clusterType ClusterType, err error) {
 	logger := logf.FromContext(ctx)
 	logger.Info("Get cluster config")
 
@@ -98,7 +100,7 @@ func GetClusterType(ctx context.Context, k8sClient *client.Client, cmName string
 	cm := &corev1.ConfigMap{}
 	for _, namespace := range namespaces {
 		logger.Info("Try to find ConfigMap", "name", cmName, "namespace", namespace)
-		err = (*k8sClient).Get(ctx, types.NamespacedName{Name: cmName, Namespace: namespace}, cm)
+		err = k8sClient.Get(ctx, types.NamespacedName{Name: cmName, Namespace: namespace}, cm)
 		if err != nil {
 			logger.Error(err, "Failed to get ConfigMap")
 			logger.Info("Did not find it", "namespace", namespace)
@@ -262,7 +264,7 @@ func GetOperatorNamespace() (string, error) {
 	} else if isRunModeLocal() {
 		return "", ErrRunLocal
 	}
-	nsBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	nsBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", ErrNoNamespace
@@ -280,22 +282,38 @@ func GetOperatorNamespace() (string, error) {
 // Authentication CR for a given IM Operator instance, so wherever that one Authentication CR is found is assumed to be
 // where the other Operands are. If no or more than one Authentication CR is found, an error is reported as this is an
 // unsupported usage of the CR.
-func GetAuthentication(ctx context.Context, k8sClient *client.Client) (authCR *operatorv1alpha1.Authentication, err error) {
-	authenticationList := &operatorv1alpha1.AuthenticationList{}
-	err = (*k8sClient).List(ctx, authenticationList)
-	if err != nil {
-		return
+func GetAuthentication(ctx context.Context, k8sClient client.Client, namespaces ...string) (authCR *operatorv1alpha1.Authentication, err error) {
+	if len(namespaces) == 0 {
+		authenticationList := &operatorv1alpha1.AuthenticationList{}
+		err = k8sClient.List(ctx, authenticationList)
+		if err != nil {
+			return
+		}
+		if len(authenticationList.Items) != 1 {
+			err = fmt.Errorf("expected to find 1 Authentication but found %d", len(authenticationList.Items))
+			return
+		}
+		return &authenticationList.Items[0], nil
 	}
-	if len(authenticationList.Items) != 1 {
-		err = fmt.Errorf("expected to find 1 Authentication but found %d", len(authenticationList.Items))
-		return
+
+	var errs error = nil
+	authCR = &operatorv1alpha1.Authentication{}
+	for _, namespace := range namespaces {
+		err = k8sClient.Get(ctx, types.NamespacedName{Name: "example-authentication", Namespace: namespace}, authCR)
+		if k8sErrors.IsNotFound(err) {
+			continue
+		} else if err == nil {
+			return
+		}
+		errs = errors.Join(errs, err)
 	}
-	return &authenticationList.Items[0], nil
+
+	return nil, errs
 }
 
 // GetServicesNamespace finds the namespace that contains the shared services deriving from the Authentication CR for
 // this IM install. Returns an error when
-func GetServicesNamespace(ctx context.Context, k8sClient *client.Client) (namespace string, err error) {
+func GetServicesNamespace(ctx context.Context, k8sClient client.Client) (namespace string, err error) {
 	authCR, err := GetAuthentication(ctx, k8sClient)
 	if err != nil {
 		return
@@ -365,7 +383,7 @@ func ReduceSubreconcilerResultsAndErrors(results []*ctrl.Result, errs []error) (
 	return
 }
 
-// Helper functions to check and remove string from a slice of strings.
+// Returns whether the string slice contains the provided string.
 func ContainsString(slice []string, s string) bool {
 	for _, item := range slice {
 		if item == s {
@@ -375,6 +393,7 @@ func ContainsString(slice []string, s string) bool {
 	return false
 }
 
+// Returns a copy of the provided string slice without the specified string.
 func RemoveString(slice []string, s string) (result []string) {
 	for _, item := range slice {
 		if item == s {
@@ -392,4 +411,23 @@ func GetCommonLabels() (l map[string]string) {
 		"app.kubernetes.io/part-of":    "im",
 		"app.kubernetes.io/managed-by": "ibm-iam-operator",
 	}
+}
+
+// DefaultLowerWait is used in instances where a requeue is needed quickly, regardless of previous requeues
+var DefaultLowerWait time.Duration = 5 * time.Millisecond
+
+// FallbackClient implements client.Client, but will specifically read directly
+// from the API server instead of the cache when a cache miss happens on an
+// attempt to GET a particular object. Useful when there is a need to work
+// around the cache's filters.
+type FallbackClient struct {
+	client.Client
+	Reader client.Reader
+}
+
+func (f *FallbackClient) Get(ctx context.Context, objkey client.ObjectKey, obj client.Object, opts ...client.GetOption) (err error) {
+	if err = f.Client.Get(ctx, objkey, obj, opts...); k8sErrors.IsNotFound(err) {
+		return f.Reader.Get(ctx, objkey, obj, opts...)
+	}
+	return
 }

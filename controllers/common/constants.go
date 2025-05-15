@@ -45,3 +45,5 @@ const (
 	PlatformIdentityManagement DeploymentName = "platform-identity-management"
 	PlatformAuthService        DeploymentName = "platform-auth-service"
 )
+
+const ManagerVersionLabel string = "authentication.operator.ibm.com/manager-version"

@@ -18,6 +18,7 @@ package operator
 
 import (
 	"context"
+	"reflect"
 	"slices"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
@@ -42,13 +43,17 @@ const (
 	ResourceNotReadyState string = "NotReady"
 )
 
-func (r *AuthenticationReconciler) setAuthenticationStatus(ctx context.Context, authCR *operatorv1alpha1.Authentication) (err error) {
+func (r *AuthenticationReconciler) setAuthenticationStatus(ctx context.Context, authCR *operatorv1alpha1.Authentication) (modified bool, err error) {
+	authCRCopy := authCR.DeepCopy()
 	nodes, err := r.getNodesStatus(ctx, authCR)
 	if len(authCR.Status.Nodes) == 0 || !slices.Equal(authCR.Status.Nodes, nodes) {
 		authCR.Status.Nodes = nodes
 	}
 	authCR.Status.Service = r.getCurrentServiceStatus(ctx, r.Client, authCR)
-	return
+	if reflect.DeepEqual(authCR.Status, authCRCopy.Status) {
+		return false, err
+	}
+	return true, err
 }
 
 // getNodesStatus returns a sorted list of IM Pods that is written to the Authentication CR's .status.nodes.

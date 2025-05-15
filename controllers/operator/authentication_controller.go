@@ -18,7 +18,6 @@ package operator
 
 import (
 	"context"
-	"reflect"
 
 	"fmt"
 	"sync"
@@ -242,25 +241,36 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return
 	}
 
-	originalAuthCR := instance.DeepCopy()
-	// Be sure to update status before returning if Authentication is found (but only if the Authentication hasn't
-	// already been updated, e.g. finalizer update
+	// Be sure to update status before returning
 	defer func() {
-		if needToRequeue {
-			result.Requeue = true
-		}
-		err = r.setAuthenticationStatus(ctx, instance)
-		if reflect.DeepEqual(originalAuthCR.Status, instance.Status) {
+		observed := &operatorv1alpha1.Authentication{}
+		modified := false
+		if subResult, err := r.getLatestAuthentication(ctx, req, observed); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+			reqLogger.Info("Could not get Authentication before service status update")
+			result = *subResult
 			goto statuslog
 		}
-		reqLogger.Info("Update status before finishing loop.")
-		if err = r.Client.Status().Update(ctx, instance); err != nil {
+		if needToRequeue {
+			reqLogger.Info("Previous subreconcilers indicate a need to requeue")
+			result.Requeue = true
+		}
+		modified, err = r.setAuthenticationStatus(ctx, observed)
+		if !modified {
+			reqLogger.Info("No new status changes needed")
+			goto statuslog
+		}
+		reqLogger.Info("Status updates found; update status before finishing loop.")
+		if err = r.Client.Status().Update(ctx, observed); err != nil {
 			reqLogger.Error(err, "Failed to update status")
 		} else {
 			reqLogger.Info("Updated status")
 		}
 	statuslog:
-		reqLogger.Info("Reconciliation complete")
+		if subreconciler.ShouldRequeue(&result, err) {
+			reqLogger.Info("Reconciliation incomplete; requeueing", "result", result, "err", err)
+		} else {
+			reqLogger.Info("Reconciliation complete", "result", result, "err", err)
+		}
 	}()
 
 	var subResult *ctrl.Result

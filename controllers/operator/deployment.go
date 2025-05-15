@@ -778,7 +778,13 @@ func specsDiffer(observed, generated *appsv1.Deployment) (different bool, err er
 func modifyDeployment(needsRollout bool) ctrlcommon.ModifyFn[*appsv1.Deployment] {
 	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, observed, generated *appsv1.Deployment) (modified bool, err error) {
 		preserveObservedFields(observed, generated)
-
+		authCR, ok := s.GetPrimary().(*operatorv1alpha1.Authentication)
+		if !ok {
+			return
+		}
+		if authCR.Spec.AutoScaleConfig {
+			generated.Spec.Replicas = observed.Spec.Replicas
+		}
 		if val, ok := observed.Labels["operator.ibm.com/bindinfoRefresh"]; !ok || val != "enabled" {
 			observed.Labels["operator.ibm.com/bindinfoRefresh"] = "enabled"
 			modified = true

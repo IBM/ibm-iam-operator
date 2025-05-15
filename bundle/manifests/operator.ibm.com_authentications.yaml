@@ -402,6 +402,9 @@ spec:
               replicas:
                 format: int32
                 type: integer
+              autoScaleConfig:
+                description: AutoScaleConfig is a boolean to enable or disable HPA
+                type: boolean
             required:
             - auditService
             - authService

@@ -280,7 +280,7 @@ func (c AuthenticationConfig) GetCSCATLSKey() (value []byte, err error) {
 }
 
 func GetConfig(ctx context.Context, r *ClientReconciler, config *AuthenticationConfig) (err error) {
-	servicesNamespace, err := ctrlCommon.GetServicesNamespace(ctx, &r.Client)
+	servicesNamespace, err := ctrlCommon.GetServicesNamespace(ctx, r.Client)
 	if err != nil {
 		return fmt.Errorf("failed to get ConfigMap: %w", err)
 	}

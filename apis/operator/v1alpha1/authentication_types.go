@@ -48,6 +48,7 @@ type AuthenticationSpec struct {
 	ClientRegistration            ClientRegistrationSpec `json:"clientRegistration"`
 	Config                        ConfigSpec             `json:"config"`
 	EnableInstanaMetricCollection bool                   `json:"enableInstanaMetricCollection,omitempty"`
+	AutoScaleConfig               bool                   `json:"autoScaleConfig,omitempty"`
 }
 
 type AuditServiceSpec struct {

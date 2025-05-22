@@ -53,7 +53,8 @@ func (r *AuthenticationReconciler) handleHPAs(ctx context.Context, req ctrl.Requ
 			// Build the HPA reconciler
 			builder := ctrlcommon.NewSecondaryReconcilerBuilder[*autoscalingv2.HorizontalPodAutoscaler]().
 				WithName(deployName + "-hpa").
-				WithGenerateFns(generateHPAObject(authCR, deployName))
+				WithGenerateFns(generateHPAObject(authCR, deployName)).
+				WithModifyFns(modifyHPA(r.needsRollout))
 
 			subRecs = append(subRecs, builder.
 				WithNamespace(authCRNS).
@@ -119,8 +120,7 @@ func generateHPAObject(instance *operatorv1alpha1.Authentication, deploymentName
 		}
 
 		container := deploy.Spec.Template.Spec.Containers[0]
-		currentReplicas := deploy.Spec.Replicas
-		maxReplicas := 2*(*currentReplicas) + 1
+		maxReplicas := 2*(instance.Spec.Replicas) + 1
 
 		memRequest := container.Resources.Requests.Memory().Value()
 		memLimit := container.Resources.Limits.Memory().Value()
@@ -220,4 +220,33 @@ func (r *AuthenticationReconciler) UpdateDeploymentReplicas(ctx context.Context,
 	}
 
 	return nil
+}
+
+// modifyHPA looks for relevant differences between the observed and
+// generated HPAs and makes modifications to the observed HPA when
+// such differences are found. Returns a boolean representing whether a
+// modification was made and an error if the operation could not be completed.
+func modifyHPA(needsRollout bool) ctrlcommon.ModifyFn[*autoscalingv2.HorizontalPodAutoscaler] {
+	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, observed, generated *autoscalingv2.HorizontalPodAutoscaler) (modified bool, err error) {
+		authCR, ok := s.GetPrimary().(*operatorv1alpha1.Authentication)
+		if !ok {
+			return
+		}
+		desiredMax := 2*(authCR.Spec.Replicas) + 1
+		if *observed.Spec.MinReplicas != authCR.Spec.Replicas || observed.Spec.MaxReplicas != desiredMax {
+			observed.Spec = generated.Spec
+			modified = true
+		}
+		if !ctrlcommon.IsControllerOf(s.GetClient().Scheme(), s.GetPrimary(), observed) {
+			if err = controllerutil.SetControllerReference(s.GetPrimary(), observed, s.GetClient().Scheme()); err != nil {
+				return false, err
+			}
+			modified = true
+		}
+
+		if !needsRollout {
+			return
+		}
+		return
+	}
 }

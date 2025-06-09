@@ -27,7 +27,7 @@ import (
 	"time"
 
 	certmgr "github.com/IBM/ibm-iam-operator/internal/api/certmanager/v1"
-	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
+	"github.com/IBM/ibm-iam-operator/internal/controller/common"
 	"github.com/IBM/ibm-iam-operator/internal/version"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -38,6 +38,7 @@ import (
 	netv1 "k8s.io/api/networking/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sRuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
@@ -48,6 +49,7 @@ import (
 	handler "sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	sscsidriverv1 "sigs.k8s.io/secrets-store-csi-driver/apis/v1"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
 	"github.com/opdev/subreconciler"
@@ -102,24 +104,24 @@ func (r *AuthenticationReconciler) getLatestAuthentication(ctx context.Context, 
 
 // RunningOnOpenShiftCluster returns whether the Operator is running on an OpenShift cluster
 func (r *AuthenticationReconciler) RunningOnOpenShiftCluster() bool {
-	return ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) && ctrlcommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient)
+	return common.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) && common.ClusterHasRouteGroupVersion(&r.DiscoveryClient)
 }
 
 // RunningOnCNCFCluster returns whether the Operator is running on a CNCF cluster
 func (r *AuthenticationReconciler) RunningOnCNCFCluster() bool {
-	return !ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) || !ctrlcommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient)
+	return !common.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) || !common.ClusterHasRouteGroupVersion(&r.DiscoveryClient)
 
 }
 
 // RunningOnUnknownCluster returns whether the Operator is running on an unknown cluster type
 func (r *AuthenticationReconciler) RunningOnUnknownCluster() bool {
-	return r.clusterType == ctrlcommon.Unknown
+	return r.clusterType == common.Unknown
 }
 
 func (r *AuthenticationReconciler) addFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
 	r.Mutex.Lock()
 	defer r.Mutex.Unlock()
-	if !ctrlcommon.ContainsString(instance.Finalizers, finalizerName) {
+	if !common.ContainsString(instance.Finalizers, finalizerName) {
 		instance.Finalizers = append(instance.Finalizers, finalizerName)
 		err = r.Update(ctx, instance)
 	}
@@ -130,8 +132,8 @@ func (r *AuthenticationReconciler) addFinalizer(ctx context.Context, finalizerNa
 func (r *AuthenticationReconciler) removeFinalizer(ctx context.Context, finalizerName string, instance *operatorv1alpha1.Authentication) (err error) {
 	r.Mutex.Lock()
 	defer r.Mutex.Unlock()
-	if ctrlcommon.ContainsString(instance.Finalizers, finalizerName) {
-		instance.Finalizers = ctrlcommon.RemoveString(instance.Finalizers, finalizerName)
+	if common.ContainsString(instance.Finalizers, finalizerName) {
+		instance.Finalizers = common.RemoveString(instance.Finalizers, finalizerName)
 		err = r.Update(ctx, instance)
 		if err != nil {
 			return fmt.Errorf("error updating the CR to remove the finalizer: %w", err)
@@ -146,7 +148,7 @@ type AuthenticationReconciler struct {
 	Scheme          *k8sRuntime.Scheme
 	DiscoveryClient discovery.DiscoveryClient
 	Mutex           sync.Mutex
-	clusterType     ctrlcommon.ClusterType
+	clusterType     common.ClusterType
 	needsRollout    bool
 }
 
@@ -240,13 +242,6 @@ func (r *AuthenticationReconciler) handleAuthenticationFinalizer(ctx context.Con
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Authentication object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
 	log := logf.FromContext(rootCtx).WithName("controller_authentication")
 	ctx := logf.IntoContext(rootCtx, log)
@@ -259,6 +254,10 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 		return result, nil
 	} else if err != nil {
 		return
+	}
+
+	if !common.ClusterHasCSIGroupVersion(&r.DiscoveryClient) && authCR.SecretsStoreCSIEnabled() {
+		log.Info("useSecretsStoreCSI is enabled, but the API is not available on this cluster. Ignoring setting until Secrets Store CSI driver is installed.")
 	}
 
 	var subResult *ctrl.Result
@@ -327,14 +326,49 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&autoscalingv2.HorizontalPodAutoscaler{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
 
 	//Add routes
-	if ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
+	if common.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
 		authCtrl.Watches(&routev1.Route{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
 	}
-	if ctrlcommon.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
+	if common.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
 		authCtrl.Watches(&operatorv1alpha1.OperandRequest{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
 	}
-	if ctrlcommon.ClusterHasOperandBindInfoAPIResource(&r.DiscoveryClient) {
+	if common.ClusterHasOperandBindInfoAPIResource(&r.DiscoveryClient) {
 		authCtrl.Watches(&operatorv1alpha1.OperandBindInfo{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+	}
+	if common.ClusterHasCSIGroupVersion(&r.DiscoveryClient) {
+		authCtrl.Watches(&sscsidriverv1.SecretProviderClass{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+		spcLabelSelector := metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				{
+					Key:      "app.kubernetes.io/part-of",
+					Operator: metav1.LabelSelectorOpIn,
+					Values:   []string{"im"},
+				},
+				{
+					Key:      SecretProviderClassAsVolumeLabel,
+					Operator: metav1.LabelSelectorOpExists,
+				},
+			},
+		}
+		spcLabelPredicate, err := predicate.LabelSelectorPredicate(spcLabelSelector)
+		if err != nil {
+			return err
+		}
+		authCtrl.Watches(&sscsidriverv1.SecretProviderClass{},
+
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
+				authCR, _ := common.GetAuthentication(ctx, r.Client)
+				if authCR == nil {
+					return
+				}
+				return []reconcile.Request{
+					{NamespacedName: types.NamespacedName{
+						Name:      authCR.Name,
+						Namespace: authCR.Namespace,
+					}},
+				}
+			}), builder.WithPredicates(spcLabelPredicate),
+		)
 	}
 
 	productCMPred := predicate.Funcs{
@@ -365,12 +399,12 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	globalCMPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
-		return o.GetName() == ctrlcommon.GlobalConfigMapName
+		return o.GetName() == common.GlobalConfigMapName
 	})
 
 	authCtrl.Watches(&corev1.ConfigMap{},
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
-			authCR, _ := ctrlcommon.GetAuthentication(ctx, r.Client)
+			authCR, _ := common.GetAuthentication(ctx, r.Client)
 			if authCR == nil {
 				return
 			}
@@ -382,9 +416,8 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			}
 		}), builder.WithPredicates(predicate.Or(globalCMPred, productCMPred)),
 	)
-
 	bootstrappedPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
-		return o.GetLabels()[ctrlcommon.ManagerVersionLabel] == version.Version
+		return o.GetLabels()[common.ManagerVersionLabel] == version.Version
 	})
 
 	authCtrl.Watches(&operatorv1alpha1.Authentication{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(bootstrappedPred))

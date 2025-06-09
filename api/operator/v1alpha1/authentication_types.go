@@ -162,6 +162,7 @@ type ConfigSpec struct {
 	Ingress                     *IngressConfig `json:"ingress,omitempty"`
 	OAuth21Enabled              *bool          `json:"oauth21Enabled,omitempty"`
 	IamUm                       *bool          `json:"iamUm,omitempty"`
+	UseSecretsStoreCSI          *bool          `json:"useSecretsStoreCSI,omitempty"`
 }
 
 type ManagedResourceStatus struct {
@@ -357,6 +358,10 @@ func (a *Authentication) GetDBSchemaVersion() string {
 		return version
 	}
 	return ""
+}
+
+func (a *Authentication) SecretsStoreCSIEnabled() bool {
+	return a.Spec.Config.UseSecretsStoreCSI != nil && *a.Spec.Config.UseSecretsStoreCSI
 }
 
 func (s ServiceStatus) IsReady() bool {

@@ -256,6 +256,8 @@ spec:
                         type: string
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
+                  useSecretsStoreCSI:
+                    type: boolean
                 required:
                 - authUniqueHosts
                 - clusterCADomain

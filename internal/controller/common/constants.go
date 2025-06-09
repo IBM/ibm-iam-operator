@@ -37,6 +37,15 @@ const MongoStatefulsetName string = "icp-mongodb"
 // Name of CommonService created by IM Operator to provision EDB share
 const DatastoreEDBCSName string = "im-common-service"
 
+// Name of SecretProvoderClass created by Paks that contains ldap bindpassword
+const IMLdapBindCredSpc string = "im-ldap-bind-creds-spc"
+
+// Name of SecretProvoderClass created by Paks that contains external edb certs
+const IMExtEDBSecretSpc string = "im-external-edb-creds-spc"
+
+// Name of volume that holds ldap bindpassword spc
+const IMLdapBindPwdVolume string = "ldap-bind-cred-vol"
+
 type DeploymentName string
 
 // The current names of Deployments managed by this Operator

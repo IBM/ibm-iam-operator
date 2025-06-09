@@ -48,6 +48,7 @@ import (
 	handler "sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	sscsidriverv1 "sigs.k8s.io/secrets-store-csi-driver/apis/v1"
 
 	certmgr "github.com/IBM/ibm-iam-operator/apis/certmanager/v1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
@@ -382,7 +383,8 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&corev1.Service{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&netv1.Ingress{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&appsv1.Deployment{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
-		Watches(&autoscalingv2.HorizontalPodAutoscaler{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+		Watches(&autoscalingv2.HorizontalPodAutoscaler{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
+		Watches(&sscsidriverv1.SecretProviderClass{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
 
 	//Add routes
 	if ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
@@ -396,6 +398,9 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	if ctrlcommon.ClusterHasOperandBindInfoAPIResource(&r.DiscoveryClient) {
 		authCtrl.Watches(&operatorv1alpha1.OperandBindInfo{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+	}
+	if ctrlcommon.ClusterHasCSIGroupVersion(&r.DiscoveryClient) {
+		authCtrl.Watches(&sscsidriverv1.SecretProviderClass{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
 	}
 
 	productCMPred := predicate.Funcs{

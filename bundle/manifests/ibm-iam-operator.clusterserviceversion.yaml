@@ -589,6 +589,14 @@ spec:
                 - patch
                 - update
                 - watch
+            - apiGroups:
+                - secrets-store.csi.x-k8s.io
+              resources:
+                - secretproviderclasses
+              verbs:
+                - get
+                - list
+                - watch
           serviceAccountName: ibm-iam-operator
     strategy: deployment
   installModes:

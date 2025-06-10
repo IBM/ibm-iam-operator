@@ -796,12 +796,12 @@ var _ = Describe("Route handling", func() {
 					Expect(route.Spec.TLS.DestinationCACertificate).To(Equal(string(platformAuthSecretSecret.Data["ca.crt"])))
 					Expect(route.Annotations).To(HaveKeyWithValue("haproxy.router.openshift.io/balance", "source"))
 				case "saml-ui-callback":
-					Expect(route.Spec.Path).To(Equal("/ibm/saml20/defaultSP/acs"))
+					Expect(route.Spec.Path).To(Equal("/ibm/saml20/defaultSP"))
 					Expect(route.Spec.Port).To(Equal(&routev1.RoutePort{TargetPort: intstr.FromInt(9443)}))
 					Expect(route.Spec.To.Name).To(Equal(PlatformAuthServiceName))
 					Expect(route.Spec.TLS.DestinationCACertificate).To(Equal(string(platformAuthSecretSecret.Data["ca.crt"])))
 					Expect(route.Annotations).To(HaveKeyWithValue("haproxy.router.openshift.io/balance", "source"))
-					Expect(route.Annotations).To(HaveKeyWithValue("haproxy.router.openshift.io/rewrite-target", "/ibm/saml20/defaultSP/acs"))
+					Expect(route.Annotations).To(HaveKeyWithValue("haproxy.router.openshift.io/rewrite-target", "/ibm/saml20/defaultSP"))
 				case "social-login-callback":
 					Expect(route.Spec.Path).To(Equal("/ibm/api/social-login"))
 					Expect(route.Spec.Port).To(Equal(&routev1.RoutePort{TargetPort: intstr.FromInt(9443)}))

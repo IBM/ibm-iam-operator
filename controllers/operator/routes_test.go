@@ -866,7 +866,7 @@ var _ = Describe("Route handling", func() {
 			hasAllValidRoutes(routes)
 		})
 
-		It("deletes all Routes when zenFrontDoor is enabled", func() {
+		It("keeps all Routes when zenFrontDoor is enabled", func() {
 			createDummyRoutes()
 			authCR.Spec.Config.ZenFrontDoor = true
 			err := r.Update(ctx, authCR)
@@ -886,8 +886,7 @@ var _ = Describe("Route handling", func() {
 			}
 			err = r.List(ctx, routes, listOpts...)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(routes.Items).To(HaveLen(1))
-			Expect(routes.Items[0].Name).To(Equal(IMCrtAuthRouteName))
+			hasAllValidRoutes(routes)
 		})
 
 		It("updates all Routes when differences are found and requeues", func() {

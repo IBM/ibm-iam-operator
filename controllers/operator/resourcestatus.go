@@ -324,6 +324,7 @@ func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, 
 		names: []string{
 			"id-mgmt",
 			"platform-auth",
+			"platform-id-auth",
 			"platform-id-provider",
 			"platform-login",
 			"platform-oidc",

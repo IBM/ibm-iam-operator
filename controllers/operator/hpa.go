@@ -108,6 +108,10 @@ func generateHPAObject(instance *operatorv1alpha1.Authentication, deploymentName
 		reqLogger := logf.FromContext(ctx)
 		deploy := &appsv1.Deployment{}
 		minReplicas := instance.Spec.Replicas
+		// set min replicas to 2 for large profile as well
+		if minReplicas > 2 {
+			minReplicas = 2
+		}
 		err = s.GetClient().Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: instance.Namespace}, deploy)
 		if err != nil {
 			reqLogger.Error(err, "Failed to fetch Deployment", "DeploymentName", deploymentName)
@@ -233,7 +237,10 @@ func modifyHPA(needsRollout bool) ctrlcommon.ModifyFn[*autoscalingv2.HorizontalP
 			return
 		}
 		desiredMax := 2*(authCR.Spec.Replicas) + 1
-		if *observed.Spec.MinReplicas != authCR.Spec.Replicas || observed.Spec.MaxReplicas != desiredMax {
+		if *observed.Spec.MinReplicas > 2 {
+			observed.Spec = generated.Spec
+			modified = true
+		} else if *observed.Spec.MinReplicas != authCR.Spec.Replicas || observed.Spec.MaxReplicas != desiredMax {
 			observed.Spec = generated.Spec
 			modified = true
 		}

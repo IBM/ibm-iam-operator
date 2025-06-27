@@ -100,9 +100,8 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 		saasServiceIdCrn = saasTenantConfigMap.Data["service_crn_id"]
 	}
 
-	ldapSpcExists := r.CheckSPCExists(ctx, ctrlcommon.IMLdapBindPwdSpc, authCR.Namespace)
+	ldapSpcExists := r.CheckSPCExists(ctx, ctrlcommon.IMLdapBindCredSpc, authCR.Namespace)
 	edbSpcExists := r.CheckSPCExists(ctx, ctrlcommon.IMExtEDBSecretSpc, authCR.Namespace)
-
 	imagePullSecret := os.Getenv("IMAGE_PULL_SECRET")
 	builders := []*ctrlcommon.SecondaryReconcilerBuilder[*appsv1.Deployment]{
 		ctrlcommon.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
@@ -1027,14 +1026,12 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string, ldapSpcExist bo
 	}
 
 	if ldapSpcExist {
-		volumes = EnsureVolumePresent(volumes, GetLdapBindPwdCsiVolume())
+		volumes = EnsureVolumePresent(volumes, GetLdapBindCredCsiVolume())
 	}
 	if edbSpcExist {
-		volumes = EnsureVolumePresent(volumes, GetPgsqlCACsiVolume())
-		volumes = EnsureVolumePresent(volumes, GetPgsqlClientCsiVolume())
+		volumes = EnsureVolumePresent(volumes, GetPgsqlCredCsiVolume())
 	} else {
-		volumes = EnsureVolumePresent(volumes, GetPgsqlCASecretVolume())
-		volumes = EnsureVolumePresent(volumes, GetPgsqlClientSecretVolume())
+		volumes = EnsureVolumePresent(volumes, GetPgsqlSecretVolume())
 	}
 	return volumes
 }
@@ -1062,18 +1059,12 @@ func GetVolumeType(vol corev1.Volume) string {
 	}
 }
 
-func GetPgsqlCASecretVolume() corev1.Volume {
+func GetPgsqlSecretVolume() corev1.Volume {
 	vol := corev1.Volume{
-		Name: "pgsql-ca-cert",
+		Name: "pgsql-certs",
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
-				SecretName: ctrlcommon.DatastoreEDBSecretName,
-				Items: []corev1.KeyToPath{
-					{
-						Key:  "ca.crt",
-						Path: "ca.crt",
-					},
-				},
+				SecretName:  ctrlcommon.DatastoreEDBSecretName,
 				DefaultMode: &partialAccess,
 			},
 		},
@@ -1081,32 +1072,9 @@ func GetPgsqlCASecretVolume() corev1.Volume {
 	return vol
 }
 
-func GetPgsqlClientSecretVolume() corev1.Volume {
+func GetPgsqlCredCsiVolume() corev1.Volume {
 	vol := corev1.Volume{
-		Name: "pgsql-client-cert",
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName: ctrlcommon.DatastoreEDBSecretName,
-				Items: []corev1.KeyToPath{
-					{
-						Key:  "tls.crt",
-						Path: "tls.crt",
-					},
-					{
-						Key:  "tls.key",
-						Path: "tls.key",
-					},
-				},
-				DefaultMode: &partialAccess,
-			},
-		},
-	}
-	return vol
-}
-
-func GetPgsqlCACsiVolume() corev1.Volume {
-	vol := corev1.Volume{
-		Name: "pgsql-ca-cert",
+		Name: "pgsql-certs",
 		VolumeSource: corev1.VolumeSource{
 			CSI: &corev1.CSIVolumeSource{
 				Driver:   "secrets-store.csi.k8s.io",
@@ -1120,23 +1088,7 @@ func GetPgsqlCACsiVolume() corev1.Volume {
 	return vol
 }
 
-func GetPgsqlClientCsiVolume() corev1.Volume {
-	vol := corev1.Volume{
-		Name: "pgsql-client-cert",
-		VolumeSource: corev1.VolumeSource{
-			CSI: &corev1.CSIVolumeSource{
-				Driver:   "secrets-store.csi.k8s.io",
-				ReadOnly: boolPtr(true),
-				VolumeAttributes: map[string]string{
-					"secretProviderClass": ctrlcommon.IMExtEDBSecretSpc,
-				},
-			},
-		},
-	}
-	return vol
-}
-
-func GetLdapBindPwdCsiVolume() corev1.Volume {
+func GetLdapBindCredCsiVolume() corev1.Volume {
 	vol := corev1.Volume{
 		Name: ctrlCommon.IMLdapBindPwdVolume,
 		VolumeSource: corev1.VolumeSource{
@@ -1144,7 +1096,7 @@ func GetLdapBindPwdCsiVolume() corev1.Volume {
 				Driver:   "secrets-store.csi.k8s.io",
 				ReadOnly: boolPtr(true),
 				VolumeAttributes: map[string]string{
-					"secretProviderClass": ctrlcommon.IMLdapBindPwdSpc,
+					"secretProviderClass": ctrlcommon.IMLdapBindCredSpc,
 				},
 			},
 		},

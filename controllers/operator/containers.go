@@ -1126,12 +1126,8 @@ func buildAuthSvcVolumeMounts(ldapSpcExist bool) []corev1.VolumeMount {
 			MountPath: "/certs/saml-certs",
 		},
 		{
-			Name:      "pgsql-ca-cert",
-			MountPath: "/certs/pgsql-ca",
-		},
-		{
-			Name:      "pgsql-client-cert",
-			MountPath: "/certs/pgsql-client",
+			Name:      "pgsql-certs",
+			MountPath: "/certs/pgsql",
 		},
 		{
 			Name:      "pgsql-client-cred",
@@ -1161,12 +1157,8 @@ func buildIdentityManagerVolumeMounts(ldapSpcExist bool) []corev1.VolumeMount {
 			MountPath: "/opt/ibm/identity-mgmt/config/scim-config",
 		},
 		{
-			Name:      "pgsql-ca-cert",
-			MountPath: "/certs/pgsql-ca",
-		},
-		{
-			Name:      "pgsql-client-cert",
-			MountPath: "/certs/pgsql-client",
+			Name:      "pgsql-certs",
+			MountPath: "/certs/pgsql",
 		},
 		{
 			Name:      "pgsql-client-cred",
@@ -1196,12 +1188,8 @@ func buildIdentityProviderVolumeMounts(ldapSpcExist bool) []corev1.VolumeMount {
 			MountPath: "/certs/saml-certs",
 		},
 		{
-			Name:      "pgsql-ca-cert",
-			MountPath: "/certs/pgsql-ca",
-		},
-		{
-			Name:      "pgsql-client-cert",
-			MountPath: "/certs/pgsql-client",
+			Name:      "pgsql-certs",
+			MountPath: "/certs/pgsql",
 		},
 		{
 			Name:      "pgsql-client-cred",

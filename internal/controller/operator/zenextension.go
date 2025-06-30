@@ -42,6 +42,38 @@ type ZenExtensionWithSpec struct {
 	Spec   map[string]any
 }
 
+// handleZenExtension manages the generation of the ZenExtension when iam behind the zen front door is requested
+func (r *AuthenticationReconciler) handleZenFrontDoor(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	subLogger := logf.FromContext(ctx).WithValues(
+		"subreconciler", "handleZenFrontDoor",
+		"ZenExtension.Name", ImZenExtName,
+		"ZenExtension.Namespace", req.Namespace)
+	subCtx := logf.IntoContext(ctx, subLogger)
+
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(subCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+	if !ctrlCommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
+		subLogger.Info("ZenExtension resource is not supported; skipping")
+		return subreconciler.ContinueReconciling()
+	}
+
+	//In addition to reconciling the zen extension, we must set the proper value of
+	//cluster_address_auth in the ibmcloud-cluster-info configmap
+	fns := []subreconciler.Fn{
+		r.removeZenExtension(authCR),
+	}
+
+	for _, fn := range fns {
+		if result, err = fn(subCtx); subreconciler.ShouldRequeue(result, err) {
+			return
+		}
+	}
+
+	return subreconciler.ContinueReconciling()
+}
+
 func (zs *ZenExtensionWithSpec) ToUnstructured(s *runtime.Scheme) (u *unstructured.Unstructured, err error) {
 	noSpec := &zenv1.ZenExtension{
 		ObjectMeta: zs.ObjectMeta,
@@ -81,36 +113,4 @@ func (r *AuthenticationReconciler) removeZenExtension(authCR *operatorv1alpha1.A
 		reqLogger.Info("Zen front door deleted successfully")
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
-}
-
-// handleZenExtension manages the generation of the ZenExtension when iam behind the zen front door is requested
-func (r *AuthenticationReconciler) handleZenFrontDoor(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	subLogger := logf.FromContext(ctx).WithValues(
-		"subreconciler", "handleZenFrontDoor",
-		"ZenExtension.Name", ImZenExtName,
-		"ZenExtension.Namespace", req.Namespace)
-	subCtx := logf.IntoContext(ctx, subLogger)
-
-	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(subCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return
-	}
-	if !ctrlCommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
-		subLogger.Info("ZenExtension resource is not supported; skipping")
-		return subreconciler.ContinueReconciling()
-	}
-
-	//In addition to reconciling the zen extension, we must set the proper value of
-	//cluster_address_auth in the ibmcloud-cluster-info configmap
-	fns := []subreconciler.Fn{
-		r.removeZenExtension(authCR),
-	}
-
-	for _, fn := range fns {
-		if result, err = fn(subCtx); subreconciler.ShouldRequeue(result, err) {
-			return
-		}
-	}
-
-	return subreconciler.ContinueReconciling()
 }

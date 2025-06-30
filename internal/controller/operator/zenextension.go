@@ -242,11 +242,7 @@ func (r *AuthenticationReconciler) createOrUpdateZenExtension(authCR *operatorv1
 func (r *AuthenticationReconciler) removeZenExtension(authCR *operatorv1alpha1.Authentication) subreconciler.Fn {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		reqLogger := logf.FromContext(ctx)
-		if authCR.Spec.Config.ZenFrontDoor {
-			return subreconciler.ContinueReconciling()
-		}
-
-		reqLogger.Info("Zen front door not enabled")
+		reqLogger.Info("Removing ZenExtension")
 		observedZenExt := &zenv1.ZenExtension{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ImZenExtName,
@@ -283,10 +279,6 @@ func (r *AuthenticationReconciler) handleZenFrontDoor(ctx context.Context, req c
 		return
 	}
 	if !ctrlCommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
-		if authCR.Spec.Config.ZenFrontDoor {
-			subLogger.Info("The ZenExtension CRD must be installed before the Zen front door can be configured")
-			return subreconciler.ContinueReconciling()
-		}
 		subLogger.Info("ZenExtension resource is not supported; skipping")
 		return subreconciler.ContinueReconciling()
 	}
@@ -295,7 +287,6 @@ func (r *AuthenticationReconciler) handleZenFrontDoor(ctx context.Context, req c
 	//cluster_address_auth in the ibmcloud-cluster-info configmap
 	fns := []subreconciler.Fn{
 		r.removeZenExtension(authCR),
-		r.createOrUpdateZenExtension(authCR),
 	}
 
 	for _, fn := range fns {

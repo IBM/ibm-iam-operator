@@ -49,6 +49,8 @@ import (
 )
 
 const AnnotationSHA1Sum string = "authentication.operator.ibm.com/sha1sum"
+const ZenProductConfigmapName = "product-configmap"
+const URL_PREFIX = "URL_PREFIX"
 
 // handleConfigMaps is a subreconciler.FnWithRequest that handles the
 // reconciliation of all ConfigMaps created for a given Authentication.
@@ -733,7 +735,7 @@ func (r *AuthenticationReconciler) generateCNCFClusterInfo(ctx context.Context, 
 	clusterAddress := strings.Join([]string{strings.Join([]string{"cp-console", authCR.Namespace}, "-"), domainName}, ".")
 	clusterEndpoint := "https://" + clusterAddress
 	clusterAddressAuth := clusterAddress
-	if authCR.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
+	if shouldUseCPDHost(authCR, &r.DiscoveryClient) {
 		zenHost, err = r.getZenHost(ctx, authCR)
 		if err == nil {
 			clusterAddressAuth = zenHost
@@ -802,7 +804,7 @@ func (r *AuthenticationReconciler) generateOCPClusterInfo(ctx context.Context, a
 	clusterAddress := domainName
 	clusterEndpoint := "https://" + clusterAddress
 	clusterAddressAuth := clusterAddress
-	if authCR.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
+	if shouldUseCPDHost(authCR, &r.DiscoveryClient) {
 		zenHost, err = r.getZenHost(ctx, authCR)
 		if err == nil {
 			clusterAddressAuth = zenHost

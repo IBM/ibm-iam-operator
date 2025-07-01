@@ -203,6 +203,13 @@ spec:
                   icpPort:
                     format: int32
                     type: integer
+                  ingress:
+                    properties:
+                      hostname:
+                        type: string
+                      secret:
+                        type: string
+                    type: object
                   installType:
                     type: string
                   isOpenshiftEnv:

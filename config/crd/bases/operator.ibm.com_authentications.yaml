@@ -244,6 +244,13 @@ spec:
                     type: boolean
                   attrMappingFromConfig:
                     type: boolean
+                  ingress:
+                    properties:
+                      hostname:
+                        type: string
+                      secret:
+                        type: string
+                    type: object
                 required:
                 - authUniqueHosts
                 - clusterCADomain

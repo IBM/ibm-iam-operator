@@ -251,6 +251,7 @@ spec:
                       secret:
                         type: string
                     type: object
+                    x-kubernetes-preserve-unknown-fields: true
                 required:
                 - authUniqueHosts
                 - clusterCADomain

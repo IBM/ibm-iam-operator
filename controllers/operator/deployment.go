@@ -107,18 +107,20 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 	}
 
 	auditTLSSecret := &corev1.Secret{}
-	auditSecretExists := true
+	auditSecretExists := false
 	auditTLSSecretStruct := types.NamespacedName{Name: common.AuditTLSSecretName, Namespace: instance.Namespace}
 	err = r.Client.Get(context.TODO(), auditTLSSecretStruct, auditTLSSecret)
 	if errors.IsAlreadyExists(err) {
-		reqLogger.Error(err, "The secret is not found", "Secret.Name", common.AuditTLSSecretName)
-		auditSecretExists = false
+		reqLogger.Error(err, "The secret is found", "Secret.Name", common.AuditTLSSecretName)
+		auditSecretExists = true
 	}
+	reqLogger.Info("Does audit-tls secret exist? ", auditSecretExists)
 
 	// Check if this Deployment already exists
 	deployment := "platform-auth-service"
 	providerDeployment := "platform-identity-provider"
 	managerDeployment := "platform-identity-management"
+	reqLogger.Info("Does audit-tls secret exists", "Deployment.Namespace", instance.Namespace, "Secret.Name", auditSecretExists)
 
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: deployment, Namespace: instance.Namespace}, currentDeployment)
 	if err != nil {
@@ -1030,6 +1032,7 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretExis
 			},
 		},
 	}
+
 	if auditSecretExists && required {
 		volumes = EnsureVolumePresent(volumes, IMAuditTLSVolume())
 	}

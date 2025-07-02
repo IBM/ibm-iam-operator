@@ -260,6 +260,7 @@ spec:
                 - wlpClientRegistrationSecret
                 - wlpClientSecret
                 type: object
+                x-kubernetes-preserve-unknown-fields: true
               identityManager:
                 properties:
                   imageName:

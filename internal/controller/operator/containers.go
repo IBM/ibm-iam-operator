@@ -371,12 +371,8 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 				MountPath: "/certs/saml-certs",
 			},
 			{
-				Name:      "pgsql-ca-cert",
-				MountPath: "/certs/pgsql-ca",
-			},
-			{
-				Name:      "pgsql-client-cert",
-				MountPath: "/certs/pgsql-client",
+				Name:      "pgsql-certs",
+				MountPath: "/certs/pgsql",
 			},
 			{
 				Name:      "pgsql-client-cred",
@@ -719,12 +715,8 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 				MountPath: "/certs/saml-certs",
 			},
 			{
-				Name:      "pgsql-ca-cert",
-				MountPath: "/certs/pgsql-ca",
-			},
-			{
-				Name:      "pgsql-client-cert",
-				MountPath: "/certs/pgsql-client",
+				Name:      "pgsql-certs",
+				MountPath: "/certs/pgsql",
 			},
 			{
 				Name:      "pgsql-client-cred",
@@ -1080,12 +1072,8 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 				MountPath: "/opt/ibm/identity-mgmt/config/scim-config",
 			},
 			{
-				Name:      "pgsql-ca-cert",
-				MountPath: "/certs/pgsql-ca",
-			},
-			{
-				Name:      "pgsql-client-cert",
-				MountPath: "/certs/pgsql-client",
+				Name:      "pgsql-certs",
+				MountPath: "/certs/pgsql",
 			},
 			{
 				Name:      "pgsql-client-cred",

@@ -110,11 +110,14 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 	auditSecretExists := false
 	auditTLSSecretStruct := types.NamespacedName{Name: common.AuditTLSSecretName, Namespace: instance.Namespace}
 	err = r.Client.Get(context.TODO(), auditTLSSecretStruct, auditTLSSecret)
-	if errors.IsNotFound(err) {
-		reqLogger.Error(err, "The secret is found", "Secret.Name", common.AuditTLSSecretName)
-		auditSecretExists = false
-	} else {
-		auditSecretExists = true
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Error(err, "The secret is not found", "Secret.Name", common.AuditTLSSecretName)
+			auditSecretExists = false
+		} else {
+			reqLogger.Error(err, "The secret is found", "Secret.Name", common.AuditTLSSecretName)
+			auditSecretExists = true
+		}
 	}
 
 	// Check if this Deployment already exists

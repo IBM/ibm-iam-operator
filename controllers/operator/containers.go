@@ -1072,8 +1072,12 @@ func buildIdentityManagerVolumeMounts(auditSecretExists bool) []corev1.VolumeMou
 			MountPath: "/opt/ibm/identity-mgmt/config/scim-config",
 		},
 		{
-			Name:      "pgsql-certs",
-			MountPath: "/certs/pgsql",
+			Name:      "pgsql-client-cert",
+			MountPath: "/certs/pgsql-client",
+		},
+		{
+			Name:      "pgsql-ca-cert",
+			MountPath: "/certs/pgsql-ca",
 		},
 		{
 			Name:      "pgsql-client-cred",
@@ -1088,7 +1092,7 @@ func buildIdentityManagerVolumeMounts(auditSecretExists bool) []corev1.VolumeMou
 	return volumeMounts
 }
 
-func buildIdentityProviderVolumeMounts(ldapSpcExist bool) []corev1.VolumeMount {
+func buildIdentityProviderVolumeMounts(auditSecretExists bool) []corev1.VolumeMount {
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "auth-key",
@@ -1103,15 +1107,19 @@ func buildIdentityProviderVolumeMounts(ldapSpcExist bool) []corev1.VolumeMount {
 			MountPath: "/certs/saml-certs",
 		},
 		{
-			Name:      "pgsql-certs",
-			MountPath: "/certs/pgsql",
+			Name:      "pgsql-client-cert",
+			MountPath: "/certs/pgsql-client",
+		},
+		{
+			Name:      "pgsql-ca-cert",
+			MountPath: "/certs/pgsql-ca",
 		},
 		{
 			Name:      "pgsql-client-cred",
 			MountPath: "/pgsql/clientinfo",
 		},
 	}
-	if ldapSpcExist {
+	if auditSecretExists {
 		volumeMounts = EnsureVolumeMountPresent(volumeMounts, GetAuditCertsVolumeMount())
 
 	}

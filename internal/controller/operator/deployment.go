@@ -989,7 +989,7 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume
 			},
 		},
 		{
-			Name: "pgsql-ca-cert",
+			Name: "pgsql-certs",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName:  common.DatastoreEDBSecretName,

@@ -77,6 +77,14 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 	if !ok {
 		samlConsoleURL = icpConsoleURL
 	}
+	auditTLSSecret := &corev1.Secret{}
+	auditSecretExists := true
+	auditTLSSecretStruct := types.NamespacedName{Name: common.AuditTLSSecretName, Namespace: req.Namespace}
+	err = r.Client.Get(deployCtx, auditTLSSecretStruct, auditTLSSecret)
+	if k8sErrors.IsNotFound(err) {
+		reqLogger.Error(err, "The secret is not found", "Secret.Name", common.AuditTLSSecretName)
+		auditSecretExists = false
+	}
 
 	// Check for the presence of dependencies, for SAAS
 	reqLogger.Info("Is SAAS enabled?", "Instance spec config value", authCR.Spec.Config.IBMCloudSaas)
@@ -104,11 +112,11 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 			WithModifyFns(modifyDeployment(r.needsRollout)),
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-identity-management").
-			WithGenerateFns(generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, saasServiceIdCrn)).
+			WithGenerateFns(generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, saasServiceIdCrn, auditSecretExists)).
 			WithModifyFns(modifyDeployment(r.needsRollout)),
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-identity-provider").
-			WithGenerateFns(generatePlatformIdentityProvider(imagePullSecret, samlConsoleURL, saasServiceIdCrn)).
+			WithGenerateFns(generatePlatformIdentityProvider(imagePullSecret, samlConsoleURL, saasServiceIdCrn, auditSecretExists)).
 			WithModifyFns(modifyDeployment(r.needsRollout)),
 	}
 
@@ -328,7 +336,7 @@ func generatePlatformAuthService(imagePullSecret, icpConsoleURL, _ string) commo
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret),
+						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, false, false),
 						Containers:     buildContainers(authCR, authServiceImage, icpConsoleURL),
 						InitContainers: buildInitContainers(initContainerImage),
 					},
@@ -348,7 +356,7 @@ func generatePlatformAuthService(imagePullSecret, icpConsoleURL, _ string) commo
 	}
 }
 
-func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string, auditSecretExists bool) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		identityManagerImage := common.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
@@ -503,8 +511,8 @@ func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret),
-						Containers:     buildManagerContainers(authCR, identityManagerImage, icpConsoleURL),
+						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretExists, true),
+						Containers:     buildManagerContainers(authCR, identityManagerImage, icpConsoleURL, auditSecretExists),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
 				},
@@ -522,7 +530,7 @@ func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string
 	}
 }
 
-func generatePlatformIdentityProvider(imagePullSecret, icpConsoleURL, saasServiceIdCrn string) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformIdentityProvider(imagePullSecret, icpConsoleURL, saasServiceIdCrn string, auditSecretExists bool) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		identityProviderImage := common.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
@@ -678,8 +686,8 @@ func generatePlatformIdentityProvider(imagePullSecret, icpConsoleURL, saasServic
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret),
-						Containers:     buildProviderContainers(authCR, identityProviderImage, icpConsoleURL, saasServiceIdCrn),
+						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretExists, true),
+						Containers:     buildProviderContainers(authCR, identityProviderImage, icpConsoleURL, saasServiceIdCrn, auditSecretExists),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
 				},
@@ -842,8 +850,8 @@ func hasDataField(fields metav1.ManagedFieldsEntry) bool {
 	return false
 }
 
-func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume {
-	return []corev1.Volume{
+func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretExists bool, required bool) []corev1.Volume {
+	volumes := []corev1.Volume{
 		{
 			Name: "platform-identity-management",
 			VolumeSource: corev1.VolumeSource{
@@ -1051,4 +1059,47 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume
 			},
 		},
 	}
+
+	if auditSecretExists && required {
+		volumes = EnsureVolumePresent(volumes, IMAuditTLSVolume())
+	}
+	return volumes
+}
+
+// EnsureVolumeMountPresent checks if a volumeMount exists
+// If not, it appends the new volume and returns the updated slice.
+func EnsureVolumePresent(volumes []corev1.Volume, newVol corev1.Volume) []corev1.Volume {
+	for _, v := range volumes {
+		if v.Name == newVol.Name {
+			return volumes // already exists
+		}
+	}
+	return append(volumes, newVol)
+}
+
+func IMAuditTLSVolume() corev1.Volume {
+	vol := corev1.Volume{
+		Name: common.IMAuditTLSVolume,
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: common.AuditTLSSecretName,
+				Items: []corev1.KeyToPath{
+					{
+						Key:  "tls.crt",
+						Path: "tls.crt",
+					},
+					{
+						Key:  "tls.key",
+						Path: "tls.key",
+					},
+					{
+						Key:  "ca.crt",
+						Path: "ca.crt",
+					},
+				},
+				DefaultMode: &partialAccess,
+			},
+		},
+	}
+	return vol
 }

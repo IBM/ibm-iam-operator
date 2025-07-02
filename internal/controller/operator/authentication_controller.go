@@ -440,6 +440,21 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			}
 		}), builder.WithPredicates(predicate.Or(globalCMPred, productCMPred)),
 	)
+
+	authCtrl.Watches(&corev1.Secret{},
+		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
+			authCR, _ := ctrlcommon.GetAuthentication(ctx, r.Client)
+			if authCR == nil {
+				return
+			}
+			return []reconcile.Request{
+				{NamespacedName: types.NamespacedName{
+					Name:      authCR.Name,
+					Namespace: authCR.Namespace,
+				}},
+			}
+		}),
+	)
 	bootstrappedPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
 		return o.GetLabels()[ctrlcommon.ManagerVersionLabel] == version.Version
 	})

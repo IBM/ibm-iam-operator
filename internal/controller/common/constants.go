@@ -28,6 +28,10 @@ const DatastoreEDBCMName string = "im-datastore-edb-cm"
 // Name of Secret containing certificates for connecting to EDB
 const DatastoreEDBSecretName string = "im-datastore-edb-secret"
 
+// Name of Secret containing certificates for Common Audit Logging
+const AuditTLSSecretName string = "audit-tls"
+const IMAuditTLSVolume string = "audit-volume"
+
 // Name of the mongodb operator deployment name
 const MongoOprDeploymentName string = "ibm-mongodb-operator"
 

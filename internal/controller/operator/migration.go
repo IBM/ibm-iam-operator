@@ -252,6 +252,20 @@ func (r *AuthenticationReconciler) getPostgresDB(ctx context.Context, req ctrl.R
 		return nil, err
 	}
 
+	if datastoreCertSecret.Data["DATABASE_PASSWORD"] != nil {
+		return dbconn.NewPostgresDB(
+			dbconn.Name(datastoreCertCM.Data["DATABASE_NAME"]),
+			dbconn.ID(req.Namespace),
+			dbconn.Port(datastoreCertCM.Data["DATABASE_PORT"]),
+			dbconn.User(datastoreCertCM.Data["DATABASE_USER"]),
+			dbconn.Password(string(datastoreCertSecret.Data["DATABASE_PASSWORD"])),
+			dbconn.Host(datastoreCertCM.Data["DATABASE_RW_ENDPOINT"]),
+			dbconn.Schemas("platformdb", "oauthdbschema", "metadata"),
+			dbconn.TLSConfig(
+				datastoreCertSecret.Data["ca.crt"],
+				datastoreCertSecret.Data["tls.crt"],
+				datastoreCertSecret.Data["tls.key"]))
+	}
 	return dbconn.NewPostgresDB(
 		dbconn.Name(datastoreCertCM.Data["DATABASE_NAME"]),
 		dbconn.ID(req.Namespace),

@@ -268,6 +268,11 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 					currentConfigMap.Data["PREFERRED_LOGIN"] = newConfigMap.Data["PREFERRED_LOGIN"]
 					cmUpdateRequired = true
 				}
+				if val, keyExists := currentConfigMap.Data["AUDIT_URL"]; !keyExists || val != newConfigMap.Data["AUDIT_URL"] {
+					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					currentConfigMap.Data["AUDIT_URL"] = newConfigMap.Data["AUDIT_URL"]
+					cmUpdateRequired = true
+				}
 				if val, keyExists := currentConfigMap.Data["MASTER_HOST"]; !keyExists || val != newConfigMap.Data["MASTER_HOST"] {
 					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					currentConfigMap.Data["MASTER_HOST"] = newConfigMap.Data["MASTER_HOST"]

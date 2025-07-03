@@ -393,7 +393,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 
 }
 
-func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string, saasCRNId string, auditSecretExists bool) corev1.Container {
+func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string, saasCRNId string, auditSecretExists bool, auditURL string) corev1.Container {
 
 	resources := instance.Spec.IdentityProvider.Resources
 	if resources == nil {
@@ -414,6 +414,10 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		{
 			Name:  "SERVICE_NAME",
 			Value: "platform-identity-provider",
+		},
+		{
+			Name:  "AUDIT_URL",
+			Value: auditURL,
 		},
 		{
 			Name: "AUDIT_ENABLED",
@@ -684,7 +688,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 
 }
 
-func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string, icpConsoleURL string, auditSecretExists bool) corev1.Container {
+func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string, icpConsoleURL string, auditSecretExists bool, auditURL string) corev1.Container {
 
 	replicaCount := int(instance.Spec.Replicas)
 	resources := instance.Spec.IdentityManager.Resources
@@ -715,6 +719,10 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		{
 			Name:  "SERVICE_NAME",
 			Value: "platform-identity-management",
+		},
+		{
+			Name:  "AUDIT_URL",
+			Value: auditURL,
 		},
 		{
 			Name: "AUDIT_ENABLED",
@@ -1005,14 +1013,14 @@ func buildContainers(instance *operatorv1alpha1.Authentication, authServiceImage
 
 func buildManagerContainers(instance *operatorv1alpha1.Authentication, identityManagerImage string, icpConsoleURL string, auditSecretExists bool) []corev1.Container {
 
-	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL, auditSecretExists)
+	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL, auditSecretExists, auditURL)
 
 	return []corev1.Container{identityManagerContainer}
 }
 
-func buildProviderContainers(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string, saasCrnId string, auditSecretExists bool) []corev1.Container {
+func buildProviderContainers(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string, saasCrnId string, auditSecretExists bool, auditURL string) []corev1.Container {
 
-	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId, auditSecretExists)
+	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId, auditSecretExists, auditURL)
 
 	return []corev1.Container{identityProviderContainer}
 }

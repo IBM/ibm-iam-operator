@@ -34,10 +34,6 @@ const MongoStatefulsetName string = "icp-mongodb"
 // Name of CommonService created by IM Operator to provision EDB share
 const DatastoreEDBCSName string = "im-common-service"
 
-// Name of Secret containing certificates for Common Audit Logging
-const AuditTLSSecretName string = "audit-tls"
-const IMAuditTLSVolume string = "audit-volume"
-
 type DeploymentName string
 
 // The current names of Deployments managed by this Operator

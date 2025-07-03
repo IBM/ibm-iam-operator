@@ -33,6 +33,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+// Name of Secret containing certificates for Common Audit Logging
+const AuditTLSSecretName string = "audit-tls"
+
 func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.Authentication, currentDeployment *appsv1.Deployment, currentProviderDeployment *appsv1.Deployment, currentManagerDeployment *appsv1.Deployment, needToRequeue *bool) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
@@ -94,7 +97,7 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 	if instance.Spec.Config.IBMCloudSaas {
 		err := r.Client.Get(context.TODO(), types.NamespacedName{Name: saasTenantConfigMapName, Namespace: instance.Namespace}, saasTenantConfigMap)
 		if err != nil {
-			if errors.IsNotFound(err) {
+			if err != nil && errors.IsNotFound(err) {
 				reqLogger.Error(err, "SAAS is enabled, waiting for the configmap ", saasTenantConfigMapName, " to be created")
 				return err
 			} else {
@@ -108,23 +111,22 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 
 	auditTLSSecret := &corev1.Secret{}
 	auditSecretExists := false
-	auditTLSSecretStruct := types.NamespacedName{Name: common.AuditTLSSecretName, Namespace: instance.Namespace}
+	auditTLSSecretStruct := types.NamespacedName{Name: AuditTLSSecretName, Namespace: instance.Namespace}
 	err = r.Client.Get(context.TODO(), auditTLSSecretStruct, auditTLSSecret)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			reqLogger.Error(err, "The secret is not found", "Secret.Name", common.AuditTLSSecretName)
-			auditSecretExists = false
-		} else {
-			reqLogger.Error(err, "The secret is found", "Secret.Name", common.AuditTLSSecretName)
-			auditSecretExists = true
-		}
+	if err != nil && errors.IsNotFound(err) {
+		reqLogger.Error(err, "There was an unexpected error while trying to retrieve the TLS Secret for audit", "Secret.Name", AuditTLSSecretName)
+		auditSecretExists = false
+	} else {
+		reqLogger.Error(err, "The TLS Secret for audit was found", "Secret.Name", AuditTLSSecretName)
+		auditSecretExists = true
 	}
 
 	// Check if this Deployment already exists
 	deployment := "platform-auth-service"
 	providerDeployment := "platform-identity-provider"
 	managerDeployment := "platform-identity-management"
-	reqLogger.Info("Does audit-tls secret exists", "Deployment.Namespace", instance.Namespace, "Secret.Name", auditSecretExists)
+	reqLogger.Info("audit-tls secret name", "Deployment.Namespace", instance.Namespace, "Secret.Name", AuditTLSSecretName)
+	reqLogger.Info("Does audit-tls secret exist?", "Deployment.Namespace", instance.Namespace, "Secret exists", auditSecretExists)
 
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: deployment, Namespace: instance.Namespace}, currentDeployment)
 	if err != nil {
@@ -838,6 +840,29 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 }
 
 func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretExists bool, required bool) []corev1.Volume {
+	auditVolume := corev1.Volume{
+		Name: IMAuditTLSVolume,
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: AuditTLSSecretName,
+				Items: []corev1.KeyToPath{
+					{
+						Key:  "tls.crt",
+						Path: "tls.crt",
+					},
+					{
+						Key:  "tls.key",
+						Path: "tls.key",
+					},
+					{
+						Key:  "ca.crt",
+						Path: "ca.crt",
+					},
+				},
+				DefaultMode: &partialAccess,
+			},
+		},
+	}
 	volumes := []corev1.Volume{
 		{
 			Name: "platform-identity-management",
@@ -1038,7 +1063,7 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretExis
 	}
 
 	if auditSecretExists && required {
-		volumes = EnsureVolumePresent(volumes, IMAuditTLSVolume())
+		volumes = EnsureVolumePresent(volumes, auditVolume)
 	}
 	return volumes
 }
@@ -1052,31 +1077,4 @@ func EnsureVolumePresent(volumes []corev1.Volume, newVol corev1.Volume) []corev1
 		}
 	}
 	return append(volumes, newVol)
-}
-
-func IMAuditTLSVolume() corev1.Volume {
-	vol := corev1.Volume{
-		Name: common.IMAuditTLSVolume,
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName: common.AuditTLSSecretName,
-				Items: []corev1.KeyToPath{
-					{
-						Key:  "tls.crt",
-						Path: "tls.crt",
-					},
-					{
-						Key:  "tls.key",
-						Path: "tls.key",
-					},
-					{
-						Key:  "ca.crt",
-						Path: "ca.crt",
-					},
-				},
-				DefaultMode: &partialAccess,
-			},
-		},
-	}
-	return vol
 }

@@ -33,9 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-// Name of Secret containing certificates for Common Audit Logging
-const AuditTLSSecretName string = "audit-tls"
-
 func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.Authentication, currentDeployment *appsv1.Deployment, currentProviderDeployment *appsv1.Deployment, currentManagerDeployment *appsv1.Deployment, needToRequeue *bool) error {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
@@ -544,7 +541,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 	return idpDeployment
 }
 
-func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string, saasCrnId string, auditSecretExists bool) *appsv1.Deployment {
+func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string, saasCrnId string, auditSecretExists bool, auditSecretName string) *appsv1.Deployment {
 
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	identityProviderImage := common.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
@@ -691,8 +688,8 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 							Operator: corev1.TolerationOpExists,
 						},
 					},
-					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretExists, true),
-					Containers:     buildProviderContainers(instance, identityProviderImage, icpConsoleURL, saasCrnId, auditSecretExists),
+					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretExists, true, auditSecretName),
+					Containers:     buildProviderContainers(instance, identityProviderImage, icpConsoleURL, saasCrnId, auditSecretExists, auditSecretName),
 					InitContainers: buildInitForMngrAndProvider(initContainerImage),
 				},
 			},
@@ -707,7 +704,7 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 	return idpDeployment
 }
 
-func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string, saasCrnId string, auditSecretExists bool) *appsv1.Deployment {
+func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string, saasCrnId string, auditSecretExists bool, auditSecretName string) *appsv1.Deployment {
 
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	identityManagerImage := common.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
@@ -854,8 +851,8 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 							Operator: corev1.TolerationOpExists,
 						},
 					},
-					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretExists, true),
-					Containers:     buildManagerContainers(instance, identityManagerImage, icpConsoleURL, auditSecretExists),
+					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretExists, true, auditSecretName),
+					Containers:     buildManagerContainers(instance, identityManagerImage, icpConsoleURL, auditSecretExists, auditSecretName),
 					InitContainers: buildInitForMngrAndProvider(initContainerImage),
 				},
 			},
@@ -870,12 +867,12 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 	return idpDeployment
 }
 
-func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretExists bool, required bool) []corev1.Volume {
+func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretExists bool, required bool, auditSecretName string) []corev1.Volume {
 	auditVolume := corev1.Volume{
 		Name: IMAuditTLSVolume,
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
-				SecretName: AuditTLSSecretName,
+				SecretName: auditSecretName,
 				Items: []corev1.KeyToPath{
 					{
 						Key:  "tls.crt",

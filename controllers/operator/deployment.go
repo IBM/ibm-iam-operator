@@ -129,6 +129,7 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 		if auditURL, ok = authIdpConfigMap.Data["AUDIT_URL"]; !ok {
 			reqLogger.Info("Audit url is not specified in the auth idp configmap", authIdpConfigMapName)
 		}
+		reqLogger.Info("Fetched audit url and audit secret from auth-idp configmap", auditSecretName, auditURL)
 		if len(auditSecretName) == 0 || len(auditURL) == 0 {
 			reqLogger.Info("Unable to fetch the audit url and audit secret from auth-idp configmap", authIdpConfigMapName)
 		} else if len(auditSecretName) > 0 {

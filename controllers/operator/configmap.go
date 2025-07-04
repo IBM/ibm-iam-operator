@@ -273,11 +273,6 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 					currentConfigMap.Data["AUDIT_URL"] = newConfigMap.Data["AUDIT_URL"]
 					cmUpdateRequired = true
 				}
-				if val, keyExists := currentConfigMap.Data["AUDIT_SECRET"]; !keyExists || val != newConfigMap.Data["AUDIT_SECRET"] {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["AUDIT_SECRET"] = newConfigMap.Data["AUDIT_SECRET"]
-					cmUpdateRequired = true
-				}
 				if val, keyExists := currentConfigMap.Data["MASTER_HOST"]; !keyExists || val != newConfigMap.Data["MASTER_HOST"] {
 					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					currentConfigMap.Data["MASTER_HOST"] = newConfigMap.Data["MASTER_HOST"]
@@ -544,7 +539,7 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 	// Set the path for SAML connections
 	masterPath := "/idauth"
 
-	auditURL, auditSecret := getAuditEndpointDetails(r.Client, instance.Namespace, "audit-endpoint")
+	auditURL := getAuditEndpointDetails(r.Client, instance.Namespace, "audit-endpoint")
 
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -563,7 +558,6 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 			"MASTER_HOST":                        clusterAddress,
 			"MASTER_PATH":                        masterPath,
 			"AUDIT_URL":                          auditURL,
-			"AUDIT_SECRET":                       auditSecret,
 			"NODE_ENV":                           "production",
 			"AUDIT_ENABLED_IDPROVIDER":           "false",
 			"AUDIT_ENABLED_IDMGMT":               "false",
@@ -981,40 +975,43 @@ func getClusterAddress(client client.Client, namespace string, configMap string)
 }
 
 // Check if hosted on IBM Cloud
-func getAuditEndpointDetails(client client.Client, namespace string, configMap string) (string, string) {
+func getAuditEndpointDetails(client client.Client, namespace string, configMap string) string {
 	var auditURL string
 	var auditSecretName string
 	// Check for the presence of audit-endpoint configmap
 	auditConfigMapName := "audit-endpoint"
 	auditConfigMap := &corev1.ConfigMap{}
-	err := client.Get(context.TODO(), types.NamespacedName{Name: auditConfigMapName, Namespace: namespace}, auditConfigMap)
-	if err != nil && k8sErrors.IsNotFound(err) {
-		log.Error(err, "The configmap ", auditConfigMapName, " is not created yet")
-		// no requeue required
-	} else {
-		auditURL = auditConfigMap.Data["audit-url"]
-		auditSecretName = auditConfigMap.Data["audit-secret"]
-		if len(auditSecretName) == 0 || len(auditURL) == 0 {
-			log.Info("Fetched details from Audit Endpoint configmap", auditURL, auditSecretName)
+	if err := client.Get(context.TODO(), types.NamespacedName{Name: auditConfigMapName, Namespace: namespace}, auditConfigMap); err != nil {
+		if k8sErrors.IsNotFound(err) {
+			log.Error(err, "The configmap ", auditConfigMapName, " is not created yet")
+			// no requeue required
 		}
-		if len(auditSecretName) > 0 && CheckSecretExists(client, namespace, auditSecretName) {
-			return auditURL, auditSecretName
-		}
+		log.Error(err, "Failed to get Audit endpoint configmap", "Secret.Name", auditConfigMapName)
+		return ""
 	}
-	return "", ""
+	auditURL = auditConfigMap.Data["audit-url"]
+	auditSecretName = auditConfigMap.Data["audit-secret"]
+	if len(auditSecretName) == 0 || len(auditURL) == 0 {
+		log.Info("Fetched details from Audit Endpoint configmap", auditURL, auditSecretName)
+	}
+	if len(auditSecretName) > 0 && CheckSecretExists(client, namespace, auditSecretName) {
+		return auditURL
+	}
+	return ""
 }
 
 func CheckSecretExists(client client.Client, namespace string, auditSecretName string) bool {
 	auditTLSSecret := &corev1.Secret{}
 	auditTLSSecretStruct := types.NamespacedName{Name: auditSecretName, Namespace: namespace}
-	err := client.Get(context.TODO(), auditTLSSecretStruct, auditTLSSecret)
-	if err != nil && k8sErrors.IsNotFound(err) {
-		log.Error(err, "There was an unexpected error while trying to retrieve the TLS Secret for audit", "Secret.Name", AuditTLSSecretName)
-		return false
-	} else {
-		log.Error(err, "The TLS Secret for audit was found", "Secret.Name", auditSecretName)
-		return true
+	if err := client.Get(context.TODO(), auditTLSSecretStruct, auditTLSSecret); err != nil {
+		if k8sErrors.IsNotFound(err) {
+			log.Error(err, "There was an unexpected error while trying to retrieve the TLS Secret for audit", "Secret.Name", AuditTLSSecretName)
+			return false
+		}
+		log.Error(err, "Failed to get Audit TLS secret specified in the Audit Endpoint configmap", "Secret.Name", auditSecretName)
 	}
+	log.Info("The TLS Secret specified in the Audit Endpoint configmap was found", "Secret.Name", auditSecretName)
+	return true
 }
 
 func readROKSURL(instance *operatorv1alpha1.Authentication) (string, error) {

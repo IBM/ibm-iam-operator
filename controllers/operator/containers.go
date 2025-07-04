@@ -1087,8 +1087,11 @@ func buildIdentityManagerVolumeMounts(auditSecretExists bool) []corev1.VolumeMou
 		},
 	}
 	if auditSecretExists {
-		volumeMounts = EnsureVolumeMountPresent(volumeMounts, GetAuditCertsVolumeMount())
-
+		newVolMount := corev1.VolumeMount{
+			Name:      IMAuditTLSVolume,
+			MountPath: "/certs/audit-tls",
+		}
+		volumeMounts = append(volumeMounts, newVolMount)
 	}
 
 	return volumeMounts
@@ -1122,28 +1125,12 @@ func buildIdentityProviderVolumeMounts(auditSecretExists bool) []corev1.VolumeMo
 		},
 	}
 	if auditSecretExists {
-		volumeMounts = EnsureVolumeMountPresent(volumeMounts, GetAuditCertsVolumeMount())
-
-	}
-
-	return volumeMounts
-}
-
-// EnsureVolumeMountPresent checks if a volumeMount exists
-// If not, it appends the new volume and returns the updated slice.
-func EnsureVolumeMountPresent(volumeMounts []corev1.VolumeMount, newVolMount corev1.VolumeMount) []corev1.VolumeMount {
-	for _, v := range volumeMounts {
-		if v.Name == newVolMount.Name {
-			return volumeMounts // already exists
+		newVolMount := corev1.VolumeMount{
+			Name:      IMAuditTLSVolume,
+			MountPath: "/certs/audit-tls",
 		}
-	}
-	return append(volumeMounts, newVolMount)
-}
+		volumeMounts = append(volumeMounts, newVolMount)
 
-func GetAuditCertsVolumeMount() corev1.VolumeMount {
-	volMount := corev1.VolumeMount{
-		Name:      IMAuditTLSVolume,
-		MountPath: "/certs/audit-tls",
 	}
-	return volMount
+	return volumeMounts
 }

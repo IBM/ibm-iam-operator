@@ -988,21 +988,20 @@ func getAuditEndpointDetails(client client.Client, namespace string, configMap s
 	auditConfigMapName := "audit-endpoint"
 	auditConfigMap := &corev1.ConfigMap{}
 	err := client.Get(context.TODO(), types.NamespacedName{Name: auditConfigMapName, Namespace: namespace}, auditConfigMap)
-	if err != nil {
-		if k8sErrors.IsNotFound(err) {
-			log.Error(err, "The configmap ", auditConfigMapName, " is not created yet")
-			// no requeue required
-		} else {
-			log.Error(err, "Failed to get ConfigMap", auditConfigMapName)
-			auditURL = auditConfigMap.Data["audit-url"]
-			auditSecretName = auditConfigMap.Data["audit-secret"]
-			if CheckSecretExists(client, namespace, auditSecretName) {
-				return auditURL, auditSecretName
-			}
+	if err != nil && k8sErrors.IsNotFound(err) {
+		log.Error(err, "The configmap ", auditConfigMapName, " is not created yet")
+		// no requeue required
+	} else {
+		auditURL = auditConfigMap.Data["audit-url"]
+		auditSecretName = auditConfigMap.Data["audit-secret"]
+		if len(auditSecretName) == 0 || len(auditURL) == 0 {
+			log.Info("Fetched details from Audit Endpoint configmap", auditURL, auditSecretName)
+		}
+		if len(auditSecretName) > 0 && CheckSecretExists(client, namespace, auditSecretName) {
+			return auditURL, auditSecretName
 		}
 	}
 	return "", ""
-
 }
 
 func CheckSecretExists(client client.Client, namespace string, auditSecretName string) bool {

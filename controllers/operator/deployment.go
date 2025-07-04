@@ -111,20 +111,21 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 
 	var auditSecretExists bool
 	var auditSecretName string
+	var auditURL string
 	// Check for the presence of audit-endpoint configmap
 	auditConfigMapName := "audit-endpoint"
 	auditConfigMap := &corev1.ConfigMap{}
 	err1 := r.Client.Get(context.TODO(), types.NamespacedName{Name: auditConfigMapName, Namespace: instance.Namespace}, auditConfigMap)
-	if err1 != nil {
-		if errors.IsNotFound(err1) {
-			reqLogger.Error(err1, "The  Audit Endpoint configmap ", auditConfigMapName, " is not created yet")
-			// no requeue required
-		} else {
-			reqLogger.Error(err1, "Failed to get Audit Endpoint configMap", auditConfigMapName)
-			auditSecretName = consoleConfigMap.Data["audit-secret"]
-			if CheckSecretExists(r.Client, instance.Namespace, auditSecretName) {
-				auditSecretExists = true
-			}
+	if err1 != nil && errors.IsNotFound(err1) {
+		reqLogger.Error(err1, "The  Audit Endpoint configmap ", auditConfigMapName, " is not created yet")
+		// no requeue required
+	} else {
+		auditSecretName = auditConfigMap.Data["audit-secret"]
+		auditURL = auditConfigMap.Data["audit-url"]
+		if len(auditSecretName) == 0 || len(auditURL) == 0 {
+			reqLogger.Error(err1, "Unable to fetch the Audit Endpoint configmap details", auditConfigMapName)
+		} else if len(auditSecretName) > 0 && CheckSecretExists(r.Client, instance.Namespace, auditSecretName) {
+			auditSecretExists = true
 		}
 	}
 

@@ -268,16 +268,6 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 					currentConfigMap.Data["PREFERRED_LOGIN"] = newConfigMap.Data["PREFERRED_LOGIN"]
 					cmUpdateRequired = true
 				}
-				if _, keyExists := currentConfigMap.Data["AUDIT_URL"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["AUDIT_URL"] = newConfigMap.Data["AUDIT_URL"]
-					cmUpdateRequired = true
-				}
-				if _, keyExists := currentConfigMap.Data["AUDIT_SECRET"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["AUDIT_SECRET"] = newConfigMap.Data["AUDIT_SECRET"]
-					cmUpdateRequired = true
-				}
 				if val, keyExists := currentConfigMap.Data["MASTER_HOST"]; !keyExists || val != newConfigMap.Data["MASTER_HOST"] {
 					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					currentConfigMap.Data["MASTER_HOST"] = newConfigMap.Data["MASTER_HOST"]
@@ -974,18 +964,6 @@ func getClusterAddress(client client.Client, namespace string, configMap string)
 		return host, nil
 	}
 	return "", errors.New(fmt.Sprint("failed to fetch the cluster address"))
-}
-
-func CheckSecretExists(client client.Client, namespace string, auditSecretName string) (bool, error) {
-	auditTLSSecret := &corev1.Secret{}
-	auditTLSSecretStruct := types.NamespacedName{Name: auditSecretName, Namespace: namespace}
-	err := client.Get(context.TODO(), auditTLSSecretStruct, auditTLSSecret)
-	if k8sErrors.IsNotFound(err) {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-	return true, nil
 }
 
 func readROKSURL(instance *operatorv1alpha1.Authentication) (string, error) {

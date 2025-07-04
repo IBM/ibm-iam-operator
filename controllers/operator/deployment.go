@@ -133,7 +133,7 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 		if len(auditSecretName) == 0 || len(auditURL) == 0 {
 			reqLogger.Info("Unable to fetch the audit url and audit secret from auth-idp configmap", authIdpConfigMapName)
 		} else if len(auditSecretName) > 0 {
-			auditSecretExists, err = CheckSecretExists(r.Client, instance.Namespace, auditSecretName)
+			auditSecretExists, err = checkSecretExists(r.Client, instance.Namespace, auditSecretName)
 			if err != nil {
 				return err
 			}
@@ -354,6 +354,18 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 	reqLogger.Info("Skip reconcile: Provider deployment already exists", "Deployment.Namespace", instance.Namespace, "Deployment.Name", providerDeployment)
 	return nil
 
+}
+
+func checkSecretExists(client client.Client, namespace string, auditSecretName string) (bool, error) {
+	auditTLSSecret := &corev1.Secret{}
+	auditTLSSecretStruct := types.NamespacedName{Name: auditSecretName, Namespace: namespace}
+	err := client.Get(context.TODO(), auditTLSSecretStruct, auditTLSSecret)
+	if errors.IsNotFound(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func getPodNames(pods []corev1.Pod) []string {

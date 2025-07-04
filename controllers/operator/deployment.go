@@ -110,29 +110,40 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 	}
 
 	var auditSecretExists bool
+	var auditSecretName string
+	var auditURL string
+	var ok bool
 	// Check for the presence of audit-endpoint configmap
-	auditConfigMapName := "audit-endpoint"
-	auditConfigMap := &corev1.ConfigMap{}
-	if err1 := r.Client.Get(context.TODO(), types.NamespacedName{Name: auditConfigMapName, Namespace: instance.Namespace}, auditConfigMap); err1 != nil {
+	authIdpConfigMapName := "platform-auth-idp"
+	authIdpConfigMap := &corev1.ConfigMap{}
+	if err1 := r.Client.Get(context.TODO(), types.NamespacedName{Name: authIdpConfigMapName, Namespace: instance.Namespace}, authIdpConfigMap); err1 != nil {
 		if errors.IsNotFound(err1) {
-			reqLogger.Error(err1, "The  Audit Endpoint configmap ", auditConfigMapName, " is not created yet")
+			reqLogger.Error(err1, "The  Auth-idp configmap ", authIdpConfigMapName, " is not found.")
 			// no requeue required
 		}
-		reqLogger.Error(err1, "Failed to get Audit Endpoint configmap ", auditConfigMapName)
-	}
-	auditSecretName := auditConfigMap.Data["audit-secret"]
-	auditURL := auditConfigMap.Data["audit-url"]
-	if len(auditSecretName) == 0 || len(auditURL) == 0 {
-		reqLogger.Info("Unable to fetch the audit url and audit secret from audit configmap", auditConfigMapName)
-	} else if len(auditSecretName) > 0 && CheckSecretExists(r.Client, instance.Namespace, auditSecretName) {
-		auditSecretExists = true
+		reqLogger.Error(err1, "Failed to get Auth-idp configmap ", authIdpConfigMapName)
+	} else {
+		if auditSecretName, ok = authIdpConfigMap.Data["AUDIT_SECRET"]; !ok {
+			reqLogger.Info("Audit secret is not specified in the auth idp configmap", authIdpConfigMapName)
+		}
+		if auditURL, ok = authIdpConfigMap.Data["AUDIT_URL"]; !ok {
+			reqLogger.Info("Audit url is not specified in the auth idp configmap", authIdpConfigMapName)
+		}
+		if len(auditSecretName) == 0 || len(auditURL) == 0 {
+			reqLogger.Info("Unable to fetch the audit url and audit secret from auth-idp configmap", authIdpConfigMapName)
+		} else if len(auditSecretName) > 0 {
+			auditSecretExists, err = CheckSecretExists(r.Client, instance.Namespace, auditSecretName)
+			if err != nil {
+				return err
+			}
+			reqLogger.Info("audit-tls secret name", "Deployment.Namespace", instance.Namespace, "Secret.Name", auditSecretName)
+		}
 	}
 
 	// Check if this Deployment already exists
 	deployment := "platform-auth-service"
 	providerDeployment := "platform-identity-provider"
 	managerDeployment := "platform-identity-management"
-	reqLogger.Info("audit-tls secret name", "Deployment.Namespace", instance.Namespace, "Secret.Name", auditSecretName)
 	reqLogger.Info("Does audit-tls secret exist?", "Deployment.Namespace", instance.Namespace, "Secret exists", auditSecretExists)
 
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: deployment, Namespace: instance.Namespace}, currentDeployment)

@@ -273,6 +273,11 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 					currentConfigMap.Data["AUDIT_URL"] = newConfigMap.Data["AUDIT_URL"]
 					cmUpdateRequired = true
 				}
+				if val, keyExists := currentConfigMap.Data["AUDIT_SECRET"]; !keyExists || val != newConfigMap.Data["AUDIT_SECRET"] {
+					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					currentConfigMap.Data["AUDIT_SECRET"] = newConfigMap.Data["AUDIT_SECRET"]
+					cmUpdateRequired = true
+				}
 				if val, keyExists := currentConfigMap.Data["MASTER_HOST"]; !keyExists || val != newConfigMap.Data["MASTER_HOST"] {
 					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 					currentConfigMap.Data["MASTER_HOST"] = newConfigMap.Data["MASTER_HOST"]
@@ -539,8 +544,6 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 	// Set the path for SAML connections
 	masterPath := "/idauth"
 
-	auditURL := getAuditEndpointDetails(r.Client, instance.Namespace, "audit-endpoint")
-
 	newConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform-auth-idp",
@@ -557,7 +560,6 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 			"IDENTITY_MGMT_URL":                  "https://platform-identity-management:4500",
 			"MASTER_HOST":                        clusterAddress,
 			"MASTER_PATH":                        masterPath,
-			"AUDIT_URL":                          auditURL,
 			"NODE_ENV":                           "production",
 			"AUDIT_ENABLED_IDPROVIDER":           "false",
 			"AUDIT_ENABLED_IDMGMT":               "false",
@@ -974,44 +976,16 @@ func getClusterAddress(client client.Client, namespace string, configMap string)
 	return "", errors.New(fmt.Sprint("failed to fetch the cluster address"))
 }
 
-// Check if hosted on IBM Cloud
-func getAuditEndpointDetails(client client.Client, namespace string, configMap string) string {
-	var auditURL string
-	var auditSecretName string
-	// Check for the presence of audit-endpoint configmap
-	auditConfigMapName := "audit-endpoint"
-	auditConfigMap := &corev1.ConfigMap{}
-	if err := client.Get(context.TODO(), types.NamespacedName{Name: auditConfigMapName, Namespace: namespace}, auditConfigMap); err != nil {
-		if k8sErrors.IsNotFound(err) {
-			log.Error(err, "The configmap ", auditConfigMapName, " is not created yet")
-			// no requeue required
-		}
-		log.Error(err, "Failed to get Audit endpoint configmap", "Secret.Name", auditConfigMapName)
-		return ""
-	}
-	auditURL = auditConfigMap.Data["audit-url"]
-	auditSecretName = auditConfigMap.Data["audit-secret"]
-	if len(auditSecretName) == 0 || len(auditURL) == 0 {
-		log.Info("Fetched details from Audit Endpoint configmap", auditURL, auditSecretName)
-	}
-	if len(auditSecretName) > 0 && CheckSecretExists(client, namespace, auditSecretName) {
-		return auditURL
-	}
-	return ""
-}
-
-func CheckSecretExists(client client.Client, namespace string, auditSecretName string) bool {
+func CheckSecretExists(client client.Client, namespace string, auditSecretName string) (bool, error) {
 	auditTLSSecret := &corev1.Secret{}
 	auditTLSSecretStruct := types.NamespacedName{Name: auditSecretName, Namespace: namespace}
-	if err := client.Get(context.TODO(), auditTLSSecretStruct, auditTLSSecret); err != nil {
-		if k8sErrors.IsNotFound(err) {
-			log.Error(err, "There was an unexpected error while trying to retrieve the TLS Secret for audit", "Secret.Name", AuditTLSSecretName)
-			return false
-		}
-		log.Error(err, "Failed to get Audit TLS secret specified in the Audit Endpoint configmap", "Secret.Name", auditSecretName)
+	err := client.Get(context.TODO(), auditTLSSecretStruct, auditTLSSecret)
+	if k8sErrors.IsNotFound(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
 	}
-	log.Info("The TLS Secret specified in the Audit Endpoint configmap was found", "Secret.Name", auditSecretName)
-	return true
+	return true, nil
 }
 
 func readROKSURL(instance *operatorv1alpha1.Authentication) (string, error) {

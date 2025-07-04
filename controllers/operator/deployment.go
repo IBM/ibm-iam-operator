@@ -94,7 +94,7 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 	if instance.Spec.Config.IBMCloudSaas {
 		err := r.Client.Get(context.TODO(), types.NamespacedName{Name: saasTenantConfigMapName, Namespace: instance.Namespace}, saasTenantConfigMap)
 		if err != nil {
-			if err != nil && errors.IsNotFound(err) {
+			if errors.IsNotFound(err) {
 				reqLogger.Error(err, "SAAS is enabled, waiting for the configmap ", saasTenantConfigMapName, " to be created")
 				return err
 			} else {
@@ -106,7 +106,6 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 		saasServiceIdCrn = saasTenantConfigMap.Data["service_crn_id"]
 	}
 
-	var auditSecretExists bool
 	var auditSecretName string
 	var auditURL string
 	var ok bool
@@ -130,9 +129,9 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 		if len(auditSecretName) == 0 || len(auditURL) == 0 {
 			reqLogger.Info("Unable to fetch the audit url and audit secret from auth-idp configmap", authIdpConfigMapName)
 		} else if len(auditSecretName) > 0 {
-			auditSecretExists, err = checkSecretExists(r.Client, instance.Namespace, auditSecretName)
-			if err != nil {
-				return err
+			_, err2 := checkSecretExists(r.Client, instance.Namespace, auditSecretName)
+			if err2 != nil {
+				return err2
 			}
 			reqLogger.Info("audit-tls secret name", "Deployment.Namespace", instance.Namespace, "Secret.Name", auditSecretName)
 		}
@@ -142,7 +141,7 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 	deployment := "platform-auth-service"
 	providerDeployment := "platform-identity-provider"
 	managerDeployment := "platform-identity-management"
-	reqLogger.Info("Does audit-tls secret exist?", "Deployment.Namespace", instance.Namespace, "Secret exists", auditSecretExists)
+	reqLogger.Info("Does audit-tls secret exist?", "Deployment.Namespace", instance.Namespace, "Secret exists", auditSecretName)
 
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: deployment, Namespace: instance.Namespace}, currentDeployment)
 	if err != nil {
@@ -213,7 +212,7 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 			reqLogger.Info("Creating a new Manager Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", currentManagerDeployment)
 			reqLogger.Info("SAAS tenant configmap was found", "Creating manager deployment with value from configmap", saasTenantConfigMapName)
 			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", managerDeployment)
-			newManagerDeployment := generateManagerDeploymentObject(instance, r.Scheme, managerDeployment, icpConsoleURL, saasServiceIdCrn, auditSecretExists, auditSecretName)
+			newManagerDeployment := generateManagerDeploymentObject(instance, r.Scheme, managerDeployment, icpConsoleURL, saasServiceIdCrn, auditSecretName)
 			err = r.Client.Create(context.TODO(), newManagerDeployment)
 			if err != nil {
 				return err
@@ -226,7 +225,7 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 	} else {
 		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentManagerDeployment.Namespace, "Deployment.Name", currentManagerDeployment.Name)
 		reqLogger.Info("SAAS tenant configmap was found", "Updating deployment with value from configmap", saasTenantConfigMapName)
-		ocwDep := generateManagerDeploymentObject(instance, r.Scheme, managerDeployment, icpConsoleURL, saasServiceIdCrn, auditSecretExists, auditSecretName)
+		ocwDep := generateManagerDeploymentObject(instance, r.Scheme, managerDeployment, icpConsoleURL, saasServiceIdCrn, auditSecretName)
 		certmanagerLabel := "certmanager.k8s.io/time-restarted"
 		if val, ok := currentManagerDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
 			ocwDep.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val
@@ -280,7 +279,7 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 			reqLogger.Info("Creating a new Manager Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", providerDeployment)
 			reqLogger.Info("SAAS tenant configmap was found", "Creating manager deployment with value from configmap", saasTenantConfigMapName)
 			reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", instance.Namespace, "Deployment.Name", providerDeployment)
-			newProviderDeployment := generateProviderDeploymentObject(instance, r.Scheme, providerDeployment, icpConsoleURL, saasServiceIdCrn, auditSecretExists, auditSecretName)
+			newProviderDeployment := generateProviderDeploymentObject(instance, r.Scheme, providerDeployment, icpConsoleURL, saasServiceIdCrn, auditSecretName)
 			err = r.Client.Create(context.TODO(), newProviderDeployment)
 			if err != nil {
 				return err
@@ -293,7 +292,7 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 	} else {
 		reqLogger.Info("Updating an existing Deployment", "Deployment.Namespace", currentProviderDeployment.Namespace, "Deployment.Name", currentProviderDeployment.Name)
 		reqLogger.Info("SAAS tenant configmap was found", "Updating deployment with value from configmap", saasTenantConfigMapName)
-		provDep := generateProviderDeploymentObject(instance, r.Scheme, providerDeployment, icpConsoleURL, saasServiceIdCrn, auditSecretExists, auditSecretName)
+		provDep := generateProviderDeploymentObject(instance, r.Scheme, providerDeployment, icpConsoleURL, saasServiceIdCrn, auditSecretName)
 		certmanagerLabel := "certmanager.k8s.io/time-restarted"
 		if val, ok := currentProviderDeployment.Spec.Template.ObjectMeta.Labels[certmanagerLabel]; ok {
 			provDep.Spec.Template.ObjectMeta.Labels[certmanagerLabel] = val
@@ -525,7 +524,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 							Operator: corev1.TolerationOpExists,
 						},
 					},
-					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, false, false, ""),
+					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, ""),
 					Containers:     buildContainers(instance, authServiceImage),
 					InitContainers: buildInitContainers(initContainerImage),
 				},
@@ -541,7 +540,7 @@ func generateDeploymentObject(instance *operatorv1alpha1.Authentication, scheme 
 	return idpDeployment
 }
 
-func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string, saasCrnId string, auditSecretExists bool, auditSecretName string) *appsv1.Deployment {
+func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string, saasCrnId string, auditSecretName string) *appsv1.Deployment {
 
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	identityProviderImage := common.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
@@ -688,8 +687,8 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 							Operator: corev1.TolerationOpExists,
 						},
 					},
-					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretExists, true, auditSecretName),
-					Containers:     buildProviderContainers(instance, identityProviderImage, icpConsoleURL, saasCrnId, auditSecretExists, auditSecretName),
+					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName),
+					Containers:     buildProviderContainers(instance, identityProviderImage, icpConsoleURL, saasCrnId, auditSecretName),
 					InitContainers: buildInitForMngrAndProvider(initContainerImage),
 				},
 			},
@@ -704,7 +703,7 @@ func generateProviderDeploymentObject(instance *operatorv1alpha1.Authentication,
 	return idpDeployment
 }
 
-func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string, saasCrnId string, auditSecretExists bool, auditSecretName string) *appsv1.Deployment {
+func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, deployment string, icpConsoleURL string, saasCrnId string, auditSecretName string) *appsv1.Deployment {
 
 	reqLogger := log.WithValues("deploymentForAuthentication", "Entry", "instance.Name", instance.Name)
 	identityManagerImage := common.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
@@ -851,8 +850,8 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 							Operator: corev1.TolerationOpExists,
 						},
 					},
-					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretExists, true, auditSecretName),
-					Containers:     buildManagerContainers(instance, identityManagerImage, icpConsoleURL, auditSecretExists, auditSecretName),
+					Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName),
+					Containers:     buildManagerContainers(instance, identityManagerImage, icpConsoleURL, auditSecretName),
 					InitContainers: buildInitForMngrAndProvider(initContainerImage),
 				},
 			},
@@ -867,7 +866,7 @@ func generateManagerDeploymentObject(instance *operatorv1alpha1.Authentication, 
 	return idpDeployment
 }
 
-func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretExists bool, required bool, auditSecretName string) []corev1.Volume {
+func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName string) []corev1.Volume {
 	auditVolume := corev1.Volume{
 		Name: IMAuditTLSVolume,
 		VolumeSource: corev1.VolumeSource{
@@ -1090,7 +1089,7 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretExis
 		},
 	}
 
-	if auditSecretExists && required {
+	if len(auditSecretName) > 0 {
 		volumes = EnsureVolumePresent(volumes, auditVolume)
 	}
 	return volumes

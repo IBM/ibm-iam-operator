@@ -393,7 +393,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 
 }
 
-func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string, saasCRNId string, auditSecretExists bool, auditSecretName string) corev1.Container {
+func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string, saasCRNId string, auditSecretName string) corev1.Container {
 
 	resources := instance.Spec.IdentityProvider.Resources
 	if resources == nil {
@@ -654,7 +654,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			},
 		},
 		Resources:    *resources,
-		VolumeMounts: buildIdentityProviderVolumeMounts(auditSecretExists),
+		VolumeMounts: buildIdentityProviderVolumeMounts(auditSecretName),
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
@@ -684,7 +684,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 
 }
 
-func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string, icpConsoleURL string, auditSecretExists bool, auditSecretName string) corev1.Container {
+func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string, icpConsoleURL string, auditSecretName string) corev1.Container {
 
 	replicaCount := int(instance.Spec.Replicas)
 	resources := instance.Spec.IdentityManager.Resources
@@ -964,7 +964,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			},
 		},
 		Resources:    *resources,
-		VolumeMounts: buildIdentityManagerVolumeMounts(auditSecretExists),
+		VolumeMounts: buildIdentityManagerVolumeMounts(auditSecretName),
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
@@ -1003,16 +1003,16 @@ func buildContainers(instance *operatorv1alpha1.Authentication, authServiceImage
 	return []corev1.Container{authServiceContainer}
 }
 
-func buildManagerContainers(instance *operatorv1alpha1.Authentication, identityManagerImage string, icpConsoleURL string, auditSecretExists bool, auditSecretName string) []corev1.Container {
+func buildManagerContainers(instance *operatorv1alpha1.Authentication, identityManagerImage string, icpConsoleURL string, auditSecretName string) []corev1.Container {
 
-	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL, auditSecretExists, auditSecretName)
+	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL, auditSecretName)
 
 	return []corev1.Container{identityManagerContainer}
 }
 
-func buildProviderContainers(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string, saasCrnId string, auditSecretExists bool, auditSecretName string) []corev1.Container {
+func buildProviderContainers(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string, saasCrnId string, auditSecretName string) []corev1.Container {
 
-	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId, auditSecretExists, auditSecretName)
+	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId, auditSecretName)
 
 	return []corev1.Container{identityProviderContainer}
 }
@@ -1059,7 +1059,7 @@ func buildInitContainerEnvVars(envVarList []string, configmapName string) []core
 	return envVars
 }
 
-func buildIdentityManagerVolumeMounts(auditSecretExists bool) []corev1.VolumeMount {
+func buildIdentityManagerVolumeMounts(auditSecretName string) []corev1.VolumeMount {
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "cluster-ca",
@@ -1086,7 +1086,7 @@ func buildIdentityManagerVolumeMounts(auditSecretExists bool) []corev1.VolumeMou
 			MountPath: "/pgsql/clientinfo",
 		},
 	}
-	if auditSecretExists {
+	if len(auditSecretName) > 0 {
 		newVolMount := corev1.VolumeMount{
 			Name:      IMAuditTLSVolume,
 			MountPath: "/certs/audit-tls",
@@ -1097,7 +1097,7 @@ func buildIdentityManagerVolumeMounts(auditSecretExists bool) []corev1.VolumeMou
 	return volumeMounts
 }
 
-func buildIdentityProviderVolumeMounts(auditSecretExists bool) []corev1.VolumeMount {
+func buildIdentityProviderVolumeMounts(auditSecretName string) []corev1.VolumeMount {
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "auth-key",
@@ -1124,7 +1124,7 @@ func buildIdentityProviderVolumeMounts(auditSecretExists bool) []corev1.VolumeMo
 			MountPath: "/pgsql/clientinfo",
 		},
 	}
-	if auditSecretExists {
+	if len(auditSecretName) > 0 {
 		newVolMount := corev1.VolumeMount{
 			Name:      IMAuditTLSVolume,
 			MountPath: "/certs/audit-tls",

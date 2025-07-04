@@ -106,35 +106,9 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 		saasServiceIdCrn = saasTenantConfigMap.Data["service_crn_id"]
 	}
 
-	var auditSecretName string
-	var auditURL string
-	var ok bool
-	// Check for the presence of audit-endpoint configmap
-	authIdpConfigMapName := "platform-auth-idp"
-	authIdpConfigMap := &corev1.ConfigMap{}
-	if err1 := r.Client.Get(context.TODO(), types.NamespacedName{Name: authIdpConfigMapName, Namespace: instance.Namespace}, authIdpConfigMap); err1 != nil {
-		if errors.IsNotFound(err1) {
-			reqLogger.Error(err1, "The  Auth-idp configmap ", authIdpConfigMapName, " is not found.")
-			// no requeue required
-		}
-		reqLogger.Error(err1, "Failed to get Auth-idp configmap ", authIdpConfigMapName)
-	} else {
-		if auditSecretName, ok = authIdpConfigMap.Data["AUDIT_SECRET"]; !ok {
-			reqLogger.Info("Audit secret is not specified in the auth idp configmap", authIdpConfigMapName)
-		}
-		if auditURL, ok = authIdpConfigMap.Data["AUDIT_URL"]; !ok {
-			reqLogger.Info("Audit url is not specified in the auth idp configmap", authIdpConfigMapName)
-		}
-		reqLogger.Info("Fetched audit url and audit secret from auth-idp configmap", auditSecretName, auditURL)
-		if len(auditSecretName) == 0 || len(auditURL) == 0 {
-			reqLogger.Info("Unable to fetch the audit url and audit secret from auth-idp configmap", authIdpConfigMapName)
-		} else if len(auditSecretName) > 0 {
-			_, err2 := checkSecretExists(r.Client, instance.Namespace, auditSecretName)
-			if err2 != nil {
-				return err2
-			}
-			reqLogger.Info("audit-tls secret name", "Deployment.Namespace", instance.Namespace, "Secret.Name", auditSecretName)
-		}
+	auditSecretName, err := fetchAuditDetails(r.Client, instance.Namespace)
+	if err != nil {
+		return err
 	}
 
 	// Check if this Deployment already exists
@@ -350,6 +324,40 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 	reqLogger.Info("Skip reconcile: Provider deployment already exists", "Deployment.Namespace", instance.Namespace, "Deployment.Name", providerDeployment)
 	return nil
 
+}
+
+func fetchAuditDetails(client client.Client, namespace string) (string, error) {
+	var auditSecretName string
+	var auditURL string
+	var ok bool
+	// Check for the presence of audit-endpoint configmap
+	authIdpConfigMapName := "platform-auth-idp"
+	authIdpConfigMap := &corev1.ConfigMap{}
+	if err1 := client.Get(context.TODO(), types.NamespacedName{Name: authIdpConfigMapName, Namespace: namespace}, authIdpConfigMap); err1 != nil {
+		if errors.IsNotFound(err1) {
+			log.Error(err1, "The  Auth-idp configmap ", authIdpConfigMapName, " is not found.")
+			// no requeue required
+		}
+		log.Error(err1, "Failed to get Auth-idp configmap ", authIdpConfigMapName)
+	} else {
+		if auditSecretName, ok = authIdpConfigMap.Data["AUDIT_SECRET"]; !ok {
+			log.Info("Audit secret is not specified in the auth idp configmap", authIdpConfigMapName)
+		}
+		if auditURL, ok = authIdpConfigMap.Data["AUDIT_URL"]; !ok {
+			log.Info("Audit url is not specified in the auth idp configmap", authIdpConfigMapName)
+		}
+		log.Info("Fetched audit url and audit secret from auth-idp configmap", auditSecretName, auditURL)
+		if len(auditSecretName) == 0 || len(auditURL) == 0 {
+			log.Info("Unable to fetch the audit url and audit secret from auth-idp configmap", authIdpConfigMapName)
+		} else if len(auditSecretName) > 0 {
+			_, err2 := checkSecretExists(client, namespace, auditSecretName)
+			if err2 != nil {
+				return "", err2
+			}
+			log.Info("audit-tls secret name", "Deployment.Namespace", namespace, "Secret.Name", auditSecretName)
+		}
+	}
+	return auditSecretName, nil
 }
 
 func checkSecretExists(client client.Client, namespace string, auditSecretName string) (bool, error) {

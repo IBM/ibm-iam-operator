@@ -106,7 +106,7 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 		saasServiceIdCrn = saasTenantConfigMap.Data["service_crn_id"]
 	}
 
-	auditSecretName, err := fetchAuditDetails(r.Client, instance.Namespace)
+	auditSecretName, err := r.getAuditSecretNameIfExists(context.TODO(), instance.Namespace)
 	if err != nil {
 		return err
 	}

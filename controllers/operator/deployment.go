@@ -106,7 +106,7 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 		saasServiceIdCrn = saasTenantConfigMap.Data["service_crn_id"]
 	}
 
-	auditSecretName, err := fetchAuditDetails(r.Client, instance.Namespace)
+	auditSecretName, err := r.getAuditSecretNameIfExists(context.TODO(), instance.Namespace)
 	if err != nil {
 		return err
 	}
@@ -326,37 +326,55 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 
 }
 
-func fetchAuditDetails(client client.Client, namespace string) (string, error) {
+// getAuditSecretNameIfExists determines whether an audit service has been
+// configured with TLS. Returns the name of the Secret used to store the TLS
+// certificates if a Secret has been identified by the user and found on the
+// cluster, or an empty string when the Secret isn't found or cannot otherwise
+// be retrieved. If an error other than NotFound is received when trying to get
+// the Secret, that is returned as well.
+func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Context, namespace string) (string, error) {
 	var auditSecretName string
 	var auditURL string
-	var ok bool
 	// Check for the presence of audit-endpoint configmap
 	authIdpConfigMapName := "platform-auth-idp"
 	authIdpConfigMap := &corev1.ConfigMap{}
-	if err1 := client.Get(context.TODO(), types.NamespacedName{Name: authIdpConfigMapName, Namespace: namespace}, authIdpConfigMap); err1 != nil {
-		if errors.IsNotFound(err1) {
-			log.Error(err1, "The  Auth-idp configmap ", authIdpConfigMapName, " is not found.")
-			// no requeue required
-		}
-		log.Error(err1, "Failed to get Auth-idp configmap ", authIdpConfigMapName)
-	} else {
-		if auditSecretName, ok = authIdpConfigMap.Data["AUDIT_SECRET"]; !ok {
-			log.Info("Audit secret is not specified in the auth idp configmap", authIdpConfigMapName)
-		}
-		if auditURL, ok = authIdpConfigMap.Data["AUDIT_URL"]; !ok {
-			log.Info("Audit url is not specified in the auth idp configmap", authIdpConfigMapName)
-		}
-		log.Info("Fetched audit url and audit secret from auth-idp configmap", auditSecretName, auditURL)
-		if len(auditSecretName) == 0 || len(auditURL) == 0 {
-			log.Info("Unable to fetch the audit url and audit secret from auth-idp configmap", authIdpConfigMapName)
-		} else if len(auditSecretName) > 0 {
-			_, err2 := checkSecretExists(client, namespace, auditSecretName)
-			if err2 != nil {
-				return "", err2
-			}
-			log.Info("audit-tls secret name", "Deployment.Namespace", namespace, "Secret.Name", auditSecretName)
-		}
+	idpCMLogger := log.WithValues("ConfigMap.Name", authIdpConfigMapName, "ConfigMap.Namespace", namespace)
+	if err := r.Get(ctx, types.NamespacedName{Name: authIdpConfigMapName, Namespace: namespace}, authIdpConfigMap); errors.IsNotFound(err) {
+		idpCMLogger.Info("ConfigMap was not found")
+		return "", nil
+	} else if err != nil {
+		idpCMLogger.Error(err, "Failed to get ConfigMap")
+		return "", err
 	}
+	if authIdpConfigMap.Data == nil {
+		idpCMLogger.Info("Invalid ConfigMap")
+		return "", nil
+	}
+	if authIdpConfigMap.Data["AUDIT_URL"] == "" {
+		idpCMLogger.Info("Audit URL is not specified in ConfigMap; assume no Secret to mount", "key", "AUDIT_URL")
+		return "", nil
+	}
+	if authIdpConfigMap.Data["AUDIT_SECRET"] == "" {
+		idpCMLogger.Info("Audit Secret is not specified in ConfigMap; assume no Secret", "key", "AUDIT_SECRET")
+		return "", nil
+	}
+	auditURL = authIdpConfigMap.Data["AUDIT_URL"]
+	auditSecretName = authIdpConfigMap.Data["AUDIT_SECRET"]
+	idpCMLogger.Info("Fetched audit URL and audit Secret from ConfigMap", "AUDIT_SECRET", auditSecretName, "AUDIT_URL", auditURL)
+
+	auditTLSSecretLogger := log.WithValues("Secret.Name", auditSecretName, "Secret.Namespace", namespace)
+	auditTLSSecret := &corev1.Secret{}
+	auditTLSSecretStruct := types.NamespacedName{Name: auditSecretName, Namespace: namespace}
+	err := r.Get(ctx, auditTLSSecretStruct, auditTLSSecret)
+	if errors.IsNotFound(err) {
+		auditTLSSecretLogger.Info("Secret for audit configuration not found")
+		return "", nil
+	} else if err != nil {
+		auditTLSSecretLogger.Error(err, "Failed to retrieve Secret for audit configuration")
+		return "", err
+	}
+
+	auditTLSSecretLogger.Info("Secret found for audit configuration")
 	return auditSecretName, nil
 }
 

@@ -195,12 +195,11 @@ func (r *AuthenticationReconciler) handleIBMCloudClusterInfo(ctx context.Context
 	}
 
 	updateFns := []func(*corev1.ConfigMap, *corev1.ConfigMap) bool{
-		updatesValuesWhen(and(zenFrontDoorEnabled[*corev1.ConfigMap](authCR), not(observedKeyValueSetTo[*corev1.ConfigMap]("cluster_address", generated.Data["cluster_address"]))),
+		updatesValuesWhen(not(observedKeyValueSetTo[*corev1.ConfigMap]("cluster_address", generated.Data["cluster_address"])),
 			"cluster_address",
 			"cluster_address_auth",
 			"proxy_address",
 			"cluster_endpoint"),
-		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("cluster_address_auth")), "cluster_address_auth"),
 	}
 
 	for _, update := range updateFns {
@@ -690,6 +689,7 @@ func getHostFromDummyRoute(ctx context.Context, cl client.Client, authCR *operat
 	return
 }
 
+// getDomain obtains the OCP appsDomain by attempting to create a dummy Route in the services namespace.
 func (r *AuthenticationReconciler) getDomain(ctx context.Context, authCR *operatorv1alpha1.Authentication) (domain string, err error) {
 	reqLogger := logf.FromContext(ctx)
 
@@ -726,21 +726,45 @@ func (r *AuthenticationReconciler) getDomain(ctx context.Context, authCR *operat
 	return domain, err
 }
 
+func getClusterAddress(authCR *operatorv1alpha1.Authentication, domainName string) (hostname string) {
+	if authCR.HasCustomIngressHostname() {
+		return *authCR.Spec.Config.Ingress.Hostname
+	}
+	multipleAuthCRRouteName := strings.Join([]string{"cp-console", authCR.Namespace}, "-")
+	if authCR.Spec.Config.OnPremMultipleDeploy {
+		return strings.Join([]string{multipleAuthCRRouteName, domainName}, ".")
+	}
+	return strings.Join([]string{"cp-console", domainName}, ".")
+}
+
+func getClusterProxy(authCR *operatorv1alpha1.Authentication, domainName string) (hostname string) {
+	if authCR.HasCustomIngressHostname() {
+		return *authCR.Spec.Config.Ingress.Hostname
+	}
+	multipleAuthCRRouteName := strings.Join([]string{"cp-proxy", authCR.Namespace}, "-")
+	if authCR.Spec.Config.OnPremMultipleDeploy {
+		return strings.Join([]string{multipleAuthCRRouteName, domainName}, ".")
+	}
+	return strings.Join([]string{"cp-proxy", domainName}, ".")
+}
+
 func (r *AuthenticationReconciler) generateCNCFClusterInfo(ctx context.Context, authCR *operatorv1alpha1.Authentication, domainName string, generated *corev1.ConfigMap) (err error) {
 	reqLogger := logf.FromContext(ctx)
 
 	rhttpPort, rhttpsPort, cname := getClusterInfoFromEnv()
 
 	zenHost := ""
-	clusterAddress := strings.Join([]string{strings.Join([]string{"cp-console", authCR.Namespace}, "-"), domainName}, ".")
-	clusterEndpoint := "https://" + clusterAddress
+	clusterAddress := getClusterAddress(authCR, domainName)
 	clusterAddressAuth := clusterAddress
+	clusterEndpoint := "https://" + clusterAddress
+	proxyDomainName := getClusterProxy(authCR, domainName)
 	if shouldUseCPDHost(authCR, &r.DiscoveryClient) {
 		zenHost, err = r.getZenHost(ctx, authCR)
 		if err == nil {
 			clusterAddressAuth = zenHost
 			clusterAddress = zenHost
 			clusterEndpoint = "https://" + zenHost
+			proxyDomainName = zenHost
 		} else {
 			reqLogger.Info("Zen host could not be retrieved; using defaults")
 		}
@@ -759,7 +783,7 @@ func (r *AuthenticationReconciler) generateCNCFClusterInfo(ctx context.Context, 
 			RouteHTTPPort:          rhttpPort,
 			RouteHTTPSPort:         rhttpsPort,
 			ClusterName:            cname,
-			ProxyAddress:           clusterAddress,
+			ProxyAddress:           proxyDomainName,
 			ProviderSVC:            fmt.Sprintf("https://platform-identity-provider.%s.svc:4300", authCR.Namespace),
 			IDMgmtSVC:              fmt.Sprintf("https://platform-identity-management.%s.svc:4500", authCR.Namespace),
 		},
@@ -784,26 +808,17 @@ func (r *AuthenticationReconciler) generateOCPClusterInfo(ctx context.Context, a
 
 	rhttpPort, rhttpsPort, cname := getClusterInfoFromEnv()
 
-	baseDomain, err := r.getDomain(ctx, authCR)
+	domainName, err := r.getDomain(ctx, authCR)
 	if err != nil {
 		return
 	}
 
-	var domainName, proxyDomainName string
-	multipleauthCRRouteName := strings.Join([]string{"cp-console", authCR.Namespace}, "-")
-	multipleauthCRProxyRouteName := strings.Join([]string{"cp-proxy", authCR.Namespace}, "-")
-	if authCR.Spec.Config.OnPremMultipleDeploy {
-		domainName = strings.Join([]string{multipleauthCRRouteName, baseDomain}, ".")
-		proxyDomainName = strings.Join([]string{multipleauthCRProxyRouteName, baseDomain}, ".")
-	} else {
-		domainName = strings.Join([]string{"cp-console", baseDomain}, ".")
-		proxyDomainName = strings.Join([]string{"cp-proxy", baseDomain}, ".")
-	}
-
 	zenHost := ""
-	clusterAddress := domainName
-	clusterEndpoint := "https://" + clusterAddress
+	clusterAddress := getClusterAddress(authCR, domainName)
 	clusterAddressAuth := clusterAddress
+	clusterEndpoint := "https://" + clusterAddress
+	proxyDomainName := getClusterProxy(authCR, domainName)
+
 	if shouldUseCPDHost(authCR, &r.DiscoveryClient) {
 		zenHost, err = r.getZenHost(ctx, authCR)
 		if err == nil {

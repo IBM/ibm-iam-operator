@@ -116,8 +116,8 @@ type ClientRegistrationSpec struct {
 }
 
 type IngressConfig struct {
-	Hostname string `json:"hostname,omitempty"`
-	Secret   string `json:"secret,omitempty"`
+	Hostname *string `json:"hostname,omitempty"`
+	Secret   *string `json:"secret,omitempty"`
 }
 
 type ConfigSpec struct {
@@ -315,8 +315,16 @@ func (a *Authentication) HasNoDBSchemaVersion() bool {
 	return !a.HasDBSchemaVersion()
 }
 
-func (a *Authentication) HasCustomizedIngress() bool {
-	return a.Spec.Config.Ingress != nil && (a.Spec.Config.Ingress.Hostname != "" || a.Spec.Config.Ingress.Secret != "")
+func (a *Authentication) HasCustomIngressHostname() bool {
+	return a.Spec.Config.Ingress != nil && a.Spec.Config.Ingress.Hostname != nil && *a.Spec.Config.Ingress.Hostname != ""
+}
+
+func (a *Authentication) HasCustomIngressCertificate() bool {
+	return a.Spec.Config.Ingress != nil && a.Spec.Config.Ingress.Hostname != nil && *a.Spec.Config.Ingress.Hostname != ""
+}
+
+func (a *Authentication) HasCustomIngress() bool {
+	return a.HasCustomIngressHostname() || a.HasCustomIngressCertificate()
 }
 
 func (a *Authentication) GetDBSchemaVersion() string {

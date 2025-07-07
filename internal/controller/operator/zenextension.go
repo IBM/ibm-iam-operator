@@ -21,7 +21,7 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
 	zenv1 "github.com/IBM/ibm-iam-operator/internal/api/zen.cpd.ibm.com/v1"
-	ctrlCommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
+	common "github.com/IBM/ibm-iam-operator/internal/controller/common"
 	"github.com/opdev/subreconciler"
 
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -54,24 +54,18 @@ func (r *AuthenticationReconciler) handleZenFrontDoor(ctx context.Context, req c
 	if result, err = r.getLatestAuthentication(subCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
-	if !ctrlCommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
+	if !common.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
 		subLogger.Info("ZenExtension resource is not supported; skipping")
 		return subreconciler.ContinueReconciling()
 	}
 
 	//In addition to reconciling the zen extension, we must set the proper value of
 	//cluster_address_auth in the ibmcloud-cluster-info configmap
-	fns := []subreconciler.Fn{
+	subreconcilers := common.Subreconcilers{
 		r.removeZenExtension(authCR),
 	}
 
-	for _, fn := range fns {
-		if result, err = fn(subCtx); subreconciler.ShouldRequeue(result, err) {
-			return
-		}
-	}
-
-	return subreconciler.ContinueReconciling()
+	return subreconcilers.Reconcile(subCtx)
 }
 
 func (zs *ZenExtensionWithSpec) ToUnstructured(s *runtime.Scheme) (u *unstructured.Unstructured, err error) {
@@ -88,7 +82,7 @@ func (zs *ZenExtensionWithSpec) ToUnstructured(s *runtime.Scheme) (u *unstructur
 	return u, nil
 }
 
-func (r *AuthenticationReconciler) removeZenExtension(authCR *operatorv1alpha1.Authentication) subreconciler.Fn {
+func (r *AuthenticationReconciler) removeZenExtension(authCR *operatorv1alpha1.Authentication) common.SecondaryReconcilerFn {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		reqLogger := logf.FromContext(ctx)
 		reqLogger.Info("Removing ZenExtension")

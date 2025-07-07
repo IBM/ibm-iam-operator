@@ -403,3 +403,19 @@ func NewSecondaryReconcilerFn(req ctrl.Request, fn subreconciler.FnWithRequest) 
 		return fn(ctx, req)
 	}
 }
+
+// Subreconcilers implements Subreconciler
+type Subreconcilers []Subreconciler
+
+var _ Subreconciler = Subreconcilers{}
+
+func (s Subreconcilers) Reconcile(ctx context.Context) (result *ctrl.Result, err error) {
+	results := []*ctrl.Result{}
+	errs := []error{}
+	for _, reconciler := range s {
+		result, err = reconciler.Reconcile(ctx)
+		results = append(results, result)
+		errs = append(errs, err)
+	}
+	return ReduceSubreconcilerResultsAndErrors(results, errs)
+}

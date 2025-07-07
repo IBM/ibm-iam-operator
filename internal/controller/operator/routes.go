@@ -87,6 +87,185 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Re
 	return r.reconcileAllRoutes(handleRouteCtx, authCR)
 }
 
+// removeExistingRouteIfItHasDifferentHost produces a GenerateFn that removes
+// the SecondaryReconciler's Route if that Route has an out-of-date .spec.host
+// value.
+func (r *AuthenticationReconciler) removeExistingRouteIfItHasDifferentHost() ctrlcommon.GenerateFn[*routev1.Route] {
+	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, route *routev1.Route) (err error) {
+		authCR := s.GetPrimary().(*operatorv1alpha1.Authentication)
+		var routeHost string
+		if result, suberr := r.getClusterAddress(authCR, &routeHost)(ctx); subreconciler.ShouldHaltOrRequeue(result, suberr) {
+			return
+		}
+		objKey := types.NamespacedName{Name: s.GetName(), Namespace: s.GetNamespace()}
+		if err = r.Get(ctx, objKey, route); k8sErrors.IsNotFound(err) {
+			return nil
+		} else if err != nil {
+			return
+		}
+
+		if route.Spec.Host == routeHost {
+			return nil
+		}
+		if err = r.Delete(ctx, route); k8sErrors.IsNotFound(err) {
+			return nil
+		} else if err != nil {
+			err = fmt.Errorf("failed to delete Route with old .spec.host: %w", err)
+		}
+		return
+	}
+}
+
+func (r *AuthenticationReconciler) reconcileAllRoutes(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx)
+	allRoutesFields := &map[string]*reconcileRouteFields{}
+	if result, err = r.getAllRoutesFields(authCR, allRoutesFields)(ctx); subreconciler.ShouldRequeue(result, err) {
+		return
+	}
+
+	allRouteReconcilers, err := r.getRouteSubreconcilers(authCR, allRoutesFields)
+	if err != nil {
+		return subreconciler.RequeueWithError(err)
+	}
+
+	if result, err = allRouteReconcilers.Reconcile(ctx); err != nil {
+		reqLogger.Info("One or more errors were encountered while reconciling Routes; requeueing")
+	} else if subreconciler.ShouldRequeue(result, err) {
+		reqLogger.Info("One or more Routes were written to; requeueing")
+	} else {
+		reqLogger.Info("Routes already up-to-date")
+	}
+	return
+}
+
+// getCustomIngressSecret retrieves the TLS Secret that is named in
+// `.spec.config.ingress.secret` on the Authentication CR. Returns an error if
+// it is unable to do so.
+func (r *AuthenticationReconciler) getCustomIngressSecret(ctx context.Context, authCR *operatorv1alpha1.Authentication, secret *corev1.Secret) (err error) {
+	if !authCR.HasCustomIngressCertificate() {
+		return
+	}
+	objKey := types.NamespacedName{Name: *authCR.Spec.Config.Ingress.Secret, Namespace: authCR.Namespace}
+	if err = r.Get(ctx, objKey, secret); err != nil {
+		return
+	}
+	return
+}
+
+func modifyRoute(s ctrlcommon.SecondaryReconciler, ctx context.Context, observed, generated *routev1.Route) (modified bool, err error) {
+	// Preserve custom annotation settings observed in the cluster; skip changes to rewrite-target
+	for annotation, value := range observed.Annotations {
+		if annotation != "haproxy.router.openshift.io/rewrite-target" {
+			generated.Annotations[annotation] = value
+		} else if generated.Annotations[annotation] != value {
+			// Log when a rewrite-target annotation change has been ignored
+			//reqLogger.Info("Attempted change to \"haproxy.router.openshift.io/rewrite-target\" prevented", "value", value)
+		}
+	}
+
+	// if observed route contains a non-empty certificate, caCertificate, and key, these values must be
+	// retained
+	if observed.Spec.TLS != nil && observed.Spec.TLS.Key != "" && observed.Spec.TLS.Certificate != "" && observed.Spec.TLS.CACertificate != "" {
+		//reqLogger.Info("Keeping custom TLS key, certificate, and CA certificate from observed Route in calculated Route")
+		generated.Spec.TLS.Key = observed.Spec.TLS.Key
+		generated.Spec.TLS.Certificate = observed.Spec.TLS.Certificate
+		generated.Spec.TLS.CACertificate = observed.Spec.TLS.CACertificate
+	}
+
+	if !IsRouteEqual(ctx, generated, observed) {
+		observed.Name = generated.Name
+		observed.Annotations = generated.Annotations
+		observed.Spec = generated.Spec
+		modified = true
+	}
+	return
+}
+
+func (r *AuthenticationReconciler) getRouteSubreconcilers(authCR *operatorv1alpha1.Authentication, allFields *map[string]*reconcileRouteFields) (subRecs ctrlcommon.Subreconcilers, err error) {
+	subRecs = ctrlcommon.Subreconcilers{
+		r.removeExtraRoutes(authCR, allFields),
+	}
+	builders := []*ctrlcommon.SecondaryReconcilerBuilder[*routev1.Route]{}
+
+	for _, fields := range *allFields {
+		builders = append(builders, ctrlcommon.NewSecondaryReconcilerBuilder[*routev1.Route]().
+			WithName(fields.Name).
+			WithGenerateFns(r.removeExistingRouteIfItHasDifferentHost(),
+				generateRouteObject(fields)).
+			WithModifyFns(modifyRoute),
+		)
+	}
+
+	for i := range builders {
+		subRecs = append(subRecs, builders[i].
+			WithNamespace(authCR.Namespace).
+			WithPrimary(authCR).
+			WithClient(r.Client).
+			MustBuild())
+	}
+
+	if authCR.HasCustomIngressCertificate() {
+		subRecs = append(subRecs, r.updateCPConsoleCertificates(authCR))
+	}
+
+	return
+}
+
+// updateCPConsoleCertificates updates the certificate-related fields on the
+// cp-console Route when .spec.config.ingress.secret is set on the
+// Authentication CR. Skips when this field is not configured or if the Zen
+// front door has been enabled on the Authentication CR with
+// .spec.config.zenFrontDoor set to true.
+func (r *AuthenticationReconciler) updateCPConsoleCertificates(authCR *operatorv1alpha1.Authentication) ctrlcommon.SecondaryReconcilerFn {
+	return ctrlcommon.SecondaryReconcilerFn(func(ctx context.Context) (result *ctrl.Result, err error) {
+		log := logf.FromContext(ctx, "Route.Name", "cp-console", "Route.Namespace", authCR.Namespace)
+		log.Info("Update certificates on UI Route if custom TLS configured")
+		if !authCR.HasCustomIngressCertificate() {
+			log.Info("Does not have .spec.config.ingress.secret configured; continuing")
+			return subreconciler.ContinueReconciling()
+		} else if authCR.Spec.Config.ZenFrontDoor {
+			log.Info("UI is using the Zen front door; continuing")
+			return subreconciler.ContinueReconciling()
+		}
+		log.Info("Ensuring Route has certificates configured")
+		secret := &corev1.Secret{}
+		if err = r.getCustomIngressSecret(ctx, authCR, secret); err != nil {
+			log.Error(err, "Failed to get Secret", "Secret.Name", authCR.Spec.Config.Ingress.Secret, "Secret.Namespace", authCR.Namespace)
+			return subreconciler.RequeueWithError(fmt.Errorf("unable to configure cp-console with custom TLS: %w", err))
+		}
+		cpConsoleRoute := &routev1.Route{}
+		objKey := types.NamespacedName{Name: "cp-console", Namespace: authCR.Namespace}
+		if err = r.Get(ctx, objKey, cpConsoleRoute); err != nil {
+			log.Error(err, "Failed to get Route")
+			return subreconciler.RequeueWithError(fmt.Errorf("unable to configure cp-console with custom TLS: %w", err))
+		}
+		modified := false
+		if cpConsoleRoute.Spec.TLS.Key != string(secret.Data["tls.key"]) {
+			cpConsoleRoute.Spec.TLS.Key = string(secret.Data["tls.key"])
+			modified = true
+		}
+		if cpConsoleRoute.Spec.TLS.Certificate != string(secret.Data["tls.crt"]) {
+			cpConsoleRoute.Spec.TLS.Certificate = string(secret.Data["tls.crt"])
+			modified = true
+		}
+		if cpConsoleRoute.Spec.TLS.CACertificate != string(secret.Data["ca.crt"]) {
+			cpConsoleRoute.Spec.TLS.CACertificate = string(secret.Data["ca.crt"])
+			modified = true
+		}
+		if !modified {
+			log.Info("UI Route is already using custom TLS; continuing")
+			return subreconciler.ContinueReconciling()
+		}
+		log.Info("UI Route needs update to customize TLS")
+		if err = r.Update(ctx, cpConsoleRoute); err != nil {
+			log.Error(err, "Failed to update UI Route")
+			return subreconciler.RequeueWithError(err)
+		}
+		log.Info("UI Route successfully updated with custom TLS; requeueing")
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	})
+}
+
 // checkForZenFrontDoor confirms whether traffic should or should not be consolidated through the cpd Route. When it
 // should, it looks for the ZenExtension containing the nginx configuration needed to properly route ingress traffic to
 // the IM microservices, and confirms that the ZenExtension has been fully processed, meaning nginx is ready for
@@ -118,40 +297,9 @@ func (r *AuthenticationReconciler) checkForZenFrontDoor(ctx context.Context, aut
 	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
-func (r *AuthenticationReconciler) reconcileAllRoutes(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	allRoutesFields := &map[string]*reconcileRouteFields{}
-	if result, err = r.getAllRoutesFields(authCR, allRoutesFields)(ctx); subreconciler.ShouldRequeue(result, err) {
-		return
-	}
-
-	allRouteReconcilers := make([]subreconciler.Fn, 0)
-	for _, routeFields := range *allRoutesFields {
-		allRouteReconcilers = append(allRouteReconcilers, r.reconcileRoute(authCR, routeFields))
-	}
-
-	allRouteReconcilers = append(allRouteReconcilers, r.removeExtraRoutes(authCR, allRoutesFields))
-
-	results := []*ctrl.Result{}
-	errs := []error{}
-	for _, reconcileRoute := range allRouteReconcilers {
-		result, err = reconcileRoute(ctx)
-		results = append(results, result)
-		errs = append(errs, err)
-	}
-	if result, err = ctrlcommon.ReduceSubreconcilerResultsAndErrors(results, errs); err != nil {
-		reqLogger.Info("Errors were encountered while reconciling Routes; requeueing")
-	} else if subreconciler.ShouldRequeue(result, err) {
-		reqLogger.Info("One or more Routes were reconciled; requeueing")
-	} else {
-		reqLogger.Info("Routes already up-to-date")
-	}
-	return
-}
-
 // removeExtraRoutes produces a subreconciler that deletes any Route that is labeled as IM's and is not in the list of
 // Routes that the Operator wants to exist.
-func (r *AuthenticationReconciler) removeExtraRoutes(authCR *operatorv1alpha1.Authentication, allRoutesFields *map[string]*reconcileRouteFields) (fn subreconciler.Fn) {
+func (r *AuthenticationReconciler) removeExtraRoutes(authCR *operatorv1alpha1.Authentication, allRoutesFields *map[string]*reconcileRouteFields) (fn ctrlcommon.SecondaryReconcilerFn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		reqLogger := logf.FromContext(ctx)
 		routesList := &routev1.RouteList{}
@@ -311,105 +459,8 @@ func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.A
 	}
 }
 
-func (r *AuthenticationReconciler) reconcileRoute(authCR *operatorv1alpha1.Authentication, fields *reconcileRouteFields) (fn subreconciler.Fn) {
-	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		namespace := authCR.Namespace
-		reqLogger := logf.FromContext(ctx, "name", fields.Name, "namespace", namespace).V(1)
-
-		reqLogger.Info("Reconciling route", "annotations", fields.Annotations, "routeHost", fields.RouteHost, "routePath", fields.RoutePath)
-
-		fCtx := logf.IntoContext(ctx, reqLogger)
-		return r.ensureRouteExists(fCtx, authCR, fields)
-	}
-}
-
-func (r *AuthenticationReconciler) ensureRouteExists(ctx context.Context, authCR *operatorv1alpha1.Authentication, fields *reconcileRouteFields) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	calculatedRoute, err := r.newRoute(authCR, fields)
-	if err != nil {
-		reqLogger.Error(err, "Error creating desired route for reconcilition")
-		return
-	}
-
-	observedRoute := &routev1.Route{}
-	err = r.Get(ctx, types.NamespacedName{Name: fields.Name, Namespace: authCR.Namespace}, observedRoute)
-	if k8sErrors.IsNotFound(err) {
-		reqLogger.Info("Route not found - creating")
-
-		err = r.Create(ctx, calculatedRoute)
-		if err != nil {
-			if k8sErrors.IsAlreadyExists(err) {
-				// Route already exists from a previous reconcile
-				reqLogger.Info("Route already exists")
-				return subreconciler.ContinueReconciling()
-			}
-			// Failed to create a new route
-			reqLogger.Error(err, "Failed to create new route")
-			return subreconciler.RequeueWithError(err)
-		}
-		// Requeue after creating new route
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	} else if err != nil {
-		reqLogger.Error(err, "Failed to get existing route for reconciliation")
-		return
-	}
-	// Determine if current route has changed
-	reqLogger.Info("Comparing current and desired routes")
-
-	// Preserve custom annotation settings observed in the cluster; skip changes to rewrite-target
-	for annotation, value := range observedRoute.Annotations {
-		if annotation != "haproxy.router.openshift.io/rewrite-target" {
-			calculatedRoute.Annotations[annotation] = value
-		} else if calculatedRoute.Annotations[annotation] != value {
-			// Log when a rewrite-target annotation change has been ignored
-			reqLogger.Info("Attempted change to \"haproxy.router.openshift.io/rewrite-target\" prevented", "value", value)
-		}
-	}
-
-	// if observed route contains a non-empty certificate, caCertificate, and key, these values must be
-	// retained
-	if observedRoute.Spec.TLS != nil && observedRoute.Spec.TLS.Key != "" && observedRoute.Spec.TLS.Certificate != "" && observedRoute.Spec.TLS.CACertificate != "" {
-		reqLogger.Info("Keeping custom TLS key, certificate, and CA certificate from observed Route in calculated Route")
-		calculatedRoute.Spec.TLS.Key = observedRoute.Spec.TLS.Key
-		calculatedRoute.Spec.TLS.Certificate = observedRoute.Spec.TLS.Certificate
-		calculatedRoute.Spec.TLS.CACertificate = observedRoute.Spec.TLS.CACertificate
-	}
-
-	//routeHost is immutable so it must be checked first and the route recreated if it has changed
-	if observedRoute.Spec.Host != calculatedRoute.Spec.Host {
-		err = r.Delete(ctx, observedRoute)
-		if err != nil {
-			reqLogger.Error(err, "Route host changed, unable to delete existing route for recreate")
-			return subreconciler.RequeueWithError(err)
-		}
-		//Recreate the route
-		err = r.Create(ctx, calculatedRoute)
-		if err != nil {
-			reqLogger.Error(err, "Route host changed, unable to create new route")
-			return subreconciler.RequeueWithError(err)
-		}
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
-
-	if !IsRouteEqual(ctx, calculatedRoute, observedRoute) {
-		reqLogger.Info("Updating route")
-
-		observedRoute.Name = calculatedRoute.Name
-		observedRoute.Annotations = calculatedRoute.Annotations
-		observedRoute.Spec = calculatedRoute.Spec
-
-		err = r.Update(ctx, observedRoute)
-		if err != nil {
-			reqLogger.Error(err, "Failed to update route")
-			return subreconciler.RequeueWithError(err)
-		}
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
-	return subreconciler.ContinueReconciling()
-}
-
 func shouldUseCPDHost(authCR *operatorv1alpha1.Authentication, dc *discovery.DiscoveryClient) bool {
-	return authCR.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(dc)
+	return !authCR.HasCustomIngressHostname() && authCR.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(dc)
 }
 
 func shouldNotUseCPDHost(authCR *operatorv1alpha1.Authentication, dc *discovery.DiscoveryClient) bool {
@@ -493,66 +544,65 @@ func IsRouteEqual(ctx context.Context, oldRoute, newRoute *routev1.Route) bool {
 	return true
 }
 
-func (r *AuthenticationReconciler) newRoute(authCR *operatorv1alpha1.Authentication, fields *reconcileRouteFields) (*routev1.Route, error) {
-	namespace := authCR.Namespace
+func generateRouteObject(fields *reconcileRouteFields) ctrlcommon.GenerateFn[*routev1.Route] {
+	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, secret *routev1.Route) (err error) {
+		reqLogger := logf.FromContext(ctx)
+		// TODO:
+		weight := int32(100)
 
-	reqLogger := log.WithValues("name", fields.Name, "namespace", namespace)
+		commonLabel := map[string]string{"app": "im"}
+		routeLabels := ctrlcommon.MergeMaps(nil, s.GetPrimary().GetLabels(), commonLabel, ctrlcommon.GetCommonLabels())
 
-	weight := int32(100)
-
-	commonLabel := map[string]string{"app": "im"}
-	routeLabels := ctrlcommon.MergeMaps(nil, authCR.Spec.Labels, commonLabel, ctrlcommon.GetCommonLabels())
-
-	route := &routev1.Route{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Route",
-			APIVersion: routev1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        fields.Name,
-			Namespace:   namespace,
-			Annotations: fields.Annotations,
-			Labels:      routeLabels,
-		},
-		Spec: routev1.RouteSpec{
-			Host: fields.RouteHost,
-			Path: fields.RoutePath,
-			Port: &routev1.RoutePort{
-				TargetPort: intstr.IntOrString{
-					Type:   intstr.Int,
-					IntVal: fields.RoutePort,
+		route := &routev1.Route{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Route",
+				APIVersion: routev1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        s.GetName(),
+				Namespace:   s.GetNamespace(),
+				Annotations: fields.Annotations,
+				Labels:      routeLabels,
+			},
+			Spec: routev1.RouteSpec{
+				Host: fields.RouteHost,
+				Path: fields.RoutePath,
+				Port: &routev1.RoutePort{
+					TargetPort: intstr.IntOrString{
+						Type:   intstr.Int,
+						IntVal: fields.RoutePort,
+					},
 				},
+				To: routev1.RouteTargetReference{
+					Name:   fields.ServiceName,
+					Kind:   "Service",
+					Weight: &weight,
+				},
+				WildcardPolicy: routev1.WildcardPolicyNone,
 			},
-			To: routev1.RouteTargetReference{
-				Name:   fields.ServiceName,
-				Kind:   "Service",
-				Weight: &weight,
-			},
-			WildcardPolicy: routev1.WildcardPolicyNone,
-		},
-	}
-
-	if len(fields.DestinationCAcert) > 0 {
-		route.Spec.TLS = &routev1.TLSConfig{
-			Termination:                   routev1.TLSTerminationReencrypt,
-			InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
-			DestinationCACertificate:      string(fields.DestinationCAcert),
 		}
-	} else if fields.RoutePath == "" {
-		// Passthrough route (if RoutePath is empty)
-		route.Spec.TLS = &routev1.TLSConfig{
-			Termination:                   routev1.TLSTerminationPassthrough,
-			InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+
+		if len(fields.DestinationCAcert) > 0 {
+			route.Spec.TLS = &routev1.TLSConfig{
+				Termination:                   routev1.TLSTerminationReencrypt,
+				InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+				DestinationCACertificate:      string(fields.DestinationCAcert),
+			}
+		} else if fields.RoutePath == "" {
+			// Passthrough route (if RoutePath is empty)
+			route.Spec.TLS = &routev1.TLSConfig{
+				Termination:                   routev1.TLSTerminationPassthrough,
+				InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+			}
 		}
-	}
 
-	err := controllerutil.SetControllerReference(authCR, route, r.Client.Scheme())
-	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for route")
-		return nil, err
+		// Set Authentication instance as the owner and controller of the Route
+		err = controllerutil.SetControllerReference(s.GetPrimary(), secret, s.GetClient().Scheme())
+		if err != nil {
+			reqLogger.Info("Failed to set owner for Route")
+		}
+		return
 	}
-
-	return route, nil
 }
 
 func (r *AuthenticationReconciler) getClusterAddress(authCR *operatorv1alpha1.Authentication, clusterAddress *string) (fn subreconciler.Fn) {

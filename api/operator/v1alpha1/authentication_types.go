@@ -157,7 +157,7 @@ type ConfigSpec struct {
 	OIDCIssuerURL               string         `json:"oidcIssuerURL"`
 	AttrMappingFromConfig       bool           `json:"attrMappingFromConfig,omitempty"`
 	ZenFrontDoor                bool           `json:"zenFrontDoor,omitempty"`
-	Ingress                     *IngressConfig `json:"customHostname,omitempty"`
+	Ingress                     *IngressConfig `json:"ingress,omitempty"`
 }
 
 type ManagedResourceStatus struct {
@@ -320,7 +320,7 @@ func (a *Authentication) HasCustomIngressHostname() bool {
 }
 
 func (a *Authentication) HasCustomIngressCertificate() bool {
-	return a.Spec.Config.Ingress != nil && a.Spec.Config.Ingress.Hostname != nil && *a.Spec.Config.Ingress.Hostname != ""
+	return a.Spec.Config.Ingress != nil && a.Spec.Config.Ingress.Secret != nil && *a.Spec.Config.Ingress.Secret != ""
 }
 
 func (a *Authentication) HasCustomIngress() bool {

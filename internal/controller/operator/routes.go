@@ -80,10 +80,6 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Re
 		return
 	}
 
-	if result, err = r.checkForZenFrontDoor(handleRouteCtx, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return
-	}
-
 	return r.reconcileAllRoutes(handleRouteCtx, authCR)
 }
 
@@ -104,9 +100,12 @@ func (r *AuthenticationReconciler) removeExistingRouteIfItHasDifferentHost() ctr
 			return
 		}
 
-		if route.Spec.Host == routeHost {
+		if route.Name == IMCrtAuthRouteName && route.Spec.Host == strings.Join([]string{IMCrtAuthRoutePrefix, routeHost}, "-") {
+			return nil
+		} else if route.Spec.Host == routeHost {
 			return nil
 		}
+
 		if err = r.Delete(ctx, route); k8sErrors.IsNotFound(err) {
 			return nil
 		} else if err != nil {
@@ -545,15 +544,14 @@ func IsRouteEqual(ctx context.Context, oldRoute, newRoute *routev1.Route) bool {
 }
 
 func generateRouteObject(fields *reconcileRouteFields) ctrlcommon.GenerateFn[*routev1.Route] {
-	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, secret *routev1.Route) (err error) {
+	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, route *routev1.Route) (err error) {
 		reqLogger := logf.FromContext(ctx)
-		// TODO:
 		weight := int32(100)
 
 		commonLabel := map[string]string{"app": "im"}
 		routeLabels := ctrlcommon.MergeMaps(nil, s.GetPrimary().GetLabels(), commonLabel, ctrlcommon.GetCommonLabels())
 
-		route := &routev1.Route{
+		*route = routev1.Route{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Route",
 				APIVersion: routev1.SchemeGroupVersion.String(),
@@ -597,7 +595,7 @@ func generateRouteObject(fields *reconcileRouteFields) ctrlcommon.GenerateFn[*ro
 		}
 
 		// Set Authentication instance as the owner and controller of the Route
-		err = controllerutil.SetControllerReference(s.GetPrimary(), secret, s.GetClient().Scheme())
+		err = controllerutil.SetControllerReference(s.GetPrimary(), route, s.GetClient().Scheme())
 		if err != nil {
 			reqLogger.Info("Failed to set owner for Route")
 		}

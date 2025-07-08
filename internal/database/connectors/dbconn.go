@@ -66,7 +66,12 @@ func NewPostgresDB(opts ...DBOption) (*PostgresDB, error) {
 }
 
 func (p *PostgresDB) Connect(ctx context.Context) (err error) {
-	dsn := fmt.Sprintf("host=%s user=%s dbname=%s port=%s sslmode=require", p.Host, p.User, p.Name, p.Port)
+	var dsn string
+	if len(p.Password) > 0 {
+		dsn = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=require", p.Host, p.User, p.Password, p.Name, p.Port)
+	} else {
+		dsn = fmt.Sprintf("host=%s user=%s dbname=%s port=%s sslmode=require", p.Host, p.User, p.Name, p.Port)
+	}
 	var connConfig *pgx.ConnConfig
 	if connConfig, err = pgx.ParseConfig(dsn); err != nil {
 		return err

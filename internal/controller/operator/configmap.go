@@ -881,7 +881,6 @@ func (r *AuthenticationReconciler) getZenHost(ctx context.Context, authCR *opera
 	err = r.Client.Get(ctx, types.NamespacedName{Name: ZenProductConfigmapName, Namespace: authCR.Namespace}, productConfigMap)
 	if k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Zen product configmap does not exist")
-		err = fmt.Errorf("expected product ConfigMap to be present but it was not found")
 		return
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get Zen product configmap "+ZenProductConfigmapName)

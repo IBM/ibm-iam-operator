@@ -364,6 +364,10 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return subreconciler.Evaluate(subResult, err)
 	}
 
+	if subResult, err := r.syncClientHostnames(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
+
 	return subreconciler.Evaluate(subreconciler.DoNotRequeue())
 }
 

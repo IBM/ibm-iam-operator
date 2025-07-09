@@ -23,6 +23,7 @@ tasks:
   code-build:
     include:
       - dind
+    displayName: Build IM Operator Multi Arch Image
     # code-build includes five configurable steps: setup, unit-test, build-artifact, sign-artifact, scan-artifact
     steps:
       - name: setup
@@ -34,34 +35,25 @@ tasks:
           - docker-socket
           - dind
         image: icr.io/continuous-delivery/base-images/base:v1.19.0
-        displayName: Build Must gather
+        displayName: Building IM Operator Multi Arch Image
         runtimeClassName: x86-xlarge
         script: |
           #!/usr/bin/env bash
-          set -x
-          set -euo pipefail
-          export GITHUB_TOKEN="$(get_env GITHUB_TOKEN)"
-          export GITHUB_USER="$(get_env GITHUB_USER)"
-          export IMAGE_REGISTRY="$(get_env IMAGE_REGISTRY)"
-          export ARTIFACTOTY_USERNAME="$(get_env ARTIFACTOTY_USERNAME)"
-          export ARTIFACTORY_TOKEN="$(get_env ARTIFACTORY_TOKEN)"
-          export BUILDKIT_IMAGE="$(get_env BUILDKIT_IMAGE)"
-          echo -e "machine github.ibm.com\n  login $GITHUB_TOKEN" >> ~/.netrc
-          set_env "TRIGGER_NAME" "$TRIGGER_NAME"
-          chmod 600 ~/.netrc
+          if [[ "$PIPELINE_DEBUG" == 1 ]]; then
+            trap env EXIT
+            env
+            set -x
+          fi
           cd "$WORKSPACE/$(load_repo app-repo path)"
-          echo "Current directory : $(pwd)"
-          echo "BUILDKIT_IMAGE : $(BUILDKIT_IMAGE)"
-          echo "list directory : $(ls -ltr)"
-          git config --global --add safe.directory $WORKSPACE/$(load_repo app-repo path)
-          echo "Current directory : $(pwd)"
-          echo "Trigger name: $TRIGGER_NAME"
-          echo "Current branch : $(git rev-parse --abbrev-ref HEAD)"
-          # install make
-          docker buildx version
-          docker buildx create --name multiarch-builder --use --driver-opt=image="${BUILDKIT_IMAGE}"
-          docker buildx inspect --bootstrap
+          export SWITCH_WORKSPACE="false"
+          export ARCH="amd64"  
+          source build_scripts/sps_build_env.sh
 
+          echo "********************************"
+          echo "Building IM Operator Multi Arch Image"
+          echo "********************************"
+          source build_scripts/build_multiarch.sh
+          
       - name: sign-artifact
         when: false
       - name: scan-artifact

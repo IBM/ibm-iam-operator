@@ -268,10 +268,10 @@ func ConfirmThatItRequeuesWithError(result *ctrl.Result, err error) {
 }
 
 func ConfirmThatItRequeuesWithDelay(result *ctrl.Result, err error, expectedDelay time.Duration) {
+	Expect(err).ToNot(HaveOccurred())
 	Expect(result).ToNot(BeNil())
 	Expect(result.Requeue).To(BeTrue())
 	Expect(result.RequeueAfter).To(Equal(expectedDelay))
-	Expect(err).ToNot(HaveOccurred())
 	Expect(subreconciler.ShouldContinue(result, err)).To(BeFalse())
 	Expect(subreconciler.ShouldRequeue(result, err)).To(BeTrue())
 	Expect(subreconciler.ShouldHaltOrRequeue(result, err)).To(BeTrue())

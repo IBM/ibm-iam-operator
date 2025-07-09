@@ -213,7 +213,6 @@ func (r *AuthenticationReconciler) updateCPConsoleCertificates(authCR *operatorv
 			log.Info("UI is using the Zen front door; continuing")
 			return subreconciler.ContinueReconciling()
 		}
-		log.Info("Ensuring Route is using custom TLS, if configured")
 
 		cpConsoleRoute := &routev1.Route{}
 		objKey := types.NamespacedName{Name: "cp-console", Namespace: authCR.Namespace}

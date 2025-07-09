@@ -225,19 +225,15 @@ func (r *AuthenticationReconciler) updateCPConsoleCertificates(authCR *operatorv
 		modified := false
 		if !authCR.HasCustomIngressCertificate() {
 			log.Info("Custom TLS has not been requested; ensure that related TLS spec is cleared")
-			log.Info("Current TLS spec", "tls.key", cpConsoleRoute.Spec.TLS.Key, "tls.crt", cpConsoleRoute.Spec.TLS.Certificate, "ca.crt", cpConsoleRoute.Spec.TLS.CACertificate)
 			if cpConsoleRoute.Spec.TLS.Key != "" {
-				log.Info("Clear key")
 				cpConsoleRoute.Spec.TLS.Key = ""
 				modified = true
 			}
 			if cpConsoleRoute.Spec.TLS.Certificate != "" {
-				log.Info("Clear certificate")
 				cpConsoleRoute.Spec.TLS.Certificate = ""
 				modified = true
 			}
 			if cpConsoleRoute.Spec.TLS.CACertificate != "" {
-				log.Info("Clear CA certificate")
 				cpConsoleRoute.Spec.TLS.CACertificate = ""
 				modified = true
 			}
@@ -263,7 +259,7 @@ func (r *AuthenticationReconciler) updateCPConsoleCertificates(authCR *operatorv
 		}
 
 		if !modified {
-			log.Info("No modifications made to UI Route; continuing")
+			log.Info("No modifications needed for UI Route; continuing")
 			return subreconciler.ContinueReconciling()
 		}
 

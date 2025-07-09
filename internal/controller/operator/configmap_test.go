@@ -158,6 +158,11 @@ var _ = Describe("ConfigMap handling", func() {
 					Namespace:       "data-ns",
 					ResourceVersion: trackerAddResourceVersion,
 				},
+				Spec: operatorv1alpha1.AuthenticationSpec{
+					Config: operatorv1alpha1.ConfigSpec{
+						OnPremMultipleDeploy: true,
+					},
+				},
 			}
 			globalConfigMap = &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
@@ -232,14 +237,16 @@ var _ = Describe("ConfigMap handling", func() {
 					"im_idmgmt_endpoint":        "https://platform-identity-management.data-ns.svc:4500",
 				},
 			}
+			ibmcloudClusterInfoCopy := ibmcloudClusterInfo.DeepCopy()
 			Expect(r.Create(ctx, ibmcloudClusterInfo)).To(Succeed())
 			result, err := r.handleIBMCloudClusterInfo(ctx, authCR, ibmcloudClusterInfo)
 			cmKey := types.NamespacedName{Name: "ibmcloud-cluster-info", Namespace: "data-ns"}
-			testutil.ConfirmThatItContinuesReconciling(result, err)
 			observed := &corev1.ConfigMap{}
 			err = r.Get(ctx, cmKey, observed)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ibmcloudClusterInfo.Data).ToNot(BeNil())
+			Expect(ibmcloudClusterInfo.Data).To(Equal(ibmcloudClusterInfoCopy.Data))
+			testutil.ConfirmThatItContinuesReconciling(result, err)
 		})
 		It("produces an error when ibm-cpp-config does not have domain_name set", func() {
 			ibmcloudClusterInfo = &corev1.ConfigMap{

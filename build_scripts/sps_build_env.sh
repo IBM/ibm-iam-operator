@@ -53,5 +53,5 @@ DIND_ENABLED="${DIND_ENABLED:-true}"
 
 if [ "$DIND_ENABLED" == "true" ]; then
     echo "Doing docker login to $DOCKER_REGISTRY"
-    make docker:login docker-na-public.artifactory.swg-devops.com DOCKER_USER=$ARTIFACTOTY_USERNAME DOCKER_PASS=$ARTIFACTORY_TOKEN
+    docker login docker-na-public.artifactory.swg-devops.com DOCKER_USER=$ARTIFACTOTY_USERNAME DOCKER_PASS=$ARTIFACTORY_TOKEN
 fi

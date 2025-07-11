@@ -34,9 +34,9 @@ tasks:
         include:
           - docker-socket
           - dind
-        image: icr.io/continuous-delivery/base-images/base:v1.19.0
+        image: icr.io/continuous-delivery/pipeline/pipeline-base-ubi:3.65
         displayName: Building IM Operator Multi Arch Image
-        runtimeClassName: x86-xlarge
+        runtimeClassName: large
         script: |
           #!/usr/bin/env bash
           if [[ "$PIPELINE_DEBUG" == 1 ]]; then

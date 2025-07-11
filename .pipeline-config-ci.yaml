@@ -36,7 +36,7 @@ tasks:
           - dind
         image: icr.io/continuous-delivery/pipeline/pipeline-base-ubi:3.65
         displayName: Building IM Operator Multi Arch Image
-        runtimeClassName: large
+        runtimeClassName: x86-xlarge
         script: |
           #!/usr/bin/env bash
           if [[ "$PIPELINE_DEBUG" == 1 ]]; then

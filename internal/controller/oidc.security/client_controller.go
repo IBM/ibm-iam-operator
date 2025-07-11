@@ -39,15 +39,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	runtimeClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/api/oidc.security/v1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
@@ -878,39 +872,8 @@ func (r *ClientReconciler) removeAnnotationFromSA(ctx context.Context, req ctrl.
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClientReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	clientCtrl := ctrl.NewControllerManagedBy(mgr).
+	return ctrl.NewControllerManagedBy(mgr).
 		For(&oidcsecurityv1.Client{}).
-		Owns(&corev1.Secret{})
-	// Follow update and create events on ibmcloud-cluster-info
-	ibmcloudClusterInfoCMPred := predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			oldObj := e.ObjectOld.(*corev1.ConfigMap)
-			newObj := e.ObjectNew.(*corev1.ConfigMap)
-
-			return oldObj.Name == "ibmcloud-cluster-info" && oldObj.Data["cluster_address"] != newObj.Data["cluster_address"]
-		},
-
-		// Allow create events
-		CreateFunc: func(e event.CreateEvent) bool {
-			obj := e.Object.(*corev1.ConfigMap)
-			return obj.Name == "ibmcloud-cluster-info"
-		},
-	}
-	clientCtrl.Watches(&corev1.ConfigMap{},
-		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
-			clientList := &oidcsecurityv1.ClientList{}
-			log := logf.FromContext(ctx)
-			if err := r.List(ctx, clientList); err != nil {
-				log.Error(err, "Failed to list Clients")
-				return
-			}
-			requests = []reconcile.Request{}
-			for _, client := range clientList.Items {
-				requests = append(requests, reconcile.Request{NamespacedName: common.GetObjectKey(&client)})
-				log.V(1).Info("Enqueueing Client CR", "Request.Name", client.Name, "Request.Namespace", client.Namespace)
-			}
-			return
-		}), builder.WithPredicates(ibmcloudClusterInfoCMPred),
-	)
-	return clientCtrl.Complete(r)
+		Owns(&corev1.Secret{}).
+		Complete(r)
 }

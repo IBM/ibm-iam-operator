@@ -15,15 +15,12 @@ export ARTIFACTOTY_USERNAME="$(get_env ARTIFACTOTY_USERNAME)"
 export ARTIFACTORY_TOKEN="$(get_env ARTIFACTORY_TOKEN)"
 
 export GIT_BRANCH="$(get_env branch)"
-export TRIGGER_NAME=$(get_env TRIGGER_NAME)
 export BUILDKIT_IMAGE="$(get_env BUILDKIT_IMAGE)"
 export DOCKER_REGISTRY="$(get_env DOCKER_REGISTRY || echo docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-scratch-docker-local/ibmcom)"
-export TAG="$(get_env TAG || cat RELEASE_VERSION | tr -s '\n' ' ')"
 
 git config --global --add safe.directory $WORKSPACE/$(load_repo app-repo path)
 
 echo "Current directory : $(pwd)"
-echo "Trigger name: $TRIGGER_NAME"
 echo "Current branch : $(git rev-parse --abbrev-ref HEAD)"
 export GIT_COMMIT="$(git rev-parse HEAD)"
 
@@ -55,7 +52,6 @@ fi
 DIND_ENABLED="${DIND_ENABLED:-true}"
 
 if [ "$DIND_ENABLED" == "true" ]; then
-    make init
     echo "Doing docker login to $DOCKER_REGISTRY"
     make docker:login docker-na-public.artifactory.swg-devops.com DOCKER_USER=$ARTIFACTOTY_USERNAME DOCKER_PASS=$ARTIFACTORY_TOKEN
 fi

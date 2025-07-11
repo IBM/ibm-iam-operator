@@ -52,8 +52,7 @@ tasks:
           echo "********************************"
           echo "Building IM Operator Multi Arch Image"
           echo "********************************"
-          source build_scripts/build_multiarch.sh
-          
+          source build_scripts/build_multiarch.sh         
       - name: sign-artifact
         when: false
       - name: scan-artifact

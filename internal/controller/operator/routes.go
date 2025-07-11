@@ -37,6 +37,7 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
 	zenv1 "github.com/IBM/ibm-iam-operator/internal/api/zen.cpd.ibm.com/v1"
+	"github.com/IBM/ibm-iam-operator/internal/controller/common"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
 )
 
@@ -58,13 +59,13 @@ var commonRouteAnnotations map[string]string = map[string]string{
 }
 
 type reconcileRouteFields struct {
-	Name              string
-	Annotations       map[string]string
-	RouteHost         string
-	RoutePath         string
-	RoutePort         int32
-	ServiceName       string
-	DestinationCAcert []byte
+	Name        string
+	Annotations map[string]string
+	RouteHost   string
+	RoutePath   string
+	RoutePort   int32
+	ServiceName string
+	TLS         *routev1.TLSConfig
 }
 
 func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
@@ -80,11 +81,195 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Re
 		return
 	}
 
-	if result, err = r.checkForZenFrontDoor(handleRouteCtx, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+	return r.reconcileAllRoutes(handleRouteCtx, authCR)
+}
+
+// removeExistingRouteIfItHasDifferentHost produces a GenerateFn that removes
+// the SecondaryReconciler's Route if that Route has an out-of-date .spec.host
+// value.
+func (r *AuthenticationReconciler) removeExistingRouteIfItHasDifferentHost() ctrlcommon.GenerateFn[*routev1.Route] {
+	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, route *routev1.Route) (err error) {
+		authCR := s.GetPrimary().(*operatorv1alpha1.Authentication)
+		var routeHost string
+		if result, suberr := r.getClusterAddress(authCR, &routeHost)(ctx); subreconciler.ShouldHaltOrRequeue(result, suberr) {
+			return
+		}
+		objKey := types.NamespacedName{Name: s.GetName(), Namespace: s.GetNamespace()}
+		if err = r.Get(ctx, objKey, route); k8sErrors.IsNotFound(err) {
+			return nil
+		} else if err != nil {
+			return
+		}
+
+		if route.Name == IMCrtAuthRouteName && route.Spec.Host == strings.Join([]string{IMCrtAuthRoutePrefix, routeHost}, "-") {
+			return nil
+		} else if route.Spec.Host == routeHost {
+			return nil
+		}
+
+		if err = r.Delete(ctx, route); k8sErrors.IsNotFound(err) {
+			return nil
+		} else if err != nil {
+			err = fmt.Errorf("failed to delete Route with old .spec.host: %w", err)
+		}
+		return
+	}
+}
+
+func (r *AuthenticationReconciler) reconcileAllRoutes(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
+	reqLogger := logf.FromContext(ctx)
+	allRoutesFields := &map[string]*reconcileRouteFields{}
+	if result, err = r.getAllRoutesFields(authCR, allRoutesFields)(ctx); subreconciler.ShouldRequeue(result, err) {
 		return
 	}
 
-	return r.reconcileAllRoutes(handleRouteCtx, authCR)
+	allRouteReconcilers, err := r.getRouteSubreconcilers(authCR, allRoutesFields)
+	if err != nil {
+		return subreconciler.RequeueWithError(err)
+	}
+
+	if result, err = allRouteReconcilers.Reconcile(ctx); err != nil {
+		reqLogger.Info("One or more errors were encountered while reconciling Routes; requeueing")
+	} else if subreconciler.ShouldRequeue(result, err) {
+		reqLogger.Info("One or more Routes were written to; requeueing")
+	} else {
+		reqLogger.Info("Routes already up-to-date")
+	}
+	return
+}
+
+// getCustomIngressSecret retrieves the TLS Secret that is named in
+// `.spec.config.ingress.secret` on the Authentication CR. Returns an error if
+// it is unable to do so.
+func (r *AuthenticationReconciler) getCustomIngressSecret(ctx context.Context, authCR *operatorv1alpha1.Authentication, secret *corev1.Secret) (err error) {
+	if !authCR.HasCustomIngressCertificate() {
+		return
+	}
+	objKey := types.NamespacedName{Name: *authCR.Spec.Config.Ingress.Secret, Namespace: authCR.Namespace}
+	if err = r.Get(ctx, objKey, secret); err != nil {
+		return
+	}
+	return
+}
+
+func modifyRoute(s ctrlcommon.SecondaryReconciler, ctx context.Context, observed, generated *routev1.Route) (modified bool, err error) {
+	// Preserve custom annotation settings observed in the cluster; skip changes to rewrite-target
+	for annotation, value := range observed.Annotations {
+		if annotation != "haproxy.router.openshift.io/rewrite-target" {
+			generated.Annotations[annotation] = value
+		} else if generated.Annotations[annotation] != value {
+			// Log when a rewrite-target annotation change has been ignored
+			//reqLogger.Info("Attempted change to \"haproxy.router.openshift.io/rewrite-target\" prevented", "value", value)
+		}
+	}
+
+	if !IsRouteEqual(ctx, generated, observed) {
+		observed.Name = generated.Name
+		observed.Annotations = generated.Annotations
+		observed.Spec = generated.Spec
+		modified = true
+	}
+	return
+}
+
+func (r *AuthenticationReconciler) getRouteSubreconcilers(authCR *operatorv1alpha1.Authentication, allFields *map[string]*reconcileRouteFields) (subRecs ctrlcommon.Subreconcilers, err error) {
+	subRecs = ctrlcommon.Subreconcilers{
+		r.removeExtraRoutes(authCR, allFields),
+	}
+	builders := []*ctrlcommon.SecondaryReconcilerBuilder[*routev1.Route]{}
+
+	for _, fields := range *allFields {
+		builders = append(builders, ctrlcommon.NewSecondaryReconcilerBuilder[*routev1.Route]().
+			WithName(fields.Name).
+			WithGenerateFns(r.removeExistingRouteIfItHasDifferentHost(),
+				generateRouteObject(fields)).
+			WithModifyFns(modifyRoute),
+		)
+	}
+
+	for i := range builders {
+		subRecs = append(subRecs, builders[i].
+			WithNamespace(authCR.Namespace).
+			WithPrimary(authCR).
+			WithClient(r.Client).
+			MustBuild())
+	}
+
+	subRecs = append(subRecs, r.updateCPConsoleCertificates(authCR))
+
+	return
+}
+
+// updateCPConsoleCertificates updates the certificate-related fields on the
+// cp-console Route when .spec.config.ingress.secret is set on the
+// Authentication CR. Skips when this field is not configured or if the Zen
+// front door has been enabled on the Authentication CR with
+// .spec.config.zenFrontDoor set to true.
+func (r *AuthenticationReconciler) updateCPConsoleCertificates(authCR *operatorv1alpha1.Authentication) ctrlcommon.SecondaryReconcilerFn {
+	return ctrlcommon.SecondaryReconcilerFn(func(ctx context.Context) (result *ctrl.Result, err error) {
+		log := logf.FromContext(ctx, "Route.Name", "cp-console", "Route.Namespace", authCR.Namespace)
+		log.Info("Update certificates on UI Route if custom TLS configured")
+		if authCR.Spec.Config.ZenFrontDoor {
+			log.Info("UI is using the Zen front door; continuing")
+			return subreconciler.ContinueReconciling()
+		}
+
+		cpConsoleRoute := &routev1.Route{}
+		objKey := types.NamespacedName{Name: "cp-console", Namespace: authCR.Namespace}
+		if err = r.Get(ctx, objKey, cpConsoleRoute); err != nil {
+			log.Error(err, "Failed to get Route")
+			return subreconciler.RequeueWithError(fmt.Errorf("unable to configure cp-console with custom TLS: %w", err))
+		}
+
+		modified := false
+		if !authCR.HasCustomIngressCertificate() {
+			log.Info("Custom TLS has not been requested; ensure that related TLS spec is cleared")
+			if cpConsoleRoute.Spec.TLS.Key != "" {
+				cpConsoleRoute.Spec.TLS.Key = ""
+				modified = true
+			}
+			if cpConsoleRoute.Spec.TLS.Certificate != "" {
+				cpConsoleRoute.Spec.TLS.Certificate = ""
+				modified = true
+			}
+			if cpConsoleRoute.Spec.TLS.CACertificate != "" {
+				cpConsoleRoute.Spec.TLS.CACertificate = ""
+				modified = true
+			}
+		} else {
+			log.Info("Custom TLS has been requested; ensure that related TLS spec is set")
+			secret := &corev1.Secret{}
+			if err = r.getCustomIngressSecret(ctx, authCR, secret); err != nil {
+				log.Error(err, "Failed to get Secret", "Secret.Name", authCR.Spec.Config.Ingress.Secret, "Secret.Namespace", authCR.Namespace)
+				return subreconciler.RequeueWithError(fmt.Errorf("unable to configure cp-console with custom TLS: %w", err))
+			}
+			if cpConsoleRoute.Spec.TLS.Key != string(secret.Data["tls.key"]) {
+				cpConsoleRoute.Spec.TLS.Key = string(secret.Data["tls.key"])
+				modified = true
+			}
+			if cpConsoleRoute.Spec.TLS.Certificate != string(secret.Data["tls.crt"]) {
+				cpConsoleRoute.Spec.TLS.Certificate = string(secret.Data["tls.crt"])
+				modified = true
+			}
+			if cpConsoleRoute.Spec.TLS.CACertificate != string(secret.Data["ca.crt"]) {
+				cpConsoleRoute.Spec.TLS.CACertificate = string(secret.Data["ca.crt"])
+				modified = true
+			}
+		}
+
+		if !modified {
+			log.Info("No modifications needed for UI Route; continuing")
+			return subreconciler.ContinueReconciling()
+		}
+
+		log.Info("UI Route needs update on TLS spec")
+		if err = r.Update(ctx, cpConsoleRoute); err != nil {
+			log.Error(err, "Failed to update UI Route")
+			return subreconciler.RequeueWithError(err)
+		}
+		log.Info("UI Route successfully updated with custom TLS; requeueing")
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	})
 }
 
 // checkForZenFrontDoor confirms whether traffic should or should not be consolidated through the cpd Route. When it
@@ -93,7 +278,7 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Re
 // traffic.
 func (r *AuthenticationReconciler) checkForZenFrontDoor(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx)
-	if shouldHaveRoutes(authCR, &r.DiscoveryClient) {
+	if shouldNotUseCPDHost(authCR, &r.DiscoveryClient) {
 		reqLogger.Info("IM Routes will be created")
 		return subreconciler.ContinueReconciling()
 	}
@@ -118,40 +303,9 @@ func (r *AuthenticationReconciler) checkForZenFrontDoor(ctx context.Context, aut
 	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
-func (r *AuthenticationReconciler) reconcileAllRoutes(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	allRoutesFields := &map[string]*reconcileRouteFields{}
-	if result, err = r.getAllRoutesFields(authCR, allRoutesFields)(ctx); subreconciler.ShouldRequeue(result, err) {
-		return
-	}
-
-	allRouteReconcilers := make([]subreconciler.Fn, 0)
-	for _, routeFields := range *allRoutesFields {
-		allRouteReconcilers = append(allRouteReconcilers, r.reconcileRoute(authCR, routeFields))
-	}
-
-	allRouteReconcilers = append(allRouteReconcilers, r.removeExtraRoutes(authCR, allRoutesFields))
-
-	results := []*ctrl.Result{}
-	errs := []error{}
-	for _, reconcileRoute := range allRouteReconcilers {
-		result, err = reconcileRoute(ctx)
-		results = append(results, result)
-		errs = append(errs, err)
-	}
-	if result, err = ctrlcommon.ReduceSubreconcilerResultsAndErrors(results, errs); err != nil {
-		reqLogger.Info("Errors were encountered while reconciling Routes; requeueing")
-	} else if subreconciler.ShouldRequeue(result, err) {
-		reqLogger.Info("One or more Routes were reconciled; requeueing")
-	} else {
-		reqLogger.Info("Routes already up-to-date")
-	}
-	return
-}
-
 // removeExtraRoutes produces a subreconciler that deletes any Route that is labeled as IM's and is not in the list of
 // Routes that the Operator wants to exist.
-func (r *AuthenticationReconciler) removeExtraRoutes(authCR *operatorv1alpha1.Authentication, allRoutesFields *map[string]*reconcileRouteFields) (fn subreconciler.Fn) {
+func (r *AuthenticationReconciler) removeExtraRoutes(authCR *operatorv1alpha1.Authentication, allRoutesFields *map[string]*reconcileRouteFields) (fn ctrlcommon.SecondaryReconcilerFn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		reqLogger := logf.FromContext(ctx)
 		routesList := &routev1.RouteList{}
@@ -188,6 +342,19 @@ func (r *AuthenticationReconciler) removeExtraRoutes(authCR *operatorv1alpha1.Au
 	}
 }
 
+func (r *AuthenticationReconciler) getCustomTLS(authCR *operatorv1alpha1.Authentication, secret *corev1.Secret) common.SecondaryReconcilerFn {
+	return func(ctx context.Context) (result *ctrl.Result, err error) {
+		if !authCR.HasCustomIngressCertificate() {
+			return subreconciler.ContinueReconciling()
+		}
+		objKey := types.NamespacedName{Name: *authCR.Spec.Config.Ingress.Secret, Namespace: authCR.Namespace}
+		if err = r.Get(ctx, objKey, secret); err != nil {
+			return subreconciler.RequeueWithError(err)
+		}
+		return subreconciler.ContinueReconciling()
+	}
+}
+
 func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.Authentication, allRoutesFields *map[string]*reconcileRouteFields) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		routeHost := ""
@@ -197,19 +364,29 @@ func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.A
 			platformIdentityManagementCert []byte
 			platformIdentityProviderCert   []byte
 		)
+		customTLSSecret := &corev1.Secret{}
 
-		fns := []subreconciler.Fn{
+		subRec := ctrlcommon.NewLazySubreconcilers(
 			r.getClusterAddress(authCR, &routeHost),
 			r.getWlpClientID(authCR, &wlpClientID),
 			r.getCertificateForService(PlatformAuthServiceName, authCR, &platformAuthCert),
 			r.getCertificateForService(PlatformIdentityManagementServiceName, authCR, &platformIdentityManagementCert),
 			r.getCertificateForService(PlatformIdentityProviderServiceName, authCR, &platformIdentityProviderCert),
+			r.getCustomTLS(authCR, customTLSSecret),
+		)
+
+		if result, err = subRec.Reconcile(ctx); subreconciler.ShouldRequeue(result, err) {
+			return
 		}
 
-		for _, fn := range fns {
-			if result, err = fn(ctx); subreconciler.ShouldRequeue(result, err) {
-				return
-			}
+		key := ""
+		caCrt := ""
+		crt := ""
+
+		if customTLSSecret.Data != nil {
+			key = string(customTLSSecret.Data["tls.key"])
+			crt = string(customTLSSecret.Data["tls.crt"])
+			caCrt = string(customTLSSecret.Data["ca.crt"])
 		}
 
 		*allRoutesFields = map[string]*reconcileRouteFields{
@@ -217,79 +394,128 @@ func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.A
 				Annotations: map[string]string{
 					"haproxy.router.openshift.io/rewrite-target": "/",
 				},
-				Name:              "id-mgmt",
-				RouteHost:         routeHost,
-				RoutePath:         "/idmgmt/",
-				RoutePort:         4500,
-				ServiceName:       PlatformIdentityManagementServiceName,
-				DestinationCAcert: platformIdentityManagementCert,
+				Name:        "id-mgmt",
+				RouteHost:   routeHost,
+				RoutePath:   "/idmgmt/",
+				RoutePort:   4500,
+				ServiceName: PlatformIdentityManagementServiceName,
+				TLS: &routev1.TLSConfig{
+					DestinationCACertificate:      string(platformIdentityManagementCert),
+					Termination:                   routev1.TLSTerminationReencrypt,
+					InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+					Key:                           key,
+					Certificate:                   crt,
+					CACertificate:                 caCrt,
+				},
 			},
 			"platform-auth": {
 				Annotations: map[string]string{
 					"haproxy.router.openshift.io/rewrite-target": "/v1/auth/",
 				},
-				Name:              "platform-auth",
-				RouteHost:         routeHost,
-				RoutePath:         "/v1/auth/",
-				RoutePort:         4300,
-				DestinationCAcert: platformIdentityProviderCert,
-				ServiceName:       PlatformIdentityProviderServiceName,
+				Name:        "platform-auth",
+				RouteHost:   routeHost,
+				RoutePath:   "/v1/auth/",
+				RoutePort:   4300,
+				ServiceName: PlatformIdentityProviderServiceName,
+				TLS: &routev1.TLSConfig{
+					DestinationCACertificate:      string(platformIdentityProviderCert),
+					Termination:                   routev1.TLSTerminationReencrypt,
+					InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+					Key:                           key,
+					Certificate:                   crt,
+					CACertificate:                 caCrt,
+				},
 			},
 			"platform-id-provider": {
 				Annotations: map[string]string{
 					"haproxy.router.openshift.io/rewrite-target": "/",
 				},
-				Name:              "platform-id-provider",
-				RouteHost:         routeHost,
-				RoutePath:         "/idprovider/",
-				RoutePort:         4300,
-				DestinationCAcert: platformIdentityProviderCert,
-				ServiceName:       PlatformIdentityProviderServiceName,
+				Name:        "platform-id-provider",
+				RouteHost:   routeHost,
+				RoutePath:   "/idprovider/",
+				RoutePort:   4300,
+				ServiceName: PlatformIdentityProviderServiceName,
+				TLS: &routev1.TLSConfig{
+					DestinationCACertificate:      string(platformIdentityProviderCert),
+					Termination:                   routev1.TLSTerminationReencrypt,
+					InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+					Key:                           key,
+					Certificate:                   crt,
+					CACertificate:                 caCrt,
+				},
 			},
 			"platform-login": {
 				Annotations: map[string]string{
 					"haproxy.router.openshift.io/rewrite-target": fmt.Sprintf("/v1/auth/authorize?client_id=%s&redirect_uri=https://%s/auth/liberty/callback&response_type=code&scope=openid+email+profile&orig=/login", wlpClientID, routeHost),
 				},
-				Name:              "platform-login",
-				RouteHost:         routeHost,
-				RoutePath:         "/login",
-				RoutePort:         4300,
-				DestinationCAcert: platformIdentityProviderCert,
-				ServiceName:       PlatformIdentityProviderServiceName,
+				Name:        "platform-login",
+				RouteHost:   routeHost,
+				RoutePath:   "/login",
+				RoutePort:   4300,
+				ServiceName: PlatformIdentityProviderServiceName,
+				TLS: &routev1.TLSConfig{
+					DestinationCACertificate:      string(platformIdentityProviderCert),
+					Termination:                   routev1.TLSTerminationReencrypt,
+					InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+					Key:                           key,
+					Certificate:                   crt,
+					CACertificate:                 caCrt,
+				},
 			},
 			"platform-oidc": {
 				Annotations: map[string]string{
 					"haproxy.router.openshift.io/balance": "source",
 				},
-				Name:              "platform-oidc",
-				RouteHost:         routeHost,
-				RoutePath:         "/oidc",
-				RoutePort:         9443,
-				DestinationCAcert: platformAuthCert,
-				ServiceName:       PlatformAuthServiceName,
+				Name:        "platform-oidc",
+				RouteHost:   routeHost,
+				RoutePath:   "/oidc",
+				RoutePort:   9443,
+				ServiceName: PlatformAuthServiceName,
+				TLS: &routev1.TLSConfig{
+					DestinationCACertificate:      string(platformAuthCert),
+					Termination:                   routev1.TLSTerminationReencrypt,
+					InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+					Key:                           key,
+					Certificate:                   crt,
+					CACertificate:                 caCrt,
+				},
 			},
 			"saml-ui-callback": {
 				Annotations: map[string]string{
 					"haproxy.router.openshift.io/balance": "source",
 				},
-				Name:              "saml-ui-callback",
-				RouteHost:         routeHost,
-				RoutePath:         "/ibm/saml20/defaultSP",
-				RoutePort:         9443,
-				ServiceName:       PlatformAuthServiceName,
-				DestinationCAcert: platformAuthCert,
+				Name:        "saml-ui-callback",
+				RouteHost:   routeHost,
+				RoutePath:   "/ibm/saml20/defaultSP",
+				RoutePort:   9443,
+				ServiceName: PlatformAuthServiceName,
+				TLS: &routev1.TLSConfig{
+					DestinationCACertificate:      string(platformAuthCert),
+					Termination:                   routev1.TLSTerminationReencrypt,
+					InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+					Key:                           key,
+					Certificate:                   crt,
+					CACertificate:                 caCrt,
+				},
 			},
 			"social-login-callback": {
 				Annotations: map[string]string{
 					"haproxy.router.openshift.io/balance":        "source",
 					"haproxy.router.openshift.io/rewrite-target": "/ibm/api/social-login",
 				},
-				Name:              "social-login-callback",
-				RouteHost:         routeHost,
-				RoutePath:         "/ibm/api/social-login",
-				RoutePort:         9443,
-				ServiceName:       PlatformAuthServiceName,
-				DestinationCAcert: platformAuthCert,
+				Name:        "social-login-callback",
+				RouteHost:   routeHost,
+				RoutePath:   "/ibm/api/social-login",
+				RoutePort:   9443,
+				ServiceName: PlatformAuthServiceName,
+				TLS: &routev1.TLSConfig{
+					DestinationCACertificate:      string(platformAuthCert),
+					Termination:                   routev1.TLSTerminationReencrypt,
+					InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+					Key:                           key,
+					Certificate:                   crt,
+					CACertificate:                 caCrt,
+				},
 			},
 			IMCrtAuthRouteName: {
 				Annotations: map[string]string{
@@ -299,6 +525,10 @@ func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.A
 				RouteHost:   strings.Join([]string{IMCrtAuthRoutePrefix, routeHost}, "-"),
 				RoutePort:   9443,
 				ServiceName: PlatformAuthServiceName,
+				TLS: &routev1.TLSConfig{
+					Termination:                   routev1.TLSTerminationPassthrough,
+					InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+				},
 			},
 		}
 
@@ -311,136 +541,12 @@ func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.A
 	}
 }
 
-func (r *AuthenticationReconciler) reconcileRoute(authCR *operatorv1alpha1.Authentication, fields *reconcileRouteFields) (fn subreconciler.Fn) {
-	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		namespace := authCR.Namespace
-		reqLogger := logf.FromContext(ctx, "name", fields.Name, "namespace", namespace).V(1)
-
-		reqLogger.Info("Reconciling route", "annotations", fields.Annotations, "routeHost", fields.RouteHost, "routePath", fields.RoutePath)
-
-		fCtx := logf.IntoContext(ctx, reqLogger)
-		if fields.Name != IMCrtAuthRouteName {
-			if shouldNotHaveRoutes(authCR, &r.DiscoveryClient) {
-				return r.ensureRouteDoesNotExist(fCtx, authCR, fields)
-			}
-		}
-
-		return r.ensureRouteExists(fCtx, authCR, fields)
-	}
+func shouldUseCPDHost(authCR *operatorv1alpha1.Authentication, dc *discovery.DiscoveryClient) bool {
+	return !authCR.HasCustomIngressHostname() && authCR.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(dc)
 }
 
-func (r *AuthenticationReconciler) ensureRouteDoesNotExist(ctx context.Context, authCR *operatorv1alpha1.Authentication, fields *reconcileRouteFields) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	reqLogger.Info("Determined Route should not exist; removing if present")
-	observedRoute := &routev1.Route{}
-	err = r.Get(ctx, types.NamespacedName{Name: fields.Name, Namespace: authCR.Namespace}, observedRoute)
-	if k8sErrors.IsNotFound(err) {
-		return subreconciler.ContinueReconciling()
-	} else if err != nil {
-		reqLogger.Error(err, "Failed to get existing route for reconciliation")
-		return subreconciler.RequeueWithError(err)
-	}
-	err = r.Delete(ctx, observedRoute)
-	if err != nil {
-		reqLogger.Error(err, "Failed to delete the Route")
-		return subreconciler.RequeueWithError(err)
-	}
-	reqLogger.Info("Successfully deleted the Route")
-
-	return subreconciler.RequeueWithDelay(defaultLowerWait)
-}
-
-func (r *AuthenticationReconciler) ensureRouteExists(ctx context.Context, authCR *operatorv1alpha1.Authentication, fields *reconcileRouteFields) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	calculatedRoute, err := r.newRoute(authCR, fields)
-	if err != nil {
-		reqLogger.Error(err, "Error creating desired route for reconcilition")
-		return
-	}
-
-	observedRoute := &routev1.Route{}
-	err = r.Get(ctx, types.NamespacedName{Name: fields.Name, Namespace: authCR.Namespace}, observedRoute)
-	if k8sErrors.IsNotFound(err) {
-		reqLogger.Info("Route not found - creating")
-
-		err = r.Create(ctx, calculatedRoute)
-		if err != nil {
-			if k8sErrors.IsAlreadyExists(err) {
-				// Route already exists from a previous reconcile
-				reqLogger.Info("Route already exists")
-				return subreconciler.ContinueReconciling()
-			}
-			// Failed to create a new route
-			reqLogger.Error(err, "Failed to create new route")
-			return subreconciler.RequeueWithError(err)
-		}
-		// Requeue after creating new route
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	} else if err != nil {
-		reqLogger.Error(err, "Failed to get existing route for reconciliation")
-		return
-	}
-	// Determine if current route has changed
-	reqLogger.Info("Comparing current and desired routes")
-
-	// Preserve custom annotation settings observed in the cluster; skip changes to rewrite-target
-	for annotation, value := range observedRoute.Annotations {
-		if annotation != "haproxy.router.openshift.io/rewrite-target" {
-			calculatedRoute.Annotations[annotation] = value
-		} else if calculatedRoute.Annotations[annotation] != value {
-			// Log when a rewrite-target annotation change has been ignored
-			reqLogger.Info("Attempted change to \"haproxy.router.openshift.io/rewrite-target\" prevented", "value", value)
-		}
-	}
-
-	// if observed route contains a non-empty certificate, caCertificate, and key, these values must be
-	// retained
-	if observedRoute.Spec.TLS != nil && observedRoute.Spec.TLS.Key != "" && observedRoute.Spec.TLS.Certificate != "" && observedRoute.Spec.TLS.CACertificate != "" {
-		reqLogger.Info("Keeping custom TLS key, certificate, and CA certificate from observed Route in calculated Route")
-		calculatedRoute.Spec.TLS.Key = observedRoute.Spec.TLS.Key
-		calculatedRoute.Spec.TLS.Certificate = observedRoute.Spec.TLS.Certificate
-		calculatedRoute.Spec.TLS.CACertificate = observedRoute.Spec.TLS.CACertificate
-	}
-
-	//routeHost is immutable so it must be checked first and the route recreated if it has changed
-	if observedRoute.Spec.Host != calculatedRoute.Spec.Host {
-		err = r.Delete(ctx, observedRoute)
-		if err != nil {
-			reqLogger.Error(err, "Route host changed, unable to delete existing route for recreate")
-			return subreconciler.RequeueWithError(err)
-		}
-		//Recreate the route
-		err = r.Create(ctx, calculatedRoute)
-		if err != nil {
-			reqLogger.Error(err, "Route host changed, unable to create new route")
-			return subreconciler.RequeueWithError(err)
-		}
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
-
-	if !IsRouteEqual(ctx, calculatedRoute, observedRoute) {
-		reqLogger.Info("Updating route")
-
-		observedRoute.Name = calculatedRoute.Name
-		observedRoute.Annotations = calculatedRoute.Annotations
-		observedRoute.Spec = calculatedRoute.Spec
-
-		err = r.Update(ctx, observedRoute)
-		if err != nil {
-			reqLogger.Error(err, "Failed to update route")
-			return subreconciler.RequeueWithError(err)
-		}
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
-	return subreconciler.ContinueReconciling()
-}
-
-func shouldNotHaveRoutes(authCR *operatorv1alpha1.Authentication, dc *discovery.DiscoveryClient) bool {
-	return authCR.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(dc)
-}
-
-func shouldHaveRoutes(authCR *operatorv1alpha1.Authentication, dc *discovery.DiscoveryClient) bool {
-	return !shouldNotHaveRoutes(authCR, dc)
+func shouldNotUseCPDHost(authCR *operatorv1alpha1.Authentication, dc *discovery.DiscoveryClient) bool {
+	return !shouldUseCPDHost(authCR, dc)
 }
 
 // Use DeepEqual to determine if 2 routes are equal.
@@ -520,73 +626,61 @@ func IsRouteEqual(ctx context.Context, oldRoute, newRoute *routev1.Route) bool {
 	return true
 }
 
-func (r *AuthenticationReconciler) newRoute(authCR *operatorv1alpha1.Authentication, fields *reconcileRouteFields) (*routev1.Route, error) {
-	namespace := authCR.Namespace
+func generateRouteObject(fields *reconcileRouteFields) ctrlcommon.GenerateFn[*routev1.Route] {
+	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, route *routev1.Route) (err error) {
+		reqLogger := logf.FromContext(ctx)
+		weight := int32(100)
 
-	reqLogger := log.WithValues("name", fields.Name, "namespace", namespace)
+		commonLabel := map[string]string{"app": "im"}
+		routeLabels := ctrlcommon.MergeMaps(nil, s.GetPrimary().GetLabels(), commonLabel, ctrlcommon.GetCommonLabels())
 
-	weight := int32(100)
-
-	commonLabel := map[string]string{"app": "im"}
-	routeLabels := ctrlcommon.MergeMaps(nil, authCR.Spec.Labels, commonLabel, ctrlcommon.GetCommonLabels())
-
-	route := &routev1.Route{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Route",
-			APIVersion: routev1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        fields.Name,
-			Namespace:   namespace,
-			Annotations: fields.Annotations,
-			Labels:      routeLabels,
-		},
-		Spec: routev1.RouteSpec{
-			Host: fields.RouteHost,
-			Path: fields.RoutePath,
-			Port: &routev1.RoutePort{
-				TargetPort: intstr.IntOrString{
-					Type:   intstr.Int,
-					IntVal: fields.RoutePort,
+		*route = routev1.Route{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Route",
+				APIVersion: routev1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        s.GetName(),
+				Namespace:   s.GetNamespace(),
+				Annotations: fields.Annotations,
+				Labels:      routeLabels,
+			},
+			Spec: routev1.RouteSpec{
+				Host: fields.RouteHost,
+				Path: fields.RoutePath,
+				Port: &routev1.RoutePort{
+					TargetPort: intstr.IntOrString{
+						Type:   intstr.Int,
+						IntVal: fields.RoutePort,
+					},
 				},
+				TLS: fields.TLS,
+				To: routev1.RouteTargetReference{
+					Name:   fields.ServiceName,
+					Kind:   "Service",
+					Weight: &weight,
+				},
+				WildcardPolicy: routev1.WildcardPolicyNone,
 			},
-			To: routev1.RouteTargetReference{
-				Name:   fields.ServiceName,
-				Kind:   "Service",
-				Weight: &weight,
-			},
-			WildcardPolicy: routev1.WildcardPolicyNone,
-		},
-	}
-
-	if len(fields.DestinationCAcert) > 0 {
-		route.Spec.TLS = &routev1.TLSConfig{
-			Termination:                   routev1.TLSTerminationReencrypt,
-			InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
-			DestinationCACertificate:      string(fields.DestinationCAcert),
 		}
-	} else if fields.RoutePath == "" {
-		// Passthrough route (if RoutePath is empty)
-		route.Spec.TLS = &routev1.TLSConfig{
-			Termination:                   routev1.TLSTerminationPassthrough,
-			InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+
+		// Set Authentication instance as the owner and controller of the Route
+		err = controllerutil.SetControllerReference(s.GetPrimary(), route, s.GetClient().Scheme())
+		if err != nil {
+			reqLogger.Info("Failed to set owner for Route")
 		}
+		return
 	}
-
-	err := controllerutil.SetControllerReference(authCR, route, r.Client.Scheme())
-	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for route")
-		return nil, err
-	}
-
-	return route, nil
 }
 
-func (r *AuthenticationReconciler) getClusterAddress(authCR *operatorv1alpha1.Authentication, clusterAddress *string) (fn subreconciler.Fn) {
+func (r *AuthenticationReconciler) getClusterAddress(authCR *operatorv1alpha1.Authentication, clusterAddress *string) (fn common.SecondaryReconcilerFn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		clusterInfoConfigMap := &corev1.ConfigMap{}
 
 		clusterAddressFieldName := "cluster_address"
+		if shouldUseCPDHost(authCR, &r.DiscoveryClient) {
+			clusterAddressFieldName = "cluster_address_auth"
+		}
 
 		fns := []subreconciler.Fn{
 			r.getClusterInfoConfigMap(authCR, clusterInfoConfigMap),
@@ -684,7 +778,7 @@ func (r *AuthenticationReconciler) ensureConfigMapHasEqualFields(_ *operatorv1al
 	}
 }
 
-func (r *AuthenticationReconciler) getWlpClientID(authCR *operatorv1alpha1.Authentication, wlpClientID *string) (fn subreconciler.Fn) {
+func (r *AuthenticationReconciler) getWlpClientID(authCR *operatorv1alpha1.Authentication, wlpClientID *string) (fn common.SecondaryReconcilerFn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		reqLogger := logf.FromContext(ctx)
 
@@ -712,7 +806,7 @@ func (r *AuthenticationReconciler) getWlpClientID(authCR *operatorv1alpha1.Authe
 
 // getCertificateForService uses the provided Service name to determine which Secret contains the matching certificate
 // data and returns it.
-func (r *AuthenticationReconciler) getCertificateForService(serviceName string, authCR *operatorv1alpha1.Authentication, certificate *[]byte) (fn subreconciler.Fn) {
+func (r *AuthenticationReconciler) getCertificateForService(serviceName string, authCR *operatorv1alpha1.Authentication, certificate *[]byte) (fn common.SecondaryReconcilerFn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		reqLogger := log.WithValues("func", "getCertificateForService", "namespace", authCR.Namespace)
 		secret := &corev1.Secret{}

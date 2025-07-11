@@ -8,7 +8,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.12.0
 	github.com/onsi/gomega v1.27.10
 	github.com/opdev/subreconciler v0.0.0-20230302151718-c4c8b5ec17c5
-	github.com/openshift/api v0.0.0-20231003083825-c3f7566f6ef6
+	github.com/openshift/api 674ad74beffc
 	github.com/zach-klippenstein/goregen v0.0.0-20160303162051-795b5e3961ea
 	go.mongodb.org/mongo-driver v1.14.0
 	k8s.io/api v0.28.2

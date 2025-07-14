@@ -12,4 +12,5 @@ sudo tar -C /usr/local -xzf go.tar.gz
 export PATH=$PATH:/usr/local/go/bin
 
 echo "Go installed: $(go version)"
+export BUILD_LOCALLY=0
 make images

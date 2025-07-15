@@ -448,6 +448,7 @@ func generateAuthIdpConfigMap(clusterInfo *corev1.ConfigMap) ctrlcommon.Generate
 				"IDENTITY_MGMT_URL":                  "https://platform-identity-management:4500",
 				"MASTER_HOST":                        clusterInfo.Data["cluster_address"],
 				"NODE_ENV":                           "production",
+				"ENABLE_JIT_EXTRA_ATTR":              "false",
 				"AUDIT_ENABLED_IDPROVIDER":           "false",
 				"AUDIT_ENABLED_IDMGMT":               "false",
 				"AUDIT_DETAIL":                       "false",

@@ -437,6 +437,17 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			Value: "platform-identity-provider",
 		},
 		{
+			Name: "ENABLE_JIT_EXTRA_ATTR",
+			ValueFrom: &corev1.EnvVarSource{
+				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "platform-auth-idp",
+					},
+					Key: "ENABLE_JIT_EXTRA_ATTR",
+				},
+			},
+		},
+		{
 			Name: "AUDIT_ENABLED",
 			ValueFrom: &corev1.EnvVarSource{
 				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{

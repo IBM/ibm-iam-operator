@@ -6,7 +6,7 @@
   name: ICP_IDENTITY_PROVIDER_IMAGE
 - image: icr.io/cpopen/cpfs/icp-identity-manager:4.5.15
   name: ICP_IDENTITY_MANAGER_IMAGE
-- image: icr.io/cpopen/cpfs/im-initcontainer:4.5.14
+- image: icr.io/cpopen/cpfs/im-initcontainer:4.5.15
   name: IM_INITCONTAINER_IMAGE
-- image: icr.io/cpopen/cpfs/iam-custom-hostname:4.5.14
+- image: icr.io/cpopen/cpfs/iam-custom-hostname:4.5.15
   name: IAM_CUSTOM_HOSTNAME_IMAGE

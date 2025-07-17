@@ -7,7 +7,9 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
+	dbconn "github.com/IBM/ibm-iam-operator/internal/database/connectors"
 	testutil "github.com/IBM/ibm-iam-operator/test/utils"
+	"github.com/jackc/pgx/v5/pgconn"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -16,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -47,6 +50,44 @@ func (d objectUpdater[T]) GetNamespace() string {
 
 func (d objectUpdater[T]) GetClient() client.Client {
 	return d.Client
+}
+
+type MockDBConn struct {
+	connect    func(context.Context) error
+	configure  func(...dbconn.DBOption) error
+	runDDL     func(context.Context, string) error
+	hasSchemas func(context.Context) (bool, error)
+	disconnect func(context.Context) error
+	logChanges func(context.Context, string, ...any) (pgconn.CommandTag, error)
+	hasSAML    func(context.Context) (bool, error)
+}
+
+func (m *MockDBConn) Connect(ctx context.Context) error {
+	return m.connect(ctx)
+}
+
+func (m *MockDBConn) Configure(opts ...dbconn.DBOption) error {
+	return m.configure(opts...)
+}
+
+func (m *MockDBConn) RunDDL(ctx context.Context, ddl string) error {
+	return m.runDDL(ctx, ddl)
+}
+
+func (m *MockDBConn) HasSchemas(ctx context.Context) (bool, error) {
+	return m.hasSchemas(ctx)
+}
+
+func (m *MockDBConn) Disconnect(ctx context.Context) error {
+	return m.disconnect(ctx)
+}
+
+func (m *MockDBConn) LogChanges(ctx context.Context, query string, args ...any) (pgconn.CommandTag, error) {
+	return m.logChanges(ctx, query, args...)
+}
+
+func (m *MockDBConn) HasSAML(ctx context.Context) (bool, error) {
+	return m.hasSAML(ctx)
 }
 
 var _ = Describe("ConfigMap handling", func() {
@@ -382,6 +423,7 @@ var _ = Describe("ConfigMap handling", func() {
 	})
 
 	Describe("platform-auth-idp handling", func() {
+		var r *AuthenticationReconciler
 		var authCR *operatorv1alpha1.Authentication
 		var cb fakeclient.ClientBuilder
 		var cl client.WithWatch
@@ -470,16 +512,29 @@ var _ = Describe("ConfigMap handling", func() {
 				WithScheme(scheme).
 				WithObjects(globalConfigMap, ibmcloudClusterInfo, authCR)
 			cl = cb.Build()
-			//dc, err := discovery.NewDiscoveryClientForConfig(cfg)
-			//Expect(err).NotTo(HaveOccurred())
+			dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+			Expect(err).NotTo(HaveOccurred())
 
-			//r = &AuthenticationReconciler{
-			//	Client: &ctrlcommon.FallbackClient{
-			//		Client: cl,
-			//		Reader: cl,
-			//	},
-			//	DiscoveryClient: *dc,
-			//}
+			r = &AuthenticationReconciler{
+				Client: &ctrlcommon.FallbackClient{
+					Client: cl,
+					Reader: cl,
+				},
+				DiscoveryClient: *dc,
+				GetPostgresDB: func(c client.Client, ctx context.Context, req ctrl.Request) (conn dbconn.DBConn, err error) {
+					return &MockDBConn{
+						connect: func(ctx context.Context) (err error) {
+							return nil
+						},
+						disconnect: func(context.Context) error {
+							return nil
+						},
+						hasSAML: func(ctx context.Context) (bool, error) {
+							return true, nil
+						},
+					}, nil
+				},
+			}
 			ctx = context.Background()
 		})
 
@@ -529,6 +584,7 @@ var _ = Describe("ConfigMap handling", func() {
 					"IDENTITY_PROVIDER_URL":              "https://platform-identity-provider:4300",
 					"IDENTITY_MGMT_URL":                  "https://platform-identity-management:4500",
 					"MASTER_HOST":                        ibmcloudClusterInfo.Data["cluster_address"],
+					"MASTER_PATH":                        "/idauth",
 					"NODE_ENV":                           "production",
 					"ENABLE_JIT_EXTRA_ATTR":              "false",
 					"AUDIT_ENABLED_IDPROVIDER":           "false",
@@ -697,10 +753,10 @@ var _ = Describe("ConfigMap handling", func() {
 				WithPrimary(authCR).MustBuild()
 			for _, test := range updateOnNotSetKeys {
 				observed := &corev1.ConfigMap{}
-				Expect(generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, observed)).
+				Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, observed)).
 					To(Succeed())
 				generated := &corev1.ConfigMap{}
-				err := generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+				err := r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
 				Expect(err).NotTo(HaveOccurred())
 				updated, err = updatePlatformAuthIDP(resource, ctx, observed, generated)
 				Expect(err).ToNot(HaveOccurred())
@@ -739,10 +795,10 @@ var _ = Describe("ConfigMap handling", func() {
 				WithPrimary(authCR).MustBuild()
 			for _, test := range updateOnNotUpToDate {
 				observed := &corev1.ConfigMap{}
-				Expect(generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, observed)).
+				Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, observed)).
 					To(Succeed())
 				generated := &corev1.ConfigMap{}
-				err := generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+				err := r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
 				Expect(err).NotTo(HaveOccurred())
 				updated, err = updatePlatformAuthIDP(resource, ctx, observed, generated)
 				Expect(err).ToNot(HaveOccurred())
@@ -775,7 +831,7 @@ var _ = Describe("ConfigMap handling", func() {
 				// Set the keys in observed to contain localhost IP
 				observed.Data[k] = "https://127.0.0.1:12345"
 				generated := &corev1.ConfigMap{}
-				Expect(generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).
+				Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).
 					To(Succeed())
 				updated, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
 				Expect(err).NotTo(HaveOccurred())
@@ -791,13 +847,13 @@ var _ = Describe("ConfigMap handling", func() {
 				WithNamespace(authCR.Namespace).
 				WithClient(cl).
 				WithPrimary(authCR).MustBuild()
-			Expect(generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, observed)).
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, observed)).
 				To(Succeed())
 			// Set the keys in observed to contain localhost IP
 			k := "OS_TOKEN_LENGTH"
 			observed.Data[k] = "24"
 			generated := &corev1.ConfigMap{}
-			Expect(generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).
 				To(Succeed())
 			updated, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
 			Expect(err).NotTo(HaveOccurred())
@@ -837,10 +893,10 @@ var _ = Describe("ConfigMap handling", func() {
 				WithPrimary(authCR).MustBuild()
 			for _, test := range updateAlways {
 				observed := getObserved()
-				Expect(generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, observed)).
+				Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, observed)).
 					To(Succeed())
 				generated := &corev1.ConfigMap{}
-				Expect(generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).
+				Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).
 					To(Succeed())
 				updated, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
 				Expect(err).ToNot(HaveOccurred())

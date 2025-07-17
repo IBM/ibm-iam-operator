@@ -25,6 +25,7 @@ import (
 
 	certmgr "github.com/IBM/ibm-iam-operator/internal/api/certmanager/v1"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
+	dbconn "github.com/IBM/ibm-iam-operator/internal/database/connectors"
 	"github.com/IBM/ibm-iam-operator/internal/database/migration"
 	"github.com/IBM/ibm-iam-operator/internal/version"
 	routev1 "github.com/openshift/api/route/v1"
@@ -175,6 +176,8 @@ type AuthenticationReconciler struct {
 	clusterType     ctrlcommon.ClusterType
 	dbSetupChan     chan *migration.Result
 	needsRollout    bool
+	GetPostgresDB   func(client.Client, context.Context, ctrl.Request) (dbconn.DBConn, error)
+	GetMongoDB      func(client.Client, context.Context, ctrl.Request) (dbconn.DBConn, error)
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -444,6 +447,12 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return o.GetLabels()[ctrlcommon.ManagerVersionLabel] == version.Version
 	})
 
+	r.GetPostgresDB = func(c client.Client, ctx context.Context, req ctrl.Request) (d dbconn.DBConn, err error) {
+		return GetPostgresDB(c, ctx, req)
+	}
+	r.GetMongoDB = func(c client.Client, ctx context.Context, req ctrl.Request) (d dbconn.DBConn, err error) {
+		return GetMongoDB(c, ctx, req)
+	}
 	authCtrl.Watches(&operatorv1alpha1.Authentication{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(bootstrappedPred))
 	return authCtrl.Named("controller_authentication").
 		Complete(r)

@@ -135,6 +135,12 @@ func (p *PostgresDB) HasSchemas(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
+type SAMLChecker interface {
+	HasSAML(context.Context) (bool, error)
+}
+
+var _ SAMLChecker = &PostgresDB{}
+
 func (p *PostgresDB) HasSAML(ctx context.Context) (has bool, err error) {
 	query := "SELECT 1 FROM platformdb.idp_configs WHERE protocol = 'saml'"
 	row := p.Conn.QueryRow(ctx, query)

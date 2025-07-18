@@ -754,7 +754,7 @@ var _ = Describe("Route handling", func() {
 		})
 
 		hasAllValidRoutes := func(routes *routev1.RouteList) {
-			Expect(routes.Items).To(HaveLen(9))
+			Expect(routes.Items).To(HaveLen(10))
 			for _, route := range routes.Items {
 				if route.Name == "cp-console" {
 					continue
@@ -824,6 +824,7 @@ var _ = Describe("Route handling", func() {
 			names := []string{
 				"id-mgmt",
 				"platform-auth",
+				"platform-id-auth",
 				"platform-id-provider",
 				"platform-login",
 				"platform-oidc",

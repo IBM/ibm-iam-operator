@@ -727,18 +727,24 @@ func preserveObservedFields(observed, generated *appsv1.Deployment) {
 			if observedContainer.Name != generatedContainer.Name {
 				continue
 			}
+
 			if generatedContainer.LivenessProbe == nil {
 				generated.Spec.Template.Spec.Containers[i].LivenessProbe = &corev1.Probe{}
 			}
-			generated.Spec.Template.Spec.Containers[i].LivenessProbe.FailureThreshold = observedContainer.LivenessProbe.FailureThreshold
-			generated.Spec.Template.Spec.Containers[i].LivenessProbe.PeriodSeconds = observedContainer.LivenessProbe.PeriodSeconds
-			generated.Spec.Template.Spec.Containers[i].LivenessProbe.SuccessThreshold = observedContainer.LivenessProbe.SuccessThreshold
+			if observedContainer.LivenessProbe != nil {
+				generated.Spec.Template.Spec.Containers[i].LivenessProbe.FailureThreshold = observedContainer.LivenessProbe.FailureThreshold
+				generated.Spec.Template.Spec.Containers[i].LivenessProbe.PeriodSeconds = observedContainer.LivenessProbe.PeriodSeconds
+				generated.Spec.Template.Spec.Containers[i].LivenessProbe.SuccessThreshold = observedContainer.LivenessProbe.SuccessThreshold
+			}
+
 			if generatedContainer.ReadinessProbe == nil {
 				generated.Spec.Template.Spec.Containers[i].ReadinessProbe = &corev1.Probe{}
 			}
-			generated.Spec.Template.Spec.Containers[i].ReadinessProbe.SuccessThreshold = observedContainer.ReadinessProbe.SuccessThreshold
-			generated.Spec.Template.Spec.Containers[i].TerminationMessagePath = observedContainer.TerminationMessagePath
-			generated.Spec.Template.Spec.Containers[i].TerminationMessagePolicy = observedContainer.TerminationMessagePolicy
+			if observedContainer.ReadinessProbe != nil {
+				generated.Spec.Template.Spec.Containers[i].ReadinessProbe.SuccessThreshold = observedContainer.ReadinessProbe.SuccessThreshold
+				generated.Spec.Template.Spec.Containers[i].TerminationMessagePath = observedContainer.TerminationMessagePath
+				generated.Spec.Template.Spec.Containers[i].TerminationMessagePolicy = observedContainer.TerminationMessagePolicy
+			}
 		}
 	}
 	for _, observedContainer := range observed.Spec.Template.Spec.InitContainers {

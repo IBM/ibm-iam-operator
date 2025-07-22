@@ -280,6 +280,23 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return subreconciler.Evaluate(subResult, err)
 	}
 
+	if subResult, err := r.ensureDatastoreSecretAndCM(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
+
+	// perform any migrations that may be needed before Deployments run
+	if subResult, err := r.handleMigrations(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
+
+	if subResult, err := r.setMigrationCompleteStatus(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
+
+	if result, err := r.handleMongoDBCleanup(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return subreconciler.Evaluate(result, err)
+	}
+
 	reqLogger.Info("Creating ibm-iam-operand-restricted serviceaccount")
 	currentSA := &corev1.ServiceAccount{}
 	err = r.createSA(instance, currentSA, &needToRequeue)
@@ -333,23 +350,6 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	r.ReconcileRemoveIngresses(ctx, instance, &needToRequeue)
 	// updates redirecturi annotations to serviceaccount
 	r.handleServiceAccount(instance, &needToRequeue)
-
-	if subResult, err := r.ensureDatastoreSecretAndCM(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-		return subreconciler.Evaluate(subResult, err)
-	}
-
-	// perform any migrations that may be needed before Deployments run
-	if subResult, err := r.handleMigrations(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-		return subreconciler.Evaluate(subResult, err)
-	}
-
-	if subResult, err := r.setMigrationCompleteStatus(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-		return subreconciler.Evaluate(subResult, err)
-	}
-
-	if result, err := r.handleMongoDBCleanup(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return subreconciler.Evaluate(result, err)
-	}
 
 	if subResult, err := r.handleDeployments(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)

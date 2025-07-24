@@ -17,6 +17,7 @@ package connectors
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -133,6 +134,26 @@ func (p *PostgresDB) HasSchemas(ctx context.Context) (bool, error) {
 
 	return true, nil
 }
+
+type SAMLChecker interface {
+	HasSAML(context.Context) (bool, error)
+}
+
+var _ SAMLChecker = &PostgresDB{}
+
+func (p *PostgresDB) HasSAML(ctx context.Context) (has bool, err error) {
+	query := "SELECT 1 FROM platformdb.idp_configs WHERE protocol = 'saml'"
+	row := p.Conn.QueryRow(ctx, query)
+	var s any
+	err = row.Scan(&s)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func (p *PostgresDB) HasMetadataSchema(ctx context.Context) (has bool, err error) {
 	query := "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'metadata'"
 	var table string

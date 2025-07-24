@@ -36,9 +36,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
-	zenv1 "github.com/IBM/ibm-iam-operator/internal/api/zen.cpd.ibm.com/v1"
 	"github.com/IBM/ibm-iam-operator/internal/controller/common"
-	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
 )
 
 const ClusterInfoConfigmapName = "ibmcloud-cluster-info"
@@ -69,10 +67,10 @@ type reconcileRouteFields struct {
 }
 
 func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := log.WithValues("subreconciler", "handleRoutes", "Namespace", req.Namespace)
+	reqLogger := logf.FromContext(ctx, "subreconciler", "handleRoutes", "Namespace", req.Namespace)
 	handleRouteCtx := logf.IntoContext(ctx, reqLogger)
 
-	if !ctrlcommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient) {
+	if !common.ClusterHasRouteGroupVersion(&r.DiscoveryClient) {
 		return subreconciler.ContinueReconciling()
 	}
 
@@ -87,8 +85,8 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Re
 // removeExistingRouteIfItHasDifferentHost produces a GenerateFn that removes
 // the SecondaryReconciler's Route if that Route has an out-of-date .spec.host
 // value.
-func (r *AuthenticationReconciler) removeExistingRouteIfItHasDifferentHost() ctrlcommon.GenerateFn[*routev1.Route] {
-	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, route *routev1.Route) (err error) {
+func (r *AuthenticationReconciler) removeExistingRouteIfItHasDifferentHost() common.GenerateFn[*routev1.Route] {
+	return func(s common.SecondaryReconciler, ctx context.Context, route *routev1.Route) (err error) {
 		authCR := s.GetPrimary().(*operatorv1alpha1.Authentication)
 		var routeHost string
 		if result, suberr := r.getClusterAddress(authCR, &routeHost)(ctx); subreconciler.ShouldHaltOrRequeue(result, suberr) {
@@ -152,7 +150,7 @@ func (r *AuthenticationReconciler) getCustomIngressSecret(ctx context.Context, a
 	return
 }
 
-func modifyRoute(s ctrlcommon.SecondaryReconciler, ctx context.Context, observed, generated *routev1.Route) (modified bool, err error) {
+func modifyRoute(s common.SecondaryReconciler, ctx context.Context, observed, generated *routev1.Route) (modified bool, err error) {
 	// Preserve custom annotation settings observed in the cluster; skip changes to rewrite-target
 	for annotation, value := range observed.Annotations {
 		if annotation != "haproxy.router.openshift.io/rewrite-target" {
@@ -172,14 +170,14 @@ func modifyRoute(s ctrlcommon.SecondaryReconciler, ctx context.Context, observed
 	return
 }
 
-func (r *AuthenticationReconciler) getRouteSubreconcilers(authCR *operatorv1alpha1.Authentication, allFields *map[string]*reconcileRouteFields) (subRecs ctrlcommon.Subreconcilers, err error) {
-	subRecs = ctrlcommon.Subreconcilers{
+func (r *AuthenticationReconciler) getRouteSubreconcilers(authCR *operatorv1alpha1.Authentication, allFields *map[string]*reconcileRouteFields) (subRecs common.Subreconcilers, err error) {
+	subRecs = common.Subreconcilers{
 		r.removeExtraRoutes(authCR, allFields),
 	}
-	builders := []*ctrlcommon.SecondaryReconcilerBuilder[*routev1.Route]{}
+	builders := []*common.SecondaryReconcilerBuilder[*routev1.Route]{}
 
 	for _, fields := range *allFields {
-		builders = append(builders, ctrlcommon.NewSecondaryReconcilerBuilder[*routev1.Route]().
+		builders = append(builders, common.NewSecondaryReconcilerBuilder[*routev1.Route]().
 			WithName(fields.Name).
 			WithGenerateFns(r.removeExistingRouteIfItHasDifferentHost(),
 				generateRouteObject(fields)).
@@ -205,8 +203,8 @@ func (r *AuthenticationReconciler) getRouteSubreconcilers(authCR *operatorv1alph
 // Authentication CR. Skips when this field is not configured or if the Zen
 // front door has been enabled on the Authentication CR with
 // .spec.config.zenFrontDoor set to true.
-func (r *AuthenticationReconciler) updateCPConsoleCertificates(authCR *operatorv1alpha1.Authentication) ctrlcommon.SecondaryReconcilerFn {
-	return ctrlcommon.SecondaryReconcilerFn(func(ctx context.Context) (result *ctrl.Result, err error) {
+func (r *AuthenticationReconciler) updateCPConsoleCertificates(authCR *operatorv1alpha1.Authentication) common.SecondaryReconcilerFn {
+	return common.SecondaryReconcilerFn(func(ctx context.Context) (result *ctrl.Result, err error) {
 		log := logf.FromContext(ctx, "Route.Name", "cp-console", "Route.Namespace", authCR.Namespace)
 		log.Info("Update certificates on UI Route if custom TLS configured")
 		if authCR.Spec.Config.ZenFrontDoor {
@@ -272,40 +270,9 @@ func (r *AuthenticationReconciler) updateCPConsoleCertificates(authCR *operatorv
 	})
 }
 
-// checkForZenFrontDoor confirms whether traffic should or should not be consolidated through the cpd Route. When it
-// should, it looks for the ZenExtension containing the nginx configuration needed to properly route ingress traffic to
-// the IM microservices, and confirms that the ZenExtension has been fully processed, meaning nginx is ready for
-// traffic.
-func (r *AuthenticationReconciler) checkForZenFrontDoor(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	if shouldNotUseCPDHost(authCR, &r.DiscoveryClient) {
-		reqLogger.Info("IM Routes will be created")
-		return subreconciler.ContinueReconciling()
-	}
-	reqLogger.Info("Zen front door has been enabled, so IM Routes will be removed if they are present")
-	frontDoor := &zenv1.ZenExtension{}
-	err = r.Get(ctx, types.NamespacedName{Name: ImZenExtName, Namespace: authCR.Namespace}, frontDoor)
-	if k8sErrors.IsNotFound(err) {
-		reqLogger.Info("ZenExtension was not found; requeuing", "ZenExtension.Name", ImZenExtName, "ZenExtension.Namespace", authCR.Namespace)
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	} else if err != nil {
-		reqLogger.Info("ZenExtension could not be retrieved due to an unexpected error", "error", err.Error())
-		return subreconciler.Requeue()
-	}
-	reqLogger.Info("Front door ZenExtension retrieved", "ZenExtension.Name", ImZenExtName, "ZenExtension.Namespace", authCR.Namespace)
-
-	if frontDoor.Ready() {
-		reqLogger.Info("Front door is ready to accept traffic, continuing")
-		return subreconciler.ContinueReconciling()
-	}
-
-	reqLogger.Info("Front door ZenExtension is not done setting up; requeuing", "ZenExtension.Name", ImZenExtName, "ZenExtension.Namespace", authCR.Namespace)
-	return subreconciler.RequeueWithDelay(defaultLowerWait)
-}
-
 // removeExtraRoutes produces a subreconciler that deletes any Route that is labeled as IM's and is not in the list of
 // Routes that the Operator wants to exist.
-func (r *AuthenticationReconciler) removeExtraRoutes(authCR *operatorv1alpha1.Authentication, allRoutesFields *map[string]*reconcileRouteFields) (fn ctrlcommon.SecondaryReconcilerFn) {
+func (r *AuthenticationReconciler) removeExtraRoutes(authCR *operatorv1alpha1.Authentication, allRoutesFields *map[string]*reconcileRouteFields) (fn common.SecondaryReconcilerFn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		reqLogger := logf.FromContext(ctx)
 		routesList := &routev1.RouteList{}
@@ -320,7 +287,7 @@ func (r *AuthenticationReconciler) removeExtraRoutes(authCR *operatorv1alpha1.Au
 		err = r.List(ctx, routesList, client.InNamespace(authCR.Namespace), client.MatchingLabels{"app": "im"})
 		changed := false
 		for _, item := range routesList.Items {
-			if !ctrlcommon.ContainsString(desiredRoutesNames, item.Name) {
+			if !common.ContainsString(desiredRoutesNames, item.Name) {
 				reqLogger.Info("Removing extra Route", "Name", item.Name)
 				if err = r.Delete(ctx, &item); k8sErrors.IsNotFound(err) {
 					reqLogger.Info("Route was not found; continuing", "Name", item.Name)
@@ -366,7 +333,7 @@ func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.A
 		)
 		customTLSSecret := &corev1.Secret{}
 
-		subRec := ctrlcommon.NewLazySubreconcilers(
+		subRec := common.NewLazySubreconcilers(
 			r.getClusterAddress(authCR, &routeHost),
 			r.getWlpClientID(authCR, &wlpClientID),
 			r.getCertificateForService(PlatformAuthServiceName, authCR, &platformAuthCert),
@@ -517,6 +484,25 @@ func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.A
 					CACertificate:                 caCrt,
 				},
 			},
+			"platform-id-auth": {
+				Annotations: map[string]string{
+					"haproxy.router.openshift.io/balance":        "source",
+					"haproxy.router.openshift.io/rewrite-target": "/",
+				},
+				Name:        "platform-id-auth",
+				RouteHost:   routeHost,
+				RoutePath:   "/idauth",
+				RoutePort:   9443,
+				ServiceName: PlatformAuthServiceName,
+				TLS: &routev1.TLSConfig{
+					DestinationCACertificate:      string(platformAuthCert),
+					Termination:                   routev1.TLSTerminationReencrypt,
+					InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+					Key:                           key,
+					Certificate:                   crt,
+					CACertificate:                 caCrt,
+				},
+			},
 			IMCrtAuthRouteName: {
 				Annotations: map[string]string{
 					"haproxy.router.openshift.io/balance": "source",
@@ -542,11 +528,7 @@ func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.A
 }
 
 func shouldUseCPDHost(authCR *operatorv1alpha1.Authentication, dc *discovery.DiscoveryClient) bool {
-	return !authCR.HasCustomIngressHostname() && authCR.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(dc)
-}
-
-func shouldNotUseCPDHost(authCR *operatorv1alpha1.Authentication, dc *discovery.DiscoveryClient) bool {
-	return !shouldUseCPDHost(authCR, dc)
+	return !authCR.HasCustomIngressHostname() && authCR.Spec.Config.ZenFrontDoor && common.ClusterHasZenExtensionGroupVersion(dc)
 }
 
 // Use DeepEqual to determine if 2 routes are equal.
@@ -626,13 +608,13 @@ func IsRouteEqual(ctx context.Context, oldRoute, newRoute *routev1.Route) bool {
 	return true
 }
 
-func generateRouteObject(fields *reconcileRouteFields) ctrlcommon.GenerateFn[*routev1.Route] {
-	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, route *routev1.Route) (err error) {
+func generateRouteObject(fields *reconcileRouteFields) common.GenerateFn[*routev1.Route] {
+	return func(s common.SecondaryReconciler, ctx context.Context, route *routev1.Route) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		weight := int32(100)
 
 		commonLabel := map[string]string{"app": "im"}
-		routeLabels := ctrlcommon.MergeMaps(nil, s.GetPrimary().GetLabels(), commonLabel, ctrlcommon.GetCommonLabels())
+		routeLabels := common.MergeMaps(nil, s.GetPrimary().GetLabels(), commonLabel, common.GetCommonLabels())
 
 		*route = routev1.Route{
 			TypeMeta: metav1.TypeMeta{
@@ -726,7 +708,7 @@ func (r *AuthenticationReconciler) getClusterInfoConfigMap(authCR *operatorv1alp
 func (r *AuthenticationReconciler) verifyConfigMapHasCorrectOwnership(authCR *operatorv1alpha1.Authentication, cm *corev1.ConfigMap) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		reqLogger := logf.FromContext(ctx)
-		if !ctrlcommon.IsOwnerOf(r.Client.Scheme(), authCR, cm) {
+		if !common.IsOwnerOf(r.Client.Scheme(), authCR, cm) {
 			reqLogger.Info("ConfigMap is not owned by this Authentication",
 				"ConfigMap.Name", cm.Name,
 				"ConfigMap.Namespace", cm.Namespace)
@@ -808,7 +790,7 @@ func (r *AuthenticationReconciler) getWlpClientID(authCR *operatorv1alpha1.Authe
 // data and returns it.
 func (r *AuthenticationReconciler) getCertificateForService(serviceName string, authCR *operatorv1alpha1.Authentication, certificate *[]byte) (fn common.SecondaryReconcilerFn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		reqLogger := log.WithValues("func", "getCertificateForService", "namespace", authCR.Namespace)
+		reqLogger := logf.FromContext(ctx, "func", "getCertificateForService", "namespace", authCR.Namespace)
 		secret := &corev1.Secret{}
 		var secretName string
 		switch serviceName {

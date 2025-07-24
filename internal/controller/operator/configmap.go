@@ -33,7 +33,8 @@ import (
 	"text/template"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
-	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
+	"github.com/IBM/ibm-iam-operator/internal/controller/common"
+	dbconn "github.com/IBM/ibm-iam-operator/internal/database/connectors"
 	"github.com/opdev/subreconciler"
 	routev1 "github.com/openshift/api/route/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -71,27 +72,27 @@ func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctr
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
 
-	builders := []*ctrlcommon.SecondaryReconcilerBuilder[*corev1.ConfigMap]{
-		ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+	builders := []*common.SecondaryReconcilerBuilder[*corev1.ConfigMap]{
+		common.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
 			WithName("platform-auth-idp").
-			WithGenerateFns(generateAuthIdpConfigMap(ibmCloudClusterInfoCM)).
+			WithGenerateFns(r.generateAuthIdpConfigMap(ibmCloudClusterInfoCM)).
 			WithModifyFns(updatePlatformAuthIDP).
 			WithOnWriteFns(signalNeedRolloutFn[*corev1.ConfigMap](r)),
-		ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+		common.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
 			WithName("registration-json").
 			WithGenerateFns(generateRegistrationJsonConfigMap(ibmCloudClusterInfoCM)).
 			WithModifyFns(updateRegistrationJSON).
 			WithOnWriteFns(replaceOIDCClientRegistrationJob),
-		ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+		common.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
 			WithName("oauth-client-map").
 			WithGenerateFns(generateOAuthClientConfigMap(ibmCloudClusterInfoCM)).
 			WithModifyFns(updateOAuthClientConfigMap),
-		ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+		common.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
 			WithName("registration-script").
 			WithGenerateFns(generateRegistrationScriptConfigMap()),
 	}
 
-	subRecs := []ctrlcommon.SecondaryReconciler{}
+	subRecs := []common.SecondaryReconciler{}
 	for i := range builders {
 		subRecs = append(subRecs, builders[i].
 			WithNamespace(authCR.Namespace).
@@ -108,7 +109,7 @@ func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctr
 		errs = append(errs, err)
 	}
 
-	return ctrlcommon.ReduceSubreconcilerResultsAndErrors(subresults, errs)
+	return common.ReduceSubreconcilerResultsAndErrors(subresults, errs)
 }
 
 // getConfigMapDataSHA1Sum calculates the SHA1 of the `.data` field.
@@ -130,7 +131,7 @@ func getConfigMapDataSHA1Sum(cm *corev1.ConfigMap) (sha string, err error) {
 // set.
 func getCNCFDomain(ctx context.Context, cl client.Client, authCR *operatorv1alpha1.Authentication) (domainName string, err error) {
 	logger := logf.FromContext(ctx)
-	cmName := ctrlcommon.GlobalConfigMapName
+	cmName := common.GlobalConfigMapName
 	cmNs := authCR.Namespace
 	cm := &corev1.ConfigMap{}
 	err = cl.Get(ctx, types.NamespacedName{Name: cmName, Namespace: cmNs}, cm)
@@ -151,12 +152,12 @@ func getCNCFDomain(ctx context.Context, cl client.Client, authCR *operatorv1alph
 
 // handleIBMCloudClusterInfo creates the ibmcloud-cluster-info configmap if not created already
 func (r *AuthenticationReconciler) handleIBMCloudClusterInfo(ctx context.Context, authCR *operatorv1alpha1.Authentication, observed *corev1.ConfigMap) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("ConfigMap.Namespace", authCR.Namespace, "ConfigMap.Name", ctrlcommon.IBMCloudClusterInfoCMName)
+	reqLogger := logf.FromContext(ctx).WithValues("ConfigMap.Namespace", authCR.Namespace, "ConfigMap.Name", common.IBMCloudClusterInfoCMName)
 	generated := &corev1.ConfigMap{}
 	if err = r.generateIBMCloudClusterInfoConfigMap(ctx, authCR, generated); err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
-	cmKey := types.NamespacedName{Name: ctrlcommon.IBMCloudClusterInfoCMName, Namespace: authCR.Namespace}
+	cmKey := types.NamespacedName{Name: common.IBMCloudClusterInfoCMName, Namespace: authCR.Namespace}
 	if err = r.Client.Get(ctx, cmKey, observed); k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Create new ConfigMap")
 		if err = r.Client.Create(ctx, generated); err != nil {
@@ -171,7 +172,7 @@ func (r *AuthenticationReconciler) handleIBMCloudClusterInfo(ctx context.Context
 	}
 
 	updated := false
-	controllerKind := ctrlcommon.GetControllerKind(observed)
+	controllerKind := common.GetControllerKind(observed)
 	if controllerKind == "ManagementIngress" {
 		reqLogger.Info("Configmap is already created by managementingress, IM installation may not proceed further until the configmap is removed")
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
@@ -220,7 +221,7 @@ func (r *AuthenticationReconciler) handleIBMCloudClusterInfo(ctx context.Context
 	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
-func replaceOIDCClientRegistrationJob(s ctrlcommon.SecondaryReconciler, ctx context.Context) (err error) {
+func replaceOIDCClientRegistrationJob(s common.SecondaryReconciler, ctx context.Context) (err error) {
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "oidc-client-registration",
@@ -233,7 +234,7 @@ func replaceOIDCClientRegistrationJob(s ctrlcommon.SecondaryReconciler, ctx cont
 	return
 }
 
-func updateRegistrationJSON(_ ctrlcommon.SecondaryReconciler, ctx context.Context, observed, generated *corev1.ConfigMap) (updated bool, err error) {
+func updateRegistrationJSON(_ common.SecondaryReconciler, ctx context.Context, observed, generated *corev1.ConfigMap) (updated bool, err error) {
 	observedJSON := &registrationJSONData{}
 	if err = json.Unmarshal([]byte(observed.Data["platform-oidc-registration.json"]), observedJSON); err != nil {
 		return
@@ -258,7 +259,7 @@ func updateRegistrationJSON(_ ctrlcommon.SecondaryReconciler, ctx context.Contex
 	return
 }
 
-func updateOAuthClientConfigMap(_ ctrlcommon.SecondaryReconciler, _ context.Context, observed, generated *corev1.ConfigMap) (updated bool, err error) {
+func updateOAuthClientConfigMap(_ common.SecondaryReconciler, _ context.Context, observed, generated *corev1.ConfigMap) (updated bool, err error) {
 	updateFns := []func(*corev1.ConfigMap, *corev1.ConfigMap) bool{
 		updatesValuesWhen(not(observedKeyValueSetTo[*corev1.ConfigMap]("MASTER_IP", generated.Data["MASTER_IP"])),
 			"MASTER_IP",
@@ -275,7 +276,7 @@ func updateOAuthClientConfigMap(_ ctrlcommon.SecondaryReconciler, _ context.Cont
 	return
 }
 
-func updatePlatformAuthIDP(_ ctrlcommon.SecondaryReconciler, _ context.Context, observed, generated *corev1.ConfigMap) (updated bool, err error) {
+func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, observed, generated *corev1.ConfigMap) (updated bool, err error) {
 	updateFns := []func(*corev1.ConfigMap, *corev1.ConfigMap) bool{
 		updatesAlways[*corev1.ConfigMap](
 			"ROKS_URL",
@@ -342,6 +343,8 @@ func updatePlatformAuthIDP(_ ctrlcommon.SecondaryReconciler, _ context.Context, 
 			"LDAP_CTX_POOL_TIMEOUT",
 			"LDAP_CTX_POOL_WAITTIME",
 			"LDAP_CTX_POOL_PREFERREDSIZE"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("MASTER_PATH")),
+			"MASTER_PATH"),
 	}
 
 	if v, ok := generated.Data["IS_OPENSHIFT_ENV"]; ok {
@@ -391,8 +394,8 @@ type registrationJSONData struct {
 	RedirectURIs            []string `json:"redirect_uris"`
 }
 
-func generateAuthIdpConfigMap(clusterInfo *corev1.ConfigMap) ctrlcommon.GenerateFn[*corev1.ConfigMap] {
-	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, generated *corev1.ConfigMap) (err error) {
+func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.ConfigMap) common.GenerateFn[*corev1.ConfigMap] {
+	return func(s common.SecondaryReconciler, ctx context.Context, generated *corev1.ConfigMap) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		authCR, ok := s.GetPrimary().(*operatorv1alpha1.Authentication)
 		if !ok {
@@ -434,6 +437,14 @@ func generateAuthIdpConfigMap(clusterInfo *corev1.ConfigMap) ctrlcommon.Generate
 			}
 		}
 
+		// Set the path for SAML connections
+		var masterPath string
+		if masterPath, err = r.getMasterPath(ctx, ctrl.Request{NamespacedName: common.GetObjectKey(s.GetPrimary())}); err != nil {
+			reqLogger.Error(err, "Failed to determine whether a preexisting SAML exists")
+			err = fmt.Errorf("could not set MASTER_PATH")
+			return
+		}
+
 		*generated = corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      s.GetName(),
@@ -449,6 +460,7 @@ func generateAuthIdpConfigMap(clusterInfo *corev1.ConfigMap) ctrlcommon.Generate
 				"IDENTITY_PROVIDER_URL":              "https://platform-identity-provider:4300",
 				"IDENTITY_MGMT_URL":                  "https://platform-identity-management:4500",
 				"MASTER_HOST":                        clusterInfo.Data["cluster_address"],
+				"MASTER_PATH":                        masterPath,
 				"NODE_ENV":                           "production",
 				"ENABLE_JIT_EXTRA_ATTR":              "false",
 				"AUDIT_ENABLED_IDPROVIDER":           "false",
@@ -536,8 +548,8 @@ func generateAuthIdpConfigMap(clusterInfo *corev1.ConfigMap) ctrlcommon.Generate
 	}
 }
 
-func generateRegistrationJsonConfigMap(clusterInfo *corev1.ConfigMap) ctrlcommon.GenerateFn[*corev1.ConfigMap] {
-	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, generated *corev1.ConfigMap) (err error) {
+func generateRegistrationJsonConfigMap(clusterInfo *corev1.ConfigMap) common.GenerateFn[*corev1.ConfigMap] {
+	return func(s common.SecondaryReconciler, ctx context.Context, generated *corev1.ConfigMap) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		authCR, ok := s.GetPrimary().(*operatorv1alpha1.Authentication)
 		if !ok {
@@ -602,8 +614,8 @@ func generateRegistrationJsonConfigMap(clusterInfo *corev1.ConfigMap) ctrlcommon
 	}
 }
 
-func generateRegistrationScriptConfigMap() ctrlcommon.GenerateFn[*corev1.ConfigMap] {
-	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, generated *corev1.ConfigMap) (err error) {
+func generateRegistrationScriptConfigMap() common.GenerateFn[*corev1.ConfigMap] {
+	return func(s common.SecondaryReconciler, ctx context.Context, generated *corev1.ConfigMap) (err error) {
 		reqLogger := logf.FromContext(ctx)
 
 		*generated = corev1.ConfigMap{
@@ -626,8 +638,8 @@ func generateRegistrationScriptConfigMap() ctrlcommon.GenerateFn[*corev1.ConfigM
 
 }
 
-func generateOAuthClientConfigMap(clusterInfo *corev1.ConfigMap) ctrlcommon.GenerateFn[*corev1.ConfigMap] {
-	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, generated *corev1.ConfigMap) (err error) {
+func generateOAuthClientConfigMap(clusterInfo *corev1.ConfigMap) common.GenerateFn[*corev1.ConfigMap] {
+	return func(s common.SecondaryReconciler, ctx context.Context, generated *corev1.ConfigMap) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		icpConsoleURL := clusterInfo.Data["cluster_address"]
 		icpProxyURL := clusterInfo.Data["proxy_address"]
@@ -697,7 +709,7 @@ func (r *AuthenticationReconciler) getDomain(ctx context.Context, authCR *operat
 	reqLogger := logf.FromContext(ctx)
 
 	commonLabel := map[string]string{"app": "im"}
-	routeLabels := ctrlcommon.MergeMap(commonLabel, authCR.Spec.Labels)
+	routeLabels := common.MergeMap(commonLabel, authCR.Spec.Labels)
 
 	imRoutes := &routev1.RouteList{}
 	listOpts := []client.ListOption{
@@ -775,7 +787,7 @@ func (r *AuthenticationReconciler) generateCNCFClusterInfo(ctx context.Context, 
 
 	*generated = corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ctrlcommon.IBMCloudClusterInfoCMName,
+			Name:      common.IBMCloudClusterInfoCMName,
 			Namespace: authCR.Namespace,
 			Labels:    map[string]string{"app": "auth-idp"},
 		},
@@ -838,7 +850,7 @@ func (r *AuthenticationReconciler) generateOCPClusterInfo(ctx context.Context, a
 
 	*generated = corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ctrlcommon.IBMCloudClusterInfoCMName,
+			Name:      common.IBMCloudClusterInfoCMName,
 			Namespace: authCR.Namespace,
 			Labels:    map[string]string{"app": "auth-idp"},
 		},
@@ -932,7 +944,7 @@ func (r *AuthenticationReconciler) generateIBMCloudClusterInfoConfigMap(ctx cont
 // isHostedOnIBMCloud checks the
 func isHostedOnIBMCloud(ctx context.Context, cl client.Client, namespace string) (isPublicCloud bool, err error) {
 	reqLogger := logf.FromContext(ctx).V(1)
-	cmName := ctrlcommon.IBMCloudClusterInfoCMName
+	cmName := common.IBMCloudClusterInfoCMName
 	cm := &corev1.ConfigMap{}
 	if err = cl.Get(ctx, types.NamespacedName{Name: cmName, Namespace: namespace}, cm); err != nil {
 		reqLogger.Info("Error getting ConfigMap", "ConfigMap.Name", cmName, "ConfigMap.Namespace", namespace, "msg", err.Error())
@@ -991,4 +1003,27 @@ func readROKSURL(ctx context.Context) (issuer string, err error) {
 	issuer = result["issuer"].(string)
 
 	return issuer, nil
+}
+
+func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, req ctrl.Request) (path string, err error) {
+	p, err := r.GetPostgresDB(r.Client, ctx, req)
+	if err != nil {
+		return
+	}
+	var has bool
+	if err = p.Connect(ctx); err != nil {
+		return
+	}
+	defer p.Disconnect(ctx)
+
+	samlChecker, ok := p.(dbconn.SAMLChecker)
+	if !ok {
+		return "", fmt.Errorf("DB unable to check for SAML connection")
+	}
+	if has, err = samlChecker.HasSAML(ctx); err != nil {
+		return
+	} else if has {
+		return "", err
+	}
+	return "/idauth", nil
 }

@@ -1031,5 +1031,17 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume
 				},
 			},
 		},
+		{
+			Name: "liberty-serverdir-vol",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name: "liberty-outputdir-vol",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
 	}
 }

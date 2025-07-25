@@ -18,6 +18,11 @@
   value:
     name: IM_INITCONTAINER_IMAGE
     value: icr.io/cpopen/cpfs/im-initcontainer:4.13.0
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value:
+    name: IM_DB_MIGRATOR_IMAGE
+    value: icr.io/cpopen/cpfs/ibm-im-db-migrator:4.13.0
 - op: replace
   path: /spec/template/spec/containers/0/imagePullPolicy
   value: IfNotPresent

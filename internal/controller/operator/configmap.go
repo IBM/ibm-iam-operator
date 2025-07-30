@@ -89,7 +89,8 @@ func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctr
 			WithModifyFns(updateOAuthClientConfigMap),
 		common.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
 			WithName("registration-script").
-			WithGenerateFns(generateRegistrationScriptConfigMap()),
+			WithGenerateFns(generateRegistrationScriptConfigMap()).
+			WithModifyFns(updateRegisterClientScript),
 	}
 
 	subRecs := []common.SecondaryReconciler{}
@@ -250,6 +251,18 @@ func updateRegistrationJSON(_ common.SecondaryReconciler, ctx context.Context, o
 		}
 
 		observed.Data["platform-oidc-registration.json"] = string(newJSON[:])
+		updated = true
+	}
+	if !reflect.DeepEqual(generated.GetOwnerReferences(), observed.GetOwnerReferences()) {
+		observed.OwnerReferences = generated.GetOwnerReferences()
+		updated = true
+	}
+	return
+}
+
+func updateRegisterClientScript(_ common.SecondaryReconciler, ctx context.Context, observed, generated *corev1.ConfigMap) (updated bool, err error) {
+	if !reflect.DeepEqual(generated.Data["register-client.sh"], observed.Data["register_client.sh"]) {
+		observed.Data["register-client.sh"] = generated.Data["register_client.sh"]
 		updated = true
 	}
 	if !reflect.DeepEqual(generated.GetOwnerReferences(), observed.GetOwnerReferences()) {

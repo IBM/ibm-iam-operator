@@ -86,7 +86,7 @@ func (r *AuthenticationReconciler) addMongoMigrationFinalizers(ctx context.Conte
 		return
 	}
 
-	if needToMigrate, err := r.needToMigrateFromMongo(ctx, authCR); !needToMigrate && err == nil {
+	if needToMigrate, err := mongoIsPresent(r.Client, ctx, authCR); !needToMigrate && err == nil {
 		reqLogger.Info("No MongoDB migration required, so no need for finalizers; continuing")
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {
@@ -365,8 +365,7 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	//var postgres dbconn.DBConn
 	//var mongo dbconn.DBConn
 
-	return r.handleMigratorJob(ctx, req)
-
+	return
 	//if postgres, err = r.GetPostgresDB(r.Client, ctx, req); k8sErrors.IsNotFound(err) {
 	//	reqLogger.Info("Could not find all resources for configuring EDB connection; requeueing")
 	//	return subreconciler.RequeueWithDelay(opreqWait)
@@ -375,7 +374,7 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	//	return subreconciler.RequeueWithError(err)
 	//}
 
-	//if needsMongoMigration, err := r.needToMigrateFromMongo(ctx, authCR); err != nil {
+	//if needsMongoMigration, err := r.mongoIsPresent(ctx, authCR); err != nil {
 	//	reqLogger.Error(err, "Failed to determine whether migration from MongoDB is needed")
 	//	return subreconciler.RequeueWithError(err)
 	//} else if needsMongoMigration {
@@ -479,20 +478,17 @@ func hasMongoDBService(c client.Client, ctx context.Context, authCR *operatorv1a
 	return true, nil
 }
 
-// needToMigrateFromMongo attempts to determine whether a migration from MongoDB is needed. Returns an error when an
+// mongoIsPresent attempts to determine whether a migration from MongoDB is needed. Returns an error when an
 // unexpected error occurs while trying to get resources from the cluster.
-func (r *AuthenticationReconciler) needToMigrateFromMongo(ctx context.Context, authCR *operatorv1alpha1.Authentication) (need bool, err error) {
-	if authCR.HasBeenMigrated() {
-		return false, nil
-	}
+func mongoIsPresent(cl client.Client, ctx context.Context, authCR *operatorv1alpha1.Authentication) (need bool, err error) {
 	var hasResource bool
-	if hasResource, err = hasPreloadMongoDBConfigMap(r.Client, ctx, authCR.Namespace); hasResource {
+	if hasResource, err = hasPreloadMongoDBConfigMap(cl, ctx, authCR.Namespace); hasResource {
 		return true, nil
 	} else if err != nil {
 		return false, err
 	}
 
-	if hasResource, err = hasMongoDBService(r.Client, ctx, authCR); hasResource {
+	if hasResource, err = hasMongoDBService(cl, ctx, authCR); hasResource {
 		return true, nil
 	} else if err != nil {
 		return false, err
@@ -552,7 +548,7 @@ func (r *AuthenticationReconciler) overrideMongoDBBootstrap(ctx context.Context,
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
-	if needsMongoMigration, err := r.needToMigrateFromMongo(ctx, authCR); err != nil {
+	if needsMongoMigration, err := mongoIsPresent(r.Client, ctx, authCR); err != nil {
 		reqLogger.Error(err, "Failed to determine whether migration from MongoDB is needed")
 		return subreconciler.RequeueWithError(err)
 	} else if !needsMongoMigration {

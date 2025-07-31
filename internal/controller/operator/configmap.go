@@ -89,7 +89,7 @@ func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctr
 			WithModifyFns(updateOAuthClientConfigMap),
 		common.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
 			WithName("registration-script").
-			WithGenerateFns(generateRegistrationScriptConfigMap()).
+			WithGenerateFns(generateRegisterClientScript).
 			WithModifyFns(updateRegisterClientScript),
 	}
 
@@ -261,8 +261,8 @@ func updateRegistrationJSON(_ common.SecondaryReconciler, ctx context.Context, o
 }
 
 func updateRegisterClientScript(_ common.SecondaryReconciler, ctx context.Context, observed, generated *corev1.ConfigMap) (updated bool, err error) {
-	if !reflect.DeepEqual(generated.Data["register-client.sh"], observed.Data["register_client.sh"]) {
-		observed.Data["register-client.sh"] = generated.Data["register_client.sh"]
+	if generated.Data["register-client.sh"] != observed.Data["register-client.sh"] {
+		observed.Data["register-client.sh"] = generated.Data["register-client.sh"]
 		updated = true
 	}
 	if !reflect.DeepEqual(generated.GetOwnerReferences(), observed.GetOwnerReferences()) {
@@ -634,28 +634,25 @@ func generateRegistrationJsonConfigMap(clusterInfo *corev1.ConfigMap) common.Gen
 	}
 }
 
-func generateRegistrationScriptConfigMap() common.GenerateFn[*corev1.ConfigMap] {
-	return func(s common.SecondaryReconciler, ctx context.Context, generated *corev1.ConfigMap) (err error) {
-		reqLogger := logf.FromContext(ctx)
+func generateRegisterClientScript(s common.SecondaryReconciler, ctx context.Context, generated *corev1.ConfigMap) (err error) {
+	reqLogger := logf.FromContext(ctx)
 
-		*generated = corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      s.GetName(),
-				Namespace: s.GetNamespace(),
-				Labels:    map[string]string{"app": "platform-auth-service"},
-			},
-			Data: map[string]string{
-				"register-client.sh": registerClientScript,
-			},
-		}
-
-		// Set Authentication authCR as the owner and controller of the ConfigMap
-		if err = controllerutil.SetControllerReference(s.GetPrimary(), generated, s.GetClient().Scheme()); err != nil {
-			reqLogger.Error(err, "Failed to set owner for ConfigMap")
-		}
-		return
+	*generated = corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      s.GetName(),
+			Namespace: s.GetNamespace(),
+			Labels:    map[string]string{"app": "platform-auth-service"},
+		},
+		Data: map[string]string{
+			"register-client.sh": registerClientScript,
+		},
 	}
 
+	// Set Authentication authCR as the owner and controller of the ConfigMap
+	if err = controllerutil.SetControllerReference(s.GetPrimary(), generated, s.GetClient().Scheme()); err != nil {
+		reqLogger.Error(err, "Failed to set owner for ConfigMap")
+	}
+	return
 }
 
 func generateOAuthClientConfigMap(clusterInfo *corev1.ConfigMap) common.GenerateFn[*corev1.ConfigMap] {

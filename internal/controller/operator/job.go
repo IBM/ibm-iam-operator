@@ -323,7 +323,6 @@ func buildContainer(jobName string, image string, resources *corev1.ResourceRequ
 				{
 					Name:      "registration-script",
 					MountPath: "/scripts",
-					ReadOnly:  true,
 				},
 				{
 					Name:      "registration-json",
@@ -572,10 +571,8 @@ func buildMigratorVolumes(needsMongoDBMigration bool) (volumes []corev1.Volume) 
 		{
 			Name: "postgres-tls",
 			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "im-datastore-edb-secret",
-					},
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "im-datastore-edb-secret",
 					Items: []corev1.KeyToPath{
 						{
 							Key:  "ca.crt",

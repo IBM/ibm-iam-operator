@@ -1199,7 +1199,7 @@ var _ = Describe("ConfigMap handling", func() {
 				WithNamespace(authCR.Namespace).
 				WithClient(cl).
 				WithPrimary(authCR).MustBuild()
-			err := generateRegistrationScriptConfigMap()(resource, ctx, generated)
+			err := generateRegisterClientScript(resource, ctx, generated)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(generated.Data).ToNot(BeNil())
 			Expect(generated.Data["register-client.sh"]).To(Equal(registerClientScript))

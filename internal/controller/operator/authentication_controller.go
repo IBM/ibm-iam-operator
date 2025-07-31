@@ -284,19 +284,6 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return subreconciler.Evaluate(subResult, err)
 	}
 
-	// perform any migrations that may be needed before Deployments run
-	if subResult, err := r.handleMigrations(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-		return subreconciler.Evaluate(subResult, err)
-	}
-
-	if subResult, err := r.setMigrationCompleteStatus(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-		return subreconciler.Evaluate(subResult, err)
-	}
-
-	if result, err := r.handleMongoDBCleanup(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return subreconciler.Evaluate(result, err)
-	}
-
 	reqLogger.Info("Creating ibm-iam-operand-restricted serviceaccount")
 	currentSA := &corev1.ServiceAccount{}
 	err = r.createSA(instance, currentSA, &needToRequeue)
@@ -306,6 +293,10 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// create operand role and role-binding
 	r.createRole(instance)
 	r.createRoleBinding(instance)
+
+	if subResult, err := r.ensureMigrationJobRuns(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
 
 	// Check if this Certificate already exists and create it if it doesn't
 	if subResult, err := r.handleCertificates(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
@@ -317,6 +308,11 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	err = r.handleService(instance, currentService, &needToRequeue)
 	if err != nil {
 		return
+	}
+
+	// Check if this Job already exists and create it if it doesn't
+	if subResult, err := r.ensureOIDCClientRegistrationJobRuns(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
 	}
 
 	// Check if this Secret already exists and create it if it doesn't
@@ -332,12 +328,6 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return subreconciler.Evaluate(subResult, err)
 	}
 
-	// Check if this Job already exists and create it if it doesn't
-	currentJob := &batchv1.Job{}
-	err = r.handleJob(instance, currentJob, &needToRequeue)
-	if err != nil {
-		return
-	}
 	// create clusterrole and clusterrolebinding
 	if subResult, err := r.handleClusterRoles(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
@@ -350,6 +340,10 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	r.ReconcileRemoveIngresses(ctx, instance, &needToRequeue)
 	// updates redirecturi annotations to serviceaccount
 	r.handleServiceAccount(instance, &needToRequeue)
+
+	if subResult, err = r.ensureMigrationJobSucceeded(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
 
 	if subResult, err := r.handleDeployments(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
@@ -369,6 +363,10 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	if subResult, err := r.syncClientHostnames(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
+	}
+
+	if result, err := r.handleMongoDBCleanup(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return subreconciler.Evaluate(result, err)
 	}
 
 	return subreconciler.Evaluate(subreconciler.DoNotRequeue())

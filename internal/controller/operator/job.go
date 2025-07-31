@@ -285,6 +285,18 @@ func buildVolumes() []corev1.Volume {
 				},
 			},
 		},
+		{
+			Name: "oidc-registration-secrets",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-oidc-credentials",
+					Items: []corev1.KeyToPath{
+						{Key: "WLP_CLIENT_ID", Path: "client_id"},
+						{Key: "OAUTH2_CLIENT_REGISTRATION_SECRET", Path: "oauthadmin_passwd"},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -311,59 +323,20 @@ func buildContainer(jobName string, image string, resources *corev1.ResourceRequ
 				{
 					Name:      "registration-script",
 					MountPath: "/scripts",
+					ReadOnly:  true,
 				},
 				{
 					Name:      "registration-json",
 					MountPath: "/jsons",
+					ReadOnly:  true,
+				},
+				{
+					Name:      "oidc-registration-secrets",
+					MountPath: "/etc/register",
+					ReadOnly:  true,
 				},
 			},
 			Command: []string{"/scripts/register-client.sh"},
-			Env: []corev1.EnvVar{
-				{
-					Name: "WLP_CLIENT_REGISTRATION_SECRET",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "platform-oidc-credentials",
-							},
-							Key: "OAUTH2_CLIENT_REGISTRATION_SECRET",
-						},
-					},
-				},
-				{
-					Name: "WLP_CLIENT_ID",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "platform-oidc-credentials",
-							},
-							Key: "WLP_CLIENT_ID",
-						},
-					},
-				},
-				{
-					Name: "WLP_CLIENT_SECRET",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "platform-oidc-credentials",
-							},
-							Key: "WLP_CLIENT_SECRET",
-						},
-					},
-				},
-				{
-					Name: "ICP_CONSOLE_URL",
-					ValueFrom: &corev1.EnvVarSource{
-						ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "ibmcloud-cluster-info",
-							},
-							Key: "cluster_address",
-						},
-					},
-				},
-			},
 		},
 	}
 
@@ -549,10 +522,12 @@ func buildMigratorContainer(s common.SecondaryReconciler, image string, resource
 			{
 				Name:      "postgres-config",
 				MountPath: "/etc/postgres/config",
+				ReadOnly:  true,
 			},
 			{
 				Name:      "postgres-tls",
 				MountPath: "/etc/postgres/certs",
+				ReadOnly:  true,
 			},
 		},
 		Command: []string{"/usr/local/bin/migrate", "--postgres-config", "/etc/postgres"},
@@ -571,9 +546,11 @@ func buildMigratorContainer(s common.SecondaryReconciler, image string, resource
 	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
 		Name:      "mongodb-admin-creds",
 		MountPath: "/etc/mongodb/config",
+		ReadOnly:  true,
 	}, corev1.VolumeMount{
 		Name:      "mongodb-certs",
 		MountPath: "/etc/mongodb/certs",
+		ReadOnly:  true,
 	})
 
 	return []corev1.Container{container}

@@ -450,6 +450,8 @@ func generateAuthIdpConfigMap(clusterInfo *corev1.ConfigMap) ctrlcommon.Generate
 				"AUDIT_ENABLED_IDPROVIDER":           "false",
 				"AUDIT_ENABLED_IDMGMT":               "false",
 				"AUDIT_DETAIL":                       "false",
+				"AUDIT_URL":                          authCR.Spec.Config.AuditUrl,
+				"AUDIT_SECRET":                       authCR.Spec.Config.AuditSecret,
 				"LOG_LEVEL_IDPROVIDER":               "info",
 				"LOG_LEVEL_AUTHSVC":                  "info",
 				"LOG_LEVEL_IDMGMT":                   "info",

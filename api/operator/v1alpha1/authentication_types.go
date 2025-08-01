@@ -134,6 +134,8 @@ type ConfigSpec struct {
 	ICPPort                     int32  `json:"icpPort"`
 	FIPSEnabled                 bool   `json:"fipsEnabled"`
 	ROKSEnabled                 bool   `json:"roksEnabled"`
+	AuditUrl                    string `json:"auditUrl,omitempty"`
+	AuditSecret                 string `json:"auditSecret,omitempty"`
 	IBMCloudSaas                bool   `json:"ibmCloudSaas,omitempty"`
 	OnPremMultipleDeploy        bool   `json:"onPremMultipleDeploy,omitempty"`
 	SaasClientRedirectUrl       string `json:"saasClientRedirectUrl,omitempty"`

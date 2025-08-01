@@ -42,6 +42,9 @@ import (
 
 const RestartAnnotation string = "authentications.operator.ibm.com/restartedAt"
 
+// Name of Secret containing certificates for Common Audit Logging
+const AuditTLSSecretName string = "audit-tls"
+
 func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleDeployments")
 	deployCtx := logf.IntoContext(ctx, reqLogger)
@@ -77,14 +80,13 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 	if !ok {
 		samlConsoleURL = icpConsoleURL
 	}
-	auditTLSSecret := &corev1.Secret{}
-	auditSecretExists := true
-	auditTLSSecretStruct := types.NamespacedName{Name: common.AuditTLSSecretName, Namespace: req.Namespace}
-	err = r.Client.Get(deployCtx, auditTLSSecretStruct, auditTLSSecret)
-	if k8sErrors.IsNotFound(err) {
-		reqLogger.Error(err, "The secret is not found", "Secret.Name", common.AuditTLSSecretName)
-		auditSecretExists = false
+
+	auditSecretName, err := r.getAuditSecretNameIfExists(context.TODO(), req.Namespace)
+	if err != nil {
+		return subreconciler.RequeueWithError(err)
 	}
+
+	reqLogger.Info("Does audit-tls secret exist?", "Deployment.Namespace", req.Namespace, "Secret exists", auditSecretName)
 
 	// Check for the presence of dependencies, for SAAS
 	reqLogger.Info("Is SAAS enabled?", "Instance spec config value", authCR.Spec.Config.IBMCloudSaas)
@@ -178,6 +180,70 @@ func (r *AuthenticationReconciler) removeCP2Deployments(ctx context.Context, req
 	}
 	reqLogger.Info("No cleanup required; continuing")
 	return subreconciler.ContinueReconciling()
+}
+
+// getAuditSecretNameIfExists determines whether an audit service has been
+// configured with TLS. Returns the name of the Secret used to store the TLS
+// certificates if a Secret has been identified by the user and found on the
+// cluster, or an empty string when the Secret isn't found or cannot otherwise
+// be retrieved. If an error other than NotFound is received when trying to get
+// the Secret, that is returned as well.
+func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Context, namespace string) (string, error) {
+	var auditSecretName string
+	var auditURL string
+	// Check for the presence of audit-endpoint configmap
+	authIdpConfigMapName := "platform-auth-idp"
+	authIdpConfigMap := &corev1.ConfigMap{}
+	idpCMLogger := log.WithValues("ConfigMap.Name", authIdpConfigMapName, "ConfigMap.Namespace", namespace)
+	if err := r.Get(ctx, types.NamespacedName{Name: authIdpConfigMapName, Namespace: namespace}, authIdpConfigMap); k8sErrors.IsNotFound(err) {
+		idpCMLogger.Info("ConfigMap was not found")
+		return "", nil
+	} else if err != nil {
+		idpCMLogger.Error(err, "Failed to get ConfigMap")
+		return "", err
+	}
+	if authIdpConfigMap.Data == nil {
+		idpCMLogger.Info("Invalid ConfigMap")
+		return "", nil
+	}
+	if authIdpConfigMap.Data["AUDIT_URL"] == "" {
+		idpCMLogger.Info("Audit URL is not specified in ConfigMap; assume no Secret to mount", "key", "AUDIT_URL")
+		return "", nil
+	}
+	if authIdpConfigMap.Data["AUDIT_SECRET"] == "" {
+		idpCMLogger.Info("Audit Secret is not specified in ConfigMap; assume no Secret", "key", "AUDIT_SECRET")
+		return "", nil
+	}
+	auditURL = authIdpConfigMap.Data["AUDIT_URL"]
+	auditSecretName = authIdpConfigMap.Data["AUDIT_SECRET"]
+	idpCMLogger.Info("Fetched audit URL and audit Secret from ConfigMap", "AUDIT_SECRET", auditSecretName, "AUDIT_URL", auditURL)
+
+	auditTLSSecretLogger := log.WithValues("Secret.Name", auditSecretName, "Secret.Namespace", namespace)
+	auditTLSSecret := &corev1.Secret{}
+	auditTLSSecretStruct := types.NamespacedName{Name: auditSecretName, Namespace: namespace}
+	err := r.Get(ctx, auditTLSSecretStruct, auditTLSSecret)
+	if k8sErrors.IsNotFound(err) {
+		auditTLSSecretLogger.Info("Secret for audit configuration not found")
+		return "", nil
+	} else if err != nil {
+		auditTLSSecretLogger.Error(err, "Failed to retrieve Secret for audit configuration")
+		return "", err
+	}
+
+	auditTLSSecretLogger.Info("Secret found for audit configuration")
+	return auditSecretName, nil
+}
+
+func checkSecretExists(client client.Client, namespace string, auditSecretName string) (bool, error) {
+	auditTLSSecret := &corev1.Secret{}
+	auditTLSSecretStruct := types.NamespacedName{Name: auditSecretName, Namespace: namespace}
+	err := client.Get(context.TODO(), auditTLSSecretStruct, auditTLSSecret)
+	if k8sErrors.IsNotFound(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func generatePlatformAuthService(imagePullSecret, icpConsoleURL, _ string) common.GenerateFn[*appsv1.Deployment] {

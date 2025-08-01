@@ -220,6 +220,10 @@ spec:
                     type: string
                   providerIssuerURL:
                     type: string
+                  auditURL:
+                    type: string
+                  auditSecret:
+                    type: string
                   roksEnabled:
                     type: boolean
                   roksURL:

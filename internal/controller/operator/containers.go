@@ -26,6 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+const IMAuditTLSVolume string = "audit-volume"
+
 func buildInitContainers(initImage string) []corev1.Container {
 	psqlEnvList := []string{"DATABASE_RW_ENDPOINT", "DATABASE_PORT"}
 	envVars := buildInitContainerEnvVars(psqlEnvList, ctrlCommon.DatastoreEDBCMName)
@@ -1211,7 +1213,7 @@ func EnsureVolumeMountPresent(volumeMounts []corev1.VolumeMount, newVolMount cor
 
 func GetAuditCertsVolumeMount() corev1.VolumeMount {
 	volMount := corev1.VolumeMount{
-		Name:      ctrlCommon.IMAuditTLSVolume,
+		Name:      IMAuditTLSVolume,
 		MountPath: "/certs/audit-tls",
 	}
 	return volMount

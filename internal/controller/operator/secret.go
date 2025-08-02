@@ -141,7 +141,8 @@ func (r *AuthenticationReconciler) getSecretSubreconcilers(ctx context.Context, 
 					"IBMID_CLIENT_SECRET":               []byte("903305fb599c8328a4d86d4cbdd07368"),
 					"IBMID_PROFILE_CLIENT_SECRET":       []byte("C1bR0rO7kE0cE3xM2tV1gI0mG1cH3jK4dD7iQ8rW6pF1aF4mQ5"),
 				})).
-			WithModifyFns(ensureSecretLabels, ensureChecksumAnnotation),
+			WithModifyFns(ensureSecretLabels, ensureChecksumAnnotation).
+			WithOnWriteFns(signalNeedRolloutFn[*corev1.Secret](r)),
 		ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.Secret]().
 			WithName("platform-auth-ibmid-jwk").
 			WithGenerateFns(generateSecretObject(

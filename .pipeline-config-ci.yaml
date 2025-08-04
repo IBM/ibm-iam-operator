@@ -19,7 +19,7 @@ tasks:
         when: 'false'
         
   code-build:
-    runtimeClassName: x86-large
+    runtimeClassName: medium
     displayName: Build amd64, ppc64le and s390x images
     include:
       - dind

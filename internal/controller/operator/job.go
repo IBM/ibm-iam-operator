@@ -46,6 +46,15 @@ func (r *AuthenticationReconciler) getMigrationJobSubreconciler(authCR *operator
 		WithPrimary(authCR).MustBuild()
 }
 
+func (r *AuthenticationReconciler) getSAMLQueryJob(authCR *operatorv1alpha1.Authentication) (subRec common.Subreconciler) {
+	return common.NewSecondaryReconcilerBuilder[*batchv1.Job]().
+		WithName("im-has-saml").
+		WithGenerateFns(generateSAMLQueryJobObject).
+		WithClient(r.Client).
+		WithNamespace(authCR.Namespace).
+		WithPrimary(authCR).MustBuild()
+}
+
 func (r *AuthenticationReconciler) ensureMigrationJobRuns(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
 	authCR := &operatorv1alpha1.Authentication{}
@@ -53,6 +62,15 @@ func (r *AuthenticationReconciler) ensureMigrationJobRuns(ctx context.Context, r
 		log.Info("Failed to retrieve Authentication CR for status update; retrying")
 	}
 	return r.getMigrationJobSubreconciler(authCR).Reconcile(ctx)
+}
+
+func (r *AuthenticationReconciler) checkSAMLPresence(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	log := logf.FromContext(ctx)
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err := r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		log.Info("Failed to retrieve Authentication CR for status update; retrying")
+	}
+	return r.getSAMLQueryJob(authCR).Reconcile(ctx)
 }
 
 func (r *AuthenticationReconciler) ensureOIDCClientRegistrationJobRuns(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
@@ -339,6 +357,16 @@ func buildContainer(jobName string, image string, resources *corev1.ResourceRequ
 		},
 	}
 
+}
+
+func generateSAMLQueryJobObject(s common.SecondaryReconciler, ctx context.Context, job *batchv1.Job) (err error) {
+	log := logf.FromContext(ctx)
+	if err = generateMigratorJobObject(s, ctx, job); err != nil {
+		return
+	}
+	log.Info("Set command for query job")
+	job.Spec.Template.Spec.Containers[0].Command = []string{"/usr/local/bin/query", "--postgres-config", "/etc/postgres"}
+	return
 }
 
 func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context, job *batchv1.Job) (err error) {

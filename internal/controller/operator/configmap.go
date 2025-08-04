@@ -345,6 +345,10 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"LDAP_CTX_POOL_PREFERREDSIZE"),
 		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("MASTER_PATH")),
 			"MASTER_PATH"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("AUDIT_URL")),
+			"AUDIT_URL"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("AUDIT_SECRET")),
+			"AUDIT_SECRET"),
 	}
 
 	if v, ok := generated.Data["IS_OPENSHIFT_ENV"]; ok {

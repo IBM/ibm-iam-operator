@@ -24,7 +24,7 @@ ALL_PLATFORMS="amd64 ppc64le s390x"
 IMAGE_REPO=${1}
 IMAGE_NAME=${2}
 VERSION=${3-"$(git describe --exact-match 2> /dev/null || git describe --match=$(git rev-parse --short=8 HEAD) --always --dirty --abbrev=8)"}
-RELEASE_VERSION=${4:-4.5.15}
+RELEASE_VERSION=$(cat ./version/version.go | grep "Version =" | awk '{ print $3}' | tr -d '"')
 MAX_PULLING_RETRY=${MAX_PULLING_RETRY-10}
 RETRY_INTERVAL=${RETRY_INTERVAL-10}
 # support other container tools, e.g. podman
@@ -55,6 +55,10 @@ if [[ -n "$($CONTAINER_CLI images -f reference="${IMAGE_REPO}/${IMAGE_NAME}:late
 then
   echo "Remove local image with conflicting reference ${IMAGE_REPO}/${IMAGE_NAME}:latest"
   ${CONTAINER_CLI} rmi "${IMAGE_REPO}/${IMAGE_NAME}:latest"
+fi
+
+if [ "$SPS_EVENT_TYPE" = "pull_request" ]; then
+    RELEASE_VERSION="$VERSION"
 fi
 
 # create multi-arch manifest

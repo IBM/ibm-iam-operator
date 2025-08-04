@@ -3,7 +3,7 @@ version: '2'
 # PR Pipeline: pr-code-checks, code-pr-finish
 tasks:
   pr-code-checks:
-    runtimeClassName: x86-xlarge
+    runtimeClassName: medium
     displayName: Build amd64, ppc64le and s390x images
     include:
       - dind

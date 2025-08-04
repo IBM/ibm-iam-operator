@@ -34,7 +34,6 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/internal/controller/common"
-	dbconn "github.com/IBM/ibm-iam-operator/internal/database/connectors"
 	"github.com/opdev/subreconciler"
 	routev1 "github.com/openshift/api/route/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -1023,24 +1022,47 @@ func readROKSURL(ctx context.Context) (issuer string, err error) {
 }
 
 func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, req ctrl.Request) (path string, err error) {
-	p, err := r.GetPostgresDB(r.Client, ctx, req)
-	if err != nil {
+	objKey := types.NamespacedName{Name: "im-has-saml", Namespace: req.Namespace}
+	job := &batchv1.Job{}
+	if err = r.Get(ctx, objKey, job); err != nil {
 		return
 	}
-	var has bool
-	if err = p.Connect(ctx); err != nil {
-		return
-	}
-	defer p.Disconnect(ctx)
+	jobUID := job.ObjectMeta.UID
 
-	samlChecker, ok := p.(dbconn.SAMLChecker)
-	if !ok {
-		return "", fmt.Errorf("DB unable to check for SAML connection")
+	podList := &corev1.PodList{}
+
+	opts := []client.ListOption{
+		client.InNamespace(req.Namespace),
+		client.MatchingLabels(map[string]string{
+			"batch.kubernetes.io/controller-uid": string(jobUID),
+			"batch.kubernetes.io/job-name":       "im-has-saml",
+		}),
 	}
-	if has, err = samlChecker.HasSAML(ctx); err != nil {
+
+	if err = r.List(ctx, podList, opts...); err != nil {
 		return
-	} else if has {
-		return "", err
+	} else if len(podList.Items) != 1 {
+		return "", fmt.Errorf("received invalid number of matching Pods (%d)", len(podList.Items))
 	}
-	return "/idauth", nil
+
+	po := podList.Items[0]
+	if len(po.Status.ContainerStatuses) != 1 {
+		return "", fmt.Errorf("received invalid number of containerStatuses (%d)", len(po.Status.ContainerStatuses))
+	}
+
+	containerState := podList.Items[0].Status.ContainerStatuses[0].State
+	if containerState.Terminated == nil {
+		return "", fmt.Errorf("container does not appear to have terminated yet")
+	}
+
+	exitCode := containerState.Terminated.ExitCode
+	switch exitCode {
+	case 2:
+		return "", fmt.Errorf("failed to query for SAML connection")
+	case 1:
+		return "", nil
+	case 0:
+		return "/idauth", nil
+	}
+	return "", fmt.Errorf("received unexpected error code while running SAML check")
 }

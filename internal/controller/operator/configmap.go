@@ -442,7 +442,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 		}
 
 		// Found AUDIT variables
-		reqLogger.Info("Found audit variables, audit url", authCR.Spec.Config.AuditUrl, " and audit secret", authCR.Spec.Config.AuditSecret)
+		reqLogger.Info("Found audit variables", "AuditUrl", authCR.Spec.Config.AuditUrl, "AuditSecret", authCR.Spec.Config.AuditSecret)
 
 		// Set the path for SAML connections
 		var masterPath string

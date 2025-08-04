@@ -235,18 +235,6 @@ func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Contex
 	return auditSecretName, nil
 }
 
-func checkSecretExists(client client.Client, namespace string, auditSecretName string) (bool, error) {
-	auditTLSSecret := &corev1.Secret{}
-	auditTLSSecretStruct := types.NamespacedName{Name: auditSecretName, Namespace: namespace}
-	err := client.Get(context.TODO(), auditTLSSecretStruct, auditTLSSecret)
-	if k8sErrors.IsNotFound(err) {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
 func generatePlatformAuthService(imagePullSecret, icpConsoleURL, _ string) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)

@@ -41,7 +41,6 @@ These environment variables impact the resulting build artifacts and can be chan
   Operator bundle image builds
 - `GIT_COMMIT_ID`: The short commit SHA for the HEAD of the current branch; used
   for image labels and single-arch image tags 
-- `GIT_REMOTE_URL`: The URL of the git remote for this project; used for image labels
 - `CONTAINER_CLI`: The container tool for builds and other image-related activities
 - `VERSION`: The version of the Operator; used for the bundle image, multi-arch
   manifest, and catalog image tags

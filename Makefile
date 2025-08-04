@@ -23,8 +23,7 @@ BUILD_LOCALLY ?= 1
 # The namespace that operator will be deployed in
 NAMESPACE=ibm-common-services
 GIT_COMMIT_ID=$(shell git rev-parse --short HEAD)
-GIT_REMOTE_URL=$(shell git config --get remote.origin.url)
-IMAGE_BUILD_OPTS=--build-arg "VCS_REF=$(GIT_COMMIT_ID)" --build-arg "VCS_URL=$(GIT_REMOTE_URL)"
+IMAGE_BUILD_OPTS=--build-arg "VCS_REF=$(GIT_COMMIT_ID)"
 
 # Image URL to use all building/pushing image targets;
 # Use your own docker registry and image name for dev/test by overridding the IMG and REGISTRY environment variable.

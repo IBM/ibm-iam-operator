@@ -33,6 +33,7 @@ ifeq ($(SPS_EVENT_TYPE), pull_request)
 else
 	REGISTRY ?= "docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-integration-docker-local/ibmcom"
 endif
+CONTAINER_CLI ?= docker
 
 MARKDOWN_LINT_WHITELIST=https://quay.io/cnr
 

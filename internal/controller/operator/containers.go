@@ -26,8 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-const IMAuditTLSVolume string = "audit-volume"
-
 func buildInitContainers(initImage string) []corev1.Container {
 	psqlEnvList := []string{"DATABASE_RW_ENDPOINT", "DATABASE_PORT"}
 	envVars := buildInitContainerEnvVars(psqlEnvList, ctrlCommon.DatastoreEDBCMName)
@@ -420,7 +418,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 
 }
 
-func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string, _ string, saasCRNId string, auditSecretExists bool) corev1.Container {
+func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string, _ string, saasCRNId string, auditSecretName string) corev1.Container {
 
 	resources := instance.Spec.IdentityProvider.Resources
 	if resources == nil {
@@ -638,7 +636,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		"LDAP_SEARCH_CACHE_SIZE", "LDAP_SEARCH_CACHE_TIMEOUT", "LDAP_CTX_POOL_INITSIZE", "LDAP_CTX_POOL_MAXSIZE",
 		"LDAP_CTX_POOL_TIMEOUT", "LDAP_CTX_POOL_WAITTIME", "LDAP_CTX_POOL_PREFERREDSIZE", "LDAP_SEARCH_CACHE_ENABLED",
 		"LDAP_SEARCH_CACHE_SIZELIMIT", "LDAP_SEARCH_EXCLUDE_WILDCARD_CHARS", "LDAP_SEARCH_SIZE_LIMIT",
-		"LDAP_SEARCH_TIME_LIMIT", "LDAP_SEARCH_CN_ATTR_ONLY", "LDAP_SEARCH_ID_ATTR_ONLY",
+		"LDAP_SEARCH_TIME_LIMIT", "LDAP_SEARCH_CN_ATTR_ONLY", "LDAP_SEARCH_ID_ATTR_ONLY", "AUDIT_URL",
 		"DB_CONNECT_TIMEOUT", "DB_IDLE_TIMEOUT", "DB_CONNECT_MAX_RETRIES", "DB_POOL_MIN_SIZE", "DB_POOL_MAX_SIZE", "DB_SSL_MODE", "SEQL_LOGGING"}
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
 
@@ -707,7 +705,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			},
 		},
 		Resources:    *resources,
-		VolumeMounts: buildIdentityProviderVolumeMounts(auditSecretExists),
+		VolumeMounts: buildIdentityProviderVolumeMounts(auditSecretName),
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
@@ -737,7 +735,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 
 }
 
-func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string, _ string, auditSecretExists bool) corev1.Container {
+func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string, _ string, auditSecretName string) corev1.Container {
 
 	replicaCount := int(instance.Spec.Replicas)
 	resources := instance.Spec.IdentityManager.Resources
@@ -968,7 +966,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		"ROKS_ENABLED", "ROKS_USER_PREFIX", "IDENTITY_AUTH_DIRECTORY_URL", "OIDC_ISSUER_URL", "BOOTSTRAP_USERID", "CLUSTER_NAME", "HTTP_ONLY", "LDAP_SEARCH_SIZE_LIMIT", "LDAP_SEARCH_TIME_LIMIT",
 		"LDAP_SEARCH_CN_ATTR_ONLY", "LDAP_SEARCH_ID_ATTR_ONLY", "LDAP_SEARCH_EXCLUDE_WILDCARD_CHARS", "IGNORE_LDAP_FILTERS_VALIDATION", "AUTH_SVC_LDAP_CONFIG_TIMEOUT",
 		"SCIM_LDAP_SEARCH_SIZE_LIMIT", "SCIM_LDAP_SEARCH_TIME_LIMIT", "SCIM_ASYNC_PARALLEL_LIMIT", "SCIM_GET_DISPLAY_FOR_GROUP_USERS", "ATTR_MAPPING_FROM_CONFIG", "SCIM_AUTH_CACHE_MAX_SIZE", "SCIM_AUTH_CACHE_TTL_VALUE",
-		"DB_CONNECT_TIMEOUT", "DB_IDLE_TIMEOUT", "DB_CONNECT_MAX_RETRIES", "DB_POOL_MIN_SIZE", "DB_POOL_MAX_SIZE", "DB_SSL_MODE", "SEQL_LOGGING"}
+		"DB_CONNECT_TIMEOUT", "DB_IDLE_TIMEOUT", "DB_CONNECT_MAX_RETRIES", "DB_POOL_MIN_SIZE", "DB_POOL_MAX_SIZE", "DB_SSL_MODE", "SEQL_LOGGING", "AUDIT_URL"}
 
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
 
@@ -1043,7 +1041,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			},
 		},
 		Resources:    *resources,
-		VolumeMounts: buildIdentityManagerVolumeMounts(auditSecretExists),
+		VolumeMounts: buildIdentityManagerVolumeMounts(auditSecretName),
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
@@ -1082,16 +1080,16 @@ func buildContainers(instance *operatorv1alpha1.Authentication, authServiceImage
 	return []corev1.Container{authServiceContainer}
 }
 
-func buildManagerContainers(instance *operatorv1alpha1.Authentication, identityManagerImage string, icpConsoleURL string, auditSecretExists bool) []corev1.Container {
+func buildManagerContainers(instance *operatorv1alpha1.Authentication, identityManagerImage string, icpConsoleURL string, auditSecretName string) []corev1.Container {
 
-	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL, auditSecretExists)
+	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL, auditSecretName)
 
 	return []corev1.Container{identityManagerContainer}
 }
 
-func buildProviderContainers(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string, saasCrnId string, auditSecretExists bool) []corev1.Container {
+func buildProviderContainers(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string, saasCrnId string, auditSecretName string) []corev1.Container {
 
-	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId, auditSecretExists)
+	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId, auditSecretName)
 
 	return []corev1.Container{identityProviderContainer}
 }
@@ -1138,7 +1136,7 @@ func buildInitContainerEnvVars(envVarList []string, configmapName string) []core
 	return envVars
 }
 
-func buildIdentityManagerVolumeMounts(auditSecretExists bool) []corev1.VolumeMount {
+func buildIdentityManagerVolumeMounts(auditSecretName string) []corev1.VolumeMount {
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "cluster-ca",
@@ -1161,7 +1159,7 @@ func buildIdentityManagerVolumeMounts(auditSecretExists bool) []corev1.VolumeMou
 			MountPath: "/pgsql/clientinfo",
 		},
 	}
-	if auditSecretExists {
+	if len(auditSecretName) > 0 {
 		volumeMounts = EnsureVolumeMountPresent(volumeMounts, GetAuditCertsVolumeMount())
 
 	}
@@ -1169,7 +1167,7 @@ func buildIdentityManagerVolumeMounts(auditSecretExists bool) []corev1.VolumeMou
 	return volumeMounts
 }
 
-func buildIdentityProviderVolumeMounts(ldapSpcExist bool) []corev1.VolumeMount {
+func buildIdentityProviderVolumeMounts(auditSecretName string) []corev1.VolumeMount {
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "auth-key",
@@ -1192,11 +1190,10 @@ func buildIdentityProviderVolumeMounts(ldapSpcExist bool) []corev1.VolumeMount {
 			MountPath: "/pgsql/clientinfo",
 		},
 	}
-	if ldapSpcExist {
+	if len(auditSecretName) > 0 {
 		volumeMounts = EnsureVolumeMountPresent(volumeMounts, GetAuditCertsVolumeMount())
 
 	}
-
 	return volumeMounts
 }
 

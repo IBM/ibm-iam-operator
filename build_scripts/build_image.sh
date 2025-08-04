@@ -1,6 +1,6 @@
 export BUILD_LOCALLY=0
 
-echo "**************** Install go ****************"
+echo "***************** Install go *****************"
 
 GO_VERSION="1.24.5"
 curl -sLO "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz"

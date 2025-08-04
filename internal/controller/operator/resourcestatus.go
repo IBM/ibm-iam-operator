@@ -313,34 +313,26 @@ func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, 
 		},
 	}
 
-	zenExtensionStatusRetrieval := statusRetrieval{
-		names: []string{
-			ImZenExtName,
-		},
-		f: getAllZenExtensionStatus,
-	}
-
 	routeStatusRetrieval := statusRetrieval{
 		names: []string{
 			"id-mgmt",
 			"platform-auth",
+			"platform-id-auth",
 			"platform-id-provider",
 			"platform-login",
 			"platform-oidc",
 			"saml-ui-callback",
 			"social-login-callback",
+			IMCrtAuthRouteName,
 		},
 		f: getAllRouteStatus,
 	}
 
-	if authentication.Spec.Config.ZenFrontDoor && ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
-		reqLogger.Info("Zen Front Door is enabled; will check ZenExtension status and skip checking Route status")
-		statusRetrievals = append(statusRetrievals, zenExtensionStatusRetrieval)
-	} else if ctrlcommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient) {
+	if ctrlcommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient) {
 		reqLogger.Info("Is running on OpenShift; will check Route status")
 		statusRetrievals = append(statusRetrievals, routeStatusRetrieval)
 	} else {
-		reqLogger.Info("ZenExtensions and Routes are not available; assuming ingress will be configured manually")
+		reqLogger.Info("Routes are not available; assuming ingress will be configured manually")
 	}
 
 	kind := "Authentication"

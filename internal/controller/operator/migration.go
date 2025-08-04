@@ -241,17 +241,31 @@ func (r *AuthenticationReconciler) handleMongoDBCleanup(ctx context.Context, req
 	return subreconciler.ContinueReconciling()
 }
 
-func (r *AuthenticationReconciler) getPostgresDB(ctx context.Context, req ctrl.Request) (p *dbconn.PostgresDB, err error) {
+func GetPostgresDB(c client.Client, ctx context.Context, req ctrl.Request) (p *dbconn.PostgresDB, err error) {
 	datastoreCertSecret := &corev1.Secret{}
-	if err = r.Get(ctx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBSecretName, Namespace: req.Namespace}, datastoreCertSecret); err != nil {
+	if err = c.Get(ctx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBSecretName, Namespace: req.Namespace}, datastoreCertSecret); err != nil {
 		return nil, err
 	}
 
 	datastoreCertCM := &corev1.ConfigMap{}
-	if err = r.Get(ctx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBCMName, Namespace: req.Namespace}, datastoreCertCM); err != nil {
+	if err = c.Get(ctx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBCMName, Namespace: req.Namespace}, datastoreCertCM); err != nil {
 		return nil, err
 	}
 
+	if datastoreCertSecret.Data["DATABASE_PASSWORD"] != nil {
+		return dbconn.NewPostgresDB(
+			dbconn.Name(datastoreCertCM.Data["DATABASE_NAME"]),
+			dbconn.ID(req.Namespace),
+			dbconn.Port(datastoreCertCM.Data["DATABASE_PORT"]),
+			dbconn.User(datastoreCertCM.Data["DATABASE_USER"]),
+			dbconn.Password(string(datastoreCertSecret.Data["DATABASE_PASSWORD"])),
+			dbconn.Host(datastoreCertCM.Data["DATABASE_RW_ENDPOINT"]),
+			dbconn.Schemas("platformdb", "oauthdbschema", "metadata"),
+			dbconn.TLSConfig(
+				datastoreCertSecret.Data["ca.crt"],
+				datastoreCertSecret.Data["tls.crt"],
+				datastoreCertSecret.Data["tls.key"]))
+	}
 	return dbconn.NewPostgresDB(
 		dbconn.Name(datastoreCertCM.Data["DATABASE_NAME"]),
 		dbconn.ID(req.Namespace),
@@ -265,10 +279,10 @@ func (r *AuthenticationReconciler) getPostgresDB(ctx context.Context, req ctrl.R
 			datastoreCertSecret.Data["tls.key"]))
 }
 
-func (r *AuthenticationReconciler) getMongoHost(ctx context.Context, namespace string) (mongoHost string, err error) {
+func getMongoHost(c client.Client, ctx context.Context, namespace string) (mongoHost string, err error) {
 	var preloadCM *corev1.ConfigMap
 	mongoHost = fmt.Sprintf("mongodb.%s.svc.cluster.local", namespace)
-	if preloadCM, err = r.getPreloadMongoDBConfigMap(ctx, namespace); err != nil {
+	if preloadCM, err = getPreloadMongoDBConfigMap(c, ctx, namespace); err != nil {
 		return
 	} else if preloadCM != nil {
 		var ok bool
@@ -282,10 +296,10 @@ func (r *AuthenticationReconciler) getMongoHost(ctx context.Context, namespace s
 	return
 }
 
-func (r *AuthenticationReconciler) getMongoDB(ctx context.Context, req ctrl.Request) (mongo *dbconn.MongoDB, err error) {
+func GetMongoDB(c client.Client, ctx context.Context, req ctrl.Request) (mongo *dbconn.MongoDB, err error) {
 	mongoName := "platform-db"
 	mongoPort := "27017"
-	mongoHost, err := r.getMongoHost(ctx, req.Namespace)
+	mongoHost, err := getMongoHost(c, ctx, req.Namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +316,7 @@ func (r *AuthenticationReconciler) getMongoDB(ctx context.Context, req ctrl.Requ
 
 	for secretName, secret := range secrets {
 		objKey := types.NamespacedName{Name: secretName, Namespace: req.Namespace}
-		if err = r.Get(ctx, objKey, secret); err != nil {
+		if err = c.Get(ctx, objKey, secret); err != nil {
 			return nil, err
 		}
 	}
@@ -351,10 +365,10 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	}
 
 	var migrations *migration.MigrationQueue
-	var postgres *dbconn.PostgresDB
-	var mongo *dbconn.MongoDB
+	var postgres dbconn.DBConn
+	var mongo dbconn.DBConn
 
-	if postgres, err = r.getPostgresDB(ctx, req); k8sErrors.IsNotFound(err) {
+	if postgres, err = r.GetPostgresDB(r.Client, ctx, req); k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Could not find all resources for configuring EDB connection; requeueing")
 		return subreconciler.RequeueWithDelay(opreqWait)
 	} else if err != nil {
@@ -366,7 +380,7 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		reqLogger.Error(err, "Failed to determine whether migration from MongoDB is needed")
 		return subreconciler.RequeueWithError(err)
 	} else if needsMongoMigration {
-		if mongo, err = r.getMongoDB(ctx, req); k8sErrors.IsNotFound(err) {
+		if mongo, err = r.GetMongoDB(r.Client, ctx, req); k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Could not find all resources for configuring MongoDB connection; requeueing")
 			return subreconciler.RequeueWithDelay(opreqWait)
 		} else if err != nil {
@@ -440,10 +454,10 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 	}
 }
 
-func (r *AuthenticationReconciler) getPreloadMongoDBConfigMap(ctx context.Context, namespace string) (cm *corev1.ConfigMap, err error) {
+func getPreloadMongoDBConfigMap(c client.Client, ctx context.Context, namespace string) (cm *corev1.ConfigMap, err error) {
 	cm = &corev1.ConfigMap{}
 	preloadConfigMapKey := types.NamespacedName{Name: "mongodb-preload-endpoint", Namespace: namespace}
-	if err = r.Get(ctx, preloadConfigMapKey, cm); k8sErrors.IsNotFound(err) {
+	if err = c.Get(ctx, preloadConfigMapKey, cm); k8sErrors.IsNotFound(err) {
 		return nil, nil
 	} else if err != nil {
 		return nil, err
@@ -451,14 +465,14 @@ func (r *AuthenticationReconciler) getPreloadMongoDBConfigMap(ctx context.Contex
 	return cm, nil
 }
 
-func (r *AuthenticationReconciler) hasPreloadMongoDBConfigMap(ctx context.Context, namespace string) (has bool, err error) {
-	cm, err := r.getPreloadMongoDBConfigMap(ctx, namespace)
+func hasPreloadMongoDBConfigMap(c client.Client, ctx context.Context, namespace string) (has bool, err error) {
+	cm, err := getPreloadMongoDBConfigMap(c, ctx, namespace)
 	return cm != nil, err
 }
 
-func (r *AuthenticationReconciler) hasMongoDBService(ctx context.Context, authCR *operatorv1alpha1.Authentication) (has bool, err error) {
+func hasMongoDBService(c client.Client, ctx context.Context, authCR *operatorv1alpha1.Authentication) (has bool, err error) {
 	service := &corev1.Service{}
-	if err = r.Get(ctx, types.NamespacedName{Name: "mongodb", Namespace: authCR.Namespace}, service); k8sErrors.IsNotFound(err) {
+	if err = c.Get(ctx, types.NamespacedName{Name: "mongodb", Namespace: authCR.Namespace}, service); k8sErrors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
 		return false, err
@@ -473,13 +487,13 @@ func (r *AuthenticationReconciler) needToMigrateFromMongo(ctx context.Context, a
 		return false, nil
 	}
 	var hasResource bool
-	if hasResource, err = r.hasPreloadMongoDBConfigMap(ctx, authCR.Namespace); hasResource {
+	if hasResource, err = hasPreloadMongoDBConfigMap(r.Client, ctx, authCR.Namespace); hasResource {
 		return true, nil
 	} else if err != nil {
 		return false, err
 	}
 
-	if hasResource, err = r.hasMongoDBService(ctx, authCR); hasResource {
+	if hasResource, err = hasMongoDBService(r.Client, ctx, authCR); hasResource {
 		return true, nil
 	} else if err != nil {
 		return false, err

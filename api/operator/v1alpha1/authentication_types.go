@@ -115,6 +115,11 @@ type ClientRegistrationSpec struct {
 	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
+type IngressConfig struct {
+	Hostname *string `json:"hostname,omitempty"`
+	Secret   *string `json:"secret,omitempty"`
+}
+
 type ConfigSpec struct {
 	ClusterCADomain             string `json:"clusterCADomain"`
 	DefaultAdminUser            string `json:"defaultAdminUser"`
@@ -154,7 +159,7 @@ type ConfigSpec struct {
 	OIDCIssuerURL               string `json:"oidcIssuerURL"`
 	AttrMappingFromConfig       bool   `json:"attrMappingFromConfig,omitempty"`
 	ZenFrontDoor                bool   `json:"zenFrontDoor,omitempty"`
-}
+  Ingress                     *IngressConfig `json:"ingress,omitempty"`
 
 type ManagedResourceStatus struct {
 	ObjectName string `json:"objectName,omitempty"`
@@ -309,6 +314,18 @@ func (a *Authentication) HasDBSchemaVersion() bool {
 
 func (a *Authentication) HasNoDBSchemaVersion() bool {
 	return !a.HasDBSchemaVersion()
+}
+
+func (a *Authentication) HasCustomIngressHostname() bool {
+	return a.Spec.Config.Ingress != nil && a.Spec.Config.Ingress.Hostname != nil && *a.Spec.Config.Ingress.Hostname != ""
+}
+
+func (a *Authentication) HasCustomIngressCertificate() bool {
+	return a.Spec.Config.Ingress != nil && a.Spec.Config.Ingress.Secret != nil && *a.Spec.Config.Ingress.Secret != ""
+}
+
+func (a *Authentication) HasCustomIngress() bool {
+	return a.HasCustomIngressHostname() || a.HasCustomIngressCertificate()
 }
 
 func (a *Authentication) GetDBSchemaVersion() string {

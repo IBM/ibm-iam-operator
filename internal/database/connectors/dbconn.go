@@ -17,6 +17,7 @@ package connectors
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -66,7 +67,12 @@ func NewPostgresDB(opts ...DBOption) (*PostgresDB, error) {
 }
 
 func (p *PostgresDB) Connect(ctx context.Context) (err error) {
-	dsn := fmt.Sprintf("host=%s user=%s dbname=%s port=%s sslmode=require", p.Host, p.User, p.Name, p.Port)
+	var dsn string
+	if len(p.Password) > 0 {
+		dsn = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=require", p.Host, p.User, p.Password, p.Name, p.Port)
+	} else {
+		dsn = fmt.Sprintf("host=%s user=%s dbname=%s port=%s sslmode=require", p.Host, p.User, p.Name, p.Port)
+	}
 	var connConfig *pgx.ConnConfig
 	if connConfig, err = pgx.ParseConfig(dsn); err != nil {
 		return err
@@ -128,6 +134,26 @@ func (p *PostgresDB) HasSchemas(ctx context.Context) (bool, error) {
 
 	return true, nil
 }
+
+type SAMLChecker interface {
+	HasSAML(context.Context) (bool, error)
+}
+
+var _ SAMLChecker = &PostgresDB{}
+
+func (p *PostgresDB) HasSAML(ctx context.Context) (has bool, err error) {
+	query := "SELECT 1 FROM platformdb.idp_configs WHERE protocol = 'saml'"
+	row := p.Conn.QueryRow(ctx, query)
+	var s any
+	err = row.Scan(&s)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func (p *PostgresDB) HasMetadataSchema(ctx context.Context) (has bool, err error) {
 	query := "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'metadata'"
 	var table string

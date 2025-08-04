@@ -403,3 +403,63 @@ func NewSecondaryReconcilerFn(req ctrl.Request, fn subreconciler.FnWithRequest) 
 		return fn(ctx, req)
 	}
 }
+
+// Subreconcilers implements Subreconciler
+type Subreconcilers []Subreconciler
+
+var _ Subreconciler = Subreconcilers{}
+
+func (s Subreconcilers) Reconcile(ctx context.Context) (result *ctrl.Result, err error) {
+	results := []*ctrl.Result{}
+	errs := []error{}
+	for _, reconciler := range s {
+		result, err = reconciler.Reconcile(ctx)
+		results = append(results, result)
+		errs = append(errs, err)
+	}
+	return ReduceSubreconcilerResultsAndErrors(results, errs)
+}
+
+type subreconcilers struct {
+	Subreconcilers
+	strategy func(*subreconcilers, context.Context) (*ctrl.Result, error)
+}
+
+func (s *subreconcilers) Reconcile(ctx context.Context) (result *ctrl.Result, err error) {
+	return s.strategy(s, ctx)
+}
+
+func NewStrictSubreconcilers(fns ...Subreconciler) *subreconcilers {
+	return &subreconcilers{
+		Subreconcilers: fns,
+		strategy:       strictReconcile,
+	}
+}
+
+func NewLazySubreconcilers(fns ...Subreconciler) *subreconcilers {
+	return &subreconcilers{
+		Subreconcilers: fns,
+		strategy:       lazyReconcile,
+	}
+}
+
+func strictReconcile(s *subreconcilers, ctx context.Context) (result *ctrl.Result, err error) {
+	for _, reconciler := range s.Subreconcilers {
+		result, err = reconciler.Reconcile(ctx)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+func lazyReconcile(s *subreconcilers, ctx context.Context) (result *ctrl.Result, err error) {
+	results := []*ctrl.Result{}
+	errs := []error{}
+	for _, reconciler := range s.Subreconcilers {
+		result, err = reconciler.Reconcile(ctx)
+		results = append(results, result)
+		errs = append(errs, err)
+	}
+	return ReduceSubreconcilerResultsAndErrors(results, errs)
+}

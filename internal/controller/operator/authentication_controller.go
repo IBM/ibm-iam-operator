@@ -25,6 +25,7 @@ import (
 
 	certmgr "github.com/IBM/ibm-iam-operator/internal/api/certmanager/v1"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
+	dbconn "github.com/IBM/ibm-iam-operator/internal/database/connectors"
 	"github.com/IBM/ibm-iam-operator/internal/database/migration"
 	"github.com/IBM/ibm-iam-operator/internal/version"
 	routev1 "github.com/openshift/api/route/v1"
@@ -50,7 +51,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
-	zenv1 "github.com/IBM/ibm-iam-operator/internal/api/zen.cpd.ibm.com/v1"
 	"github.com/opdev/subreconciler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -176,6 +176,8 @@ type AuthenticationReconciler struct {
 	clusterType     ctrlcommon.ClusterType
 	dbSetupChan     chan *migration.Result
 	needsRollout    bool
+	GetPostgresDB   func(client.Client, context.Context, ctrl.Request) (dbconn.DBConn, error)
+	GetMongoDB      func(client.Client, context.Context, ctrl.Request) (dbconn.DBConn, error)
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -278,6 +280,23 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return subreconciler.Evaluate(subResult, err)
 	}
 
+	if subResult, err := r.ensureDatastoreSecretAndCM(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
+
+	// perform any migrations that may be needed before Deployments run
+	if subResult, err := r.handleMigrations(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
+
+	if subResult, err := r.setMigrationCompleteStatus(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
+
+	if result, err := r.handleMongoDBCleanup(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return subreconciler.Evaluate(result, err)
+	}
+
 	reqLogger.Info("Creating ibm-iam-operand-restricted serviceaccount")
 	currentSA := &corev1.ServiceAccount{}
 	err = r.createSA(instance, currentSA, &needToRequeue)
@@ -332,23 +351,6 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// updates redirecturi annotations to serviceaccount
 	r.handleServiceAccount(instance, &needToRequeue)
 
-	if subResult, err := r.ensureDatastoreSecretAndCM(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-		return subreconciler.Evaluate(subResult, err)
-	}
-
-	// perform any migrations that may be needed before Deployments run
-	if subResult, err := r.handleMigrations(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-		return subreconciler.Evaluate(subResult, err)
-	}
-
-	if subResult, err := r.setMigrationCompleteStatus(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-		return subreconciler.Evaluate(subResult, err)
-	}
-
-	if result, err := r.handleMongoDBCleanup(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return subreconciler.Evaluate(result, err)
-	}
-
 	if subResult, err := r.handleDeployments(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
 	}
@@ -362,6 +364,10 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	if subResult, err := r.handleHPAs(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
+
+	if subResult, err := r.syncClientHostnames(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
 	}
 
@@ -384,9 +390,6 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	//Add routes
 	if ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
 		authCtrl.Watches(&routev1.Route{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
-	}
-	if ctrlcommon.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
-		authCtrl.Watches(&zenv1.ZenExtension{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
 	}
 	if ctrlcommon.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
 		authCtrl.Watches(&operatorv1alpha1.OperandRequest{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
@@ -459,6 +462,12 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return o.GetLabels()[ctrlcommon.ManagerVersionLabel] == version.Version
 	})
 
+	r.GetPostgresDB = func(c client.Client, ctx context.Context, req ctrl.Request) (d dbconn.DBConn, err error) {
+		return GetPostgresDB(c, ctx, req)
+	}
+	r.GetMongoDB = func(c client.Client, ctx context.Context, req ctrl.Request) (d dbconn.DBConn, err error) {
+		return GetMongoDB(c, ctx, req)
+	}
 	authCtrl.Watches(&operatorv1alpha1.Authentication{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(bootstrappedPred))
 	return authCtrl.Named("controller_authentication").
 		Complete(r)

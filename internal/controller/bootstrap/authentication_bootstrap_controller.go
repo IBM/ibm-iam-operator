@@ -124,8 +124,6 @@ func (r *BootstrapReconciler) writeConfigurationsToAuthenticationCR(ctx context.
 		"PREFERRED_LOGIN":          &authCR.Spec.Config.PreferredLogin,
 		"OIDC_ISSUER_URL":          &authCR.Spec.Config.OIDCIssuerURL,
 		"PROVIDER_ISSUER_URL":      &authCR.Spec.Config.ProviderIssuerURL,
-		"AUDIT_URL":                &authCR.Spec.Config.AuditUrl,
-		"AUDIT_SECRET":             &authCR.Spec.Config.AuditSecret,
 		"CLUSTER_NAME":             &authCR.Spec.Config.ClusterName,
 		"FIPS_ENABLED":             &authCR.Spec.Config.FIPSEnabled,
 		"IBM_CLOUD_SAAS":           &authCR.Spec.Config.IBMCloudSaas,

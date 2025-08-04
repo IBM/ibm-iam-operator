@@ -82,7 +82,7 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 		samlConsoleURL = icpConsoleURL
 	}
 
-	auditSecretName, err := r.getAuditSecretNameIfExists(context.TODO(), req.Namespace)
+	auditSecretName, err := r.getAuditSecretNameIfExists(ctx, req.Namespace)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}

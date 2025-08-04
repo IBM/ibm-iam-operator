@@ -189,7 +189,7 @@ func (r *AuthenticationReconciler) removeCP2Deployments(ctx context.Context, req
 // cluster, or an empty string when the Secret isn't found or cannot otherwise
 // be retrieved. If an error other than NotFound is received when trying to get
 // the Secret, that is returned as well.
-func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Context, namespace string) (string, error) {
+func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Context, namespace string) (*string, error) {
 	var auditSecretName string
 	var auditURL string
 	// Check for the presence of audit-endpoint configmap
@@ -198,22 +198,22 @@ func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Contex
 	idpCMLogger := log.WithValues("ConfigMap.Name", authIdpConfigMapName, "ConfigMap.Namespace", namespace)
 	if err := r.Get(ctx, types.NamespacedName{Name: authIdpConfigMapName, Namespace: namespace}, authIdpConfigMap); k8sErrors.IsNotFound(err) {
 		idpCMLogger.Info("ConfigMap was not found")
-		return "", nil
+		return nil, nil
 	} else if err != nil {
 		idpCMLogger.Error(err, "Failed to get ConfigMap")
-		return "", err
+		return nil, err
 	}
 	if authIdpConfigMap.Data == nil {
 		idpCMLogger.Info("Invalid ConfigMap")
-		return "", nil
+		return nil, nil
 	}
 	if authIdpConfigMap.Data["AUDIT_URL"] == "" {
 		idpCMLogger.Info("Audit URL is not specified in ConfigMap; assume no Secret to mount", "key", "AUDIT_URL")
-		return "", nil
+		return nil, nil
 	}
 	if authIdpConfigMap.Data["AUDIT_SECRET"] == "" {
 		idpCMLogger.Info("Audit Secret is not specified in ConfigMap; assume no Secret", "key", "AUDIT_SECRET")
-		return "", nil
+		return nil, nil
 	}
 	auditURL = authIdpConfigMap.Data["AUDIT_URL"]
 	auditSecretName = authIdpConfigMap.Data["AUDIT_SECRET"]
@@ -225,14 +225,14 @@ func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Contex
 	err := r.Get(ctx, auditTLSSecretStruct, auditTLSSecret)
 	if k8sErrors.IsNotFound(err) {
 		auditTLSSecretLogger.Info("Secret for audit configuration not found")
-		return "", nil
+		return nil, nil
 	} else if err != nil {
 		auditTLSSecretLogger.Error(err, "Failed to retrieve Secret for audit configuration")
-		return "", err
+		return nil, err
 	}
 
 	auditTLSSecretLogger.Info("Secret found for audit configuration")
-	return auditSecretName, nil
+	return &auditSecretName, nil
 }
 
 func generatePlatformAuthService(imagePullSecret, icpConsoleURL, _ string) common.GenerateFn[*appsv1.Deployment] {
@@ -391,7 +391,7 @@ func generatePlatformAuthService(imagePullSecret, icpConsoleURL, _ string) commo
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, ""),
+						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, nil),
 						Containers:     buildContainers(authCR, authServiceImage, icpConsoleURL),
 						InitContainers: buildInitContainers(initContainerImage),
 					},
@@ -411,7 +411,7 @@ func generatePlatformAuthService(imagePullSecret, icpConsoleURL, _ string) commo
 	}
 }
 
-func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string, auditSecretName string) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string, auditSecretName *string) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		identityManagerImage := common.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
@@ -585,7 +585,7 @@ func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string
 	}
 }
 
-func generatePlatformIdentityProvider(imagePullSecret, icpConsoleURL, saasServiceIdCrn string, auditSecretName string) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformIdentityProvider(imagePullSecret, icpConsoleURL, saasServiceIdCrn string, auditSecretName *string) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		identityProviderImage := common.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
@@ -911,7 +911,7 @@ func hasDataField(fields metav1.ManagedFieldsEntry) bool {
 	return false
 }
 
-func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName string) []corev1.Volume {
+func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName *string) []corev1.Volume {
 	volumes := []corev1.Volume{
 		{
 			Name: "platform-identity-management",
@@ -1095,12 +1095,12 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName
 			},
 		},
 	}
-	if len(auditSecretName) > 0 {
+	if auditSecretName != nil {
 		auditVolume := corev1.Volume{
 			Name: IMAuditTLSVolume,
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: auditSecretName,
+					SecretName: *auditSecretName,
 					Items: []corev1.KeyToPath{
 						{
 							Key:  "tls.crt",
@@ -1124,7 +1124,7 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName
 	return volumes
 }
 
-// EnsureVolumeMountPresent checks if a volumeMount exists
+// EnsureVolumePresent checks if a volume exists
 // If not, it appends the new volume and returns the updated slice.
 func EnsureVolumePresent(volumes []corev1.Volume, newVol corev1.Volume) []corev1.Volume {
 	for _, v := range volumes {

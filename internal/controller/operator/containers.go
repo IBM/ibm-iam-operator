@@ -414,7 +414,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 
 }
 
-func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string, _ string, saasCRNId string, auditSecretName string) corev1.Container {
+func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string, _ string, saasCRNId string, auditSecretName *string) corev1.Container {
 
 	resources := instance.Spec.IdentityProvider.Resources
 	if resources == nil {
@@ -731,7 +731,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 
 }
 
-func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string, _ string, auditSecretName string) corev1.Container {
+func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string, _ string, auditSecretName *string) corev1.Container {
 
 	replicaCount := int(instance.Spec.Replicas)
 	resources := instance.Spec.IdentityManager.Resources
@@ -1087,14 +1087,14 @@ func buildContainers(instance *operatorv1alpha1.Authentication, authServiceImage
 	return []corev1.Container{authServiceContainer}
 }
 
-func buildManagerContainers(instance *operatorv1alpha1.Authentication, identityManagerImage string, icpConsoleURL string, auditSecretName string) []corev1.Container {
+func buildManagerContainers(instance *operatorv1alpha1.Authentication, identityManagerImage string, icpConsoleURL string, auditSecretName *string) []corev1.Container {
 
 	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL, auditSecretName)
 
 	return []corev1.Container{identityManagerContainer}
 }
 
-func buildProviderContainers(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string, saasCrnId string, auditSecretName string) []corev1.Container {
+func buildProviderContainers(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string, saasCrnId string, auditSecretName *string) []corev1.Container {
 
 	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId, auditSecretName)
 
@@ -1143,7 +1143,7 @@ func buildInitContainerEnvVars(envVarList []string, configmapName string) []core
 	return envVars
 }
 
-func buildIdentityManagerVolumeMounts(auditSecretName string) []corev1.VolumeMount {
+func buildIdentityManagerVolumeMounts(auditSecretName *string) []corev1.VolumeMount {
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "cluster-ca",
@@ -1166,15 +1166,18 @@ func buildIdentityManagerVolumeMounts(auditSecretName string) []corev1.VolumeMou
 			MountPath: "/pgsql/clientinfo",
 		},
 	}
-	if len(auditSecretName) > 0 {
-		volumeMounts = EnsureVolumeMountPresent(volumeMounts, GetAuditCertsVolumeMount())
-
+	if auditSecretName != nil {
+		newVolMount := corev1.VolumeMount{
+			Name:      IMAuditTLSVolume,
+			MountPath: "/certs/audit-tls",
+		}
+		volumeMounts = append(volumeMounts, newVolMount)
 	}
 
 	return volumeMounts
 }
 
-func buildIdentityProviderVolumeMounts(auditSecretName string) []corev1.VolumeMount {
+func buildIdentityProviderVolumeMounts(auditSecretName *string) []corev1.VolumeMount {
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "auth-key",
@@ -1197,28 +1200,12 @@ func buildIdentityProviderVolumeMounts(auditSecretName string) []corev1.VolumeMo
 			MountPath: "/pgsql/clientinfo",
 		},
 	}
-	if len(auditSecretName) > 0 {
-		volumeMounts = EnsureVolumeMountPresent(volumeMounts, GetAuditCertsVolumeMount())
-
+	if auditSecretName != nil {
+		newVolMount := corev1.VolumeMount{
+			Name:      IMAuditTLSVolume,
+			MountPath: "/certs/audit-tls",
+		}
+		volumeMounts = append(volumeMounts, newVolMount)
 	}
 	return volumeMounts
-}
-
-// EnsureVolumeMountPresent checks if a volumeMount exists
-// If not, it appends the new volume and returns the updated slice.
-func EnsureVolumeMountPresent(volumeMounts []corev1.VolumeMount, newVolMount corev1.VolumeMount) []corev1.VolumeMount {
-	for _, v := range volumeMounts {
-		if v.Name == newVolMount.Name {
-			return volumeMounts // already exists
-		}
-	}
-	return append(volumeMounts, newVolMount)
-}
-
-func GetAuditCertsVolumeMount() corev1.VolumeMount {
-	volMount := corev1.VolumeMount{
-		Name:      IMAuditTLSVolume,
-		MountPath: "/certs/audit-tls",
-	}
-	return volMount
 }

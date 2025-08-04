@@ -23,20 +23,18 @@ BUILD_LOCALLY ?= 1
 # The namespace that operator will be deployed in
 NAMESPACE=ibm-common-services
 GIT_COMMIT_ID=$(shell git rev-parse --short HEAD)
-GIT_REMOTE_URL=$(shell git config --get remote.origin.url)
-IMAGE_BUILD_OPTS=--build-arg "VCS_REF=$(GIT_COMMIT_ID)" --build-arg "VCS_URL=$(GIT_REMOTE_URL)"
+IMAGE_BUILD_OPTS=--build-arg "VCS_REF=$(GIT_COMMIT_ID)"
 
 # Image URL to use all building/pushing image targets;
 # Use your own docker registry and image name for dev/test by overridding the IMG and REGISTRY environment variable.
 IMG ?= ibm-iam-operator
-REGISTRY ?= "docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-integration-docker-local/ibmcom"
-CONTAINER_CLI ?= docker
+ifeq ($(SPS_EVENT_TYPE), pull_request)
+	REGISTRY ?= "docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-scratch-docker-local/ibmcom"
+else
+	REGISTRY ?= "docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-integration-docker-local/ibmcom"
+endif
 
 MARKDOWN_LINT_WHITELIST=https://quay.io/cnr
-
-ifeq ($(BUILD_LOCALLY),0)
-    export CONFIG_DOCKER_TARGET = config-docker
-endif
 
 TESTARGS_DEFAULT := "-v"
 export TESTARGS ?= $(TESTARGS_DEFAULT)
@@ -375,7 +373,7 @@ bundle-render: ## Render the bundle contents into the local FBC index.
 
 TARGET_ARCH=$(LOCAL_ARCH)
 
-build-image: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator manager image
+build-image: $(GO) licenses-dir ## Build the Operator manager image
 	@echo "Building manager binary for linux/$(TARGET_ARCH)"
 	@CGO_ENABLED=0 GOOS=linux GOARCH=$(TARGET_ARCH) $(GO) build -a -o build/_output/bin/manager main.go
 	@echo "Building manager image for linux/$(TARGET_ARCH)"

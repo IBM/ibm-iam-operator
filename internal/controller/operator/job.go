@@ -542,7 +542,7 @@ func buildMigratorContainer(s common.SecondaryReconciler, image string, resource
 	container := corev1.Container{
 		Name:            s.GetName(),
 		Image:           image,
-		ImagePullPolicy: corev1.PullAlways,
+		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: &corev1.SecurityContext{
 			SeccompProfile: &corev1.SeccompProfile{
 				Type: corev1.SeccompProfileTypeRuntimeDefault,

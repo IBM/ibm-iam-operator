@@ -376,7 +376,7 @@ func generateSAMLQueryJobObject(s common.SecondaryReconciler, ctx context.Contex
 		return
 	}
 	log.Info("Set command for query job")
-	job.Spec.Template.Spec.Containers[0].Command = []string{"/usr/local/bin/migrate query", "--postgres-config", "/etc/postgres"}
+	job.Spec.Template.Spec.Containers[0].Command = []string{"/usr/local/bin/migrate", "query", "--postgres-config", "/etc/postgres"}
 	return
 }
 
@@ -568,7 +568,7 @@ func buildMigratorContainer(s common.SecondaryReconciler, image string, resource
 				ReadOnly:  true,
 			},
 		},
-		Command: []string{"/usr/local/bin/migrate migrate", "--postgres-config", "/etc/postgres"},
+		Command: []string{"/usr/local/bin/migrate", "migrate", "--postgres-config", "/etc/postgres"},
 	}
 
 	if mongoHost == "" {

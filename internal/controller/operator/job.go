@@ -70,6 +70,17 @@ func (r *AuthenticationReconciler) checkSAMLPresence(ctx context.Context, req ct
 	if result, err := r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		log.Info("Failed to retrieve Authentication CR for status update; retrying")
 	}
+	cm := &corev1.ConfigMap{}
+	objKey := types.NamespacedName{Name: "platform-auth-idp", Namespace: req.Namespace}
+	if err = r.Get(ctx, objKey, cm); err != nil && !k8sErrors.IsNotFound(err) {
+		return subreconciler.RequeueWithError(err)
+	}
+
+	// If MASTER_PATH set, skip creating this Job
+	var ok bool
+	if _, ok = cm.Data["MASTER_PATH"]; ok {
+		return subreconciler.ContinueReconciling()
+	}
 	return r.getSAMLQueryJob(authCR).Reconcile(ctx)
 }
 

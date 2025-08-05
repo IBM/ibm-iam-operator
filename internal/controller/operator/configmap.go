@@ -458,7 +458,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 
 		// Set the path for SAML connections
 		var masterPath string
-		if masterPath, err = r.getMasterPath(ctx, ctrl.Request{NamespacedName: common.GetObjectKey(s.GetPrimary())}); err != nil {
+		if masterPath, err = r.getMasterPath(ctx, s.GetNamespace()); err != nil {
 			reqLogger.Error(err, "Failed to determine whether a preexisting SAML exists")
 			err = fmt.Errorf("could not set MASTER_PATH")
 			return
@@ -1021,8 +1021,8 @@ func readROKSURL(ctx context.Context) (issuer string, err error) {
 	return issuer, nil
 }
 
-func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, req ctrl.Request) (path string, err error) {
-	cmKey := types.NamespacedName{Name: "platform-auth-idp", Namespace: req.Namespace}
+func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, namespace string) (path string, err error) {
+	cmKey := types.NamespacedName{Name: "platform-auth-idp", Namespace: namespace}
 	cm := &corev1.ConfigMap{}
 	if err = r.Get(ctx, cmKey, cm); err != nil && !k8sErrors.IsNotFound(err) {
 		return
@@ -1030,7 +1030,7 @@ func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, req ctrl.R
 		return v, nil
 	}
 
-	jobKey := types.NamespacedName{Name: "im-has-saml", Namespace: req.Namespace}
+	jobKey := types.NamespacedName{Name: "im-has-saml", Namespace: namespace}
 	job := &batchv1.Job{}
 	if err = r.Get(ctx, jobKey, job); err != nil {
 		return
@@ -1040,7 +1040,7 @@ func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, req ctrl.R
 	podList := &corev1.PodList{}
 
 	opts := []client.ListOption{
-		client.InNamespace(req.Namespace),
+		client.InNamespace(namespace),
 		client.MatchingLabels(map[string]string{
 			"batch.kubernetes.io/controller-uid": string(jobUID),
 			"batch.kubernetes.io/job-name":       "im-has-saml",
@@ -1064,13 +1064,26 @@ func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, req ctrl.R
 	}
 
 	exitCode := containerState.Terminated.ExitCode
+	var deleteJob bool
 	switch exitCode {
 	case 2:
-		return "", fmt.Errorf("failed to query for SAML connection")
+		err = fmt.Errorf("failed to query for SAML connection; check Job %s in namespace %s for details", "im-has-saml", namespace)
 	case 1:
-		return "", nil
+		deleteJob = true
 	case 0:
-		return "/idauth", nil
+		path = "/idauth"
+		deleteJob = true
+	default:
+		err = fmt.Errorf("received unexpected error code while running SAML; check Job %s in namespace %s for details", "im-has-saml", namespace)
 	}
-	return "", fmt.Errorf("received unexpected error code while running SAML check")
+
+	if !deleteJob {
+		return
+	}
+
+	if err = r.Delete(ctx, job); err != nil && !k8sErrors.IsNotFound(err) {
+		return "", fmt.Errorf("failed to delete Job %s in namespace %s after getting MASTER_PATH: %w", "im-has-saml", namespace, err)
+	}
+
+	return
 }

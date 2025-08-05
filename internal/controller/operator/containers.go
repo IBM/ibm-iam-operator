@@ -1200,7 +1200,7 @@ func buildIdentityProviderVolumeMounts(auditSecretName *string) []corev1.VolumeM
 			MountPath: "/pgsql/clientinfo",
 		},
 	}
-	if auditSecretName != nil {
+	if auditSecretName != nil && *auditSecretName != "" {
 		newVolMount := corev1.VolumeMount{
 			Name:      IMAuditTLSVolume,
 			MountPath: "/certs/audit-tls",

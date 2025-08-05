@@ -378,7 +378,6 @@ spec:
                       initialDelaySeconds: 3
                       periodSeconds: 20
                       timeoutSeconds: 3
-                      
                     resources:
                       limits:
                         cpu: 25m

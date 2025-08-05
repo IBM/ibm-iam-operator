@@ -76,6 +76,14 @@ spec:
               value: ""
             - name: cluster_name
               value: ""
+          livenessProbe:
+            failureThreshold: 10
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 120
+            periodSeconds: 60
+            timeoutSeconds: 10
           resources:
             limits:
               cpu: 25m

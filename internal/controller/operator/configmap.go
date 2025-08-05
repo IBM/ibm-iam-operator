@@ -1022,9 +1022,17 @@ func readROKSURL(ctx context.Context) (issuer string, err error) {
 }
 
 func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, req ctrl.Request) (path string, err error) {
-	objKey := types.NamespacedName{Name: "im-has-saml", Namespace: req.Namespace}
+	cmKey := types.NamespacedName{Name: "platform-auth-idp", Namespace: req.Namespace}
+	cm := &corev1.ConfigMap{}
+	if err = r.Get(ctx, cmKey, cm); err != nil && !k8sErrors.IsNotFound(err) {
+		return
+	} else if v, ok := cm.Data["MASTER_PATH"]; err == nil && ok {
+		return v, nil
+	}
+
+	jobKey := types.NamespacedName{Name: "im-has-saml", Namespace: req.Namespace}
 	job := &batchv1.Job{}
-	if err = r.Get(ctx, objKey, job); err != nil {
+	if err = r.Get(ctx, jobKey, job); err != nil {
 		return
 	}
 	jobUID := job.ObjectMeta.UID

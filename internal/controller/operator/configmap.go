@@ -345,6 +345,10 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"LDAP_CTX_POOL_PREFERREDSIZE"),
 		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("MASTER_PATH")),
 			"MASTER_PATH"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("AUDIT_URL")),
+			"AUDIT_URL"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("AUDIT_SECRET")),
+			"AUDIT_SECRET"),
 	}
 
 	if v, ok := generated.Data["IS_OPENSHIFT_ENV"]; ok {
@@ -437,6 +441,9 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 			}
 		}
 
+		// Found AUDIT variables
+		reqLogger.Info("Found audit variables", "AuditUrl", authCR.Spec.Config.AuditUrl, "AuditSecret", authCR.Spec.Config.AuditSecret)
+
 		// Set the path for SAML connections
 		var masterPath string
 		if masterPath, err = r.getMasterPath(ctx, ctrl.Request{NamespacedName: common.GetObjectKey(s.GetPrimary())}); err != nil {
@@ -466,6 +473,8 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"AUDIT_ENABLED_IDPROVIDER":           "false",
 				"AUDIT_ENABLED_IDMGMT":               "false",
 				"AUDIT_DETAIL":                       "false",
+				"AUDIT_URL":                          *authCR.Spec.Config.AuditUrl,
+				"AUDIT_SECRET":                       *authCR.Spec.Config.AuditSecret,
 				"LOG_LEVEL_IDPROVIDER":               "info",
 				"LOG_LEVEL_AUTHSVC":                  "info",
 				"LOG_LEVEL_IDMGMT":                   "info",

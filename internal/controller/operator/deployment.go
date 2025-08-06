@@ -82,7 +82,7 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 		samlConsoleURL = icpConsoleURL
 	}
 
-	auditSecretName, err := r.getAuditSecretNameIfExists(context.TODO(), req.Namespace)
+	auditSecretName, err := r.getAuditSecretNameIfExists(context.TODO(), req.Namespace, authCR.Spec.Config.AuditUrl, authCR.Spec.Config.AuditSecret)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
@@ -189,50 +189,35 @@ func (r *AuthenticationReconciler) removeCP2Deployments(ctx context.Context, req
 // cluster, or an empty string when the Secret isn't found or cannot otherwise
 // be retrieved. If an error other than NotFound is received when trying to get
 // the Secret, that is returned as well.
-func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Context, namespace string) (*string, error) {
-	var auditSecretName string
-	var auditURL string
-	// Check for the presence of audit-endpoint configmap
-	authIdpConfigMapName := "platform-auth-idp"
-	authIdpConfigMap := &corev1.ConfigMap{}
-	idpCMLogger := log.WithValues("ConfigMap.Name", authIdpConfigMapName, "ConfigMap.Namespace", namespace)
-	if err := r.Get(ctx, types.NamespacedName{Name: authIdpConfigMapName, Namespace: namespace}, authIdpConfigMap); k8sErrors.IsNotFound(err) {
-		idpCMLogger.Info("ConfigMap was not found")
-		return nil, nil
-	} else if err != nil {
-		idpCMLogger.Error(err, "Failed to get ConfigMap")
-		return nil, err
-	}
-	if authIdpConfigMap.Data == nil {
-		idpCMLogger.Info("Invalid ConfigMap")
-		return nil, nil
-	}
-	if authIdpConfigMap.Data["AUDIT_URL"] == "" {
-		idpCMLogger.Info("Audit URL is not specified in ConfigMap; assume no Secret to mount", "key", "AUDIT_URL")
-		return nil, nil
-	}
-	if authIdpConfigMap.Data["AUDIT_SECRET"] == "" {
-		idpCMLogger.Info("Audit Secret is not specified in ConfigMap; assume no Secret", "key", "AUDIT_SECRET")
-		return nil, nil
-	}
-	auditURL = authIdpConfigMap.Data["AUDIT_URL"]
-	auditSecretName = authIdpConfigMap.Data["AUDIT_SECRET"]
-	idpCMLogger.Info("Fetched audit URL and audit Secret from ConfigMap", "AUDIT_SECRET", auditSecretName, "AUDIT_URL", auditURL)
+func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Context, namespace string, auditUrl *string, auditSecretName *string) (*string, error) {
+	//var auditSecretName string
+	//var auditURL string
+	reqLogger := logf.FromContext(ctx)
 
-	auditTLSSecretLogger := log.WithValues("Secret.Name", auditSecretName, "Secret.Namespace", namespace)
+	if auditUrl == nil {
+		reqLogger.Info("Audit URL is not specified in Authentication CR", "key", "AUDIT_URL")
+		return nil, nil
+	}
+	if auditSecretName == nil {
+		reqLogger.Info("Audit Secret is not specified in Authentication CR", "key", "AUDIT_SECRET")
+		return nil, nil
+	}
+
+	reqLogger.Info("Fetched audit URL and audit Secret from Authentication CR", "AUDIT_SECRET", auditSecretName, "AUDIT_URL", auditUrl)
+
 	auditTLSSecret := &corev1.Secret{}
-	auditTLSSecretStruct := types.NamespacedName{Name: auditSecretName, Namespace: namespace}
-	err := r.Get(ctx, auditTLSSecretStruct, auditTLSSecret)
-	if k8sErrors.IsNotFound(err) {
-		auditTLSSecretLogger.Info("Secret for audit configuration not found")
+	auditTLSSecretStruct := types.NamespacedName{Name: *auditSecretName, Namespace: namespace}
+	err1 := r.Get(ctx, auditTLSSecretStruct, auditTLSSecret)
+	if k8sErrors.IsNotFound(err1) {
+		reqLogger.Info("Secret for audit configuration not found")
 		return nil, nil
-	} else if err != nil {
-		auditTLSSecretLogger.Error(err, "Failed to retrieve Secret for audit configuration")
-		return nil, err
+	} else if err1 != nil {
+		reqLogger.Error(err1, "Failed to retrieve Secret for audit configuration")
+		return nil, err1
 	}
 
-	auditTLSSecretLogger.Info("Secret found for audit configuration")
-	return &auditSecretName, nil
+	reqLogger.Info("Secret found for audit configuration")
+	return auditSecretName, nil
 }
 
 func generatePlatformAuthService(imagePullSecret, icpConsoleURL, _ string) common.GenerateFn[*appsv1.Deployment] {
@@ -567,7 +552,7 @@ func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string
 							},
 						},
 						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName),
-						Containers:     buildManagerContainers(authCR, identityManagerImage, icpConsoleURL, auditSecretName),
+						Containers:     buildManagerContainers(authCR, identityManagerImage, icpConsoleURL),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
 				},
@@ -742,7 +727,7 @@ func generatePlatformIdentityProvider(imagePullSecret, icpConsoleURL, saasServic
 							},
 						},
 						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName),
-						Containers:     buildProviderContainers(authCR, identityProviderImage, icpConsoleURL, saasServiceIdCrn, auditSecretName),
+						Containers:     buildProviderContainers(authCR, identityProviderImage, icpConsoleURL, saasServiceIdCrn),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
 				},

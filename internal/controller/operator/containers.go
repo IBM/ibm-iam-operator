@@ -386,6 +386,18 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 				Name:      "liberty-outputdir-vol",
 				MountPath: "/opt/ibm/wlp/output/defaultServer",
 			},
+			{
+				Name:      "liberty-logs-vol",
+				MountPath: "/logs",
+			},
+			{
+				Name:      "liberty-tmp-vol",
+				MountPath: "/tmp",
+			},
+			{
+				Name:      "auth-service-data-vol",
+				MountPath: "/opt/ibm/auth-service",
+			},
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
@@ -702,7 +714,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			},
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
-			ReadOnlyRootFilesystem:   &falseVar,
+			ReadOnlyRootFilesystem:   &trueVar,
 			AllowPrivilegeEscalation: &falseVar,
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
@@ -730,6 +742,11 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 				Name:      "pgsql-client-cred",
 				MountPath: "/pgsql/clientinfo",
 			},
+			{
+				Name:      "provider-data-vol",
+				MountPath: "/opt/ibm/provider-data",
+			},
+
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
@@ -1070,7 +1087,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			},
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
-			ReadOnlyRootFilesystem:   &falseVar,
+			ReadOnlyRootFilesystem:   &trueVar,
 			AllowPrivilegeEscalation: &falseVar,
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},

@@ -1026,8 +1026,10 @@ func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, namespace 
 	cm := &corev1.ConfigMap{}
 	if err = r.Get(ctx, cmKey, cm); err != nil && !k8sErrors.IsNotFound(err) {
 		return
-	} else if v, ok := cm.Data["MASTER_PATH"]; err == nil && ok {
-		return v, nil
+	} else if err == nil {
+		if v, ok := cm.Data["MASTER_PATH"]; ok {
+			return v, nil
+		}
 	}
 
 	jobKey := types.NamespacedName{Name: "im-has-saml", Namespace: namespace}

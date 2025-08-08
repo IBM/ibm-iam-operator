@@ -74,13 +74,13 @@ func (r *AuthenticationReconciler) checkSAMLPresence(ctx context.Context, req ct
 	objKey := types.NamespacedName{Name: "platform-auth-idp", Namespace: req.Namespace}
 	if err = r.Get(ctx, objKey, cm); err != nil && !k8sErrors.IsNotFound(err) {
 		return subreconciler.RequeueWithError(err)
+	} else if err == nil {
+		// If MASTER_PATH set, skip creating this Job
+		if _, ok := cm.Data["MASTER_PATH"]; ok {
+			return subreconciler.ContinueReconciling()
+		}
 	}
 
-	// If MASTER_PATH set, skip creating this Job
-	var ok bool
-	if _, ok = cm.Data["MASTER_PATH"]; ok {
-		return subreconciler.ContinueReconciling()
-	}
 	return r.getSAMLQueryJob(authCR).Reconcile(ctx)
 }
 

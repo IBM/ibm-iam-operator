@@ -1069,9 +1069,9 @@ func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, namespace 
 	case 2:
 		err = fmt.Errorf("failed to query for SAML connection; check Job %s in namespace %s for details, or delete the Job to rerun", "im-has-saml", namespace)
 	case 1:
+		path = "/idauth"
 		deleteJob = true
 	case 0:
-		path = "/idauth"
 		deleteJob = true
 	default:
 		err = fmt.Errorf("received unexpected error code while running SAML; check Job %s in namespace %s for details, or delete the Job to rerun", "im-has-saml", namespace)

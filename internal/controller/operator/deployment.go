@@ -395,6 +395,7 @@ func generatePlatformAuthService(imagePullSecret, icpConsoleURL, _ string) commo
 
 func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string, auditSecretName *string) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
+		reqLogger := logf.FromContext(ctx)
 		identityManagerImage := common.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
 		initContainerImage := common.GetImageRef("IM_INITCONTAINER_IMAGE")
 		authCR, ok := s.GetPrimary().(*operatorv1alpha1.Authentication)

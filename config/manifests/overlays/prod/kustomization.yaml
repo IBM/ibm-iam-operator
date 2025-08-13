@@ -8,6 +8,8 @@ patches:
 - path: annotations_patch.yaml
   target:
     group: operators.coreos.com
-    version: v1alpha1
     kind: ClusterServiceVersion
     name: ibm-iam-operator.v0.0.0
+    version: v1alpha1
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization

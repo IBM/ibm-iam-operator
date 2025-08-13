@@ -202,6 +202,14 @@ spec:
                   icpPort:
                     format: int32
                     type: integer
+                  ingress:
+                    properties:
+                      hostname:
+                        type: string
+                      secret:
+                        type: string
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
                   installType:
                     type: string
                   isOpenshiftEnv:
@@ -268,6 +276,7 @@ spec:
                 - wlpClientRegistrationSecret
                 - wlpClientSecret
                 type: object
+                x-kubernetes-preserve-unknown-fields: true
               enableInstanaMetricCollection:
                 type: boolean
               identityManager:

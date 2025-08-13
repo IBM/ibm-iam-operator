@@ -244,6 +244,14 @@ spec:
                     type: boolean
                   attrMappingFromConfig:
                     type: boolean
+                  ingress:
+                    properties:
+                      hostname:
+                        type: string
+                      secret:
+                        type: string
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
                 required:
                 - authUniqueHosts
                 - clusterCADomain
@@ -267,6 +275,7 @@ spec:
                 - wlpClientRegistrationSecret
                 - wlpClientSecret
                 type: object
+                x-kubernetes-preserve-unknown-fields: true
               identityManager:
                 properties:
                   imageName:

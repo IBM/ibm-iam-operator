@@ -152,7 +152,7 @@ metadata:
     categories: Security
     certified: "false"
     containerImage: icr.io/cpopen/ibm-iam-operator:4.13.0
-    createdAt: "2025-05-15T13:42:55Z"
+    createdAt: "2025-07-08T01:10:36Z"
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage the lifecycle of IAM services. With this operator, you can simply deploy and upgrade the IAM services
     features.operators.openshift.io/disconnected: "true"
     features.operators.openshift.io/fips-compliant: "true"
@@ -163,7 +163,7 @@ metadata:
     features.operators.openshift.io/token-auth-gcp: "false"
     olm.skipRange: <4.13.0
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
-    operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://github.com/IBM/ibm-iam-operator
     support: IBM
   labels:
@@ -316,6 +316,22 @@ spec:
                     image: icr.io/cpopen/ibm-iam-operator:4.13.0
                     imagePullPolicy: IfNotPresent
                     name: ibm-iam-operator
+                    livenessProbe:
+                      failureThreshold: 10
+                      httpGet:
+                        path: /healthz
+                        port: 8081
+                      initialDelaySeconds: 120
+                      periodSeconds: 60
+                      timeoutSeconds: 10
+                    readinessProbe:
+                      failureThreshold: 10
+                      httpGet:
+                        path: /readyz
+                        port: 8081
+                      initialDelaySeconds: 3
+                      periodSeconds: 20
+                      timeoutSeconds: 3
                     resources:
                       limits:
                         cpu: 25m
@@ -629,5 +645,3 @@ spec:
       name: ICP_IDENTITY_MANAGER_IMAGE
     - image: icr.io/cpopen/cpfs/im-initcontainer:4.13.0
       name: IM_INITCONTAINER_IMAGE
-    - image: icr.io/cpopen/cpfs/iam-custom-hostname:4.13.0
-      name: IAM_CUSTOM_HOSTNAME_IMAGE

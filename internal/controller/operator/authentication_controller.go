@@ -49,6 +49,7 @@ import (
 	handler "sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	sscsidriverv1 "sigs.k8s.io/secrets-store-csi-driver/apis/v1"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
 	"github.com/opdev/subreconciler"
@@ -385,7 +386,8 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&corev1.Service{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&netv1.Ingress{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&appsv1.Deployment{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
-		Watches(&autoscalingv2.HorizontalPodAutoscaler{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+		Watches(&autoscalingv2.HorizontalPodAutoscaler{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
+		Watches(&sscsidriverv1.SecretProviderClass{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
 
 	//Add routes
 	if ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
@@ -442,6 +444,27 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				}},
 			}
 		}), builder.WithPredicates(predicate.Or(globalCMPred, productCMPred)),
+	)
+	ldapSPCPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
+		return o.GetName() == ctrlcommon.IMLdapBindCredSpc
+	})
+	edbSPCPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
+		return o.GetName() == ctrlcommon.IMExtEDBSecretSpc
+	})
+
+	authCtrl.Watches(&sscsidriverv1.SecretProviderClass{},
+		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
+			authCR, _ := ctrlcommon.GetAuthentication(ctx, r.Client)
+			if authCR == nil {
+				return
+			}
+			return []reconcile.Request{
+				{NamespacedName: types.NamespacedName{
+					Name:      authCR.Name,
+					Namespace: authCR.Namespace,
+				}},
+			}
+		}), builder.WithPredicates(predicate.Or(ldapSPCPred, edbSPCPred)),
 	)
 	bootstrappedPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
 		return o.GetLabels()[ctrlcommon.ManagerVersionLabel] == version.Version

@@ -82,7 +82,7 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 		samlConsoleURL = icpConsoleURL
 	}
 
-	auditSecretName, err := r.getAuditSecretNameIfExists(context.TODO(), req.Namespace, authCR.Spec.Config.AuditUrl, authCR.Spec.Config.AuditSecret)
+	auditSecretName, err := r.getAuditSecretNameIfExists(context.TODO(), authCR)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
@@ -189,24 +189,24 @@ func (r *AuthenticationReconciler) removeCP2Deployments(ctx context.Context, req
 // cluster, or an empty string when the Secret isn't found or cannot otherwise
 // be retrieved. If an error other than NotFound is received when trying to get
 // the Secret, that is returned as well.
-func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Context, namespace string, auditUrl *string, auditSecretName *string) (*string, error) {
+func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Context, authCR *operatorv1alpha1.Authentication) (*string, error) {
 	//var auditSecretName string
 	//var auditURL string
 	reqLogger := logf.FromContext(ctx)
 
-	if auditUrl == nil {
+	if authCR.Spec.Config.AuditUrl == nil {
 		reqLogger.Info("Audit URL is not specified in Authentication CR", "key", "AUDIT_URL")
 		return nil, nil
 	}
-	if auditSecretName == nil {
+	if authCR.Spec.Config.AuditSecret == nil {
 		reqLogger.Info("Audit Secret is not specified in Authentication CR", "key", "AUDIT_SECRET")
 		return nil, nil
 	}
 
-	reqLogger.Info("Fetched audit URL and audit Secret from Authentication CR", "AUDIT_SECRET", auditSecretName, "AUDIT_URL", auditUrl)
+	reqLogger.Info("Fetched audit URL and audit Secret from Authentication CR", "AUDIT_SECRET", authCR.Spec.Config.AuditSecret, "AUDIT_URL", auditUrl)
 
 	auditTLSSecret := &corev1.Secret{}
-	auditTLSSecretStruct := types.NamespacedName{Name: *auditSecretName, Namespace: namespace}
+	auditTLSSecretStruct := types.NamespacedName{Name: *authCR.Spec.Config.AuditSecret, Namespace: authCR.Namespace}
 	err1 := r.Get(ctx, auditTLSSecretStruct, auditTLSSecret)
 	if k8sErrors.IsNotFound(err1) {
 		reqLogger.Info("Secret for audit configuration not found")
@@ -217,7 +217,7 @@ func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Contex
 	}
 
 	reqLogger.Info("Secret found for audit configuration")
-	return auditSecretName, nil
+	return authCR.Spec.Config.AuditSecret, nil
 }
 
 func generatePlatformAuthService(imagePullSecret, icpConsoleURL, _ string) common.GenerateFn[*appsv1.Deployment] {
@@ -1080,7 +1080,7 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName
 			},
 		},
 	}
-	if auditSecretName != nil {
+	if auditSecretName != nil && *auditSecretName != "" {
 		auditVolume := corev1.Volume{
 			Name: IMAuditTLSVolume,
 			VolumeSource: corev1.VolumeSource{
@@ -1104,18 +1104,7 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName
 				},
 			},
 		}
-		volumes = EnsureVolumePresent(volumes, auditVolume)
+		volumes = append(volumes, auditVolume)
 	}
 	return volumes
-}
-
-// EnsureVolumePresent checks if a volume exists
-// If not, it appends the new volume and returns the updated slice.
-func EnsureVolumePresent(volumes []corev1.Volume, newVol corev1.Volume) []corev1.Volume {
-	for _, v := range volumes {
-		if v.Name == newVol.Name {
-			return volumes // already exists
-		}
-	}
-	return append(volumes, newVol)
 }

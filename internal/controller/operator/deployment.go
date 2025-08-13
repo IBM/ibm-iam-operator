@@ -86,6 +86,7 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
+	auditSecretName = authCR.Spec.Config.AuditSecret
 
 	reqLogger.Info("Does audit-tls secret exist?", "Deployment.Namespace", req.Namespace, "Secret exists", auditSecretName)
 
@@ -194,28 +195,24 @@ func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Contex
 	//var auditURL string
 	reqLogger := logf.FromContext(ctx)
 
-	if authCR.Spec.Config.AuditUrl == nil {
-		reqLogger.Info("Audit URL is not specified in Authentication CR", "key", "AUDIT_URL")
-		return nil, nil
-	}
-	if authCR.Spec.Config.AuditSecret == nil {
-		reqLogger.Info("Audit Secret is not specified in Authentication CR", "key", "AUDIT_SECRET")
+	if authCR.Spec.Config.AuditUrl == nil || authCR.Spec.Config.AuditSecret == nil {
+		reqLogger.Info("Audit URL or Audit Secret is not specified in Authentication CR", "key", "AUDIT_URL")
 		return nil, nil
 	}
 
 	reqLogger.Info("Fetched audit URL and audit Secret from Authentication CR", "AUDIT_SECRET", authCR.Spec.Config.AuditSecret, "AUDIT_URL", authCR.Spec.Config.AuditUrl)
-
-	auditTLSSecret := &corev1.Secret{}
-	auditTLSSecretStruct := types.NamespacedName{Name: *authCR.Spec.Config.AuditSecret, Namespace: authCR.Namespace}
-	err1 := r.Get(ctx, auditTLSSecretStruct, auditTLSSecret)
-	if k8sErrors.IsNotFound(err1) {
-		reqLogger.Info("Secret for audit configuration not found")
-		return nil, nil
-	} else if err1 != nil {
-		reqLogger.Error(err1, "Failed to retrieve Secret for audit configuration")
-		return nil, err1
+	if authCR.Spec.Config.AuditSecret != nil {
+		auditTLSSecret := &corev1.Secret{}
+		auditTLSSecretStruct := types.NamespacedName{Name: *authCR.Spec.Config.AuditSecret, Namespace: authCR.Namespace}
+		err1 := r.Get(ctx, auditTLSSecretStruct, auditTLSSecret)
+		if k8sErrors.IsNotFound(err1) {
+			reqLogger.Info("Secret for audit configuration not found")
+			return nil, nil
+		} else if err1 != nil {
+			reqLogger.Error(err1, "Failed to retrieve Secret for audit configuration")
+			return nil, err1
+		}
 	}
-
 	reqLogger.Info("Secret found for audit configuration")
 	return authCR.Spec.Config.AuditSecret, nil
 }
@@ -398,8 +395,6 @@ func generatePlatformAuthService(imagePullSecret, icpConsoleURL, _ string) commo
 
 func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string, auditSecretName *string) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
-		reqLogger := logf.FromContext(ctx)
-		reqLogger.Info("received auditSecretName", auditSecretName)
 		identityManagerImage := common.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
 		initContainerImage := common.GetImageRef("IM_INITCONTAINER_IMAGE")
 		authCR, ok := s.GetPrimary().(*operatorv1alpha1.Authentication)
@@ -898,9 +893,6 @@ func hasDataField(fields metav1.ManagedFieldsEntry) bool {
 }
 
 func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName *string) []corev1.Volume {
-	reqLogger := logf.FromContext(context.TODO())
-	reqLogger.Info("CALLING IDP VOLUMES", auditSecretName)
-	reqLogger.Info("CALLING IDP VOLUMES value", *auditSecretName)
 	volumes := []corev1.Volume{
 		{
 			Name: "platform-identity-management",

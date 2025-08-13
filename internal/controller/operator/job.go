@@ -377,6 +377,7 @@ func generateSAMLQueryJobObject(s common.SecondaryReconciler, ctx context.Contex
 	}
 	log.Info("Set command for query job")
 	job.Spec.Template.Spec.Containers[0].Command = []string{"/usr/local/bin/migrator", "query", "--postgres-config", "/etc/postgres"}
+	job.Spec.Template.Spec.Containers[0].Name = s.GetName()
 	return
 }
 

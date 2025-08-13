@@ -203,7 +203,7 @@ func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Contex
 		return nil, nil
 	}
 
-	reqLogger.Info("Fetched audit URL and audit Secret from Authentication CR", "AUDIT_SECRET", authCR.Spec.Config.AuditSecret, "AUDIT_URL", auditUrl)
+	reqLogger.Info("Fetched audit URL and audit Secret from Authentication CR", "AUDIT_SECRET", authCR.Spec.Config.AuditSecret, "AUDIT_URL", authCR.Spec.Config.AuditUrl)
 
 	auditTLSSecret := &corev1.Secret{}
 	auditTLSSecretStruct := types.NamespacedName{Name: *authCR.Spec.Config.AuditSecret, Namespace: authCR.Namespace}
@@ -399,6 +399,7 @@ func generatePlatformAuthService(imagePullSecret, icpConsoleURL, _ string) commo
 func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string, auditSecretName *string) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
+		reqLogger.Info("received auditSecretName", auditSecretName)
 		identityManagerImage := common.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
 		initContainerImage := common.GetImageRef("IM_INITCONTAINER_IMAGE")
 		authCR, ok := s.GetPrimary().(*operatorv1alpha1.Authentication)
@@ -897,6 +898,9 @@ func hasDataField(fields metav1.ManagedFieldsEntry) bool {
 }
 
 func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName *string) []corev1.Volume {
+	reqLogger := logf.FromContext(context.TODO())
+	reqLogger.Info("CALLING IDP VOLUMES", auditSecretName)
+	reqLogger.Info("CALLING IDP VOLUMES value", *auditSecretName)
 	volumes := []corev1.Volume{
 		{
 			Name: "platform-identity-management",

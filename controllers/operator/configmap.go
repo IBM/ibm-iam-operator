@@ -182,7 +182,11 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 				newConfigMap = registrationJsonConfigMap(instance, wlpClientID, wlpClientSecret, icpConsoleURL, r.Scheme)
 				if newConfigMap == nil {
 					err = fmt.Errorf("an error occurred during registration-json generation")
-					return err
+					return
+				}
+				err = replaceOIDCClientRegistrationJob(r.Client, context.TODO(), instance.Namespace)
+				if err != nil {
+					return
 				}
 			case "oauth-client-map":
 				newConfigMap = oauthClientConfigMap(instance, icpConsoleURL, icpProxyURL, r.Scheme)
@@ -244,6 +248,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 				reqLogger.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
 				return
 			}
+			r.needsRollout = true
 			// ConfigMap created successfully - return and requeue
 			*needToRequeue = true
 		} else if err != nil {
@@ -440,6 +445,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 					reqLogger.Error(err, "Failed to update an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "Configmap.Name", currentConfigMap.Name)
 					return
 				}
+				r.needsRollout = true
 			}
 		case "registration-json":
 			platformOIDCCredentials := &corev1.Secret{}
@@ -664,6 +670,19 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 		return nil, err
 	}
 	return newConfigMap, nil
+}
+
+func replaceOIDCClientRegistrationJob(cl client.Client, ctx context.Context, namespace string) (err error) {
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "oidc-client-registration",
+			Namespace: namespace,
+		},
+	}
+	if err = cl.Delete(ctx, job); k8sErrors.IsNotFound(err) {
+		return nil
+	}
+	return
 }
 
 func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, icpConsoleURL string, scheme *runtime.Scheme) *corev1.ConfigMap {

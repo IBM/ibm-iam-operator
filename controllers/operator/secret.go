@@ -18,6 +18,10 @@ package operator
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"maps"
 	"reflect"
 	"time"
@@ -25,7 +29,7 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -96,7 +100,7 @@ func (r *AuthenticationReconciler) handleSecret(instance *operatorv1alpha1.Authe
 	for secret := range secretData {
 		err = r.Get(context.TODO(), types.NamespacedName{Name: secret, Namespace: instance.Namespace}, currentSecret)
 		if err != nil {
-			if errors.IsNotFound(err) {
+			if k8sErrors.IsNotFound(err) {
 				// Define a new Secret
 				newSecret := generateSecretObject(instance, r.Scheme, secret, secretData[secret])
 				reqLogger.Info("Creating a new Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
@@ -132,6 +136,9 @@ func (r *AuthenticationReconciler) handleSecret(instance *operatorv1alpha1.Authe
 					reqLogger.Error(err, "Failed to update an existing Secret", "Secret.Namespace", currentSecret.Namespace, "Secret.Name", currentSecret.Name)
 					return err
 				}
+			}
+			if secretUpdateRequired && (secret == "platform-auth-idp-credentials" || secret == "platform-oidc-credentials" || secret == "platform-auth-scim-credentials") {
+				r.needsRollout = true
 			}
 		}
 
@@ -236,7 +243,7 @@ func (r *AuthenticationReconciler) createClusterCACert(i *operatorv1alpha1.Authe
 	if err == nil {
 		reqLogger.Info("Successfully created secret")
 		return
-	} else if !errors.IsAlreadyExists(err) {
+	} else if !k8sErrors.IsAlreadyExists(err) {
 		reqLogger.Error(err, "Failed to create secret")
 		return err
 	}
@@ -294,4 +301,17 @@ func WaitForTimeout(timeout time.Duration) <-chan struct{} {
 		close(stopChWithTimeout)
 	}()
 	return stopChWithTimeout
+}
+
+// getSecretDataSHA1Sum calculates the SHA1
+func getSecretDataSHA1Sum(s *corev1.Secret) (sha string, err error) {
+	var dataBytes []byte
+	if s.Data == nil {
+		return "", errors.New("no .data defined on Secret")
+	}
+	if dataBytes, err = json.Marshal(s.Data); err != nil {
+		return "", err
+	}
+	dataSHA := sha1.Sum(dataBytes)
+	return fmt.Sprintf("%x", dataSHA[:]), nil
 }

@@ -184,6 +184,7 @@ type AuthenticationReconciler struct {
 	Mutex           sync.Mutex
 	clusterType     ctrlcommon.ClusterType
 	dbSetupChan     chan *migration.Result
+	needsRollout    bool
 }
 
 // GetFromCacheOrAPI first tries to GET the object from the cache; if this

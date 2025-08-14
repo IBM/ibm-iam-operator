@@ -296,6 +296,8 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"IBM_CLOUD_SAAS",
 			"SAAS_CLIENT_REDIRECT_URL",
 			"ATTR_MAPPING_FROM_CONFIG",
+			"AUDIT_URL",
+			"AUDIT_SECRET",
 		),
 		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("OS_TOKEN_LENGTH", "45"),
 			"OS_TOKEN_LENGTH"),

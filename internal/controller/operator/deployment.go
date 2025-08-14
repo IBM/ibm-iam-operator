@@ -204,6 +204,7 @@ func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Contex
 	if authCR.Spec.Config.AuditSecret != nil {
 		auditTLSSecret := &corev1.Secret{}
 		auditTLSSecretStruct := types.NamespacedName{Name: *authCR.Spec.Config.AuditSecret, Namespace: authCR.Namespace}
+		reqLogger.Info("Checking for audit Secret", "Audit secret", authCR.Spec.Config.AuditSecret, "Namespace", authCR.Namespace)
 		err1 := r.Get(ctx, auditTLSSecretStruct, auditTLSSecret)
 		if k8sErrors.IsNotFound(err1) {
 			reqLogger.Info("Secret for audit configuration not found")

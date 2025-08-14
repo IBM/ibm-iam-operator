@@ -585,6 +585,8 @@ var _ = Describe("ConfigMap handling", func() {
 					"IDENTITY_MGMT_URL":                  "https://platform-identity-management:4500",
 					"MASTER_HOST":                        ibmcloudClusterInfo.Data["cluster_address"],
 					"MASTER_PATH":                        "/idauth",
+					"AUDIT_URL":                          "",
+					"AUDIT_SECRET":                       "",
 					"NODE_ENV":                           "production",
 					"ENABLE_JIT_EXTRA_ATTR":              "false",
 					"AUDIT_ENABLED_IDPROVIDER":           "false",
@@ -680,6 +682,13 @@ var _ = Describe("ConfigMap handling", func() {
 					"DB_SSL_MODE",
 					[]string{
 						"DB_SSL_MODE",
+					},
+				},
+				{
+					"AUDIT_URL",
+					[]string{
+						"AUDIT_URL",
+						"AUDIT_SECRET",
 					},
 				},
 				{

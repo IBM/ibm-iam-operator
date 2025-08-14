@@ -79,6 +79,8 @@ metadata:
               "openshiftPort": 443,
               "preferredLogin": "",
               "providerIssuerURL": "",
+              "auditUrl": "",
+              "auditSecret": "",
               "roksEnabled": true,
               "roksURL": "https://roks.domain.name:443",
               "roksUserPrefix": "changeme",

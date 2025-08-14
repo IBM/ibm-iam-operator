@@ -346,8 +346,7 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("MASTER_PATH")),
 			"MASTER_PATH"),
 		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("AUDIT_URL")),
-			"AUDIT_URL"),
-		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("AUDIT_SECRET")),
+			"AUDIT_URL",
 			"AUDIT_SECRET"),
 	}
 
@@ -442,7 +441,9 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 		}
 
 		// Found AUDIT variables
-		reqLogger.Info("Found audit variables", "AuditUrl", authCR.Spec.Config.AuditUrl, "AuditSecret", authCR.Spec.Config.AuditSecret)
+		if authCR.Spec.Config.AuditUrl != nil || authCR.Spec.Config.AuditSecret != nil {
+			reqLogger.Info("Found audit variables", "AuditUrl", authCR.Spec.Config.AuditUrl, "AuditSecret", authCR.Spec.Config.AuditSecret)
+		}
 
 		// Set the path for SAML connections
 		var masterPath string
@@ -473,8 +474,6 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"AUDIT_ENABLED_IDPROVIDER":           "false",
 				"AUDIT_ENABLED_IDMGMT":               "false",
 				"AUDIT_DETAIL":                       "false",
-				"AUDIT_URL":                          *authCR.Spec.Config.AuditUrl,
-				"AUDIT_SECRET":                       *authCR.Spec.Config.AuditSecret,
 				"LOG_LEVEL_IDPROVIDER":               "info",
 				"LOG_LEVEL_AUTHSVC":                  "info",
 				"LOG_LEVEL_IDMGMT":                   "info",
@@ -545,6 +544,12 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
 				"IS_OPENSHIFT_ENV":                   strconv.FormatBool(isOSEnv),
 			},
+		}
+
+		if authCR.Spec.Config.AuditUrl != nil && authCR.Spec.Config.AuditSecret != nil {
+			dataPointer := &generated.Data
+			(*dataPointer)["AUDIT_URL"] = *authCR.Spec.Config.AuditUrl
+			(*dataPointer)["AUDIT_SECRET"] = *authCR.Spec.Config.AuditSecret // Dereference the pointer first
 		}
 
 		// Set Authentication authCR as the owner and controller of the ConfigMap

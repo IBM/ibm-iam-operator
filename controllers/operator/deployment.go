@@ -158,11 +158,13 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 	metaAnnotations := ctrlCommon.MergeMaps(nil, currentDeployment.Annotations, ctrlCommon.GetBindInfoRefreshMap())
 	currentDeployment.Labels = metaLabels
 	currentDeployment.Annotations = metaAnnotations
+	authDep.Spec.Template.Annotations = ctrlCommon.MergeMaps(nil, authDep.Spec.Template.Annotations, currentDeployment.Spec.Template.Annotations)
 	currentDeployment.Spec = authDep.Spec
 	if r.needsRollout {
+		reqLogger.Info("Signal rollout with annotation")
 		timestampNow := time.Now().UTC().Format(time.RFC3339)
-		if authDep.Spec.Template.Annotations[RestartAnnotation] != timestampNow {
-			authDep.Spec.Template.Annotations[RestartAnnotation] = timestampNow
+		if currentDeployment.Spec.Template.Annotations[RestartAnnotation] != timestampNow {
+			currentDeployment.Spec.Template.Annotations[RestartAnnotation] = timestampNow
 		}
 	}
 	err = r.Client.Update(context.TODO(), currentDeployment)
@@ -225,8 +227,10 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 	metaAnnotations = ctrlCommon.MergeMaps(nil, currentManagerDeployment.Annotations, ctrlCommon.GetBindInfoRefreshMap())
 	currentManagerDeployment.Labels = metaLabels
 	currentManagerDeployment.Annotations = metaAnnotations
+	ocwDep.Spec.Template.Annotations = ctrlCommon.MergeMaps(nil, ocwDep.Spec.Template.Annotations, currentManagerDeployment.Spec.Template.Annotations)
 	currentManagerDeployment.Spec = ocwDep.Spec
 	if r.needsRollout {
+		reqLogger.Info("Signal rollout with annotation")
 		timestampNow := time.Now().UTC().Format(time.RFC3339)
 		if currentManagerDeployment.Spec.Template.Annotations[RestartAnnotation] != timestampNow {
 			currentManagerDeployment.Spec.Template.Annotations[RestartAnnotation] = timestampNow
@@ -292,8 +296,10 @@ func (r *AuthenticationReconciler) handleDeployment(instance *operatorv1alpha1.A
 	metaAnnotations = ctrlCommon.MergeMaps(nil, currentProviderDeployment.Annotations, ctrlCommon.GetBindInfoRefreshMap())
 	currentProviderDeployment.Labels = metaLabels
 	currentProviderDeployment.Annotations = metaAnnotations
+	provDep.Spec.Template.Annotations = ctrlCommon.MergeMaps(nil, provDep.Spec.Template.Annotations, currentProviderDeployment.Spec.Template.Annotations)
 	currentProviderDeployment.Spec = provDep.Spec
 	if r.needsRollout {
+		reqLogger.Info("Signal rollout with annotation")
 		timestampNow := time.Now().UTC().Format(time.RFC3339)
 		if currentProviderDeployment.Spec.Template.Annotations[RestartAnnotation] != timestampNow {
 			currentProviderDeployment.Spec.Template.Annotations[RestartAnnotation] = timestampNow

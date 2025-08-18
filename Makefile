@@ -39,7 +39,7 @@ MARKDOWN_LINT_WHITELIST=https://quay.io/cnr
 
 TESTARGS_DEFAULT := "-v"
 export TESTARGS ?= $(TESTARGS_DEFAULT)
-BUNDLE_VERSION ?= $(shell cat ./internal/version/version.go | grep "Version =" | awk '{ print $$3}' | tr -d '"')
+BUNDLE_VERSION ?= $(shell grep "Version =" ./internal/version/version.go | cut -d'"' -f2)
 VERSION ?= $(BUNDLE_VERSION)
 
 LOCAL_OS := $(shell uname)

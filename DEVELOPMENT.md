@@ -14,7 +14,7 @@ To build this project, you will need the following:
 The [Makefile](./Makefile) is structured such that other dependencies of this project are obtained as they are needed by
 running `go install` or `curl` to download and install these dependencies to the `bin` directory of this project. The
 versions of these dependencies are pinned via defaulted variables within the Makefile. If you would like to run with
-different versions of these dependencies, install them to this project's `bin` directory and `export` the variables
+different versions of these dependencies, install them to this project's `bin` directory and `export` the variables,
 associated with each custom version. These variables are as follows:
 
 - kustomize:

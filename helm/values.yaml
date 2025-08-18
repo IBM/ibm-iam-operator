@@ -2,7 +2,6 @@ cpfs:
   imageRegistryNamespaceOperator: cpopen
   imageRegistryNamespaceOperand: cpopen/cpfs
   labels:
-
 global:
   operatorNamespace: operators
   instanceNamespace: instance
@@ -10,11 +9,10 @@ global:
   imagePullSecret: ibm-entitlement-key
   imagePullPolicy: IfNotPresent
   tetheredNamespaces:
-  - tenant1
-  - tenant2
-
+    - tenant1
+    - tenant2
 operator:
-  imageTag: "4.14.0" 
+  imageTag: "4.14.0"
 operands:
   platformIdentityProvider:
     imageTag: "4.14.0"

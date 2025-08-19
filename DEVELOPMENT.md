@@ -80,7 +80,7 @@ To build an Operator image for a single architecture only, run one of the follow
 
 #### Multi-Arch Images
 
-To build an Operator image for each architecture as well as a multi-arch manifest, run the following target:
+To build an Operator image for each architecture as well as a multi-arch manifest , run the following target:
 
 ```sh
 make images

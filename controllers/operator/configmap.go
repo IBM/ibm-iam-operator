@@ -19,6 +19,7 @@ package operator
 import (
 	"bytes"
 	"context"
+	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -50,6 +51,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
+
+const AnnotationSHA1Sum string = "authentication.operator.ibm.com/sha1sum"
 
 func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentConfigMap *corev1.ConfigMap, needToRequeue *bool) (err error) {
 
@@ -172,327 +175,357 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 	// Creation the default configmaps
 	for index, configMap := range configMapList {
 		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: instance.Namespace}, currentConfigMap)
-		if err != nil {
-			if k8sErrors.IsNotFound(err) {
-				// Define a new ConfigMap
-				if configMapList[index] == "registration-json" {
-					newConfigMap = registrationJsonConfigMap(instance, wlpClientID, wlpClientSecret, icpConsoleURL, r.Scheme)
-					if newConfigMap == nil {
-						err = fmt.Errorf("an error occurred during registration-json generation")
-						return err
-					}
-				} else if configMapList[index] == "oauth-client-map" {
-					newConfigMap = oauthClientConfigMap(instance, icpConsoleURL, icpProxyURL, r.Scheme)
-				} else {
-					if newConfigMap, err = functionList[index](instance, r.Scheme); err != nil {
-						return err
-					}
-					if configMapList[index] == "platform-auth-idp" {
-						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL == "https://roks.domain.name:443" { //we enable it by default
-							reqLogger.Info("Create platform-auth-idp Configmap roks settings", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-							issuer, err := readROKSURL(instance)
-							if err != nil {
-								reqLogger.Error(err, "Failed to get issuer URL", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
-								return err
-							}
-							newConfigMap.Data["ROKS_ENABLED"] = "true"
-							newConfigMap.Data["ROKS_URL"] = issuer
-							if instance.Spec.Config.ROKSUserPrefix == "changeme" { //we change it to empty prefix, that's the new default in 3.5
-								if isPublicCloud {
-									newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
-								} else {
-									newConfigMap.Data["ROKS_USER_PREFIX"] = ""
-								}
-							} else { // user specifies prefix but does not specify roksEnabled and roksURL we take the user provided prefix
-								newConfigMap.Data["ROKS_USER_PREFIX"] = instance.Spec.Config.ROKSUserPrefix
-							}
-						} else {
-							reqLogger.Info("Honor end user's setting", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-							//if user does not specify the prefix, we set it to IAM# to be consistent with previous release
-							if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL != "https://roks.domain.name:443" && instance.Spec.Config.ROKSUserPrefix == "changeme" {
-								newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
-							}
+		if k8sErrors.IsNotFound(err) {
+			// Define a new ConfigMap
+			switch configMapList[index] {
+			case "registration-json":
+				newConfigMap = registrationJsonConfigMap(instance, wlpClientID, wlpClientSecret, icpConsoleURL, r.Scheme)
+				if newConfigMap == nil {
+					err = fmt.Errorf("an error occurred during registration-json generation")
+					return
+				}
+				err = replaceOIDCClientRegistrationJob(r.Client, context.TODO(), instance.Namespace)
+				if err != nil {
+					return
+				}
+			case "oauth-client-map":
+				newConfigMap = oauthClientConfigMap(instance, icpConsoleURL, icpProxyURL, r.Scheme)
+			default:
+				if newConfigMap, err = functionList[index](instance, r.Scheme); err != nil {
+					return err
+				}
+				if configMapList[index] == "platform-auth-idp" {
+					if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL == "https://roks.domain.name:443" { //we enable it by default
+						reqLogger.Info("Create platform-auth-idp Configmap roks settings", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+						issuer, err := readROKSURL(instance)
+						if err != nil {
+							reqLogger.Error(err, "Failed to get issuer URL", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
+							return err
 						}
-						reqLogger.Info("Adding new variable to configmap", "Configmap.Namespace", currentConfigMap.Namespace, "isOSEnv", isOSEnv)
-						// Detect cluster type - cncf or openshift
-						// if global cm, ignore CR, and populate auth-idp with value from global
-						// if no global cm, take value from CR - NOT REQD.
-						newConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(r.RunningOnOpenShiftCluster())
-
+						newConfigMap.Data["ROKS_ENABLED"] = "true"
+						newConfigMap.Data["ROKS_URL"] = issuer
+						if instance.Spec.Config.ROKSUserPrefix == "changeme" { //we change it to empty prefix, that's the new default in 3.5
+							if isPublicCloud {
+								newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
+							} else {
+								newConfigMap.Data["ROKS_USER_PREFIX"] = ""
+							}
+						} else { // user specifies prefix but does not specify roksEnabled and roksURL we take the user provided prefix
+							newConfigMap.Data["ROKS_USER_PREFIX"] = instance.Spec.Config.ROKSUserPrefix
+						}
 					} else {
-						//user specifies roksEnabled and roksURL, but not roksPrefix, then we set prefix to IAM# (consistent with previous release behavior)
+						reqLogger.Info("Honor end user's setting", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+						//if user does not specify the prefix, we set it to IAM# to be consistent with previous release
 						if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL != "https://roks.domain.name:443" && instance.Spec.Config.ROKSUserPrefix == "changeme" {
 							newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
 						}
 					}
+					reqLogger.Info("Adding new variable to configmap", "Configmap.Namespace", currentConfigMap.Namespace, "isOSEnv", isOSEnv)
+					// Detect cluster type - cncf or openshift
+					// if global cm, ignore CR, and populate auth-idp with value from global
+					// if no global cm, take value from CR - NOT REQD.
+					newConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(r.RunningOnOpenShiftCluster())
+
+					var sum string
+					sum, err = getConfigMapDataSHA1Sum(newConfigMap)
+					if err != nil {
+						return
+					}
+
+					newConfigMap.Annotations = map[string]string{
+						AnnotationSHA1Sum: sum,
+					}
+				} else {
+					//user specifies roksEnabled and roksURL, but not roksPrefix, then we set prefix to IAM# (consistent with previous release behavior)
+					if instance.Spec.Config.ROKSEnabled && instance.Spec.Config.ROKSURL != "https://roks.domain.name:443" && instance.Spec.Config.ROKSUserPrefix == "changeme" {
+						newConfigMap.Data["ROKS_USER_PREFIX"] = "IAM#"
+					}
 				}
-				reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
-				err = r.Client.Create(context.TODO(), newConfigMap)
-				if err != nil {
-					reqLogger.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
-					return
-				}
-				// ConfigMap created successfully - return and requeue
-				*needToRequeue = true
-			} else {
-				reqLogger.Error(err, "Failed to get ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
+			}
+			reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
+			err = r.Client.Create(context.TODO(), newConfigMap)
+			if err != nil {
+				reqLogger.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
 				return
 			}
-		} else {
-			// @posriniv - find a more efficient solution
-			if configMapList[index] == "platform-auth-idp" {
-				cmUpdateRequired := false
-				if newConfigMap, err = functionList[index](instance, r.Scheme); err != nil {
-					return err
-				}
-				if _, keyExists := currentConfigMap.Data["LDAP_RECURSIVE_SEARCH"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["LDAP_RECURSIVE_SEARCH"] = newConfigMap.Data["LDAP_RECURSIVE_SEARCH"]
-					cmUpdateRequired = true
-				}
-				if _, keyExists := currentConfigMap.Data["CLAIMS_SUPPORTED"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["CLAIMS_SUPPORTED"] = newConfigMap.Data["CLAIMS_SUPPORTED"]
-					currentConfigMap.Data["CLAIMS_MAP"] = newConfigMap.Data["CLAIMS_MAP"]
-					currentConfigMap.Data["SCOPE_CLAIM"] = newConfigMap.Data["SCOPE_CLAIM"]
-					currentConfigMap.Data["BOOTSTRAP_USERID"] = newConfigMap.Data["BOOTSTRAP_USERID"]
-					cmUpdateRequired = true
-				}
-				if _, keyExists := currentConfigMap.Data["PROVIDER_ISSUER_URL"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["PROVIDER_ISSUER_URL"] = newConfigMap.Data["PROVIDER_ISSUER_URL"]
-					cmUpdateRequired = true
-				}
-				if _, keyExists := currentConfigMap.Data["PREFERRED_LOGIN"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["PREFERRED_LOGIN"] = newConfigMap.Data["PREFERRED_LOGIN"]
-					cmUpdateRequired = true
-				}
-				if val, keyExists := currentConfigMap.Data["MASTER_HOST"]; !keyExists || val != newConfigMap.Data["MASTER_HOST"] {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["MASTER_HOST"] = newConfigMap.Data["MASTER_HOST"]
-					cmUpdateRequired = true
-				}
-				if _, keyExists := currentConfigMap.Data["AUDIT_URL"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["AUDIT_URL"] = newConfigMap.Data["AUDIT_URL"]
-					cmUpdateRequired = true
-				}
-				if _, keyExists := currentConfigMap.Data["DB_CONNECT_TIMEOUT"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap with connection pooling information", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["DB_CONNECT_TIMEOUT"] = newConfigMap.Data["DB_CONNECT_TIMEOUT"]
-					currentConfigMap.Data["DB_IDLE_TIMEOUT"] = newConfigMap.Data["DB_IDLE_TIMEOUT"]
-					currentConfigMap.Data["DB_CONNECT_MAX_RETRIES"] = newConfigMap.Data["DB_CONNECT_MAX_RETRIES"]
-					currentConfigMap.Data["DB_POOL_MIN_SIZE"] = newConfigMap.Data["DB_POOL_MIN_SIZE"]
-					currentConfigMap.Data["DB_POOL_MAX_SIZE"] = newConfigMap.Data["DB_POOL_MAX_SIZE"]
-					currentConfigMap.Data["SEQL_LOGGING"] = newConfigMap.Data["SEQL_LOGGING"]
-					cmUpdateRequired = true
-				}
-				if _, keyExists := currentConfigMap.Data["DB_SSL_MODE"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap with db ssl mode information", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["DB_SSL_MODE"] = newConfigMap.Data["DB_SSL_MODE"]
-					cmUpdateRequired = true
-				}
-				if _, keyExists := currentConfigMap.Data["OS_TOKEN_LENGTH"]; keyExists {
-					if currentConfigMap.Data["OS_TOKEN_LENGTH"] == "45" {
-						reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-						reqLogger.Info("Updating OS token length", "New length is ", newConfigMap.Data["OS_TOKEN_LENGTH"])
-						currentConfigMap.Data["OS_TOKEN_LENGTH"] = newConfigMap.Data["OS_TOKEN_LENGTH"]
-						cmUpdateRequired = true
-					}
-				}
-				if _, keyExists := currentConfigMap.Data["SCIM_LDAP_ATTRIBUTES_MAPPING"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap to add new SCIM variables", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["SCIM_LDAP_ATTRIBUTES_MAPPING"] = newConfigMap.Data["SCIM_LDAP_ATTRIBUTES_MAPPING"]
-					currentConfigMap.Data["SCIM_LDAP_SEARCH_SIZE_LIMIT"] = newConfigMap.Data["SCIM_LDAP_SEARCH_SIZE_LIMIT"]
-					currentConfigMap.Data["SCIM_LDAP_SEARCH_TIME_LIMIT"] = newConfigMap.Data["SCIM_LDAP_SEARCH_TIME_LIMIT"]
-					currentConfigMap.Data["SCIM_ASYNC_PARALLEL_LIMIT"] = newConfigMap.Data["SCIM_ASYNC_PARALLEL_LIMIT"]
-					currentConfigMap.Data["SCIM_GET_DISPLAY_FOR_GROUP_USERS"] = newConfigMap.Data["SCIM_GET_DISPLAY_FOR_GROUP_USERS"]
-					cmUpdateRequired = true
-				}
-				if _, keyExists := currentConfigMap.Data["SCIM_AUTH_CACHE_MAX_SIZE"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap to add new SCIM variables", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["SCIM_AUTH_CACHE_MAX_SIZE"] = newConfigMap.Data["SCIM_AUTH_CACHE_MAX_SIZE"]
-					cmUpdateRequired = true
-				}
-				if _, keyExists := currentConfigMap.Data["SCIM_AUTH_CACHE_TTL_VALUE"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap to add new SCIM variables", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["SCIM_AUTH_CACHE_TTL_VALUE"] = newConfigMap.Data["SCIM_AUTH_CACHE_TTL_VALUE"]
-					cmUpdateRequired = true
-				}
-				if _, keyExists := currentConfigMap.Data["AUTH_SVC_LDAP_CONFIG_TIMEOUT"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap to add new variable for auth-service LDAP configuration timeout", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["AUTH_SVC_LDAP_CONFIG_TIMEOUT"] = newConfigMap.Data["AUTH_SVC_LDAP_CONFIG_TIMEOUT"]
-					cmUpdateRequired = true
-				}
-				if _, keyExists := currentConfigMap.Data["IBM_CLOUD_SAAS"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["IBM_CLOUD_SAAS"] = newConfigMap.Data["IBM_CLOUD_SAAS"]
-					currentConfigMap.Data["SAAS_CLIENT_REDIRECT_URL"] = newConfigMap.Data["SAAS_CLIENT_REDIRECT_URL"]
-					cmUpdateRequired = true
-				}
-				if _, keyExists := currentConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap to add new variable for attribute mapping resource", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"] = newConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"]
-					cmUpdateRequired = true
-				}
-				if _, keyExists := currentConfigMap.Data["LDAP_CTX_POOL_INITSIZE"]; !keyExists {
-					reqLogger.Info("Updating an existing Configmap to add context pool for ldap configuration", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["LDAP_CTX_POOL_INITSIZE"] = newConfigMap.Data["LDAP_CTX_POOL_INITSIZE"]
-					currentConfigMap.Data["LDAP_CTX_POOL_MAXSIZE"] = newConfigMap.Data["LDAP_CTX_POOL_MAXSIZE"]
-					currentConfigMap.Data["LDAP_CTX_POOL_TIMEOUT"] = newConfigMap.Data["LDAP_CTX_POOL_TIMEOUT"]
-					currentConfigMap.Data["LDAP_CTX_POOL_WAITTIME"] = newConfigMap.Data["LDAP_CTX_POOL_WAITTIME"]
-					currentConfigMap.Data["LDAP_CTX_POOL_PREFERREDSIZE"] = newConfigMap.Data["LDAP_CTX_POOL_PREFERREDSIZE"]
-					cmUpdateRequired = true
-				}
-				// Indicates an upgrade from a previous
-				if _, keyExists := currentConfigMap.Data["MASTER_PATH"]; !keyExists {
-					req := ctrl.Request{NamespacedName: types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}}
-					var path string
-					path, err = r.getMasterPath(context.Background(), req)
-					if err != nil {
-						reqLogger.Error(err, "Failed to determine if a SAML connection already exists")
-						return
-					}
-					currentConfigMap.Data["MASTER_PATH"] = path
-					cmUpdateRequired = true
-				}
-				_, keyExists := currentConfigMap.Data["IS_OPENSHIFT_ENV"]
-				if keyExists {
-					reqLogger.Info("Current configmap", "Current Value", currentConfigMap.Data["IS_OPENSHIFT_ENV"])
-					if currentConfigMap.Data["IS_OPENSHIFT_ENV"] != strconv.FormatBool(r.RunningOnOpenShiftCluster()) {
-						currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(r.RunningOnOpenShiftCluster())
-					}
-				} else {
-					currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(r.RunningOnOpenShiftCluster())
-				}
-
-				// This code would take care updating cp2 specific values into cp3 format
-				idmgmtSVC, keyExists := currentConfigMap.Data["IDENTITY_MGMT_URL"]
-				if keyExists && strings.Contains(idmgmtSVC, "127.0.0.1") {
-					reqLogger.Info("Upgrade check : IDENTITY_MGMT_URL entry would be upgraded to CP3 format ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["IDENTITY_MGMT_URL"] = "https://platform-identity-management:4500"
-					cmUpdateRequired = true
-				}
-
-				authSVC, keyExists := currentConfigMap.Data["BASE_OIDC_URL"]
-				if keyExists && strings.Contains(authSVC, "127.0.0.1") {
-					reqLogger.Info("Upgrade check : BASE_OIDC_URL entry would be upgraded to CP3 format ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["BASE_OIDC_URL"] = "https://platform-auth-service:9443/oidc/endpoint/OP"
-					cmUpdateRequired = true
-				}
-
-				authdirSVC, keyExists := currentConfigMap.Data["IDENTITY_AUTH_DIRECTORY_URL"]
-				if keyExists && strings.Contains(authdirSVC, "127.0.0.1") {
-					reqLogger.Info("Upgrade check : IDENTITY_AUTH_DIRECTORY_URL entry would be upgraded to CP3 format ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["IDENTITY_AUTH_DIRECTORY_URL"] = "https://platform-auth-service:3100"
-					cmUpdateRequired = true
-				}
-
-				idproviderSVC, keyExists := currentConfigMap.Data["IDENTITY_PROVIDER_URL"]
-				if keyExists && strings.Contains(idproviderSVC, "127.0.0.1") {
-					reqLogger.Info("Upgrade check : IDENTITY_PROVIDER_URL entry would be upgraded to CP3 format ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
-					currentConfigMap.Data["IDENTITY_PROVIDER_URL"] = "https://platform-identity-provider:4300"
-					cmUpdateRequired = true
-				}
-				roksUrl, keyExists := currentConfigMap.Data["ROKS_URL"]
-				if keyExists {
-					desiredRoksUrl, err := readROKSURL(instance)
-					if err == nil && len(desiredRoksUrl) != 0 && roksUrl != desiredRoksUrl {
-						currentConfigMap.Data["ROKS_URL"] = desiredRoksUrl
-						cmUpdateRequired = true
-					}
-				}
-
+			r.needsRollout = true
+			// ConfigMap created successfully - return and requeue
+			*needToRequeue = true
+		} else if err != nil {
+			reqLogger.Error(err, "Failed to get ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
+			return
+		}
+		switch configMapList[index] {
+		case "platform-auth-idp":
+			cmUpdateRequired := false
+			var beforeSum string
+			if currentConfigMap.Annotations == nil {
+				beforeSum = ""
+			} else {
+				beforeSum = currentConfigMap.Annotations[AnnotationSHA1Sum]
+			}
+			if newConfigMap, err = functionList[index](instance, r.Scheme); err != nil {
+				return err
+			}
+			if _, keyExists := currentConfigMap.Data["LDAP_RECURSIVE_SEARCH"]; !keyExists {
+				reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["LDAP_RECURSIVE_SEARCH"] = newConfigMap.Data["LDAP_RECURSIVE_SEARCH"]
 				cmUpdateRequired = true
-
-				if cmUpdateRequired {
-					err = r.Client.Update(context.TODO(), currentConfigMap)
-					if err != nil {
-						reqLogger.Error(err, "Failed to update an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "Configmap.Name", currentConfigMap.Name)
-						return
-					}
-				}
-			} else if configMapList[index] == "registration-json" {
-				platformOIDCCredentials := &corev1.Secret{}
-				var servicesNamespace string
-				servicesNamespace, err = ctrlCommon.GetServicesNamespace(context.Background(), &r.Client)
-				if err != nil {
-					reqLogger.Error(err, "Failed to get services namespace")
-					return
-				}
-				objectKey := types.NamespacedName{Name: "platform-oidc-credentials", Namespace: servicesNamespace}
-				err = r.Client.Get(context.Background(), objectKey, platformOIDCCredentials)
-				if err != nil {
-					reqLogger.Error(err, "Failed to get Secret for registration-json update")
-					return
-				}
-				latestWLPClientID := platformOIDCCredentials.Data["WLP_CLIENT_ID"]
-				latestWLPClientSecret := platformOIDCCredentials.Data["WLP_CLIENT_SECRET"]
-				newConfigMap = registrationJsonConfigMap(instance, string(latestWLPClientID[:]), string(latestWLPClientSecret[:]), icpConsoleURL, r.Scheme)
-				if newConfigMap == nil {
-					err = fmt.Errorf("an error occurred during registration-json generation")
-					return err
-				}
-				reqLogger.Info("Calculated new platform-oidc-registration.json")
-				var currentRegistrationJSON, newRegistrationJSON *registrationJSONData
-				newRegistrationJSON = &registrationJSONData{}
-				currentRegistrationJSON = &registrationJSONData{}
-				if err = json.Unmarshal([]byte(newConfigMap.Data["platform-oidc-registration.json"]), newRegistrationJSON); err != nil {
-					reqLogger.Error(err, "Failed to unmarshal calculated ConfigMap")
-					return
-				}
-				if err = json.Unmarshal([]byte(currentConfigMap.Data["platform-oidc-registration.json"]), currentRegistrationJSON); err != nil {
-					reqLogger.Error(err, "Failed to unmarshal observed ConfigMap")
-					return
-				}
-				var updatedJSON, updatedOwnerRefs bool
-				if !reflect.DeepEqual(newRegistrationJSON, currentRegistrationJSON) {
-					reqLogger.Info("Difference found in observed vs calculated platform-oidc-registration.json")
-					var newJSON []byte
-					if newJSON, err = json.MarshalIndent(newRegistrationJSON, "", "  "); err != nil {
-						reqLogger.Error(err, "Failed to marshal JSON for registration-json update")
-						return
-					}
-					currentConfigMap.Data["platform-oidc-registration.json"] = string(newJSON[:])
-					updatedJSON = true
-				}
-				if !reflect.DeepEqual(newConfigMap.GetOwnerReferences(), currentConfigMap.GetOwnerReferences()) {
-					reqLogger.Info("Difference found in observed vs calculated OwnerReferences")
-					currentConfigMap.OwnerReferences = newConfigMap.GetOwnerReferences()
-					updatedOwnerRefs = true
-				}
-				if updatedJSON || updatedOwnerRefs {
-					reqLogger.Info("Updating ConfigMap")
-					if err = r.Client.Update(context.Background(), currentConfigMap); err != nil {
-						reqLogger.Error(err, "Failed to update ConfigMap", "Name", "registration-json", "Namespace", instance.Namespace)
-						return
-					}
-					reqLogger.Info("ConfigMap successfully updated")
-					if updatedJSON {
-						reqLogger.Info("Deleting Job to re-run with upated ConfigMap", "Job.Name", "oidc-client-registration")
-
-						job := &batchv1.Job{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "oidc-client-registration",
-								Namespace: instance.Namespace,
-							},
-						}
-						if err = r.Client.Delete(context.TODO(), job); err != nil {
-							if k8sErrors.IsNotFound(err) {
-								reqLogger.Info("Job not found on cluster; continuing", "Job.Name", "oidc-client-registration")
-								return nil
-							}
-							reqLogger.Error(err, "Could not delete job", "Job.Name", "oidc-client-registration")
-							return
-						}
-						reqLogger.Info("Deleted Job", "Job.Name", "oidc-client-registration")
-						return
-					}
-				} else {
-					reqLogger.Info("No ConfigMap update required")
+			}
+			if _, keyExists := currentConfigMap.Data["CLAIMS_SUPPORTED"]; !keyExists {
+				reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["CLAIMS_SUPPORTED"] = newConfigMap.Data["CLAIMS_SUPPORTED"]
+				currentConfigMap.Data["CLAIMS_MAP"] = newConfigMap.Data["CLAIMS_MAP"]
+				currentConfigMap.Data["SCOPE_CLAIM"] = newConfigMap.Data["SCOPE_CLAIM"]
+				currentConfigMap.Data["BOOTSTRAP_USERID"] = newConfigMap.Data["BOOTSTRAP_USERID"]
+				cmUpdateRequired = true
+			}
+			if _, keyExists := currentConfigMap.Data["PROVIDER_ISSUER_URL"]; !keyExists {
+				reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["PROVIDER_ISSUER_URL"] = newConfigMap.Data["PROVIDER_ISSUER_URL"]
+				cmUpdateRequired = true
+			}
+			if _, keyExists := currentConfigMap.Data["PREFERRED_LOGIN"]; !keyExists {
+				reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["PREFERRED_LOGIN"] = newConfigMap.Data["PREFERRED_LOGIN"]
+				cmUpdateRequired = true
+			}
+			if val, keyExists := currentConfigMap.Data["MASTER_HOST"]; !keyExists || val != newConfigMap.Data["MASTER_HOST"] {
+				reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["MASTER_HOST"] = newConfigMap.Data["MASTER_HOST"]
+				cmUpdateRequired = true
+			}
+			if _, keyExists := currentConfigMap.Data["AUDIT_URL"]; !keyExists {
+				reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["AUDIT_URL"] = newConfigMap.Data["AUDIT_URL"]
+				cmUpdateRequired = true
+			}
+			if _, keyExists := currentConfigMap.Data["DB_CONNECT_TIMEOUT"]; !keyExists {
+				reqLogger.Info("Updating an existing Configmap with connection pooling information", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["DB_CONNECT_TIMEOUT"] = newConfigMap.Data["DB_CONNECT_TIMEOUT"]
+				currentConfigMap.Data["DB_IDLE_TIMEOUT"] = newConfigMap.Data["DB_IDLE_TIMEOUT"]
+				currentConfigMap.Data["DB_CONNECT_MAX_RETRIES"] = newConfigMap.Data["DB_CONNECT_MAX_RETRIES"]
+				currentConfigMap.Data["DB_POOL_MIN_SIZE"] = newConfigMap.Data["DB_POOL_MIN_SIZE"]
+				currentConfigMap.Data["DB_POOL_MAX_SIZE"] = newConfigMap.Data["DB_POOL_MAX_SIZE"]
+				currentConfigMap.Data["SEQL_LOGGING"] = newConfigMap.Data["SEQL_LOGGING"]
+				cmUpdateRequired = true
+			}
+			if _, keyExists := currentConfigMap.Data["DB_SSL_MODE"]; !keyExists {
+				reqLogger.Info("Updating an existing Configmap with db ssl mode information", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["DB_SSL_MODE"] = newConfigMap.Data["DB_SSL_MODE"]
+				cmUpdateRequired = true
+			}
+			if _, keyExists := currentConfigMap.Data["OS_TOKEN_LENGTH"]; keyExists {
+				if currentConfigMap.Data["OS_TOKEN_LENGTH"] == "45" {
+					reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+					reqLogger.Info("Updating OS token length", "New length is ", newConfigMap.Data["OS_TOKEN_LENGTH"])
+					currentConfigMap.Data["OS_TOKEN_LENGTH"] = newConfigMap.Data["OS_TOKEN_LENGTH"]
+					cmUpdateRequired = true
 				}
 			}
+			if _, keyExists := currentConfigMap.Data["SCIM_LDAP_ATTRIBUTES_MAPPING"]; !keyExists {
+				reqLogger.Info("Updating an existing Configmap to add new SCIM variables", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["SCIM_LDAP_ATTRIBUTES_MAPPING"] = newConfigMap.Data["SCIM_LDAP_ATTRIBUTES_MAPPING"]
+				currentConfigMap.Data["SCIM_LDAP_SEARCH_SIZE_LIMIT"] = newConfigMap.Data["SCIM_LDAP_SEARCH_SIZE_LIMIT"]
+				currentConfigMap.Data["SCIM_LDAP_SEARCH_TIME_LIMIT"] = newConfigMap.Data["SCIM_LDAP_SEARCH_TIME_LIMIT"]
+				currentConfigMap.Data["SCIM_ASYNC_PARALLEL_LIMIT"] = newConfigMap.Data["SCIM_ASYNC_PARALLEL_LIMIT"]
+				currentConfigMap.Data["SCIM_GET_DISPLAY_FOR_GROUP_USERS"] = newConfigMap.Data["SCIM_GET_DISPLAY_FOR_GROUP_USERS"]
+				cmUpdateRequired = true
+			}
+			if _, keyExists := currentConfigMap.Data["SCIM_AUTH_CACHE_MAX_SIZE"]; !keyExists {
+				reqLogger.Info("Updating an existing Configmap to add new SCIM variables", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["SCIM_AUTH_CACHE_MAX_SIZE"] = newConfigMap.Data["SCIM_AUTH_CACHE_MAX_SIZE"]
+				cmUpdateRequired = true
+			}
+			if _, keyExists := currentConfigMap.Data["SCIM_AUTH_CACHE_TTL_VALUE"]; !keyExists {
+				reqLogger.Info("Updating an existing Configmap to add new SCIM variables", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["SCIM_AUTH_CACHE_TTL_VALUE"] = newConfigMap.Data["SCIM_AUTH_CACHE_TTL_VALUE"]
+				cmUpdateRequired = true
+			}
+			if _, keyExists := currentConfigMap.Data["AUTH_SVC_LDAP_CONFIG_TIMEOUT"]; !keyExists {
+				reqLogger.Info("Updating an existing Configmap to add new variable for auth-service LDAP configuration timeout", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["AUTH_SVC_LDAP_CONFIG_TIMEOUT"] = newConfigMap.Data["AUTH_SVC_LDAP_CONFIG_TIMEOUT"]
+				cmUpdateRequired = true
+			}
+			if _, keyExists := currentConfigMap.Data["IBM_CLOUD_SAAS"]; !keyExists {
+				reqLogger.Info("Updating an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["IBM_CLOUD_SAAS"] = newConfigMap.Data["IBM_CLOUD_SAAS"]
+				currentConfigMap.Data["SAAS_CLIENT_REDIRECT_URL"] = newConfigMap.Data["SAAS_CLIENT_REDIRECT_URL"]
+				cmUpdateRequired = true
+			}
+			if _, keyExists := currentConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"]; !keyExists {
+				reqLogger.Info("Updating an existing Configmap to add new variable for attribute mapping resource", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"] = newConfigMap.Data["ATTR_MAPPING_FROM_CONFIG"]
+				cmUpdateRequired = true
+			}
+			if _, keyExists := currentConfigMap.Data["LDAP_CTX_POOL_INITSIZE"]; !keyExists {
+				reqLogger.Info("Updating an existing Configmap to add context pool for ldap configuration", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["LDAP_CTX_POOL_INITSIZE"] = newConfigMap.Data["LDAP_CTX_POOL_INITSIZE"]
+				currentConfigMap.Data["LDAP_CTX_POOL_MAXSIZE"] = newConfigMap.Data["LDAP_CTX_POOL_MAXSIZE"]
+				currentConfigMap.Data["LDAP_CTX_POOL_TIMEOUT"] = newConfigMap.Data["LDAP_CTX_POOL_TIMEOUT"]
+				currentConfigMap.Data["LDAP_CTX_POOL_WAITTIME"] = newConfigMap.Data["LDAP_CTX_POOL_WAITTIME"]
+				currentConfigMap.Data["LDAP_CTX_POOL_PREFERREDSIZE"] = newConfigMap.Data["LDAP_CTX_POOL_PREFERREDSIZE"]
+				cmUpdateRequired = true
+			}
+			// Indicates an upgrade from a previous
+			if _, keyExists := currentConfigMap.Data["MASTER_PATH"]; !keyExists {
+				req := ctrl.Request{NamespacedName: types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}}
+				var path string
+				path, err = r.getMasterPath(context.Background(), req)
+				if err != nil {
+					reqLogger.Error(err, "Failed to determine if a SAML connection already exists")
+					return
+				}
+				currentConfigMap.Data["MASTER_PATH"] = path
+				cmUpdateRequired = true
+			}
+			_, keyExists := currentConfigMap.Data["IS_OPENSHIFT_ENV"]
+			if keyExists {
+				reqLogger.Info("Current configmap", "Current Value", currentConfigMap.Data["IS_OPENSHIFT_ENV"])
+				if currentConfigMap.Data["IS_OPENSHIFT_ENV"] != strconv.FormatBool(r.RunningOnOpenShiftCluster()) {
+					currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(r.RunningOnOpenShiftCluster())
+				}
+			} else {
+				currentConfigMap.Data["IS_OPENSHIFT_ENV"] = strconv.FormatBool(r.RunningOnOpenShiftCluster())
+			}
+
+			// This code would take care updating cp2 specific values into cp3 format
+			idmgmtSVC, keyExists := currentConfigMap.Data["IDENTITY_MGMT_URL"]
+			if keyExists && strings.Contains(idmgmtSVC, "127.0.0.1") {
+				reqLogger.Info("Upgrade check : IDENTITY_MGMT_URL entry would be upgraded to CP3 format ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["IDENTITY_MGMT_URL"] = "https://platform-identity-management:4500"
+				cmUpdateRequired = true
+			}
+
+			authSVC, keyExists := currentConfigMap.Data["BASE_OIDC_URL"]
+			if keyExists && strings.Contains(authSVC, "127.0.0.1") {
+				reqLogger.Info("Upgrade check : BASE_OIDC_URL entry would be upgraded to CP3 format ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["BASE_OIDC_URL"] = "https://platform-auth-service:9443/oidc/endpoint/OP"
+				cmUpdateRequired = true
+			}
+
+			authdirSVC, keyExists := currentConfigMap.Data["IDENTITY_AUTH_DIRECTORY_URL"]
+			if keyExists && strings.Contains(authdirSVC, "127.0.0.1") {
+				reqLogger.Info("Upgrade check : IDENTITY_AUTH_DIRECTORY_URL entry would be upgraded to CP3 format ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["IDENTITY_AUTH_DIRECTORY_URL"] = "https://platform-auth-service:3100"
+				cmUpdateRequired = true
+			}
+
+			idproviderSVC, keyExists := currentConfigMap.Data["IDENTITY_PROVIDER_URL"]
+			if keyExists && strings.Contains(idproviderSVC, "127.0.0.1") {
+				reqLogger.Info("Upgrade check : IDENTITY_PROVIDER_URL entry would be upgraded to CP3 format ", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["IDENTITY_PROVIDER_URL"] = "https://platform-identity-provider:4300"
+				cmUpdateRequired = true
+			}
+			roksUrl, keyExists := currentConfigMap.Data["ROKS_URL"]
+			if keyExists {
+				desiredRoksUrl, err := readROKSURL(instance)
+				if err == nil && len(desiredRoksUrl) != 0 && roksUrl != desiredRoksUrl {
+					currentConfigMap.Data["ROKS_URL"] = desiredRoksUrl
+					cmUpdateRequired = true
+				}
+			}
+
+			var afterSum string
+			afterSum, err = getConfigMapDataSHA1Sum(currentConfigMap)
+			if err != nil {
+				return
+			}
+			if beforeSum != afterSum {
+				if currentConfigMap.Annotations == nil {
+					currentConfigMap.Annotations = map[string]string{}
+				}
+				currentConfigMap.Annotations[AnnotationSHA1Sum] = afterSum
+				cmUpdateRequired = true
+			}
+
+			if cmUpdateRequired {
+				err = r.Client.Update(context.TODO(), currentConfigMap)
+				if err != nil {
+					reqLogger.Error(err, "Failed to update an existing Configmap", "Configmap.Namespace", currentConfigMap.Namespace, "Configmap.Name", currentConfigMap.Name)
+					return
+				}
+				r.needsRollout = true
+			}
+		case "registration-json":
+			platformOIDCCredentials := &corev1.Secret{}
+			var servicesNamespace string
+			servicesNamespace, err = ctrlCommon.GetServicesNamespace(context.Background(), &r.Client)
+			if err != nil {
+				reqLogger.Error(err, "Failed to get services namespace")
+				return
+			}
+			objectKey := types.NamespacedName{Name: "platform-oidc-credentials", Namespace: servicesNamespace}
+			err = r.Client.Get(context.Background(), objectKey, platformOIDCCredentials)
+			if err != nil {
+				reqLogger.Error(err, "Failed to get Secret for registration-json update")
+				return
+			}
+			latestWLPClientID := platformOIDCCredentials.Data["WLP_CLIENT_ID"]
+			latestWLPClientSecret := platformOIDCCredentials.Data["WLP_CLIENT_SECRET"]
+			newConfigMap = registrationJsonConfigMap(instance, string(latestWLPClientID[:]), string(latestWLPClientSecret[:]), icpConsoleURL, r.Scheme)
+			if newConfigMap == nil {
+				err = fmt.Errorf("an error occurred during registration-json generation")
+				return err
+			}
+			reqLogger.Info("Calculated new platform-oidc-registration.json")
+			var currentRegistrationJSON, newRegistrationJSON *registrationJSONData
+			newRegistrationJSON = &registrationJSONData{}
+			currentRegistrationJSON = &registrationJSONData{}
+			if err = json.Unmarshal([]byte(newConfigMap.Data["platform-oidc-registration.json"]), newRegistrationJSON); err != nil {
+				reqLogger.Error(err, "Failed to unmarshal calculated ConfigMap")
+				return
+			}
+			if err = json.Unmarshal([]byte(currentConfigMap.Data["platform-oidc-registration.json"]), currentRegistrationJSON); err != nil {
+				reqLogger.Error(err, "Failed to unmarshal observed ConfigMap")
+				return
+			}
+			var updatedJSON, updatedOwnerRefs bool
+			if !reflect.DeepEqual(newRegistrationJSON, currentRegistrationJSON) {
+				reqLogger.Info("Difference found in observed vs calculated platform-oidc-registration.json")
+				var newJSON []byte
+				if newJSON, err = json.MarshalIndent(newRegistrationJSON, "", "  "); err != nil {
+					reqLogger.Error(err, "Failed to marshal JSON for registration-json update")
+					return
+				}
+				currentConfigMap.Data["platform-oidc-registration.json"] = string(newJSON[:])
+				updatedJSON = true
+			}
+			if !reflect.DeepEqual(newConfigMap.GetOwnerReferences(), currentConfigMap.GetOwnerReferences()) {
+				reqLogger.Info("Difference found in observed vs calculated OwnerReferences")
+				currentConfigMap.OwnerReferences = newConfigMap.GetOwnerReferences()
+				updatedOwnerRefs = true
+			}
+			if updatedJSON || updatedOwnerRefs {
+				reqLogger.Info("Updating ConfigMap")
+				if err = r.Client.Update(context.Background(), currentConfigMap); err != nil {
+					reqLogger.Error(err, "Failed to update ConfigMap", "Name", "registration-json", "Namespace", instance.Namespace)
+					return
+				}
+				reqLogger.Info("ConfigMap successfully updated")
+				if updatedJSON {
+					reqLogger.Info("Deleting Job to re-run with upated ConfigMap", "Job.Name", "oidc-client-registration")
+
+					job := &batchv1.Job{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "oidc-client-registration",
+							Namespace: instance.Namespace,
+						},
+					}
+					if err = r.Client.Delete(context.TODO(), job); err != nil {
+						if k8sErrors.IsNotFound(err) {
+							reqLogger.Info("Job not found on cluster; continuing", "Job.Name", "oidc-client-registration")
+							return nil
+						}
+						reqLogger.Error(err, "Could not delete job", "Job.Name", "oidc-client-registration")
+						return
+					}
+					reqLogger.Info("Deleted Job", "Job.Name", "oidc-client-registration")
+					return
+				}
+			}
+		default:
+			reqLogger.Info("No ConfigMap update required")
 		}
 	}
 
@@ -637,6 +670,19 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 		return nil, err
 	}
 	return newConfigMap, nil
+}
+
+func replaceOIDCClientRegistrationJob(cl client.Client, ctx context.Context, namespace string) (err error) {
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "oidc-client-registration",
+			Namespace: namespace,
+		},
+	}
+	if err = cl.Delete(ctx, job); k8sErrors.IsNotFound(err) {
+		return nil
+	}
+	return
 }
 
 func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, icpConsoleURL string, scheme *runtime.Scheme) *corev1.ConfigMap {
@@ -1042,4 +1088,17 @@ func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, req ctrl.R
 		return "", err
 	}
 	return "/idauth", nil
+}
+
+// getConfigMapDataSHA1Sum calculates the SHA1 of the `.data` field.
+func getConfigMapDataSHA1Sum(cm *corev1.ConfigMap) (sha string, err error) {
+	var dataBytes []byte
+	if cm.Data == nil {
+		return "", errors.New("no .data defined on ConfigMap")
+	}
+	if dataBytes, err = json.Marshal(cm.Data); err != nil {
+		return "", err
+	}
+	dataSHA := sha1.Sum(dataBytes)
+	return fmt.Sprintf("%x", dataSHA[:]), nil
 }

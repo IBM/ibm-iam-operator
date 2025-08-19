@@ -18,6 +18,10 @@ package operator
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"maps"
 	"reflect"
 	"time"
@@ -25,7 +29,7 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -93,45 +97,54 @@ func (r *AuthenticationReconciler) handleSecret(instance *operatorv1alpha1.Authe
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	var err error
 
-	for secret := range secretData {
-		err = r.Get(context.TODO(), types.NamespacedName{Name: secret, Namespace: instance.Namespace}, currentSecret)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				// Define a new Secret
-				newSecret := generateSecretObject(instance, r.Scheme, secret, secretData[secret])
-				reqLogger.Info("Creating a new Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
-				err = r.Client.Create(context.TODO(), newSecret)
-				if err != nil {
-					reqLogger.Error(err, "Failed to create new Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
-					return err
-				}
-				// Secret created successfully - return and requeue
-				*needToRequeue = true
-			} else {
-				reqLogger.Error(err, "Failed to get Secret", "Secret.Namespace", instance.Namespace, "Secret.Name", secret)
+	for secretName := range secretData {
+		secretLog := reqLogger.WithValues("Secret.Name", secretName)
+		err = r.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: instance.Namespace}, currentSecret)
+		if k8sErrors.IsNotFound(err) {
+			// Define a new Secret
+			newSecret := generateSecretObject(instance, r.Scheme, secretName, secretData[secretName])
+			secretLog.Info("Creating a new Secret")
+			err = r.Client.Create(context.TODO(), newSecret)
+			if err != nil {
+				reqLogger.Error(err, "Failed to create new Secret")
 				return err
 			}
+			if secretName == "platform-auth-idp-credentials" || secretName == "platform-oidc-credentials" || secretName == "platform-auth-scim-credentials" {
+				reqLogger.Info("Deployments will be rolled out next reconcile")
+				r.needsRollout = true
+			}
+			// Secret created successfully - return and requeue
+			*needToRequeue = true
+		} else if err != nil {
+			secretLog.Error(err, "Failed to get Secret")
+			return err
 		} else {
+			secretLog.Info("Need to update Secret")
 			secretUpdateRequired := false
 			generatedLabels := ctrlCommon.MergeMaps(nil, currentSecret.Labels, ctrlCommon.GetCommonLabels())
 			if !maps.Equal(generatedLabels, currentSecret.Labels) {
 				currentSecret.Labels = generatedLabels
 				secretUpdateRequired = true
 			}
-			if secret == "platform-auth-idp-encryption" {
+			if secretName == "platform-auth-idp-encryption" {
 				if _, keyExists := currentSecret.Data["ENCRYPTION_IV"]; !keyExists {
-					reqLogger.Info("Updating an existing Secret", "Secret.Namespace", currentSecret.Namespace, "Secret.Name", currentSecret.Name)
-					newSecret := generateSecretObject(instance, r.Scheme, secret, secretData[secret])
+					secretLog.Info("Updating an existing Secret")
+					newSecret := generateSecretObject(instance, r.Scheme, secretName, secretData[secretName])
 					currentSecret.Data["ENCRYPTION_IV"] = newSecret.Data["ENCRYPTION_IV"]
 					secretUpdateRequired = true
 				}
 			}
 			if secretUpdateRequired {
+				secretLog.Info("Updating Secret")
 				err = r.Client.Update(context.TODO(), currentSecret)
 				if err != nil {
-					reqLogger.Error(err, "Failed to update an existing Secret", "Secret.Namespace", currentSecret.Namespace, "Secret.Name", currentSecret.Name)
+					secretLog.Error(err, "Failed to update an existing Secret", "Secret.Namespace", currentSecret.Namespace, "Secret.Name", currentSecret.Name)
 					return err
 				}
+			}
+			if secretUpdateRequired && (secretName == "platform-auth-idp-credentials" || secretName == "platform-oidc-credentials" || secretName == "platform-auth-scim-credentials") && !r.needsRollout {
+				secretLog.Info("Deployments will be rolled out next reconcile")
+				r.needsRollout = true
 			}
 		}
 
@@ -236,7 +249,7 @@ func (r *AuthenticationReconciler) createClusterCACert(i *operatorv1alpha1.Authe
 	if err == nil {
 		reqLogger.Info("Successfully created secret")
 		return
-	} else if !errors.IsAlreadyExists(err) {
+	} else if !k8sErrors.IsAlreadyExists(err) {
 		reqLogger.Error(err, "Failed to create secret")
 		return err
 	}
@@ -294,4 +307,17 @@ func WaitForTimeout(timeout time.Duration) <-chan struct{} {
 		close(stopChWithTimeout)
 	}()
 	return stopChWithTimeout
+}
+
+// getSecretDataSHA1Sum calculates the SHA1
+func getSecretDataSHA1Sum(s *corev1.Secret) (sha string, err error) {
+	var dataBytes []byte
+	if s.Data == nil {
+		return "", errors.New("no .data defined on Secret")
+	}
+	if dataBytes, err = json.Marshal(s.Data); err != nil {
+		return "", err
+	}
+	dataSHA := sha1.Sum(dataBytes)
+	return fmt.Sprintf("%x", dataSHA[:]), nil
 }

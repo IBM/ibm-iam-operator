@@ -367,6 +367,11 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 				currentConfigMap.Data["LDAP_CTX_POOL_PREFERREDSIZE"] = newConfigMap.Data["LDAP_CTX_POOL_PREFERREDSIZE"]
 				cmUpdateRequired = true
 			}
+			if _, keyExists := currentConfigMap.Data["LIBERTY_SAMESITE_COOKIE"]; !keyExists {
+				reqLogger.Info("Updating an existing Configmap to add liberty samesite cookie", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["LIBERTY_SAMESITE_COOKIE"] = newConfigMap.Data["LIBERTY_SAMESITE_COOKIE"]
+				cmUpdateRequired = true
+			}
 			// Indicates an upgrade from a previous
 			if _, keyExists := currentConfigMap.Data["MASTER_PATH"]; !keyExists {
 				req := ctrl.Request{NamespacedName: types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}}
@@ -660,6 +665,7 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 			"SCIM_AUTH_CACHE_MAX_SIZE":           "1000",
 			"SCIM_AUTH_CACHE_TTL_VALUE":          "60",
 			"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
+			"LIBERTY_SAMESITE_COOKIE":            "",
 		},
 	}
 

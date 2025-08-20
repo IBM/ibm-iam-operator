@@ -139,8 +139,11 @@ func (r *BootstrapReconciler) writeConfigurationsToAuthenticationCR(ctx context.
 			continue
 		}
 		switch crValue := crField.(type) {
+
 		case *string:
-			if *crValue != cmValue {
+			if crValue == nil {
+				crValue = &cmValue
+			} else if *crValue != cmValue {
 				*crValue = cmValue
 			}
 		case *bool:

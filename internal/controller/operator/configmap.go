@@ -347,9 +347,6 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"LDAP_CTX_POOL_PREFERREDSIZE"),
 		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("MASTER_PATH")),
 			"MASTER_PATH"),
-		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("AUDIT_URL")),
-			"AUDIT_URL",
-			"AUDIT_SECRET"),
 	}
 
 	if v, ok := generated.Data["IS_OPENSHIFT_ENV"]; ok {
@@ -546,12 +543,6 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
 				"IS_OPENSHIFT_ENV":                   strconv.FormatBool(isOSEnv),
 			},
-		}
-
-		if authCR.Spec.Config.AuditUrl != nil && authCR.Spec.Config.AuditSecret != nil {
-			dataPointer := &generated.Data
-			(*dataPointer)["AUDIT_URL"] = *authCR.Spec.Config.AuditUrl
-			(*dataPointer)["AUDIT_SECRET"] = *authCR.Spec.Config.AuditSecret // Dereference the pointer first
 		}
 
 		// Set Authentication authCR as the owner and controller of the ConfigMap

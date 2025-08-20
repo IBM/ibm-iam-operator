@@ -201,7 +201,7 @@ func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Contex
 	}
 
 	reqLogger.Info("Fetched audit URL and audit Secret from Authentication CR", "AUDIT_SECRET", authCR.Spec.Config.AuditSecret, "AUDIT_URL", authCR.Spec.Config.AuditUrl)
-	if authCR.Spec.Config.AuditSecret != nil {
+	if authCR.Spec.Config.AuditSecret != nil && len(*authCR.Spec.Config.AuditSecret) > 0 {
 		auditTLSSecret := &corev1.Secret{}
 		auditTLSSecretStruct := types.NamespacedName{Name: *authCR.Spec.Config.AuditSecret, Namespace: authCR.Namespace}
 		reqLogger.Info("Checking for audit Secret", "Audit secret", authCR.Spec.Config.AuditSecret, "Namespace", authCR.Namespace)
@@ -210,7 +210,7 @@ func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Contex
 			reqLogger.Info("Secret for audit configuration not found")
 			return nil, nil
 		} else if err1 != nil {
-			reqLogger.Error(err1, "Failed to retrieve Secret for audit configuration")
+			reqLogger.Error(err1, "Failed to retrieve the secret for audit configuration")
 			return nil, err1
 		}
 	}

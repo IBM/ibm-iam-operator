@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,8 +37,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-// BootStrapReconciler handles modifications to the Authentication CR before it is reconciled by the
-// main Authentication controller
+// BootStrapReconciler handles modifications to the Authentication CR before it
+// is reconciled by the main Authentication controller; this is meant to handle
+// edge cases that are encountered during upgrades.
 type BootstrapReconciler struct {
 	client.Client
 }
@@ -105,10 +107,13 @@ func (r *BootstrapReconciler) makeAuthenticationCorrections(ctx context.Context,
 // writeConfigurationsToAuthenticationCR copies values from the
 // platform-auth-idp ConfigMap to the Authentication CR.
 func (r *BootstrapReconciler) writeConfigurationsToAuthenticationCR(ctx context.Context, authCR *operatorv1alpha1.Authentication) (err error) {
+	log := logf.FromContext(ctx, "ConfigMap.Name", "platform-auth-idp").V(1)
 	platformAuthIDPCM := &corev1.ConfigMap{}
 	if err = r.Get(ctx, types.NamespacedName{Name: "platform-auth-idp", Namespace: authCR.Namespace}, platformAuthIDPCM); k8sErrors.IsNotFound(err) {
+		log.Info("ConfigMap not found")
 		return nil
 	} else if err != nil {
+		log.Error(err, "Failed to get ConfigMap")
 		return fmt.Errorf("failed to get ConfigMap: %w", err)
 	}
 	keys := map[string]any{
@@ -123,34 +128,56 @@ func (r *BootstrapReconciler) writeConfigurationsToAuthenticationCR(ctx context.
 		"NONCE_ENABLED":            &authCR.Spec.Config.NONCEEnabled,
 		"PREFERRED_LOGIN":          &authCR.Spec.Config.PreferredLogin,
 		"OIDC_ISSUER_URL":          &authCR.Spec.Config.OIDCIssuerURL,
-		"AUDIT_URL":                authCR.Spec.Config.AuditUrl,
-		"AUDIT_SECRET":             authCR.Spec.Config.AuditSecret,
 		"PROVIDER_ISSUER_URL":      &authCR.Spec.Config.ProviderIssuerURL,
 		"CLUSTER_NAME":             &authCR.Spec.Config.ClusterName,
 		"FIPS_ENABLED":             &authCR.Spec.Config.FIPSEnabled,
 		"IBM_CLOUD_SAAS":           &authCR.Spec.Config.IBMCloudSaas,
 		"SAAS_CLIENT_REDIRECT_URL": &authCR.Spec.Config.SaasClientRedirectUrl,
 		"ATTR_MAPPING_FROM_CONFIG": &authCR.Spec.Config.AttrMappingFromConfig,
+		"AUDIT_URL":                &authCR.Spec.Config.AuditUrl,
+		"AUDIT_SECRET":             &authCR.Spec.Config.AuditSecret,
 	}
 
 	for key, crField := range keys {
+		keyLog := log.WithValues("key", key)
 		cmValue, ok := platformAuthIDPCM.Data[key]
 		if !ok {
+			keyLog.Info("Key not found; continuing")
 			continue
 		}
+		keyLog.Info("Key found", "value", cmValue)
 		switch crValue := crField.(type) {
 
 		case *string:
-			if crValue == nil {
-				crValue = &cmValue
-			} else if *crValue != cmValue {
+			keyLog.Info("Value type is string")
+			if crValue != nil && *crValue != cmValue {
+				keyLog.Info("Value of property on CR does not match value for key in ConfigMap")
 				*crValue = cmValue
+			} else if crValue != nil {
+				keyLog.Info("Values match")
+			}
+		case **string:
+			keyLog.Info("Value type is optional string")
+			if *crValue == nil {
+				keyLog.Info("Property is not set on CR")
+				*crValue = ptr.To(cmValue)
+			} else if **crValue != cmValue {
+				keyLog.Info("Value of property on CR does not match value for key in ConfigMap")
+				*crValue = ptr.To(cmValue)
+			} else {
+				keyLog.Info("Values match")
 			}
 		case *bool:
+			keyLog.Info("Value type is bool")
 			cmValueBool, _ := strconv.ParseBool(cmValue)
-			if *crValue != cmValueBool {
+			if crValue != nil && *crValue != cmValueBool {
+				keyLog.Info("Value of property on CR does not match value for key in ConfigMap")
 				*crValue = cmValueBool
+			} else if crValue != nil {
+				keyLog.Info("Values match")
 			}
+		default:
+			keyLog.Info("Value type is unknown; skipping")
 		}
 	}
 

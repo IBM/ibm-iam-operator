@@ -70,19 +70,13 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 		return subreconciler.RequeueWithError(err)
 	}
 
-	// Check if the ibmcloud-cluster-info created by IM-Operator
-	if !common.IsOwnerOf(r.Client.Scheme(), authCR, consoleConfigMap) {
-		reqLogger.Info("Reconcile Deployment : Can't find ibmcloud-cluster-info Configmap created by IM operator, IM deployment may not proceed", "Configmap.Namespace", consoleConfigMap.Namespace, "ConfigMap.Name", common.IBMCloudClusterInfoCMName)
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
-
 	icpConsoleURL := consoleConfigMap.Data["cluster_address"]
 	samlConsoleURL, ok := consoleConfigMap.Data["cluster_address_auth"]
 	if !ok {
 		samlConsoleURL = icpConsoleURL
 	}
 
-	auditSecretName, err := r.getAuditSecretNameIfExists(deployCtx, authCR)
+	auditSecretName, err := r.getAuditSecretNameIfExists(context.TODO(), authCR)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
@@ -189,8 +183,6 @@ func (r *AuthenticationReconciler) removeCP2Deployments(ctx context.Context, req
 // be retrieved. If an error other than NotFound is received when trying to get
 // the Secret, that is returned as well.
 func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Context, authCR *operatorv1alpha1.Authentication) (*string, error) {
-	//var auditSecretName string
-	//var auditURL string
 	reqLogger := logf.FromContext(ctx)
 
 	if authCR.Spec.Config.AuditUrl == nil || authCR.Spec.Config.AuditSecret == nil {

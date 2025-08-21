@@ -86,8 +86,6 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
-	auditSecretName = authCR.Spec.Config.AuditSecret
-
 	reqLogger.Info("Does audit-tls secret exist?", "Deployment.Namespace", req.Namespace, "Secret exists", auditSecretName)
 
 	// Check for the presence of dependencies, for SAAS

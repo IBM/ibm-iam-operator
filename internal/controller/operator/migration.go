@@ -11,14 +11,11 @@ import (
 
 	certmgr "github.com/IBM/ibm-iam-operator/internal/api/certmanager/v1"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
-	database "github.com/IBM/ibm-iam-operator/internal/database"
 	dbconn "github.com/IBM/ibm-iam-operator/internal/database/connectors"
-	"github.com/IBM/ibm-iam-operator/internal/database/migration"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -89,7 +86,7 @@ func (r *AuthenticationReconciler) addMongoMigrationFinalizers(ctx context.Conte
 		return
 	}
 
-	if needToMigrate, err := r.needToMigrateFromMongo(ctx, authCR); !needToMigrate && err == nil {
+	if needToMigrate, err := mongoIsPresent(r.Client, ctx, authCR); !needToMigrate && err == nil {
 		reqLogger.Info("No MongoDB migration required, so no need for finalizers; continuing")
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {
@@ -356,104 +353,6 @@ func (r *AuthenticationReconciler) setMigrationCompleteStatus(ctx context.Contex
 	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
-func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleMigrations")
-	reqLogger.Info("Perform any pending migrations")
-	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return
-	}
-
-	var migrations *migration.MigrationQueue
-	var postgres dbconn.DBConn
-	var mongo dbconn.DBConn
-
-	if postgres, err = r.GetPostgresDB(r.Client, ctx, req); k8sErrors.IsNotFound(err) {
-		reqLogger.Info("Could not find all resources for configuring EDB connection; requeueing")
-		return subreconciler.RequeueWithDelay(opreqWait)
-	} else if err != nil {
-		reqLogger.Error(err, "Failed to find resources for configuring EDB connection")
-		return subreconciler.RequeueWithError(err)
-	}
-
-	if needsMongoMigration, err := r.needToMigrateFromMongo(ctx, authCR); err != nil {
-		reqLogger.Error(err, "Failed to determine whether migration from MongoDB is needed")
-		return subreconciler.RequeueWithError(err)
-	} else if needsMongoMigration {
-		if mongo, err = r.GetMongoDB(r.Client, ctx, req); k8sErrors.IsNotFound(err) {
-			reqLogger.Info("Could not find all resources for configuring MongoDB connection; requeueing")
-			return subreconciler.RequeueWithDelay(opreqWait)
-		} else if err != nil {
-			reqLogger.Error(err, "Failed to find resources for configuring MongoDB connection")
-			return subreconciler.RequeueWithError(err)
-		}
-	}
-
-	migrations, err = database.PlanMigrations(ctx, postgres, mongo)
-	if err != nil {
-		err = fmt.Errorf("failed to form a migration plan: %w", err)
-		reqLogger.Error(err, "Failed to handle migrations")
-		return subreconciler.RequeueWithError(err)
-	}
-
-	if migrations.Len() > 0 && r.dbSetupChan == nil {
-		reqLogger.Info("Found migrations; starting a migration worker")
-		r.dbSetupChan = make(chan *migration.Result, 1)
-		go database.Migrate(context.Background(),
-			r.dbSetupChan,
-			migrations)
-		condition := operatorv1alpha1.NewMigrationInProgressCondition()
-		meta.SetStatusCondition(&authCR.Status.Conditions, *condition)
-		if err = r.Client.Status().Update(ctx, authCR); err != nil {
-			reqLogger.Error(err, "Failed to set condition on Authentication", "condition", operatorv1alpha1.ConditionMigrated)
-			return subreconciler.RequeueWithDelayAndError(defaultLowerWait, err)
-		}
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
-
-	if r.dbSetupChan == nil {
-		reqLogger.Info("No active or pending migrations; continuing")
-		return subreconciler.ContinueReconciling()
-	}
-
-	// nil serves as a sentinel value to indicate that the controller should be open to performing new migrations
-	// again. The checks above ensure that, if there are migrations found, dbSetupChan is set to a new
-	// channel and the migration goroutine is kicked off, which is safe to permit into the following select, or, if
-	// dbSetupChan is still nil, meaning that no migration scenarios were identified on the cluster, that serves as
-	// an indication that the subreconciler can signal that no more work is needed for the time being.
-	//
-	// The times when nil should therefore be set are when:
-	// * There are no new migrations
-	// * One of the current migrations has failed; this is so that, once requeued, the process of identifying and
-	//   enqueueing migrations can begin anew.
-	select {
-	case migrationResult, ok := <-r.dbSetupChan:
-		if ok {
-			reqLogger.Info("Received a migration result from the worker")
-		}
-		var runningCondition, performedCondition *metav1.Condition
-		if migrationResult != nil && migrationResult.Error != nil {
-			reqLogger.Error(migrationResult.Error, "Encountered an error while performing the current migration")
-			performedCondition = operatorv1alpha1.NewMigrationFailureCondition(migrationResult.Incomplete[0].Name)
-		} else if migrationResult != nil {
-			reqLogger.Info("Completed all migrations successfully")
-			performedCondition = operatorv1alpha1.NewMigrationCompleteCondition()
-		} else {
-			reqLogger.Info("No migrations needed to be performed by the worker")
-			performedCondition = operatorv1alpha1.NewMigrationCompleteCondition()
-		}
-		runningCondition = operatorv1alpha1.NewMigrationFinishedCondition()
-		r.dbSetupChan = nil
-		loopCtx := logf.IntoContext(ctx, reqLogger)
-
-		r.loopUntilConditionsSet(loopCtx, req, performedCondition, runningCondition)
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	default:
-		reqLogger.Info("Migration still in progress; check again in 10s")
-		return subreconciler.RequeueWithDelay(migrationWait)
-	}
-}
-
 func getPreloadMongoDBConfigMap(c client.Client, ctx context.Context, namespace string) (cm *corev1.ConfigMap, err error) {
 	cm = &corev1.ConfigMap{}
 	preloadConfigMapKey := types.NamespacedName{Name: "mongodb-preload-endpoint", Namespace: namespace}
@@ -480,20 +379,17 @@ func hasMongoDBService(c client.Client, ctx context.Context, authCR *operatorv1a
 	return true, nil
 }
 
-// needToMigrateFromMongo attempts to determine whether a migration from MongoDB is needed. Returns an error when an
+// mongoIsPresent attempts to determine whether a migration from MongoDB is needed. Returns an error when an
 // unexpected error occurs while trying to get resources from the cluster.
-func (r *AuthenticationReconciler) needToMigrateFromMongo(ctx context.Context, authCR *operatorv1alpha1.Authentication) (need bool, err error) {
-	if authCR.HasBeenMigrated() {
-		return false, nil
-	}
+func mongoIsPresent(cl client.Client, ctx context.Context, authCR *operatorv1alpha1.Authentication) (need bool, err error) {
 	var hasResource bool
-	if hasResource, err = hasPreloadMongoDBConfigMap(r.Client, ctx, authCR.Namespace); hasResource {
+	if hasResource, err = hasPreloadMongoDBConfigMap(cl, ctx, authCR.Namespace); hasResource {
 		return true, nil
 	} else if err != nil {
 		return false, err
 	}
 
-	if hasResource, err = hasMongoDBService(r.Client, ctx, authCR); hasResource {
+	if hasResource, err = hasMongoDBService(cl, ctx, authCR); hasResource {
 		return true, nil
 	} else if err != nil {
 		return false, err
@@ -553,7 +449,7 @@ func (r *AuthenticationReconciler) overrideMongoDBBootstrap(ctx context.Context,
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
-	if needsMongoMigration, err := r.needToMigrateFromMongo(ctx, authCR); err != nil {
+	if needsMongoMigration, err := mongoIsPresent(r.Client, ctx, authCR); err != nil {
 		reqLogger.Error(err, "Failed to determine whether migration from MongoDB is needed")
 		return subreconciler.RequeueWithError(err)
 	} else if !needsMongoMigration {

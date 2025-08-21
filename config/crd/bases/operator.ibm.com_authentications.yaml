@@ -219,7 +219,11 @@ spec:
                   preferredLogin:
                     type: string
                   defaultLogin:
-                    type: string 
+                    type: string
+                  auditUrl:
+                    type: string
+                  auditSecret:
+                    type: string
                   providerIssuerURL:
                     type: string
                   roksEnabled:

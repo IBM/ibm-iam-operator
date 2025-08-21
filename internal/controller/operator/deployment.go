@@ -42,6 +42,10 @@ import (
 
 const RestartAnnotation string = "authentications.operator.ibm.com/restartedAt"
 
+// Name of Secret containing certificates for Common Audit Logging
+const AuditTLSSecretName string = "audit-tls"
+const IMAuditTLSVolume string = "audit-volume"
+
 func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleDeployments")
 	deployCtx := logf.IntoContext(ctx, reqLogger)
@@ -78,6 +82,12 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 		samlConsoleURL = icpConsoleURL
 	}
 
+	auditSecretName, err := r.getAuditSecretNameIfExists(deployCtx, authCR)
+	if err != nil {
+		return subreconciler.RequeueWithError(err)
+	}
+	reqLogger.Info("Does audit-tls secret exist?", "Deployment.Namespace", req.Namespace, "Secret exists", auditSecretName)
+
 	// Check for the presence of dependencies, for SAAS
 	reqLogger.Info("Is SAAS enabled?", "Instance spec config value", authCR.Spec.Config.IBMCloudSaas)
 	var saasServiceIdCrn string = ""
@@ -104,11 +114,11 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 			WithModifyFns(modifyDeployment(r.needsRollout)),
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-identity-management").
-			WithGenerateFns(generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, saasServiceIdCrn)).
+			WithGenerateFns(generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, saasServiceIdCrn, auditSecretName)).
 			WithModifyFns(modifyDeployment(r.needsRollout)),
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-identity-provider").
-			WithGenerateFns(generatePlatformIdentityProvider(imagePullSecret, samlConsoleURL, saasServiceIdCrn)).
+			WithGenerateFns(generatePlatformIdentityProvider(imagePullSecret, samlConsoleURL, saasServiceIdCrn, auditSecretName)).
 			WithModifyFns(modifyDeployment(r.needsRollout)),
 	}
 
@@ -170,6 +180,40 @@ func (r *AuthenticationReconciler) removeCP2Deployments(ctx context.Context, req
 	}
 	reqLogger.Info("No cleanup required; continuing")
 	return subreconciler.ContinueReconciling()
+}
+
+// getAuditSecretNameIfExists determines whether an audit service has been
+// configured with TLS. Returns the name of the Secret used to store the TLS
+// certificates if a Secret has been identified by the user and found on the
+// cluster, or an empty string when the Secret isn't found or cannot otherwise
+// be retrieved. If an error other than NotFound is received when trying to get
+// the Secret, that is returned as well.
+func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Context, authCR *operatorv1alpha1.Authentication) (*string, error) {
+	//var auditSecretName string
+	//var auditURL string
+	reqLogger := logf.FromContext(ctx)
+
+	if authCR.Spec.Config.AuditUrl == nil || authCR.Spec.Config.AuditSecret == nil {
+		reqLogger.Info("Audit URL or Audit Secret is not specified in Authentication CR", "key", "AUDIT_URL")
+		return nil, nil
+	}
+
+	reqLogger.Info("Fetched audit URL and audit Secret from Authentication CR", "AUDIT_SECRET", authCR.Spec.Config.AuditSecret, "AUDIT_URL", authCR.Spec.Config.AuditUrl)
+	if authCR.Spec.Config.AuditSecret != nil && len(*authCR.Spec.Config.AuditSecret) > 0 {
+		auditTLSSecret := &corev1.Secret{}
+		auditTLSSecretStruct := types.NamespacedName{Name: *authCR.Spec.Config.AuditSecret, Namespace: authCR.Namespace}
+		reqLogger.Info("Checking for audit Secret", "Audit secret", authCR.Spec.Config.AuditSecret, "Namespace", authCR.Namespace)
+		err1 := r.Get(ctx, auditTLSSecretStruct, auditTLSSecret)
+		if k8sErrors.IsNotFound(err1) {
+			reqLogger.Info("Secret for audit configuration not found")
+			return nil, nil
+		} else if err1 != nil {
+			reqLogger.Error(err1, "Failed to retrieve the secret for audit configuration")
+			return nil, err1
+		}
+	}
+	reqLogger.Info("Secret found for audit configuration")
+	return authCR.Spec.Config.AuditSecret, nil
 }
 
 func generatePlatformAuthService(imagePullSecret, icpConsoleURL, _ string) common.GenerateFn[*appsv1.Deployment] {
@@ -328,7 +372,7 @@ func generatePlatformAuthService(imagePullSecret, icpConsoleURL, _ string) commo
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret),
+						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, nil),
 						Containers:     buildContainers(authCR, authServiceImage, icpConsoleURL),
 						InitContainers: buildInitContainers(initContainerImage),
 					},
@@ -348,7 +392,7 @@ func generatePlatformAuthService(imagePullSecret, icpConsoleURL, _ string) commo
 	}
 }
 
-func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string, auditSecretName *string) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		identityManagerImage := common.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
@@ -503,7 +547,7 @@ func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret),
+						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName),
 						Containers:     buildManagerContainers(authCR, identityManagerImage, icpConsoleURL),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
@@ -522,7 +566,7 @@ func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string
 	}
 }
 
-func generatePlatformIdentityProvider(imagePullSecret, icpConsoleURL, saasServiceIdCrn string) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformIdentityProvider(imagePullSecret, icpConsoleURL, saasServiceIdCrn string, auditSecretName *string) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		identityProviderImage := common.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
@@ -678,7 +722,7 @@ func generatePlatformIdentityProvider(imagePullSecret, icpConsoleURL, saasServic
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret),
+						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName),
 						Containers:     buildProviderContainers(authCR, identityProviderImage, icpConsoleURL, saasServiceIdCrn),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
@@ -848,8 +892,8 @@ func hasDataField(fields metav1.ManagedFieldsEntry) bool {
 	return false
 }
 
-func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume {
-	return []corev1.Volume{
+func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName *string) []corev1.Volume {
+	volumes := []corev1.Volume{
 		{
 			Name: "platform-identity-management",
 			VolumeSource: corev1.VolumeSource{
@@ -1032,4 +1076,31 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string) []corev1.Volume
 			},
 		},
 	}
+	if auditSecretName != nil && *auditSecretName != "" {
+		auditVolume := corev1.Volume{
+			Name: IMAuditTLSVolume,
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: *auditSecretName,
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "tls.crt",
+							Path: "tls.crt",
+						},
+						{
+							Key:  "tls.key",
+							Path: "tls.key",
+						},
+						{
+							Key:  "ca.crt",
+							Path: "ca.crt",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		}
+		volumes = append(volumes, auditVolume)
+	}
+	return volumes
 }

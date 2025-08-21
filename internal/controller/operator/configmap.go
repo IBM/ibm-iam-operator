@@ -296,6 +296,8 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"IBM_CLOUD_SAAS",
 			"SAAS_CLIENT_REDIRECT_URL",
 			"ATTR_MAPPING_FROM_CONFIG",
+			"AUDIT_URL",
+			"AUDIT_SECRET",
 		),
 		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("OS_TOKEN_LENGTH", "45"),
 			"OS_TOKEN_LENGTH"),
@@ -435,6 +437,11 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				err = fmt.Errorf("issuer URL is empty")
 				return
 			}
+		}
+
+		// Found AUDIT variables
+		if authCR.Spec.Config.AuditUrl != nil || authCR.Spec.Config.AuditSecret != nil {
+			reqLogger.Info("Found audit variables", "AuditUrl", authCR.Spec.Config.AuditUrl, "AuditSecret", authCR.Spec.Config.AuditSecret)
 		}
 
 		// Set the path for SAML connections

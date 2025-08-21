@@ -443,6 +443,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			}
 		}), builder.WithPredicates(predicate.Or(globalCMPred, productCMPred)),
 	)
+
 	bootstrappedPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
 		return o.GetLabels()[ctrlcommon.ManagerVersionLabel] == version.Version
 	})

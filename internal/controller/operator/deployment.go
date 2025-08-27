@@ -71,12 +71,8 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 	}
 
 	icpConsoleURL := consoleConfigMap.Data["cluster_address"]
-	samlConsoleURL, ok := consoleConfigMap.Data["cluster_address_auth"]
-	if !ok {
-		samlConsoleURL = icpConsoleURL
-	}
 
-	auditSecretName, err := r.getAuditSecretNameIfExists(context.TODO(), authCR)
+	auditSecretName, err := r.getAuditSecretNameIfExists(deployCtx, authCR)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
@@ -104,15 +100,15 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 	builders := []*common.SecondaryReconcilerBuilder[*appsv1.Deployment]{
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-auth-service").
-			WithGenerateFns(generatePlatformAuthService(imagePullSecret, icpConsoleURL, saasServiceIdCrn)).
+			WithGenerateFns(generatePlatformAuthService(imagePullSecret, icpConsoleURL)).
 			WithModifyFns(modifyDeployment(r.needsRollout)),
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-identity-management").
-			WithGenerateFns(generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, saasServiceIdCrn, auditSecretName)).
+			WithGenerateFns(generatePlatformIdentityManagement(imagePullSecret, auditSecretName)).
 			WithModifyFns(modifyDeployment(r.needsRollout)),
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-identity-provider").
-			WithGenerateFns(generatePlatformIdentityProvider(imagePullSecret, samlConsoleURL, saasServiceIdCrn, auditSecretName)).
+			WithGenerateFns(generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn, auditSecretName)).
 			WithModifyFns(modifyDeployment(r.needsRollout)),
 	}
 
@@ -208,7 +204,7 @@ func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Contex
 	return authCR.Spec.Config.AuditSecret, nil
 }
 
-func generatePlatformAuthService(imagePullSecret, icpConsoleURL, _ string) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformAuthService(imagePullSecret, icpConsoleURL string) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		authServiceImage := common.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
@@ -384,7 +380,7 @@ func generatePlatformAuthService(imagePullSecret, icpConsoleURL, _ string) commo
 	}
 }
 
-func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string, auditSecretName *string) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformIdentityManagement(imagePullSecret string, auditSecretName *string) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		identityManagerImage := common.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
@@ -540,7 +536,7 @@ func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string
 							},
 						},
 						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName),
-						Containers:     buildManagerContainers(authCR, identityManagerImage, icpConsoleURL),
+						Containers:     buildManagerContainers(authCR, identityManagerImage),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
 				},
@@ -558,7 +554,7 @@ func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string
 	}
 }
 
-func generatePlatformIdentityProvider(imagePullSecret, icpConsoleURL, saasServiceIdCrn string, auditSecretName *string) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn string, auditSecretName *string) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		identityProviderImage := common.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
@@ -715,7 +711,7 @@ func generatePlatformIdentityProvider(imagePullSecret, icpConsoleURL, saasServic
 							},
 						},
 						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName),
-						Containers:     buildProviderContainers(authCR, identityProviderImage, icpConsoleURL, saasServiceIdCrn),
+						Containers:     buildProviderContainers(authCR, identityProviderImage, saasServiceIdCrn),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
 				},

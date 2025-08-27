@@ -22,7 +22,6 @@ import (
 	"slices"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
-	zenv1 "github.com/IBM/ibm-iam-operator/internal/api/zen.cpd.ibm.com/v1"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -239,45 +238,6 @@ func getAllRouteStatus(ctx context.Context, k8sClient client.Client, names []str
 	for _, name := range names {
 		nsn := types.NamespacedName{Name: name, Namespace: namespace}
 		statuses = append(statuses, getRouteStatus(ctx, k8sClient, nsn))
-	}
-	reqLogger.Info("New statuses", "statuses", statuses)
-	return
-}
-
-func getZenExtensionStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getRouteStatus").V(1)
-	kind := "ZenExtension"
-	status = operatorv1alpha1.ManagedResourceStatus{
-		ObjectName: namespacedName.Name,
-		APIVersion: UnknownAPIVersion,
-		Namespace:  namespacedName.Namespace,
-		Kind:       kind,
-		Status:     ResourceNotReadyState,
-	}
-	zenExtension := &zenv1.ZenExtension{}
-	err := k8sClient.Get(ctx, namespacedName, zenExtension)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			reqLogger.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
-		} else {
-			reqLogger.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
-		}
-		return
-	}
-
-	status.APIVersion = zenExtension.APIVersion
-	if zenExtension.NotReady() {
-		return
-	}
-	status.Status = ResourceReadyState
-	return
-}
-
-func getAllZenExtensionStatus(ctx context.Context, k8sClient client.Client, names []string, namespace string) (statuses []operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getAllZenExtensionStatus").V(1)
-	for _, name := range names {
-		nsn := types.NamespacedName{Name: name, Namespace: namespace}
-		statuses = append(statuses, getZenExtensionStatus(ctx, k8sClient, nsn))
 	}
 	reqLogger.Info("New statuses", "statuses", statuses)
 	return

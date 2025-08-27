@@ -332,7 +332,7 @@ func GetMongoDB(c client.Client, ctx context.Context, req ctrl.Request) (mongo *
 }
 
 func (r *AuthenticationReconciler) setMigrationCompleteStatus(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "setMigrationCompleteStatus")
+	reqLogger := logf.FromContext(ctx, "subreconciler", "setMigrationCompleteStatus")
 	reqLogger.Info("Set the migration success condition if it is not already set")
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {

@@ -414,7 +414,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 
 }
 
-func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string, _ string, saasCRNId string) corev1.Container {
+func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage, saasCRNId string) corev1.Container {
 
 	resources := instance.Spec.IdentityProvider.Resources
 	if resources == nil {
@@ -731,7 +731,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 
 }
 
-func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string, _ string) corev1.Container {
+func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string) corev1.Container {
 
 	replicaCount := int(instance.Spec.Replicas)
 	resources := instance.Spec.IdentityManager.Resources
@@ -1087,16 +1087,16 @@ func buildContainers(instance *operatorv1alpha1.Authentication, authServiceImage
 	return []corev1.Container{authServiceContainer}
 }
 
-func buildManagerContainers(instance *operatorv1alpha1.Authentication, identityManagerImage string, icpConsoleURL string) []corev1.Container {
+func buildManagerContainers(instance *operatorv1alpha1.Authentication, identityManagerImage string) []corev1.Container {
 
-	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL)
+	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage)
 
 	return []corev1.Container{identityManagerContainer}
 }
 
-func buildProviderContainers(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string, saasCrnId string) []corev1.Container {
+func buildProviderContainers(instance *operatorv1alpha1.Authentication, identityProviderImage string, saasCrnId string) []corev1.Container {
 
-	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId)
+	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, saasCrnId)
 
 	return []corev1.Container{identityProviderContainer}
 }

@@ -21,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	"k8s.io/utils/ptr"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -573,19 +572,6 @@ var _ = Describe("ConfigMap handling", func() {
 					Reader: cl,
 				},
 				DiscoveryClient: *dc,
-				GetPostgresDB: func(c client.Client, ctx context.Context, req ctrl.Request) (conn dbconn.DBConn, err error) {
-					return &MockDBConn{
-						connect: func(ctx context.Context) (err error) {
-							return nil
-						},
-						disconnect: func(context.Context) error {
-							return nil
-						},
-						hasSAML: func(ctx context.Context) (bool, error) {
-							return true, nil
-						},
-					}, nil
-				},
 			}
 			ctx = context.Background()
 		})

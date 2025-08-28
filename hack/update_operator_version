@@ -29,10 +29,13 @@ export CPOPEN_LOCATION="icr.io/cpopen"
 export PRODUCTION_IMAGE="${CPOPEN_LOCATION}/ibm-iam-operator"
 
 
-echo "Update the version.go"
+echo "Update go files"
 current_version="$(grep 'Version =' "${REPO_ROOT}/internal/version/version.go" | cut -f2 -d\")" 
 sed s/$current_version/$VERSION/ $REPO_ROOT/internal/version/version.go > $REPO_ROOT/internal/version/version.go.new
 mv $REPO_ROOT/internal/version/version.go.new $REPO_ROOT/internal/version/version.go
+sed s/$current_version/$VERSION/ $REPO_ROOT/internal/database/schema/v1/tables_test.go > $REPO_ROOT/internal/database/schema/v1/tables_test.go.new
+mv $REPO_ROOT/internal/database/schema/v1/tables_test.go.new $REPO_ROOT/internal/database/schema/v1/tables_test.go
+
 
 
 echo "Update the containerImage and olm.skipRange annotations in dev and patch"
@@ -65,11 +68,20 @@ $LOCALBIN/yq -i '.spec.*.imageTag = env(VERSION)' \
   "${REPO_ROOT}/config/samples/overlays/prod/authentication_image_patch.yaml"
 cp "${REPO_ROOT}/config/samples/overlays/prod/authentication_image_patch.yaml" "${REPO_ROOT}/config/samples/overlays/dev/authentication_image_patch.yaml"
 
-echo "Update chart versions"
-$LOCALBIN/yq -i '.appVersion = env(VERSION), .version = env(VERSION)' "${REPO_ROOT}/helm/Chart.yaml"
-$LOCALBIN/yq -i '.appVersion = env(VERSION), .version = env(VERSION)' "${REPO_ROOT}/helm-cluster-scoped/Chart.yaml"
-
 echo "Making the bundle"
 make bundle
+
+echo "Update chart versions"
+$LOCALBIN/yq -i '.appVersion = env(VERSION), .version = env(VERSION)' "${REPO_ROOT}/helm/Chart.yaml"
+$LOCALBIN/yq -i '.operator.imageTag = env(VERSION) | .operands.platformIdentityProvider.imageTag = env(VERSION) | .operands.platformAuthService.imageTag = env(VERSION) | .operands.platformIdentityManagement.imageTag = env(VERSION) | .operands.imInitContainer.imageTag = env(VERSION)' "${REPO_ROOT}/helm/values.yaml"
+$LOCALBIN/yq -i '.appVersion = env(VERSION), .version = env(VERSION)' "${REPO_ROOT}/helm-cluster-scoped/Chart.yaml"
+sed s/$current_version/$VERSION/ $REPO_ROOT/helm/templates/10-deployment.yaml > $REPO_ROOT/helm/templates/10-deployment.yaml.new
+mv $REPO_ROOT/helm/templates/10-deployment.yaml.new $REPO_ROOT/helm/templates/10-deployment.yaml
+
+echo "Update READMEs"
+sed s/$current_version/$VERSION/ $REPO_ROOT/README.md > $REPO_ROOT/README.md.new
+mv $REPO_ROOT/README.md.new $REPO_ROOT/README.md
+sed s/$current_version/$VERSION/ $REPO_ROOT/DEVELOPMENT.md > $REPO_ROOT/DEVELOPMENT.md.new
+mv $REPO_ROOT/DEVELOPMENT.md.new $REPO_ROOT/DEVELOPMENT.md
 
 echo "Done"

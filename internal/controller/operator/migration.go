@@ -11,11 +11,9 @@ import (
 
 	certmgr "github.com/IBM/ibm-iam-operator/internal/api/certmanager/v1"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
-	dbconn "github.com/IBM/ibm-iam-operator/internal/database/connectors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -79,7 +77,7 @@ func (r *AuthenticationReconciler) finalizeMongoMigrationObject(ctx context.Cont
 
 // addMongoMigrationFinalizers is a subreconciler that adds finalizers to resources that are being retained during migration
 func (r *AuthenticationReconciler) addMongoMigrationFinalizers(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "addFinalizers")
+	reqLogger := logf.FromContext(ctx, "subreconciler", "addFinalizers")
 	reqLogger.Info("Add finalizers to MongoDB resources in case migration is needed")
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
@@ -143,7 +141,7 @@ func (r *AuthenticationReconciler) addMongoMigrationFinalizers(ctx context.Conte
 }
 
 func (r *AuthenticationReconciler) handleMongoDBCleanup(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleMongoDBCleanup")
+	reqLogger := logf.FromContext(ctx, "subreconciler", "handleMongoDBCleanup")
 	reqLogger.Info("Clean up MongoDB resources if no longer needed")
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
@@ -238,44 +236,6 @@ func (r *AuthenticationReconciler) handleMongoDBCleanup(ctx context.Context, req
 	return subreconciler.ContinueReconciling()
 }
 
-func GetPostgresDB(c client.Client, ctx context.Context, req ctrl.Request) (p *dbconn.PostgresDB, err error) {
-	datastoreCertSecret := &corev1.Secret{}
-	if err = c.Get(ctx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBSecretName, Namespace: req.Namespace}, datastoreCertSecret); err != nil {
-		return nil, err
-	}
-
-	datastoreCertCM := &corev1.ConfigMap{}
-	if err = c.Get(ctx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBCMName, Namespace: req.Namespace}, datastoreCertCM); err != nil {
-		return nil, err
-	}
-
-	if datastoreCertSecret.Data["DATABASE_PASSWORD"] != nil {
-		return dbconn.NewPostgresDB(
-			dbconn.Name(datastoreCertCM.Data["DATABASE_NAME"]),
-			dbconn.ID(req.Namespace),
-			dbconn.Port(datastoreCertCM.Data["DATABASE_PORT"]),
-			dbconn.User(datastoreCertCM.Data["DATABASE_USER"]),
-			dbconn.Password(string(datastoreCertSecret.Data["DATABASE_PASSWORD"])),
-			dbconn.Host(datastoreCertCM.Data["DATABASE_RW_ENDPOINT"]),
-			dbconn.Schemas("platformdb", "oauthdbschema", "metadata"),
-			dbconn.TLSConfig(
-				datastoreCertSecret.Data["ca.crt"],
-				datastoreCertSecret.Data["tls.crt"],
-				datastoreCertSecret.Data["tls.key"]))
-	}
-	return dbconn.NewPostgresDB(
-		dbconn.Name(datastoreCertCM.Data["DATABASE_NAME"]),
-		dbconn.ID(req.Namespace),
-		dbconn.Port(datastoreCertCM.Data["DATABASE_PORT"]),
-		dbconn.User(datastoreCertCM.Data["DATABASE_USER"]),
-		dbconn.Host(datastoreCertCM.Data["DATABASE_RW_ENDPOINT"]),
-		dbconn.Schemas("platformdb", "oauthdbschema", "metadata"),
-		dbconn.TLSConfig(
-			datastoreCertSecret.Data["ca.crt"],
-			datastoreCertSecret.Data["tls.crt"],
-			datastoreCertSecret.Data["tls.key"]))
-}
-
 func getMongoHost(c client.Client, ctx context.Context, namespace string) (mongoHost string, err error) {
 	var preloadCM *corev1.ConfigMap
 	mongoHost = fmt.Sprintf("mongodb.%s.svc.cluster.local", namespace)
@@ -291,66 +251,6 @@ func getMongoHost(c client.Client, ctx context.Context, namespace string) (mongo
 	}
 
 	return
-}
-
-func GetMongoDB(c client.Client, ctx context.Context, req ctrl.Request) (mongo *dbconn.MongoDB, err error) {
-	mongoName := "platform-db"
-	mongoPort := "27017"
-	mongoHost, err := getMongoHost(c, ctx, req.Namespace)
-	if err != nil {
-		return nil, err
-	}
-
-	mongoAdminCredsName := "icp-mongodb-admin"
-	mongoClientCertName := "icp-mongodb-client-cert"
-	mongoCACertName := "mongodb-root-ca-cert"
-
-	secrets := map[string]*corev1.Secret{
-		mongoAdminCredsName: {},
-		mongoClientCertName: {},
-		mongoCACertName:     {},
-	}
-
-	for secretName, secret := range secrets {
-		objKey := types.NamespacedName{Name: secretName, Namespace: req.Namespace}
-		if err = c.Get(ctx, objKey, secret); err != nil {
-			return nil, err
-		}
-	}
-
-	return dbconn.NewMongoDB(
-		dbconn.Name(mongoName),
-		dbconn.Port(mongoPort),
-		dbconn.Host(mongoHost),
-		dbconn.User(string(secrets[mongoAdminCredsName].Data["user"])),
-		dbconn.Password(string(secrets[mongoAdminCredsName].Data["password"])),
-		dbconn.Schemas(mongoName),
-		dbconn.TLSConfig(
-			secrets[mongoCACertName].Data["ca.crt"],
-			secrets[mongoClientCertName].Data["tls.crt"],
-			secrets[mongoClientCertName].Data["tls.key"]))
-}
-
-func (r *AuthenticationReconciler) setMigrationCompleteStatus(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx, "subreconciler", "setMigrationCompleteStatus")
-	reqLogger.Info("Set the migration success condition if it is not already set")
-	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return
-	}
-	if authCR.HasBeenMigrated() {
-		reqLogger.Info("MigrationsPerformed condition has already been set; continuing")
-		return subreconciler.ContinueReconciling()
-	}
-	condition := operatorv1alpha1.NewMigrationCompleteCondition()
-	meta.SetStatusCondition(&authCR.Status.Conditions, *condition)
-	if err = r.Client.Status().Update(ctx, authCR); err != nil {
-		reqLogger.Info("Failed to set migration success condition on Authentication", "reason", err.Error())
-	} else {
-		reqLogger.Info("Set migration success condition on Authentication")
-	}
-
-	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
 func getPreloadMongoDBConfigMap(c client.Client, ctx context.Context, namespace string) (cm *corev1.ConfigMap, err error) {

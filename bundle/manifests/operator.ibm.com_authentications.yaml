@@ -172,6 +172,10 @@ spec:
                 properties:
                   attrMappingFromConfig:
                     type: boolean
+                  auditSecret:
+                    type: string
+                  auditUrl:
+                    type: string
                   authUniqueHosts:
                     type: string
                   bootstrapUserId:
@@ -227,10 +231,6 @@ spec:
                   preferredLogin:
                     type: string
                   providerIssuerURL:
-                    type: string
-                  auditUrl:
-                    type: string
-                  auditSecret:
                     type: string
                   roksEnabled:
                     type: boolean

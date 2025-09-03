@@ -1,0 +1,41 @@
+version: '2'
+
+# PR Pipeline: pr-code-checks, code-pr-finish
+tasks:
+  pr-code-checks:
+    runtimeClassName: medium
+    displayName: Build amd64, ppc64le and s390x images
+    include:
+      - dind
+    steps:
+      - name: checks-setup
+        when: 'false'
+      - name: detect-secrets
+        when: 'false'
+      - name: unit-test
+        include:
+          - docker-socket
+          - dind
+        image: icr.io/continuous-delivery/pipeline/pipeline-base-ubi:3.66
+        script: |
+          #!/usr/bin/env bash
+          if [[ "$PIPELINE_DEBUG" == 1 ]]; then
+              trap env EXIT
+              env
+              set -x
+          fi
+          cd "$WORKSPACE/$(load_repo app-repo path)"
+          export ARCH="amd64"
+          export GIT_BRANCH="$(get_env git-branch)"
+          export GIT_COMMIT="$(get_env git-commit)"
+          export BUILD_TAG="${GIT_COMMIT:0:7}"
+          source build_scripts/setup_env.sh
+          source build_scripts/build_image.sh
+      - name: compliance-checks
+        when: 'false'
+
+finally:
+  code-pr-finish:
+    steps:
+      - name: run-stage
+        when: 'false'

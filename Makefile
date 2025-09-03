@@ -37,10 +37,6 @@ CONTAINER_CLI ?= docker
 
 MARKDOWN_LINT_WHITELIST=https://quay.io/cnr
 
-ifeq ($(BUILD_LOCALLY),0)
-    export CONFIG_DOCKER_TARGET = config-docker
-endif
-
 TESTARGS_DEFAULT := "-v"
 export TESTARGS ?= $(TESTARGS_DEFAULT)
 BUNDLE_VERSION ?= $(shell cat ./version/version.go | grep "Version =" | awk '{ print $$3}' | tr -d '"')
@@ -381,7 +377,7 @@ bundle-render: ## Render the bundle contents into the local FBC index.
 	./hack/bundle-render $(IMG).v$(BUNDLE_VERSION) $(BUNDLE_IMG)
 
 TARGET_ARCH=$(LOCAL_ARCH)
-build-image: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator manager image
+build-image: $(GO) licenses-dir ## Build the Operator manager image
 	@echo "Building manager binary for linux/$(TARGET_ARCH)"
 	@CGO_ENABLED=0 GOOS=linux GOARCH=$(TARGET_ARCH) $(GO) build -a -o build/_output/bin/manager main.go
 	@echo "Building manager image for linux/$(TARGET_ARCH)"
@@ -404,12 +400,13 @@ build-image-ppc64le: build-image
 build-image-s390x: TARGET_ARCH=s390x
 build-image-s390x: build-image
 
-images: $(CONFIG_DOCKER_TARGET)  ## Build the multi-arch manifest.
+images:
 	@${MAKE} build-image-amd64
 	@${MAKE} build-image-ppc64le
 	@${MAKE} build-image-s390x
-	@DOCKER_BUILDKIT=1 MAX_PULLING_RETRY=20 RETRY_INTERVAL=30 common/scripts/multiarch_image.sh $(REGISTRY) $(IMG) $(GIT_COMMIT_ID) $(VERSION)
-
+	@if [ "$(SPS_EVENT_TYPE)" = "push" ]; then \
+		DOCKER_BUILDKIT=1 MAX_PULLING_RETRY=20 RETRY_INTERVAL=30 common/scripts/multiarch_image.sh $(REGISTRY) $(IMG) $(GIT_COMMIT_ID) $(VERSION); \
+	fi
 ##@ Deployment
 
 ifndef IGNORE_NOT_FOUND

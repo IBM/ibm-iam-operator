@@ -57,6 +57,8 @@ metadata:
               }
             },
             "config": {
+              "auditSecret": "",
+              "auditUrl": "",
               "authUniqueHosts": "internal-ip1 internal-ip2 mycluster.icp",
               "bootstrapUserId": "kubeadmin",
               "claimsMap": "name=\"givenName\" family_name=\"givenName\" given_name=\"givenName\" preferred_username=\"displayName\" display_name=\"displayName\"",
@@ -79,8 +81,6 @@ metadata:
               "openshiftPort": 443,
               "preferredLogin": "",
               "providerIssuerURL": "",
-              "auditUrl": "",
-              "auditSecret": "",
               "roksEnabled": true,
               "roksURL": "https://roks.domain.name:443",
               "roksUserPrefix": "changeme",
@@ -154,7 +154,7 @@ metadata:
     categories: Security
     certified: "false"
     containerImage: icr.io/cpopen/ibm-iam-operator:4.14.0
-    createdAt: "2025-08-18T18:56:37Z"
+    createdAt: "2025-08-28T15:02:42Z"
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage the lifecycle of IAM services. With this operator, you can simply deploy and upgrade the IAM services
     features.operators.openshift.io/disconnected: "true"
     features.operators.openshift.io/fips-compliant: "true"
@@ -315,6 +315,8 @@ spec:
                         value: icr.io/cpopen/cpfs/icp-identity-manager:4.14.0
                       - name: IM_INITCONTAINER_IMAGE
                         value: icr.io/cpopen/cpfs/im-initcontainer:4.14.0
+                      - name: IM_DB_MIGRATOR_IMAGE
+                        value: icr.io/cpopen/cpfs/ibm-im-db-migrator:0.0.1
                     image: icr.io/cpopen/ibm-iam-operator:4.14.0
                     imagePullPolicy: IfNotPresent
                     livenessProbe:

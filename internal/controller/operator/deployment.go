@@ -71,17 +71,7 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 		return subreconciler.RequeueWithError(err)
 	}
 
-	// Check if the ibmcloud-cluster-info created by IM-Operator
-	if !common.IsOwnerOf(r.Client.Scheme(), authCR, consoleConfigMap) {
-		reqLogger.Info("Reconcile Deployment : Can't find ibmcloud-cluster-info Configmap created by IM operator, IM deployment may not proceed", "Configmap.Namespace", consoleConfigMap.Namespace, "ConfigMap.Name", common.IBMCloudClusterInfoCMName)
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
-
 	icpConsoleURL := consoleConfigMap.Data["cluster_address"]
-	samlConsoleURL, ok := consoleConfigMap.Data["cluster_address_auth"]
-	if !ok {
-		samlConsoleURL = icpConsoleURL
-	}
 
 	auditSecretName, err := r.getAuditSecretNameIfExists(deployCtx, authCR)
 	if err != nil {
@@ -113,16 +103,16 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 	builders := []*common.SecondaryReconcilerBuilder[*appsv1.Deployment]{
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-auth-service").
-			WithGenerateFns(generatePlatformAuthService(imagePullSecret, icpConsoleURL, saasServiceIdCrn, ldapSpcExists, edbSpcExists)).
-			WithModifyFns(modifyDeployment(r.needsRollout, ldapSpcExists, edbSpcExists)),
+			WithGenerateFns(generatePlatformAuthService(imagePullSecret, icpConsoleURL, ldapSpcExists, edbSpcExists)).
+			WithModifyFns(modifyDeployment(r.needsRollout)),
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-identity-management").
-			WithGenerateFns(generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, saasServiceIdCrn, auditSecretName, ldapSpcExists, edbSpcExists)).
-			WithModifyFns(modifyDeployment(r.needsRollout, ldapSpcExists, edbSpcExists)),
+			WithGenerateFns(generatePlatformIdentityManagement(imagePullSecret, auditSecretName, ldapSpcExists, edbSpcExists)).
+			WithModifyFns(modifyDeployment(r.needsRollout)),
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-identity-provider").
-			WithGenerateFns(generatePlatformIdentityProvider(imagePullSecret, samlConsoleURL, saasServiceIdCrn, auditSecretName, ldapSpcExists, edbSpcExists)).
-			WithModifyFns(modifyDeployment(r.needsRollout, ldapSpcExists, edbSpcExists)),
+			WithGenerateFns(generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn, auditSecretName, ldapSpcExists, edbSpcExists)).
+			WithModifyFns(modifyDeployment(r.needsRollout)),
 	}
 
 	subRecs := []common.SecondaryReconciler{}
@@ -192,8 +182,6 @@ func (r *AuthenticationReconciler) removeCP2Deployments(ctx context.Context, req
 // be retrieved. If an error other than NotFound is received when trying to get
 // the Secret, that is returned as well.
 func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Context, authCR *operatorv1alpha1.Authentication) (*string, error) {
-	//var auditSecretName string
-	//var auditURL string
 	reqLogger := logf.FromContext(ctx)
 
 	if authCR.Spec.Config.AuditUrl == nil || authCR.Spec.Config.AuditSecret == nil {
@@ -219,7 +207,7 @@ func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Contex
 	return authCR.Spec.Config.AuditSecret, nil
 }
 
-func generatePlatformAuthService(imagePullSecret, icpConsoleURL, _ string, ldapSpcExist bool, edbSpcExist bool) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformAuthService(imagePullSecret, icpConsoleURL string, ldapSpcExist bool, edbSpcExist bool) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		authServiceImage := common.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
@@ -396,7 +384,7 @@ func generatePlatformAuthService(imagePullSecret, icpConsoleURL, _ string, ldapS
 	}
 }
 
-func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string, auditSecretName *string, ldapSpcExist bool, edbSpcExist bool) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformIdentityManagement(imagePullSecret string, auditSecretName *string, ldapSpcExist bool, edbSpcExist bool) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		identityManagerImage := common.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
@@ -552,7 +540,7 @@ func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string
 							},
 						},
 						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSpcExist, edbSpcExist),
-						Containers:     buildManagerContainers(authCR, identityManagerImage, icpConsoleURL, ldapSpcExist),
+						Containers:     buildManagerContainers(authCR, identityManagerImage, ldapSpcExist),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
 				},
@@ -570,7 +558,7 @@ func generatePlatformIdentityManagement(imagePullSecret, icpConsoleURL, _ string
 	}
 }
 
-func generatePlatformIdentityProvider(imagePullSecret, icpConsoleURL, saasServiceIdCrn string, auditSecretName *string, ldapSpcExist bool, edbSpcExist bool) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn string, auditSecretName *string, ldapSpcExist bool, edbSpcExist bool) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		identityProviderImage := common.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
@@ -727,7 +715,7 @@ func generatePlatformIdentityProvider(imagePullSecret, icpConsoleURL, saasServic
 							},
 						},
 						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSpcExist, edbSpcExist),
-						Containers:     buildProviderContainers(authCR, identityProviderImage, icpConsoleURL, saasServiceIdCrn, ldapSpcExist),
+						Containers:     buildProviderContainers(authCR, identityProviderImage, saasServiceIdCrn, ldapSpcExist),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
 				},
@@ -826,7 +814,7 @@ func specsDiffer(observed, generated *appsv1.Deployment) (different bool, err er
 // generated Deployments and makes modifications to the observed Deployment when
 // such differences are found. Returns a boolean representing whether a
 // modification was made and an error if the operation could not be completed.
-func modifyDeployment(needsRollout bool, ldapSpcExist bool, edbSpcExist bool) common.ModifyFn[*appsv1.Deployment] {
+func modifyDeployment(needsRollout bool) common.ModifyFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, observed, generated *appsv1.Deployment) (modified bool, err error) {
 		preserveObservedFields(observed, generated)
 		authCR, ok := s.GetPrimary().(*operatorv1alpha1.Authentication)

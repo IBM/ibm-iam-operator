@@ -22,14 +22,14 @@ import (
 	"slices"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
-	zenv1 "github.com/IBM/ibm-iam-operator/internal/api/zen.cpd.ibm.com/v1"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -45,15 +45,99 @@ const (
 
 func (r *AuthenticationReconciler) setAuthenticationStatus(ctx context.Context, authCR *operatorv1alpha1.Authentication) (modified bool, err error) {
 	authCRCopy := authCR.DeepCopy()
-	nodes, err := r.getNodesStatus(ctx, authCR)
+	var nodes []string
+	nodes, err = r.getNodesStatus(ctx, authCR)
+	if err != nil {
+		return
+	}
 	if len(authCR.Status.Nodes) == 0 || !slices.Equal(authCR.Status.Nodes, nodes) {
 		authCR.Status.Nodes = nodes
 	}
+
+	err = r.setMigrationStatusConditions(ctx, authCR)
+	if err != nil {
+		return
+	}
+
 	authCR.Status.Service = r.getCurrentServiceStatus(ctx, r.Client, authCR)
 	if !reflect.DeepEqual(authCR.Status, authCRCopy.Status) {
 		modified = true
 	}
 	return
+}
+
+// setMigrationStatusConditions sets the appropriate MigrationsPerformed and
+// MigrationsRunning metav1.Condition values within the Authentication CR's
+// status conditions.
+func (r *AuthenticationReconciler) setMigrationStatusConditions(ctx context.Context, authCR *operatorv1alpha1.Authentication) (err error) {
+	objKey := types.NamespacedName{Name: "ibm-im-db-migrator", Namespace: authCR.Namespace}
+	job := &batchv1.Job{}
+	err = r.Get(ctx, objKey, job)
+	if k8sErrors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	setMigratedStatus(authCR, job)
+	setMigrationsRunningStatus(authCR, job)
+	return
+}
+
+// jobHasCompleted flags whether the Job has completed successfully
+func jobHasCompleted(job *batchv1.Job) (running bool) {
+	return job.Status.CompletionTime != nil
+}
+
+// jobHasFailed flags whether any Pod associated with the Job has failed.
+func jobHasFailed(job *batchv1.Job) (hasFailed bool) {
+	return job.Status.Failed > 0
+}
+
+// jobHasCompletelyFailed flags whether the Job has failed to the point of
+// hitting its BackoffLimit.
+func jobHasCompletelyFailed(job *batchv1.Job) (hasFailed bool) {
+	if job.Spec.BackoffLimit == nil {
+		return job.Status.Failed == 6
+	}
+	return job.Status.Failed == *job.Spec.BackoffLimit
+}
+
+// setMigrationsRunningStatus sets the appropriate metav1.Condition of type
+// MigrationsRunning given the current state of the migration Job and the
+// Authentication CR.
+func setMigrationsRunningStatus(authCR *operatorv1alpha1.Authentication, job *batchv1.Job) {
+	if jobHasCompletelyFailed(job) || jobHasCompleted(job) {
+		meta.SetStatusCondition(&authCR.Status.Conditions, *operatorv1alpha1.NewMigrationFinishedCondition())
+		return
+	}
+	currentCondition := meta.FindStatusCondition(
+		authCR.Status.Conditions,
+		operatorv1alpha1.ConditionMigrationsRunning)
+	if currentCondition == nil || currentCondition.Status == metav1.ConditionFalse {
+		meta.SetStatusCondition(&authCR.Status.Conditions, *operatorv1alpha1.NewMigrationInProgressCondition())
+		return
+	}
+}
+
+// setMigratedStatus sets the appropriate metav1.Condition of type
+// MigrationsPerformed given the current state of the migration Job and the
+// Authentication CR.
+func setMigratedStatus(authCR *operatorv1alpha1.Authentication, job *batchv1.Job) {
+	if jobHasCompleted(job) {
+		meta.SetStatusCondition(&authCR.Status.Conditions, *operatorv1alpha1.NewMigrationCompleteCondition())
+		return
+	}
+	if jobHasFailed(job) {
+		meta.SetStatusCondition(&authCR.Status.Conditions, *operatorv1alpha1.NewMigrationFailureCondition())
+		return
+	}
+	currentCondition := meta.FindStatusCondition(
+		authCR.Status.Conditions,
+		operatorv1alpha1.ConditionMigrated)
+	if currentCondition == nil || currentCondition.Status == metav1.ConditionTrue {
+		meta.SetStatusCondition(&authCR.Status.Conditions, *operatorv1alpha1.NewMigrationYetToBeCompleteCondition())
+		return
+	}
 }
 
 // getNodesStatus returns a sorted list of IM Pods that is written to the Authentication CR's .status.nodes.
@@ -100,7 +184,7 @@ func getServiceStatus(ctx context.Context, k8sClient client.Client, namespacedNa
 	service := &corev1.Service{}
 	err := k8sClient.Get(ctx, namespacedName, service)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
 		} else {
 			reqLogger.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
@@ -135,7 +219,7 @@ func getDeploymentStatus(ctx context.Context, k8sClient client.Client, namespace
 	deployment := &appsv1.Deployment{}
 	err := k8sClient.Get(ctx, namespacedName, deployment)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
 		} else {
 			reqLogger.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
@@ -175,7 +259,7 @@ func getJobStatus(ctx context.Context, k8sClient client.Client, namespacedName t
 	job := &batchv1.Job{}
 	err := k8sClient.Get(ctx, namespacedName, job)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
 		} else {
 			reqLogger.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
@@ -215,7 +299,7 @@ func getRouteStatus(ctx context.Context, k8sClient client.Client, namespacedName
 	route := &routev1.Route{}
 	err := k8sClient.Get(ctx, namespacedName, route)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
 		} else {
 			reqLogger.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
@@ -239,45 +323,6 @@ func getAllRouteStatus(ctx context.Context, k8sClient client.Client, names []str
 	for _, name := range names {
 		nsn := types.NamespacedName{Name: name, Namespace: namespace}
 		statuses = append(statuses, getRouteStatus(ctx, k8sClient, nsn))
-	}
-	reqLogger.Info("New statuses", "statuses", statuses)
-	return
-}
-
-func getZenExtensionStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getRouteStatus").V(1)
-	kind := "ZenExtension"
-	status = operatorv1alpha1.ManagedResourceStatus{
-		ObjectName: namespacedName.Name,
-		APIVersion: UnknownAPIVersion,
-		Namespace:  namespacedName.Namespace,
-		Kind:       kind,
-		Status:     ResourceNotReadyState,
-	}
-	zenExtension := &zenv1.ZenExtension{}
-	err := k8sClient.Get(ctx, namespacedName, zenExtension)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			reqLogger.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
-		} else {
-			reqLogger.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
-		}
-		return
-	}
-
-	status.APIVersion = zenExtension.APIVersion
-	if zenExtension.NotReady() {
-		return
-	}
-	status.Status = ResourceReadyState
-	return
-}
-
-func getAllZenExtensionStatus(ctx context.Context, k8sClient client.Client, names []string, namespace string) (statuses []operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getAllZenExtensionStatus").V(1)
-	for _, name := range names {
-		nsn := types.NamespacedName{Name: name, Namespace: namespace}
-		statuses = append(statuses, getZenExtensionStatus(ctx, k8sClient, nsn))
 	}
 	reqLogger.Info("New statuses", "statuses", statuses)
 	return
@@ -308,7 +353,7 @@ func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, 
 			f: getAllDeploymentStatus,
 		},
 		{
-			names: []string{"oidc-client-registration"},
+			names: []string{"oidc-client-registration", "ibm-im-db-migration"},
 			f:     getAllJobStatus,
 		},
 	}

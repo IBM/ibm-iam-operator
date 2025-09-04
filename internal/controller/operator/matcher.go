@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"slices"
 
-	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -72,36 +71,11 @@ func observedKeyValueSetTo[T client.Object](key string, value any) matcherFunc[T
 	}
 }
 
-// zenFrontDoorEnabled[T] matches when the Authentication CR has the Zen front
-// door enabled.
-func zenFrontDoorEnabled[T client.Object](authCR *operatorv1alpha1.Authentication) matcherFunc[T] {
-	return func(observed T) bool {
-		return authCR.Spec.Config.ZenFrontDoor
-	}
-}
-
 // not[T] returns a matcherFunc[T] that returns whether the provided
 // matcherFunc[T] failed to find a match.
 func not[T client.Object](isMatch matcherFunc[T]) matcherFunc[T] {
 	return func(observed T) bool {
 		return !isMatch(observed)
-	}
-}
-
-// and[T] returns a matcherFunc[T] that returns whether all of the supplied
-// matchers found a match.
-func and[T client.Object](matchers ...matcherFunc[T]) matcherFunc[T] {
-	return func(observed T) (matches bool) {
-		if len(matchers) == 0 {
-			return false
-		}
-		matches = true
-		for _, isMatch := range matchers {
-			if !isMatch(observed) {
-				return false
-			}
-		}
-		return
 	}
 }
 

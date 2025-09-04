@@ -482,7 +482,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"LOG_LEVEL_MW":                       "info",
 				"IDTOKEN_LIFETIME":                   "12h",
 				"SESSION_TIMEOUT":                    "43200",
-				"IAM_UM":                             strconv.FormatBool(authCR.Spec.Config.IAM_UM),
+				"IAM_UM":                             strconv.FormatBool(*authCR.Spec.Config.IamUm),
 				"OIDC_ISSUER_URL":                    authCR.Spec.Config.OIDCIssuerURL,
 				"PDP_REDIS_CACHE_DEFAULT_TTL":        "600",
 				"FIPS_ENABLED":                       strconv.FormatBool(authCR.Spec.Config.FIPSEnabled),

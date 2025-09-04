@@ -584,7 +584,7 @@ var _ = Describe("ConfigMap handling", func() {
 					"IDENTITY_PROVIDER_URL":              "https://platform-identity-provider:4300",
 					"IDENTITY_MGMT_URL":                  "https://platform-identity-management:4500",
 					"MASTER_HOST":                        ibmcloudClusterInfo.Data["cluster_address"],
-					"IAM_UM":                             strconv.FormatBool(authCR.Spec.Config.IAM_UM),
+					"IAM_UM":                             strconv.FormatBool(*authCR.Spec.Config.IamUm),
 					"MASTER_PATH":                        "/idauth",
 					"AUDIT_URL":                          "",
 					"AUDIT_SECRET":                       "",

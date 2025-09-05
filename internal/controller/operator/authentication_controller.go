@@ -25,8 +25,6 @@ import (
 
 	certmgr "github.com/IBM/ibm-iam-operator/internal/api/certmanager/v1"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
-	dbconn "github.com/IBM/ibm-iam-operator/internal/database/connectors"
-	"github.com/IBM/ibm-iam-operator/internal/database/migration"
 	"github.com/IBM/ibm-iam-operator/internal/version"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -36,9 +34,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
@@ -79,9 +75,6 @@ var memory550 = resource.NewQuantity(550*1024*1024, resource.BinarySI)   // 550M
 var memory650 = resource.NewQuantity(650*1024*1024, resource.BinarySI)   // 650Mi
 var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024Mi
 
-// migrationWait is used when still waiting on a result to be produced by the migration worker
-var migrationWait time.Duration = 10 * time.Second
-
 // opreqWait is used for the resources that interact with and originate from OperandRequests
 var opreqWait time.Duration = 100 * time.Millisecond
 
@@ -90,29 +83,6 @@ var defaultLowerWait time.Duration = 5 * time.Millisecond
 
 // finalizerName is the finalizer appended to the Authentication CR
 var finalizerName = "authentication.operator.ibm.com"
-
-func (r *AuthenticationReconciler) loopUntilConditionsSet(ctx context.Context, req ctrl.Request, conditions ...*metav1.Condition) {
-	reqLogger := logf.FromContext(ctx)
-	conditionsSet := false
-	for !conditionsSet {
-		authCR := &operatorv1alpha1.Authentication{}
-		if result, err := r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-			reqLogger.Info("Failed to retrieve Authentication CR for status update; retrying")
-			continue
-		}
-		for _, condition := range conditions {
-			if condition == nil {
-				continue
-			}
-			meta.SetStatusCondition(&authCR.Status.Conditions, *condition)
-		}
-		if err := r.Client.Status().Update(ctx, authCR); err != nil {
-			reqLogger.Error(err, "Failed to set conditions on Authentication; retrying", "conditions", conditions)
-			continue
-		}
-		conditionsSet = true
-	}
-}
 
 func (r *AuthenticationReconciler) getLatestAuthentication(ctx context.Context, req ctrl.Request, authentication *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx)
@@ -174,10 +144,7 @@ type AuthenticationReconciler struct {
 	DiscoveryClient discovery.DiscoveryClient
 	Mutex           sync.Mutex
 	clusterType     ctrlcommon.ClusterType
-	dbSetupChan     chan *migration.Result
 	needsRollout    bool
-	GetPostgresDB   func(client.Client, context.Context, ctrl.Request) (dbconn.DBConn, error)
-	GetMongoDB      func(client.Client, context.Context, ctrl.Request) (dbconn.DBConn, error)
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -284,19 +251,6 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return subreconciler.Evaluate(subResult, err)
 	}
 
-	// perform any migrations that may be needed before Deployments run
-	if subResult, err := r.handleMigrations(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-		return subreconciler.Evaluate(subResult, err)
-	}
-
-	if subResult, err := r.setMigrationCompleteStatus(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-		return subreconciler.Evaluate(subResult, err)
-	}
-
-	if result, err := r.handleMongoDBCleanup(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return subreconciler.Evaluate(result, err)
-	}
-
 	reqLogger.Info("Creating ibm-iam-operand-restricted serviceaccount")
 	currentSA := &corev1.ServiceAccount{}
 	err = r.createSA(instance, currentSA, &needToRequeue)
@@ -306,6 +260,14 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// create operand role and role-binding
 	r.createRole(instance)
 	r.createRoleBinding(instance)
+
+	if subResult, err := r.ensureMigrationJobRuns(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
+
+	if subResult, err := r.checkSAMLPresence(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
 
 	// Check if this Certificate already exists and create it if it doesn't
 	if subResult, err := r.handleCertificates(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
@@ -317,6 +279,11 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	err = r.handleService(instance, currentService, &needToRequeue)
 	if err != nil {
 		return
+	}
+
+	// Check if this Job already exists and create it if it doesn't
+	if subResult, err := r.ensureOIDCClientRegistrationJobRuns(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
 	}
 
 	// Check if this Secret already exists and create it if it doesn't
@@ -332,12 +299,6 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return subreconciler.Evaluate(subResult, err)
 	}
 
-	// Check if this Job already exists and create it if it doesn't
-	currentJob := &batchv1.Job{}
-	err = r.handleJob(instance, currentJob, &needToRequeue)
-	if err != nil {
-		return
-	}
 	// create clusterrole and clusterrolebinding
 	if subResult, err := r.handleClusterRoles(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
@@ -350,6 +311,10 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	r.ReconcileRemoveIngresses(ctx, instance, &needToRequeue)
 	// updates redirecturi annotations to serviceaccount
 	r.handleServiceAccount(instance, &needToRequeue)
+
+	if subResult, err = r.ensureMigrationJobSucceeded(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
 
 	if subResult, err := r.handleDeployments(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
@@ -369,6 +334,10 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	if subResult, err := r.syncClientHostnames(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
+	}
+
+	if result, err := r.handleMongoDBCleanup(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return subreconciler.Evaluate(result, err)
 	}
 
 	return subreconciler.Evaluate(subreconciler.DoNotRequeue())
@@ -443,16 +412,11 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			}
 		}), builder.WithPredicates(predicate.Or(globalCMPred, productCMPred)),
 	)
+
 	bootstrappedPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
 		return o.GetLabels()[ctrlcommon.ManagerVersionLabel] == version.Version
 	})
 
-	r.GetPostgresDB = func(c client.Client, ctx context.Context, req ctrl.Request) (d dbconn.DBConn, err error) {
-		return GetPostgresDB(c, ctx, req)
-	}
-	r.GetMongoDB = func(c client.Client, ctx context.Context, req ctrl.Request) (d dbconn.DBConn, err error) {
-		return GetMongoDB(c, ctx, req)
-	}
 	authCtrl.Watches(&operatorv1alpha1.Authentication{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(bootstrappedPred))
 	return authCtrl.Named("controller_authentication").
 		Complete(r)

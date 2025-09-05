@@ -434,7 +434,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 
 }
 
-func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage string, _ string, saasCRNId string) corev1.Container {
+func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage, saasCRNId string) corev1.Container {
 
 	resources := instance.Spec.IdentityProvider.Resources
 	if resources == nil {
@@ -652,7 +652,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		"LDAP_SEARCH_CACHE_SIZE", "LDAP_SEARCH_CACHE_TIMEOUT", "LDAP_CTX_POOL_INITSIZE", "LDAP_CTX_POOL_MAXSIZE",
 		"LDAP_CTX_POOL_TIMEOUT", "LDAP_CTX_POOL_WAITTIME", "LDAP_CTX_POOL_PREFERREDSIZE", "LDAP_SEARCH_CACHE_ENABLED",
 		"LDAP_SEARCH_CACHE_SIZELIMIT", "LDAP_SEARCH_EXCLUDE_WILDCARD_CHARS", "LDAP_SEARCH_SIZE_LIMIT",
-		"LDAP_SEARCH_TIME_LIMIT", "LDAP_SEARCH_CN_ATTR_ONLY", "LDAP_SEARCH_ID_ATTR_ONLY",
+		"LDAP_SEARCH_TIME_LIMIT", "LDAP_SEARCH_CN_ATTR_ONLY", "LDAP_SEARCH_ID_ATTR_ONLY", "AUDIT_URL",
 		"DB_CONNECT_TIMEOUT", "DB_IDLE_TIMEOUT", "DB_CONNECT_MAX_RETRIES", "DB_POOL_MIN_SIZE", "DB_POOL_MAX_SIZE", "DB_SSL_MODE", "SEQL_LOGGING"}
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
 
@@ -720,34 +720,8 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 				Drop: []corev1.Capability{"ALL"},
 			},
 		},
-		Resources: *resources,
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      "auth-key",
-				MountPath: "/opt/ibm/identity-provider/server/boot/auth-key",
-			},
-			{
-				Name:      "identity-provider-cert",
-				MountPath: "/opt/ibm/identity-provider/certs",
-			},
-			{
-				Name:      "saml-cert",
-				MountPath: "/certs/saml-certs",
-			},
-			{
-				Name:      "pgsql-certs",
-				MountPath: "/certs/pgsql",
-			},
-			{
-				Name:      "pgsql-client-cred",
-				MountPath: "/pgsql/clientinfo",
-			},
-			{
-				Name:      "provider-data-vol",
-				MountPath: "/opt/ibm/provider-data",
-			},
-
-		},
+		Resources:    *resources,
+		VolumeMounts: buildIdentityProviderVolumeMounts(instance.Spec.Config.AuditSecret),
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
@@ -777,7 +751,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 
 }
 
-func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string, _ string) corev1.Container {
+func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string) corev1.Container {
 
 	replicaCount := int(instance.Spec.Replicas)
 	resources := instance.Spec.IdentityManager.Resources
@@ -1019,7 +993,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		"ROKS_ENABLED", "ROKS_USER_PREFIX", "IDENTITY_AUTH_DIRECTORY_URL", "OIDC_ISSUER_URL", "BOOTSTRAP_USERID", "CLUSTER_NAME", "HTTP_ONLY", "LDAP_SEARCH_SIZE_LIMIT", "LDAP_SEARCH_TIME_LIMIT",
 		"LDAP_SEARCH_CN_ATTR_ONLY", "LDAP_SEARCH_ID_ATTR_ONLY", "LDAP_SEARCH_EXCLUDE_WILDCARD_CHARS", "IGNORE_LDAP_FILTERS_VALIDATION", "AUTH_SVC_LDAP_CONFIG_TIMEOUT",
 		"SCIM_LDAP_SEARCH_SIZE_LIMIT", "SCIM_LDAP_SEARCH_TIME_LIMIT", "SCIM_ASYNC_PARALLEL_LIMIT", "SCIM_GET_DISPLAY_FOR_GROUP_USERS", "ATTR_MAPPING_FROM_CONFIG", "SCIM_AUTH_CACHE_MAX_SIZE", "SCIM_AUTH_CACHE_TTL_VALUE",
-		"DB_CONNECT_TIMEOUT", "DB_IDLE_TIMEOUT", "DB_CONNECT_MAX_RETRIES", "DB_POOL_MIN_SIZE", "DB_POOL_MAX_SIZE", "DB_SSL_MODE", "SEQL_LOGGING"}
+		"DB_CONNECT_TIMEOUT", "DB_IDLE_TIMEOUT", "DB_CONNECT_MAX_RETRIES", "DB_POOL_MIN_SIZE", "DB_POOL_MAX_SIZE", "DB_SSL_MODE", "SEQL_LOGGING", "AUDIT_URL"}
 
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
 
@@ -1093,29 +1067,8 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 				Drop: []corev1.Capability{"ALL"},
 			},
 		},
-		Resources: *resources,
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      "cluster-ca",
-				MountPath: "/opt/ibm/identity-mgmt/certs",
-			},
-			{
-				Name:      "platform-identity-management",
-				MountPath: "/opt/ibm/identity-mgmt/server/certs",
-			},
-			{
-				Name:      "scim-ldap-attributes-mapping",
-				MountPath: "/opt/ibm/identity-mgmt/config/scim-config",
-			},
-			{
-				Name:      "pgsql-certs",
-				MountPath: "/certs/pgsql",
-			},
-			{
-				Name:      "pgsql-client-cred",
-				MountPath: "/pgsql/clientinfo",
-			},
-		},
+		Resources:    *resources,
+		VolumeMounts: buildIdentityManagerVolumeMounts(instance.Spec.Config.AuditSecret),
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
@@ -1154,16 +1107,16 @@ func buildContainers(instance *operatorv1alpha1.Authentication, authServiceImage
 	return []corev1.Container{authServiceContainer}
 }
 
-func buildManagerContainers(instance *operatorv1alpha1.Authentication, identityManagerImage string, icpConsoleURL string) []corev1.Container {
+func buildManagerContainers(instance *operatorv1alpha1.Authentication, identityManagerImage string) []corev1.Container {
 
-	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL)
+	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage)
 
 	return []corev1.Container{identityManagerContainer}
 }
 
-func buildProviderContainers(instance *operatorv1alpha1.Authentication, identityProviderImage string, icpConsoleURL string, saasCrnId string) []corev1.Container {
+func buildProviderContainers(instance *operatorv1alpha1.Authentication, identityProviderImage string, saasCrnId string) []corev1.Container {
 
-	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId)
+	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, saasCrnId)
 
 	return []corev1.Container{identityProviderContainer}
 }
@@ -1208,4 +1161,75 @@ func buildInitContainerEnvVars(envVarList []string, configmapName string) []core
 
 	}
 	return envVars
+}
+
+func buildIdentityManagerVolumeMounts(auditSecretName *string) []corev1.VolumeMount {
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "cluster-ca",
+			MountPath: "/opt/ibm/identity-mgmt/certs",
+		},
+		{
+			Name:      "platform-identity-management",
+			MountPath: "/opt/ibm/identity-mgmt/server/certs",
+		},
+		{
+			Name:      "scim-ldap-attributes-mapping",
+			MountPath: "/opt/ibm/identity-mgmt/config/scim-config",
+		},
+		{
+			Name:      "pgsql-certs",
+			MountPath: "/certs/pgsql",
+		},
+		{
+			Name:      "pgsql-client-cred",
+			MountPath: "/pgsql/clientinfo",
+		},
+	}
+	if auditSecretName != nil && *auditSecretName != "" {
+		newVolMount := corev1.VolumeMount{
+			Name:      IMAuditTLSVolume,
+			MountPath: "/certs/audit-tls",
+		}
+		volumeMounts = append(volumeMounts, newVolMount)
+	}
+
+	return volumeMounts
+}
+
+func buildIdentityProviderVolumeMounts(auditSecretName *string) []corev1.VolumeMount {
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "auth-key",
+			MountPath: "/opt/ibm/identity-provider/server/boot/auth-key",
+		},
+		{
+			Name:      "identity-provider-cert",
+			MountPath: "/opt/ibm/identity-provider/certs",
+		},
+		{
+			Name:      "saml-cert",
+			MountPath: "/certs/saml-certs",
+		},
+		{
+			Name:      "pgsql-certs",
+			MountPath: "/certs/pgsql",
+		},
+		{
+			Name:      "pgsql-client-cred",
+			MountPath: "/pgsql/clientinfo",
+		},
+    {
+      Name:      "provider-data-vol",
+      MountPath: "/opt/ibm/provider-data",
+    },
+	}
+	if auditSecretName != nil && *auditSecretName != "" {
+		newVolMount := corev1.VolumeMount{
+			Name:      IMAuditTLSVolume,
+			MountPath: "/certs/audit-tls",
+		}
+		volumeMounts = append(volumeMounts, newVolMount)
+	}
+	return volumeMounts
 }

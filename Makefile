@@ -26,8 +26,7 @@ DATA_NS ?= $(CONTROL_NS)
 WATCH_NS ?= $(DATA_NS)
 
 GIT_COMMIT_ID=$(shell git rev-parse --short HEAD)
-GIT_REMOTE_URL=$(shell git config --get remote.origin.url)
-IMAGE_BUILD_OPTS=--build-arg "VCS_REF=$(GIT_COMMIT_ID)" --build-arg "VCS_URL=$(GIT_REMOTE_URL)" --build-arg "IMG_VERSION=$(VERSION)" --build-arg "IMG_RELEASE=$(shell date +%s)"
+IMAGE_BUILD_OPTS=--build-arg "VCS_REF=$(GIT_COMMIT_ID)" --build-arg "IMG_VERSION=$(VERSION)" --build-arg "IMG_RELEASE=$(shell date +%s)"
 
 # Image URL to use all building/pushing image targets;
 # Use your own docker registry and image name for dev/test by overridding the IMG and REGISTRY environment variable.
@@ -37,13 +36,10 @@ CONTAINER_CLI ?= docker
 
 MARKDOWN_LINT_WHITELIST=https://quay.io/cnr
 
-ifeq ($(BUILD_LOCALLY),0)
-    export CONFIG_DOCKER_TARGET = config-docker
-endif
 
 TESTARGS_DEFAULT := "-v"
 export TESTARGS ?= $(TESTARGS_DEFAULT)
-BUNDLE_VERSION ?= $(shell cat ./internal/version/version.go | grep "Version =" | awk '{ print $$3}' | tr -d '"')
+BUNDLE_VERSION ?= $(shell grep "Version =" ./internal/version/version.go | cut -d'"' -f2)
 VERSION ?= $(BUNDLE_VERSION)
 
 LOCAL_OS := $(shell uname)
@@ -414,7 +410,7 @@ bundle-render: ## Render the bundle contents into the local FBC index.
 	./hack/bundle-render $(IMG).v$(BUNDLE_VERSION) $(BUNDLE_IMG)
 
 TARGET_ARCH=$(LOCAL_ARCH)
-build-image: $(GO) $(CONFIG_DOCKER_TARGET) licenses-dir ## Build the Operator manager image
+build-image: $(GO) licenses-dir ## Build the Operator manager image
 	@echo "Building manager binary for linux/$(TARGET_ARCH)"
 	@CGO_ENABLED=0 GOOS=linux GOARCH=$(TARGET_ARCH) $(GO) build -a -o build/_output/bin/manager cmd/main.go
 	@echo "Building manager image for linux/$(TARGET_ARCH)"
@@ -437,11 +433,13 @@ build-image-ppc64le: build-image
 build-image-s390x: TARGET_ARCH=s390x
 build-image-s390x: build-image
 
-images: $(CONFIG_DOCKER_TARGET)  ## Build the multi-arch manifest.
+images:
 	@${MAKE} build-image-amd64
 	@${MAKE} build-image-ppc64le
 	@${MAKE} build-image-s390x
-	@DOCKER_BUILDKIT=1 MAX_PULLING_RETRY=20 RETRY_INTERVAL=30 common/scripts/multiarch_image.sh $(REGISTRY) $(IMG) $(GIT_COMMIT_ID) $(VERSION)
+	@if [ "$(SPS_EVENT_TYPE)" = "push" ]; then \
+		DOCKER_BUILDKIT=1 MAX_PULLING_RETRY=20 RETRY_INTERVAL=30 common/scripts/multiarch_image.sh $(REGISTRY) $(IMG) $(GIT_COMMIT_ID) $(VERSION); \
+	fi
 
 ##@ Deployment
 

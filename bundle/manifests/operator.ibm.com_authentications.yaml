@@ -172,6 +172,10 @@ spec:
                 properties:
                   attrMappingFromConfig:
                     type: boolean
+                  auditSecret:
+                    type: string
+                  auditUrl:
+                    type: string
                   authUniqueHosts:
                     type: string
                   bootstrapUserId:

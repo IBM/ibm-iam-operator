@@ -24,7 +24,7 @@ metadata:
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.13.0",
+              "imageTag": "4.14.0",
               "ldapsCACert": "platform-auth-ldaps-ca-cert",
               "resources": {
                 "limits": {
@@ -43,7 +43,7 @@ metadata:
             "clientRegistration": {
               "imageName": "im-initcontainer",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.13.0",
+              "imageTag": "4.14.0",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -57,6 +57,8 @@ metadata:
               }
             },
             "config": {
+              "auditSecret": "",
+              "auditUrl": "",
               "authUniqueHosts": "internal-ip1 internal-ip2 mycluster.icp",
               "bootstrapUserId": "kubeadmin",
               "claimsMap": "name=\"givenName\" family_name=\"givenName\" given_name=\"givenName\" preferred_username=\"displayName\" display_name=\"displayName\"",
@@ -95,7 +97,7 @@ metadata:
             "identityManager": {
               "imageName": "icp-identity-manager",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.13.0",
+              "imageTag": "4.14.0",
               "masterNodesList": "10.0.0.1",
               "resources": {
                 "limits": {
@@ -113,7 +115,7 @@ metadata:
             "identityProvider": {
               "imageName": "icp-identity-provider",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.13.0",
+              "imageTag": "4.14.0",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -130,7 +132,7 @@ metadata:
             "initMongodb": {
               "imageName": "im-initcontainer",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.13.0",
+              "imageTag": "4.14.0",
               "resources": {
                 "limits": {
                   "cpu": "100m",
@@ -151,8 +153,8 @@ metadata:
     capabilities: Basic Install
     categories: Security
     certified: "false"
-    containerImage: icr.io/cpopen/ibm-iam-operator:4.13.0
-    createdAt: "2025-07-08T01:10:36Z"
+    containerImage: icr.io/cpopen/ibm-iam-operator:4.14.0
+    createdAt: "2025-08-28T15:02:42Z"
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage the lifecycle of IAM services. With this operator, you can simply deploy and upgrade the IAM services
     features.operators.openshift.io/disconnected: "true"
     features.operators.openshift.io/fips-compliant: "true"
@@ -161,7 +163,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: "false"
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
-    olm.skipRange: <4.13.0
+    olm.skipRange: <4.14.0
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://github.com/IBM/ibm-iam-operator
@@ -171,7 +173,7 @@ metadata:
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
     operatorframework.io/os.linux: supported
-  name: ibm-iam-operator.v4.13.0
+  name: ibm-iam-operator.v4.14.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -306,16 +308,17 @@ spec:
                       - name: ROUTE_HTTPS_PORT
                       - name: cluster_name
                       - name: ICP_PLATFORM_AUTH_IMAGE
-                        value: icr.io/cpopen/cpfs/icp-platform-auth:4.13.0
+                        value: icr.io/cpopen/cpfs/icp-platform-auth:4.14.0
                       - name: ICP_IDENTITY_PROVIDER_IMAGE
-                        value: icr.io/cpopen/cpfs/icp-identity-provider:4.13.0
+                        value: icr.io/cpopen/cpfs/icp-identity-provider:4.14.0
                       - name: ICP_IDENTITY_MANAGER_IMAGE
-                        value: icr.io/cpopen/cpfs/icp-identity-manager:4.13.0
+                        value: icr.io/cpopen/cpfs/icp-identity-manager:4.14.0
                       - name: IM_INITCONTAINER_IMAGE
-                        value: icr.io/cpopen/cpfs/im-initcontainer:4.13.0
-                    image: icr.io/cpopen/ibm-iam-operator:4.13.0
+                        value: icr.io/cpopen/cpfs/im-initcontainer:4.14.0
+                      - name: IM_DB_MIGRATOR_IMAGE
+                        value: icr.io/cpopen/cpfs/ibm-im-db-migrator:0.0.1
+                    image: icr.io/cpopen/ibm-iam-operator:4.14.0
                     imagePullPolicy: IfNotPresent
-                    name: ibm-iam-operator
                     livenessProbe:
                       failureThreshold: 10
                       httpGet:
@@ -324,6 +327,7 @@ spec:
                       initialDelaySeconds: 120
                       periodSeconds: 60
                       timeoutSeconds: 10
+                    name: ibm-iam-operator
                     readinessProbe:
                       failureThreshold: 10
                       httpGet:
@@ -625,15 +629,15 @@ spec:
   maturity: stable
   provider:
     name: IBM
-  version: 4.13.0
+  version: 4.14.0
   relatedImages:
-    - image: icr.io/cpopen/ibm-iam-operator:4.13.0
+    - image: icr.io/cpopen/ibm-iam-operator:4.14.0
       name: IBM_IAM_OPERATOR_IMAGE
-    - image: icr.io/cpopen/cpfs/icp-platform-auth:4.13.0
+    - image: icr.io/cpopen/cpfs/icp-platform-auth:4.14.0
       name: ICP_PLATFORM_AUTH_IMAGE
-    - image: icr.io/cpopen/cpfs/icp-identity-provider:4.13.0
+    - image: icr.io/cpopen/cpfs/icp-identity-provider:4.14.0
       name: ICP_IDENTITY_PROVIDER_IMAGE
-    - image: icr.io/cpopen/cpfs/icp-identity-manager:4.13.0
+    - image: icr.io/cpopen/cpfs/icp-identity-manager:4.14.0
       name: ICP_IDENTITY_MANAGER_IMAGE
-    - image: icr.io/cpopen/cpfs/im-initcontainer:4.13.0
+    - image: icr.io/cpopen/cpfs/im-initcontainer:4.14.0
       name: IM_INITCONTAINER_IMAGE

@@ -1,0 +1,78 @@
+version: '2'
+
+# CI Pipeline: code-checks, code-build, deploy-checks, deploy-release
+tasks:
+  code-checks:
+    # code-checks includes five configurable steps: setup, detect-secrets, compliance-checks, peer-review, static-scan
+    include:
+      - dind
+    steps:
+      - name: checks-setup
+        when: 'false'
+      - name: detect-secrets
+        when: 'false'
+      - name: compliance-checks
+        when: 'false'
+      - name: peer-review
+        when: 'false'
+      - name: static-scan
+        when: 'false'
+        
+  code-build:
+    runtimeClassName: medium
+    displayName: Build amd64, ppc64le and s390x images
+    include:
+      - dind
+    # code-build includes five configurable steps: setup, unit-test, build-artifact, sign-artifact, scan-artifact
+    steps:
+      - name: setup
+        when: 'false'
+      - name: unit-test
+        when: 'false'
+      - name: build-artifact
+        include:
+          - docker-socket
+          - dind
+        image: icr.io/continuous-delivery/pipeline/pipeline-base-ubi:3.66
+        script: |
+          #!/usr/bin/env bash
+          if [[ "$PIPELINE_DEBUG" == 1 ]]; then
+              trap env EXIT
+              env
+              set -x
+          fi
+          cd "$WORKSPACE/$(load_repo app-repo path)"
+          export ARCH="amd64"
+          export GIT_BRANCH="$(get_env git-branch)"
+          export GIT_COMMIT="$(get_env git-commit)"
+          export BUILD_TAG="$(cat internal/version/version.go | tr -d '\n')"
+          source build_scripts/setup_env.sh
+          source build_scripts/build_image.sh
+      - name: sign-artifact
+        when: 'false'
+      - name: scan-artifact
+        when: 'false'
+
+  deploy-checks:
+    include:
+      - dind
+    # deploy-checks includes three configurable steps: deploy, dynamic-scan, acceptance-test
+    steps:
+      - name: deploy
+        when: 'false'
+      - name: dynamic-scan
+        when: 'false'
+      - name: acceptance-test
+        when: 'false'
+
+  deploy-release:
+    # deploy-release includes one configurable step: run-stage
+    steps:
+      - name: run-stage
+        when: 'false'
+
+finally:
+  code-ci-finish:
+    steps:
+      - name: run-stage
+        when: 'false'

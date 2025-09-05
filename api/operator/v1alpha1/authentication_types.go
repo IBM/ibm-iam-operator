@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"sync"
 
@@ -139,6 +138,8 @@ type ConfigSpec struct {
 	ICPPort                     int32          `json:"icpPort"`
 	FIPSEnabled                 bool           `json:"fipsEnabled"`
 	ROKSEnabled                 bool           `json:"roksEnabled"`
+	AuditUrl                    *string        `json:"auditUrl,omitempty"`
+	AuditSecret                 *string        `json:"auditSecret,omitempty"`
 	IBMCloudSaas                bool           `json:"ibmCloudSaas,omitempty"`
 	OnPremMultipleDeploy        bool           `json:"onPremMultipleDeploy,omitempty"`
 	SaasClientRedirectUrl       string         `json:"saasClientRedirectUrl,omitempty"`
@@ -218,15 +219,8 @@ const ReasonMigrationsInProgress string = "InProgress"
 const ReasonMigrationsDone string = "Done"
 const ReasonMigrationFailure string = "Failed"
 
-func NewMigrationCompleteCondition() *metav1.Condition {
-	return &metav1.Condition{
-		Type:    ConditionMigrated,
-		Status:  metav1.ConditionTrue,
-		Reason:  ReasonMigrationComplete,
-		Message: MessageMigrationSuccess,
-	}
-}
-
+// Creates a new ConditionMigrationsRunning condition for when the migration Job
+// is still running.
 func NewMigrationInProgressCondition() *metav1.Condition {
 	return &metav1.Condition{
 		Type:    ConditionMigrationsRunning,
@@ -236,6 +230,8 @@ func NewMigrationInProgressCondition() *metav1.Condition {
 	}
 }
 
+// Creates a new ConditionMigrationsRunning condition for when the migration Job
+// has stopped running.
 func NewMigrationFinishedCondition() *metav1.Condition {
 	return &metav1.Condition{
 		Type:    ConditionMigrationsRunning,
@@ -245,8 +241,33 @@ func NewMigrationFinishedCondition() *metav1.Condition {
 	}
 }
 
-func NewMigrationFailureCondition(name string) *metav1.Condition {
-	message := fmt.Sprintf("Migration %q failed; review the IM Operator \"migration_worker\" logs for more information", name)
+// Creates a new ConditionMigrated condition for when the migration Job has
+// succeeded.
+func NewMigrationCompleteCondition() *metav1.Condition {
+	return &metav1.Condition{
+		Type:    ConditionMigrated,
+		Status:  metav1.ConditionTrue,
+		Reason:  ReasonMigrationComplete,
+		Message: MessageMigrationSuccess,
+	}
+}
+
+// Creates a new ConditionMigrated condition for when the migration Job has yet
+// to run at all; should not be set unless the previous status is
+// `metav1.ConditionTrue`.
+func NewMigrationYetToBeCompleteCondition() *metav1.Condition {
+	message := "The \"ibm-im-db-migration\" Job is not yet complete"
+	return &metav1.Condition{
+		Type:    ConditionMigrated,
+		Status:  metav1.ConditionFalse,
+		Reason:  ReasonMigrationsInProgress,
+		Message: message,
+	}
+}
+
+// Creates a new ConditionMigrated condition for when the migration Job fails.
+func NewMigrationFailureCondition() *metav1.Condition {
+	message := "Migration failed; review the \"ibm-im-db-migrator\" Job logs for more information"
 	return &metav1.Condition{
 		Type:    ConditionMigrated,
 		Status:  metav1.ConditionFalse,

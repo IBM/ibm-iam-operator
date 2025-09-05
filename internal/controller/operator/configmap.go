@@ -356,6 +356,10 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 		updateFns = append(updateFns, updatesValuesWhen(
 			not(observedKeyValueSetTo[*corev1.ConfigMap]("IS_OPENSHIFT_ENV", v)), "IS_OPENSHIFT_ENV"))
 	}
+	if v, ok := generated.Data["IAM_UM"]; ok {
+		updateFns = append(updateFns, updatesValuesWhen(
+			not(observedKeyValueSetTo[*corev1.ConfigMap]("IAM_UM", v)), "IAM_UM"))
+	}
 
 	for _, update := range updateFns {
 		updated = update(observed, generated) || updated
@@ -455,6 +459,12 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 			return
 		}
 
+		var iamUm bool
+		if authCR.Spec.Config.IamUm != nil {
+			reqLogger.Info("Found user management install", "IamUm", *authCR.Spec.Config.IamUm)
+			iamUm = *authCR.Spec.Config.IamUm
+		}
+
 		*generated = corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      s.GetName(),
@@ -482,7 +492,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"LOG_LEVEL_MW":                       "info",
 				"IDTOKEN_LIFETIME":                   "12h",
 				"SESSION_TIMEOUT":                    "43200",
-				"IAM_UM":                             strconv.FormatBool(*authCR.Spec.Config.IamUm),
+				"IAM_UM":                             strconv.FormatBool(iamUm),
 				"OIDC_ISSUER_URL":                    authCR.Spec.Config.OIDCIssuerURL,
 				"PDP_REDIS_CACHE_DEFAULT_TTL":        "600",
 				"FIPS_ENABLED":                       strconv.FormatBool(authCR.Spec.Config.FIPSEnabled),

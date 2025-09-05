@@ -460,6 +460,7 @@ var _ = Describe("ConfigMap handling", func() {
 						ClaimsMap:             "someclaims",
 						ScopeClaim:            "scopeclaimexample",
 						IsOpenshiftEnv:        false,
+						IamUm:                 ptr.To(false),
 					},
 				},
 			}
@@ -690,6 +691,12 @@ var _ = Describe("ConfigMap handling", func() {
 					[]string{
 						"AUDIT_URL",
 						"AUDIT_SECRET",
+					},
+				},
+				{
+					"IAM_UM",
+					[]string{
+						"IAM_UM",
 					},
 				},
 				{

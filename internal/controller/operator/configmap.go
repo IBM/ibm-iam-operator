@@ -561,7 +561,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"SCIM_AUTH_CACHE_TTL_VALUE":          "60",
 				"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
 				"IS_OPENSHIFT_ENV":                   strconv.FormatBool(isOSEnv),
-				"OAUTH_21_ENABLED":					  strconv.FormatBool(oauth21Enabled)
+				"OAUTH_21_ENABLED":                   strconv.FormatBool(oauth21Enabled),
 			},
 		}
 

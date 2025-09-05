@@ -686,7 +686,7 @@ var _ = Describe("ConfigMap handling", func() {
 					"SCIM_ASYNC_PARALLEL_LIMIT":          "100",
 					"SCIM_GET_DISPLAY_FOR_GROUP_USERS":   "true",
 					"IS_OPENSHIFT_ENV":                   "false",
-					"OAUTH_21_ENABLED":					  "false"
+					"OAUTH_21_ENABLED":                   "false",
 				},
 			}
 		}

@@ -473,37 +473,7 @@ var _ = Describe("ConfigMap handling", func() {
 		var imHasSAMLJob *batchv1.Job
 		var imHasSAMLPod *corev1.Pod
 		BeforeEach(func() {
-			authCR = &operatorv1alpha1.Authentication{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: "operator.ibm.com/v1alpha1",
-					Kind:       "Authentication",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "example-authentication",
-					Namespace:       "data-ns",
-					ResourceVersion: trackerAddResourceVersion,
-				},
-				Spec: operatorv1alpha1.AuthenticationSpec{
-					Config: operatorv1alpha1.ConfigSpec{
-						ClusterName:           "mycluster",
-						ClusterCADomain:       "domain.example.com",
-						DefaultAdminUser:      "myadmin",
-						ZenFrontDoor:          true,
-						PreferredLogin:        "ldap",
-						ProviderIssuerURL:     "example.com",
-						ROKSURL:               "",
-						ROKSEnabled:           false,
-						FIPSEnabled:           true,
-						NONCEEnabled:          true,
-						OIDCIssuerURL:         "oidc.example.com",
-						SaasClientRedirectUrl: "saasclient.example.com",
-						ClaimsMap:             "someclaims",
-						ScopeClaim:            "scopeclaimexample",
-						IsOpenshiftEnv:        false,
-						IamUm:                 ptr.To(false),
-					},
-				},
-			}
+			authCR = generateAuthCR("data-ns")
 			globalConfigMap = &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "ibm-cpp-config",
@@ -652,7 +622,6 @@ var _ = Describe("ConfigMap handling", func() {
 					"IDENTITY_PROVIDER_URL":              "https://platform-identity-provider:4300",
 					"IDENTITY_MGMT_URL":                  "https://platform-identity-management:4500",
 					"MASTER_HOST":                        ibmcloudClusterInfo.Data["cluster_address"],
-					"IAM_UM":                             strconv.FormatBool(*authCR.Spec.Config.IamUm),
 					"MASTER_PATH":                        "/idauth",
 					"AUDIT_URL":                          "",
 					"AUDIT_SECRET":                       "",

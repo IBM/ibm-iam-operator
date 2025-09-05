@@ -2,6 +2,8 @@ package operator
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
 	"reflect"
 	"strconv"
 
@@ -12,13 +14,13 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	"k8s.io/utils/ptr"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -125,6 +127,7 @@ var _ = Describe("ConfigMap handling", func() {
 			scheme = runtime.NewScheme()
 			Expect(corev1.AddToScheme(scheme)).To(Succeed())
 			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
+			Expect(batchv1.AddToScheme(scheme)).To(Succeed())
 			cb = *fakeclient.NewClientBuilder().
 				WithScheme(scheme).
 				WithObjects(globalConfigMap, authCR)
@@ -218,6 +221,7 @@ var _ = Describe("ConfigMap handling", func() {
 			scheme = runtime.NewScheme()
 			Expect(corev1.AddToScheme(scheme)).To(Succeed())
 			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
+			Expect(batchv1.AddToScheme(scheme)).To(Succeed())
 			cb = *fakeclient.NewClientBuilder().
 				WithScheme(scheme).
 				WithObjects(globalConfigMap, authCR)
@@ -422,6 +426,40 @@ var _ = Describe("ConfigMap handling", func() {
 		})
 	})
 
+	generateAuthCR := func(ns string) (authCR *operatorv1alpha1.Authentication) {
+		authCR = &operatorv1alpha1.Authentication{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "operator.ibm.com/v1alpha1",
+				Kind:       "Authentication",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "example-authentication",
+				Namespace:       fmt.Sprintf("%s-%d", ns, rand.Intn(500)),
+				ResourceVersion: trackerAddResourceVersion,
+			},
+			Spec: operatorv1alpha1.AuthenticationSpec{
+				Config: operatorv1alpha1.ConfigSpec{
+					ClusterName:           "mycluster",
+					ClusterCADomain:       "domain.example.com",
+					DefaultAdminUser:      "myadmin",
+					ZenFrontDoor:          true,
+					PreferredLogin:        "ldap",
+					ProviderIssuerURL:     "example.com",
+					ROKSURL:               "",
+					ROKSEnabled:           false,
+					FIPSEnabled:           true,
+					NONCEEnabled:          true,
+					OIDCIssuerURL:         "oidc.example.com",
+					SaasClientRedirectUrl: "saasclient.example.com",
+					ClaimsMap:             "someclaims",
+					ScopeClaim:            "scopeclaimexample",
+					IsOpenshiftEnv:        false,
+				},
+			},
+		}
+		return
+	}
+
 	Describe("platform-auth-idp handling", func() {
 		var r *AuthenticationReconciler
 		var authCR *operatorv1alpha1.Authentication
@@ -432,6 +470,8 @@ var _ = Describe("ConfigMap handling", func() {
 		var globalConfigMap *corev1.ConfigMap
 		var ibmcloudClusterInfo *corev1.ConfigMap
 		var updated bool
+		var imHasSAMLJob *batchv1.Job
+		var imHasSAMLPod *corev1.Pod
 		BeforeEach(func() {
 			authCR = &operatorv1alpha1.Authentication{
 				TypeMeta: metav1.TypeMeta{
@@ -467,7 +507,7 @@ var _ = Describe("ConfigMap handling", func() {
 			globalConfigMap = &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "ibm-cpp-config",
-					Namespace: "data-ns",
+					Namespace: authCR.Namespace,
 				},
 				Data: map[string]string{
 					"kubernetes_cluster_type": "cncf",
@@ -477,7 +517,7 @@ var _ = Describe("ConfigMap handling", func() {
 			ibmcloudClusterInfo = &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "ibmcloud-cluster-info",
-					Namespace: "data-ns",
+					Namespace: authCR.Namespace,
 					OwnerReferences: []metav1.OwnerReference{
 						{
 							APIVersion:         "operator.ibm.com/v1alpha1",
@@ -506,12 +546,52 @@ var _ = Describe("ConfigMap handling", func() {
 					"im_idmgmt_endpoint":        "https://platform-identity-management.data-ns.svc:4500",
 				},
 			}
+			imHasSAMLJob = &batchv1.Job{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "batch/v1",
+					Kind:       "Job",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "im-has-saml",
+					Namespace: authCR.Namespace,
+					UID:       types.UID("96467cef-a1d2-455c-97be-eae3d6196e95"),
+				},
+				Spec: batchv1.JobSpec{},
+			}
+			imHasSAMLPod = &corev1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Pod",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "im-has-saml-pod",
+					Namespace: authCR.Namespace,
+					Labels: map[string]string{
+						"batch.kubernetes.io/controller-uid": "96467cef-a1d2-455c-97be-eae3d6196e95",
+						"batch.kubernetes.io/job-name":       "im-has-saml",
+					},
+				},
+				Spec: corev1.PodSpec{},
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "im-has-saml",
+							State: corev1.ContainerState{
+								Terminated: &corev1.ContainerStateTerminated{
+									ExitCode: 0,
+								},
+							},
+						},
+					},
+				},
+			}
 			scheme = runtime.NewScheme()
 			Expect(corev1.AddToScheme(scheme)).To(Succeed())
 			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
+			Expect(batchv1.AddToScheme(scheme)).To(Succeed())
 			cb = *fakeclient.NewClientBuilder().
 				WithScheme(scheme).
-				WithObjects(globalConfigMap, ibmcloudClusterInfo, authCR)
+				WithObjects(globalConfigMap, ibmcloudClusterInfo, authCR, imHasSAMLJob, imHasSAMLPod)
 			cl = cb.Build()
 			dc, err := discovery.NewDiscoveryClientForConfig(cfg)
 			Expect(err).NotTo(HaveOccurred())
@@ -522,28 +602,15 @@ var _ = Describe("ConfigMap handling", func() {
 					Reader: cl,
 				},
 				DiscoveryClient: *dc,
-				GetPostgresDB: func(c client.Client, ctx context.Context, req ctrl.Request) (conn dbconn.DBConn, err error) {
-					return &MockDBConn{
-						connect: func(ctx context.Context) (err error) {
-							return nil
-						},
-						disconnect: func(context.Context) error {
-							return nil
-						},
-						hasSAML: func(ctx context.Context) (bool, error) {
-							return true, nil
-						},
-					}, nil
-				},
 			}
 			ctx = context.Background()
 		})
 
-		getObserved := func() *corev1.ConfigMap {
+		getObserved := func(ns string) *corev1.ConfigMap {
 			return &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "platform-auth-idp",
-					Namespace: "data-ns",
+					Namespace: ns,
 					OwnerReferences: []metav1.OwnerReference{
 						{
 							APIVersion:         "operator.ibm.com/v1alpha1",
@@ -770,8 +837,33 @@ var _ = Describe("ConfigMap handling", func() {
 				WithPrimary(authCR).MustBuild()
 			for _, test := range updateOnNotSetKeys {
 				observed := &corev1.ConfigMap{}
+				r.Create(ctx, &batchv1.Job{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "batch/v1",
+						Kind:       "Job",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "im-has-saml",
+						Namespace: authCR.Namespace,
+						UID:       types.UID("96467cef-a1d2-455c-97be-eae3d6196e95"),
+					},
+					Spec: batchv1.JobSpec{},
+				})
 				Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, observed)).
 					To(Succeed())
+
+				r.Create(ctx, &batchv1.Job{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "batch/v1",
+						Kind:       "Job",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "im-has-saml",
+						Namespace: authCR.Namespace,
+						UID:       types.UID("96467cef-a1d2-455c-97be-eae3d6196e95"),
+					},
+					Spec: batchv1.JobSpec{},
+				})
 				generated := &corev1.ConfigMap{}
 				err := r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
 				Expect(err).NotTo(HaveOccurred())
@@ -812,9 +904,33 @@ var _ = Describe("ConfigMap handling", func() {
 				WithPrimary(authCR).MustBuild()
 			for _, test := range updateOnNotUpToDate {
 				observed := &corev1.ConfigMap{}
+				r.Create(ctx, &batchv1.Job{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "batch/v1",
+						Kind:       "Job",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "im-has-saml",
+						Namespace: authCR.Namespace,
+						UID:       types.UID("96467cef-a1d2-455c-97be-eae3d6196e95"),
+					},
+					Spec: batchv1.JobSpec{},
+				})
 				Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, observed)).
 					To(Succeed())
 				generated := &corev1.ConfigMap{}
+				r.Create(ctx, &batchv1.Job{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "batch/v1",
+						Kind:       "Job",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "im-has-saml",
+						Namespace: authCR.Namespace,
+						UID:       types.UID("96467cef-a1d2-455c-97be-eae3d6196e95"),
+					},
+					Spec: batchv1.JobSpec{},
+				})
 				err := r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
 				Expect(err).NotTo(HaveOccurred())
 				updated, err = updatePlatformAuthIDP(resource, ctx, observed, generated)
@@ -844,10 +960,22 @@ var _ = Describe("ConfigMap handling", func() {
 				WithClient(cl).
 				WithPrimary(authCR).MustBuild()
 			for _, k := range updateWhenLocalhostUsed {
-				observed := getObserved()
+				observed := getObserved(authCR.Namespace)
 				// Set the keys in observed to contain localhost IP
 				observed.Data[k] = "https://127.0.0.1:12345"
 				generated := &corev1.ConfigMap{}
+				r.Create(ctx, &batchv1.Job{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "batch/v1",
+						Kind:       "Job",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "im-has-saml",
+						Namespace: authCR.Namespace,
+						UID:       types.UID("96467cef-a1d2-455c-97be-eae3d6196e95"),
+					},
+					Spec: batchv1.JobSpec{},
+				})
 				Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).
 					To(Succeed())
 				updated, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
@@ -864,12 +992,36 @@ var _ = Describe("ConfigMap handling", func() {
 				WithNamespace(authCR.Namespace).
 				WithClient(cl).
 				WithPrimary(authCR).MustBuild()
+			r.Create(ctx, &batchv1.Job{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "batch/v1",
+					Kind:       "Job",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "im-has-saml",
+					Namespace: authCR.Namespace,
+					UID:       types.UID("96467cef-a1d2-455c-97be-eae3d6196e95"),
+				},
+				Spec: batchv1.JobSpec{},
+			})
 			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, observed)).
 				To(Succeed())
 			// Set the keys in observed to contain localhost IP
 			k := "OS_TOKEN_LENGTH"
 			observed.Data[k] = "24"
 			generated := &corev1.ConfigMap{}
+			r.Create(ctx, &batchv1.Job{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "batch/v1",
+					Kind:       "Job",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "im-has-saml",
+					Namespace: authCR.Namespace,
+					UID:       types.UID("96467cef-a1d2-455c-97be-eae3d6196e95"),
+				},
+				Spec: batchv1.JobSpec{},
+			})
 			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).
 				To(Succeed())
 			updated, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
@@ -909,10 +1061,34 @@ var _ = Describe("ConfigMap handling", func() {
 				WithClient(cl).
 				WithPrimary(authCR).MustBuild()
 			for _, test := range updateAlways {
-				observed := getObserved()
+				observed := getObserved(authCR.Namespace)
+				r.Create(ctx, &batchv1.Job{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "batch/v1",
+						Kind:       "Job",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "im-has-saml",
+						Namespace: authCR.Namespace,
+						UID:       types.UID("96467cef-a1d2-455c-97be-eae3d6196e95"),
+					},
+					Spec: batchv1.JobSpec{},
+				})
 				Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, observed)).
 					To(Succeed())
 				generated := &corev1.ConfigMap{}
+				r.Create(ctx, &batchv1.Job{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "batch/v1",
+						Kind:       "Job",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "im-has-saml",
+						Namespace: authCR.Namespace,
+						UID:       types.UID("96467cef-a1d2-455c-97be-eae3d6196e95"),
+					},
+					Spec: batchv1.JobSpec{},
+				})
 				Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).
 					To(Succeed())
 				updated, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
@@ -1207,7 +1383,7 @@ var _ = Describe("ConfigMap handling", func() {
 				WithNamespace(authCR.Namespace).
 				WithClient(cl).
 				WithPrimary(authCR).MustBuild()
-			err := generateRegistrationScriptConfigMap()(resource, ctx, generated)
+			err := generateRegisterClientScript(resource, ctx, generated)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(generated.Data).ToNot(BeNil())
 			Expect(generated.Data["register-client.sh"]).To(Equal(registerClientScript))

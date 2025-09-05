@@ -34,7 +34,6 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/internal/controller/common"
-	dbconn "github.com/IBM/ibm-iam-operator/internal/database/connectors"
 	"github.com/opdev/subreconciler"
 	routev1 "github.com/openshift/api/route/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -89,7 +88,8 @@ func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctr
 			WithModifyFns(updateOAuthClientConfigMap),
 		common.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
 			WithName("registration-script").
-			WithGenerateFns(generateRegistrationScriptConfigMap()),
+			WithGenerateFns(generateRegisterClientScript).
+			WithModifyFns(updateRegisterClientScript),
 	}
 
 	subRecs := []common.SecondaryReconciler{}
@@ -250,6 +250,18 @@ func updateRegistrationJSON(_ common.SecondaryReconciler, ctx context.Context, o
 		}
 
 		observed.Data["platform-oidc-registration.json"] = string(newJSON[:])
+		updated = true
+	}
+	if !reflect.DeepEqual(generated.GetOwnerReferences(), observed.GetOwnerReferences()) {
+		observed.OwnerReferences = generated.GetOwnerReferences()
+		updated = true
+	}
+	return
+}
+
+func updateRegisterClientScript(_ common.SecondaryReconciler, ctx context.Context, observed, generated *corev1.ConfigMap) (updated bool, err error) {
+	if generated.Data["register-client.sh"] != observed.Data["register-client.sh"] {
+		observed.Data["register-client.sh"] = generated.Data["register-client.sh"]
 		updated = true
 	}
 	if !reflect.DeepEqual(generated.GetOwnerReferences(), observed.GetOwnerReferences()) {
@@ -453,7 +465,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 
 		// Set the path for SAML connections
 		var masterPath string
-		if masterPath, err = r.getMasterPath(ctx, ctrl.Request{NamespacedName: common.GetObjectKey(s.GetPrimary())}); err != nil {
+		if masterPath, err = r.getMasterPath(ctx, s.GetNamespace()); err != nil {
 			reqLogger.Error(err, "Failed to determine whether a preexisting SAML exists")
 			err = fmt.Errorf("could not set MASTER_PATH")
 			return
@@ -635,28 +647,25 @@ func generateRegistrationJsonConfigMap(clusterInfo *corev1.ConfigMap) common.Gen
 	}
 }
 
-func generateRegistrationScriptConfigMap() common.GenerateFn[*corev1.ConfigMap] {
-	return func(s common.SecondaryReconciler, ctx context.Context, generated *corev1.ConfigMap) (err error) {
-		reqLogger := logf.FromContext(ctx)
+func generateRegisterClientScript(s common.SecondaryReconciler, ctx context.Context, generated *corev1.ConfigMap) (err error) {
+	reqLogger := logf.FromContext(ctx)
 
-		*generated = corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      s.GetName(),
-				Namespace: s.GetNamespace(),
-				Labels:    map[string]string{"app": "platform-auth-service"},
-			},
-			Data: map[string]string{
-				"register-client.sh": registerClientScript,
-			},
-		}
-
-		// Set Authentication authCR as the owner and controller of the ConfigMap
-		if err = controllerutil.SetControllerReference(s.GetPrimary(), generated, s.GetClient().Scheme()); err != nil {
-			reqLogger.Error(err, "Failed to set owner for ConfigMap")
-		}
-		return
+	*generated = corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      s.GetName(),
+			Namespace: s.GetNamespace(),
+			Labels:    map[string]string{"app": "platform-auth-service"},
+		},
+		Data: map[string]string{
+			"register-client.sh": registerClientScript,
+		},
 	}
 
+	// Set Authentication authCR as the owner and controller of the ConfigMap
+	if err = controllerutil.SetControllerReference(s.GetPrimary(), generated, s.GetClient().Scheme()); err != nil {
+		reqLogger.Error(err, "Failed to set owner for ConfigMap")
+	}
+	return
 }
 
 func generateOAuthClientConfigMap(clusterInfo *corev1.ConfigMap) common.GenerateFn[*corev1.ConfigMap] {
@@ -1026,25 +1035,71 @@ func readROKSURL(ctx context.Context) (issuer string, err error) {
 	return issuer, nil
 }
 
-func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, req ctrl.Request) (path string, err error) {
-	p, err := r.GetPostgresDB(r.Client, ctx, req)
-	if err != nil {
+func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, namespace string) (path string, err error) {
+	cmKey := types.NamespacedName{Name: "platform-auth-idp", Namespace: namespace}
+	cm := &corev1.ConfigMap{}
+	if err = r.Get(ctx, cmKey, cm); err != nil && !k8sErrors.IsNotFound(err) {
 		return
+	} else if err == nil {
+		if v, ok := cm.Data["MASTER_PATH"]; ok {
+			return v, nil
+		}
 	}
-	var has bool
-	if err = p.Connect(ctx); err != nil {
-		return
-	}
-	defer p.Disconnect(ctx)
 
-	samlChecker, ok := p.(dbconn.SAMLChecker)
-	if !ok {
-		return "", fmt.Errorf("DB unable to check for SAML connection")
-	}
-	if has, err = samlChecker.HasSAML(ctx); err != nil {
+	jobKey := types.NamespacedName{Name: "im-has-saml", Namespace: namespace}
+	job := &batchv1.Job{}
+	if err = r.Get(ctx, jobKey, job); err != nil {
 		return
-	} else if has {
-		return "", err
 	}
-	return "/idauth", nil
+	jobUID := job.ObjectMeta.UID
+
+	podList := &corev1.PodList{}
+
+	opts := []client.ListOption{
+		client.InNamespace(namespace),
+		client.MatchingLabels(map[string]string{
+			"batch.kubernetes.io/controller-uid": string(jobUID),
+			"batch.kubernetes.io/job-name":       "im-has-saml",
+		}),
+	}
+
+	if err = r.List(ctx, podList, opts...); err != nil {
+		return
+	} else if len(podList.Items) != 1 {
+		return "", fmt.Errorf("received invalid number of matching Pods (%d)", len(podList.Items))
+	}
+
+	po := podList.Items[0]
+	if len(po.Status.ContainerStatuses) != 1 {
+		return "", fmt.Errorf("received invalid number of containerStatuses (%d)", len(po.Status.ContainerStatuses))
+	}
+
+	containerState := podList.Items[0].Status.ContainerStatuses[0].State
+	if containerState.Terminated == nil {
+		return "", fmt.Errorf("container does not appear to have terminated yet")
+	}
+
+	exitCode := containerState.Terminated.ExitCode
+	var deleteJob bool
+	switch exitCode {
+	case 2:
+		err = fmt.Errorf("failed to query for SAML connection; check Job %s in namespace %s for details, or delete the Job to rerun", "im-has-saml", namespace)
+	case 1:
+		path = "/idauth"
+		deleteJob = true
+	case 0:
+		deleteJob = true
+	default:
+		err = fmt.Errorf("received unexpected error code while running SAML; check Job %s in namespace %s for details, or delete the Job to rerun", "im-has-saml", namespace)
+	}
+
+	if !deleteJob {
+		return
+	}
+
+	if err = r.Delete(ctx, job); err != nil && !k8sErrors.IsNotFound(err) {
+		return "", fmt.Errorf("failed to delete Job %s in namespace %s after getting MASTER_PATH: %w", "im-has-saml", namespace, err)
+	}
+
+	return
 }

@@ -342,7 +342,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			},
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
-			ReadOnlyRootFilesystem:   &falseVar,
+			ReadOnlyRootFilesystem:   &trueVar,
 			AllowPrivilegeEscalation: &falseVar,
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
@@ -377,6 +377,26 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			{
 				Name:      "pgsql-client-cred",
 				MountPath: "/pgsql/clientinfo",
+			},
+			{
+				Name:      "liberty-serverdir-vol",
+				MountPath: "/opt/ibm/wlp/usr/servers/defaultServer",
+			},
+			{
+				Name:      "liberty-outputdir-vol",
+				MountPath: "/opt/ibm/wlp/output/defaultServer",
+			},
+			{
+				Name:      "liberty-logs-vol",
+				MountPath: "/logs",
+			},
+			{
+				Name:      "liberty-tmp-vol",
+				MountPath: "/tmp",
+			},
+			{
+				Name:      "auth-service-data-vol",
+				MountPath: "/opt/ibm/auth-service",
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
@@ -694,7 +714,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			},
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
-			ReadOnlyRootFilesystem:   &falseVar,
+			ReadOnlyRootFilesystem:   &trueVar,
 			AllowPrivilegeEscalation: &falseVar,
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
@@ -1041,7 +1061,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			},
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
-			ReadOnlyRootFilesystem:   &falseVar,
+			ReadOnlyRootFilesystem:   &trueVar,
 			AllowPrivilegeEscalation: &falseVar,
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
@@ -1199,6 +1219,10 @@ func buildIdentityProviderVolumeMounts(auditSecretName *string) []corev1.VolumeM
 			Name:      "pgsql-client-cred",
 			MountPath: "/pgsql/clientinfo",
 		},
+	    {
+	      Name:      "provider-data-vol",
+	      MountPath: "/opt/ibm/provider-data",
+	    },
 	}
 	if auditSecretName != nil && *auditSecretName != "" {
 		newVolMount := corev1.VolumeMount{

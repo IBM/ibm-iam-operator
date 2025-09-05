@@ -730,6 +730,12 @@ var _ = Describe("ConfigMap handling", func() {
 					},
 				},
 				{
+					"IAM_UM",
+					[]string{
+						"IAM_UM",
+					},
+				},
+				{
 					"SCIM_LDAP_ATTRIBUTES_MAPPING",
 					[]string{
 						"SCIM_LDAP_ATTRIBUTES_MAPPING",

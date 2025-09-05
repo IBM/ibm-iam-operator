@@ -159,6 +159,7 @@ type ConfigSpec struct {
 	AttrMappingFromConfig       bool           `json:"attrMappingFromConfig,omitempty"`
 	ZenFrontDoor                bool           `json:"zenFrontDoor,omitempty"`
 	Ingress                     *IngressConfig `json:"ingress,omitempty"`
+	IamUm                       *bool          `json:"iamUm,omitempty"`
 }
 
 type ManagedResourceStatus struct {

@@ -130,7 +130,7 @@ func convertToLibertyFormat(memory string) string {
 
 }
 
-func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authServiceImage string, _ string) corev1.Container {
+func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authServiceImage string, ldapSpcExist bool) corev1.Container {
 
 	resources := instance.Spec.AuthService.Resources
 
@@ -348,37 +348,8 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 				Drop: []corev1.Capability{"ALL"},
 			},
 		},
-		Resources: *resources,
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      "auth-key",
-				MountPath: "/certs/platform-auth",
-			},
-			{
-				Name:      "ibmid-jwk-cert",
-				MountPath: "/certs/ibmid/jwk",
-			},
-			{
-				Name:      "ibmid-ssl-cert",
-				MountPath: "/certs/ibmid/ssl",
-			},
-			{
-				Name:      "ldaps-ca-cert",
-				MountPath: "/opt/ibm/ldaps",
-			},
-			{
-				Name:      "saml-cert",
-				MountPath: "/certs/saml-certs",
-			},
-			{
-				Name:      "pgsql-certs",
-				MountPath: "/certs/pgsql",
-			},
-			{
-				Name:      "pgsql-client-cred",
-				MountPath: "/pgsql/clientinfo",
-			},
-		},
+		Resources:    *resources,
+		VolumeMounts: buildAuthSvcVolumeMounts(ldapSpcExist),
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
@@ -414,7 +385,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 
 }
 
-func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage, saasCRNId string) corev1.Container {
+func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, identityProviderImage, saasCRNId string, ldapSpcExist bool) corev1.Container {
 
 	resources := instance.Spec.IdentityProvider.Resources
 	if resources == nil {
@@ -701,7 +672,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			},
 		},
 		Resources:    *resources,
-		VolumeMounts: buildIdentityProviderVolumeMounts(instance.Spec.Config.AuditSecret),
+		VolumeMounts: buildIdentityProviderVolumeMounts(instance.Spec.Config.AuditSecret, ldapSpcExist),
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
@@ -731,7 +702,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 
 }
 
-func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string) corev1.Container {
+func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string, ldapSpcExist bool) corev1.Container {
 
 	replicaCount := int(instance.Spec.Replicas)
 	resources := instance.Spec.IdentityManager.Resources
@@ -1048,7 +1019,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			},
 		},
 		Resources:    *resources,
-		VolumeMounts: buildIdentityManagerVolumeMounts(instance.Spec.Config.AuditSecret),
+		VolumeMounts: buildIdentityManagerVolumeMounts(instance.Spec.Config.AuditSecret, ldapSpcExist),
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
@@ -1078,25 +1049,21 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 
 }
 
-func buildContainers(instance *operatorv1alpha1.Authentication, authServiceImage string, icpConsoleURL string) []corev1.Container {
-
-	authServiceContainer := buildAuthServiceContainer(instance, authServiceImage, icpConsoleURL)
-	//identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId)
-	//identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL)
-
+func buildContainers(instance *operatorv1alpha1.Authentication, authServiceImage string, ldapSpcExist bool) []corev1.Container {
+	authServiceContainer := buildAuthServiceContainer(instance, authServiceImage, ldapSpcExist)
 	return []corev1.Container{authServiceContainer}
 }
 
-func buildManagerContainers(instance *operatorv1alpha1.Authentication, identityManagerImage string) []corev1.Container {
+func buildManagerContainers(instance *operatorv1alpha1.Authentication, identityManagerImage string, ldapSpcExist bool) []corev1.Container {
 
-	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage)
+	identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, ldapSpcExist)
 
 	return []corev1.Container{identityManagerContainer}
 }
 
-func buildProviderContainers(instance *operatorv1alpha1.Authentication, identityProviderImage string, saasCrnId string) []corev1.Container {
+func buildProviderContainers(instance *operatorv1alpha1.Authentication, identityProviderImage string, saasCrnId string, ldapSpcExist bool) []corev1.Container {
 
-	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, saasCrnId)
+	identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, saasCrnId, ldapSpcExist)
 
 	return []corev1.Container{identityProviderContainer}
 }
@@ -1143,7 +1110,46 @@ func buildInitContainerEnvVars(envVarList []string, configmapName string) []core
 	return envVars
 }
 
-func buildIdentityManagerVolumeMounts(auditSecretName *string) []corev1.VolumeMount {
+func buildAuthSvcVolumeMounts(ldapSpcExist bool) []corev1.VolumeMount {
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "auth-key",
+			MountPath: "/certs/platform-auth",
+		},
+		{
+			Name:      "ibmid-jwk-cert",
+			MountPath: "/certs/ibmid/jwk",
+		},
+		{
+			Name:      "ibmid-ssl-cert",
+			MountPath: "/certs/ibmid/ssl",
+		},
+		{
+			Name:      "ldaps-ca-cert",
+			MountPath: "/opt/ibm/ldaps",
+		},
+		{
+			Name:      "saml-cert",
+			MountPath: "/certs/saml-certs",
+		},
+		{
+			Name:      "pgsql-certs",
+			MountPath: "/certs/pgsql",
+		},
+		{
+			Name:      "pgsql-client-cred",
+			MountPath: "/pgsql/clientinfo",
+		},
+	}
+	if ldapSpcExist {
+		volumeMounts = EnsureVolumeMountPresent(volumeMounts, GetLdapBindPwdVolumeMount())
+
+	}
+
+	return volumeMounts
+}
+
+func buildIdentityManagerVolumeMounts(auditSecretName *string, ldapSpcExist bool) []corev1.VolumeMount {
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "cluster-ca",
@@ -1166,6 +1172,10 @@ func buildIdentityManagerVolumeMounts(auditSecretName *string) []corev1.VolumeMo
 			MountPath: "/pgsql/clientinfo",
 		},
 	}
+	if ldapSpcExist {
+		volumeMounts = EnsureVolumeMountPresent(volumeMounts, GetLdapBindPwdVolumeMount())
+	}
+
 	if auditSecretName != nil && *auditSecretName != "" {
 		newVolMount := corev1.VolumeMount{
 			Name:      IMAuditTLSVolume,
@@ -1177,7 +1187,7 @@ func buildIdentityManagerVolumeMounts(auditSecretName *string) []corev1.VolumeMo
 	return volumeMounts
 }
 
-func buildIdentityProviderVolumeMounts(auditSecretName *string) []corev1.VolumeMount {
+func buildIdentityProviderVolumeMounts(auditSecretName *string, ldapSpcExist bool) []corev1.VolumeMount {
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "auth-key",
@@ -1200,6 +1210,10 @@ func buildIdentityProviderVolumeMounts(auditSecretName *string) []corev1.VolumeM
 			MountPath: "/pgsql/clientinfo",
 		},
 	}
+	if ldapSpcExist {
+		volumeMounts = EnsureVolumeMountPresent(volumeMounts, GetLdapBindPwdVolumeMount())
+
+	}
 	if auditSecretName != nil && *auditSecretName != "" {
 		newVolMount := corev1.VolumeMount{
 			Name:      IMAuditTLSVolume,
@@ -1207,5 +1221,25 @@ func buildIdentityProviderVolumeMounts(auditSecretName *string) []corev1.VolumeM
 		}
 		volumeMounts = append(volumeMounts, newVolMount)
 	}
+
 	return volumeMounts
+}
+
+// EnsureVolumeMountPresent checks if a volumeMount exists
+// If not, it appends the new volume and returns the updated slice.
+func EnsureVolumeMountPresent(volumeMounts []corev1.VolumeMount, newVolMount corev1.VolumeMount) []corev1.VolumeMount {
+	for _, v := range volumeMounts {
+		if v.Name == newVolMount.Name {
+			return volumeMounts // already exists
+		}
+	}
+	return append(volumeMounts, newVolMount)
+}
+
+func GetLdapBindPwdVolumeMount() corev1.VolumeMount {
+	volMount := corev1.VolumeMount{
+		Name:      ctrlCommon.IMLdapBindPwdVolume,
+		MountPath: "/opt/ibm/vault/ldap-bind-cred",
+	}
+	return volMount
 }

@@ -284,6 +284,14 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - secrets-store.csi.x-k8s.io
+  resources:
+  - secretproviderclasses
+  verbs:
+  - get
+  - list
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

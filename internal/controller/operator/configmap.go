@@ -1091,7 +1091,11 @@ func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, namespace 
 		return
 	}
 
-	if err = r.Delete(ctx, job); err != nil && !k8sErrors.IsNotFound(err) {
+	deleteOpts := []client.DeleteOption{
+		client.PropagationPolicy(metav1.DeletePropagationForeground),
+	}
+
+	if err = r.Delete(ctx, job, deleteOpts...); err != nil && !k8sErrors.IsNotFound(err) {
 		return "", fmt.Errorf("failed to delete Job %s in namespace %s after getting MASTER_PATH: %w", "im-has-saml", namespace, err)
 	}
 

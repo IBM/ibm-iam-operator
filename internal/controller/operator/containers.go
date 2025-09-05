@@ -130,7 +130,7 @@ func convertToLibertyFormat(memory string) string {
 
 }
 
-func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authServiceImage string, _ string, ldapSpcExist bool) corev1.Container {
+func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authServiceImage string, ldapSpcExist bool) corev1.Container {
 
 	resources := instance.Spec.AuthService.Resources
 
@@ -1049,12 +1049,8 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 
 }
 
-func buildContainers(instance *operatorv1alpha1.Authentication, authServiceImage string, icpConsoleURL string, ldapSpcExist bool) []corev1.Container {
-
-	authServiceContainer := buildAuthServiceContainer(instance, authServiceImage, icpConsoleURL, ldapSpcExist)
-	//identityProviderContainer := buildIdentityProviderContainer(instance, identityProviderImage, icpConsoleURL, saasCrnId)
-	//identityManagerContainer := buildIdentityManagerContainer(instance, identityManagerImage, icpConsoleURL)
-
+func buildContainers(instance *operatorv1alpha1.Authentication, authServiceImage string, ldapSpcExist bool) []corev1.Container {
+	authServiceContainer := buildAuthServiceContainer(instance, authServiceImage, ldapSpcExist)
 	return []corev1.Container{authServiceContainer}
 }
 

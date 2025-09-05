@@ -34,6 +34,7 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -71,8 +72,6 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 		return subreconciler.RequeueWithError(err)
 	}
 
-	icpConsoleURL := consoleConfigMap.Data["cluster_address"]
-
 	auditSecretName, err := r.getAuditSecretNameIfExists(deployCtx, authCR)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
@@ -103,7 +102,7 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 	builders := []*common.SecondaryReconcilerBuilder[*appsv1.Deployment]{
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-auth-service").
-			WithGenerateFns(generatePlatformAuthService(imagePullSecret, icpConsoleURL, ldapSpcExists, edbSpcExists)).
+			WithGenerateFns(generatePlatformAuthService(imagePullSecret, ldapSpcExists, edbSpcExists)).
 			WithModifyFns(modifyDeployment(r.needsRollout)),
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-identity-management").
@@ -207,7 +206,7 @@ func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Contex
 	return authCR.Spec.Config.AuditSecret, nil
 }
 
-func generatePlatformAuthService(imagePullSecret, icpConsoleURL string, ldapSpcExist bool, edbSpcExist bool) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformAuthService(imagePullSecret string, ldapSpcExist bool, edbSpcExist bool) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		authServiceImage := common.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
@@ -364,7 +363,7 @@ func generatePlatformAuthService(imagePullSecret, icpConsoleURL string, ldapSpcE
 							},
 						},
 						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, nil, ldapSpcExist, edbSpcExist),
-						Containers:     buildContainers(authCR, authServiceImage, icpConsoleURL, ldapSpcExist),
+						Containers:     buildContainers(authCR, authServiceImage, ldapSpcExist),
 						InitContainers: buildInitContainers(initContainerImage),
 					},
 				},
@@ -1086,16 +1085,48 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName
 		volumes = append(volumes, auditVolume)
 	}
 	if ldapSpcExist {
-		volumes = EnsureVolumePresent(volumes, GetLdapBindCredCsiVolume())
+		volumes = ensureVolumePresent(volumes, corev1.Volume{
+			Name: common.IMLdapBindPwdVolume,
+			VolumeSource: corev1.VolumeSource{
+				CSI: &corev1.CSIVolumeSource{
+					Driver:   "secrets-store.csi.k8s.io",
+					ReadOnly: ptr.To(true),
+					VolumeAttributes: map[string]string{
+						"secretProviderClass": common.IMLdapBindCredSpc,
+					},
+				},
+			},
+		})
 	}
 	if edbSpcExist {
-		volumes = EnsureVolumePresent(volumes, GetPgsqlCsiVolume())
+		volumes = ensureVolumePresent(volumes, corev1.Volume{
+			Name: "pgsql-certs",
+			VolumeSource: corev1.VolumeSource{
+				CSI: &corev1.CSIVolumeSource{
+					Driver:   "secrets-store.csi.k8s.io",
+					ReadOnly: ptr.To(true),
+					VolumeAttributes: map[string]string{
+						"secretProviderClass": common.IMExtEDBSecretSpc,
+					},
+				},
+			},
+		})
 	} else {
-		volumes = EnsureVolumePresent(volumes, GetPgsqlSecretVolume())
+		volumes = ensureVolumePresent(volumes, corev1.Volume{
+			Name: "pgsql-certs",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  common.DatastoreEDBSecretName,
+					DefaultMode: &partialAccess,
+				},
+			},
+		})
 	}
 	return volumes
 }
 
+// CheckSPCExists returns whether a SecretProviderClass with the given name
+// exists in the provided namespace.
 func (r *AuthenticationReconciler) CheckSPCExists(ctx context.Context, spcName string, namespace string) (exist bool) {
 	spc := &sscsidriverv1.SecretProviderClass{}
 	if common.ClusterHasCSIGroupVersion(&r.DiscoveryClient) {
@@ -1105,85 +1136,22 @@ func (r *AuthenticationReconciler) CheckSPCExists(ctx context.Context, spcName s
 	return false
 }
 
-func GetVolumeType(vol corev1.Volume) string {
-	switch {
-	case vol.VolumeSource.Secret != nil:
-		return "Secret"
-	case vol.VolumeSource.CSI != nil:
-		return "CSI"
-	case vol.VolumeSource.ConfigMap != nil:
-		return "ConfigMap"
-	// add other cases as needed
-	default:
-		return "Unknown"
-	}
-}
-
-func GetPgsqlSecretVolume() corev1.Volume {
-	vol := corev1.Volume{
-		Name: "pgsql-certs",
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName:  common.DatastoreEDBSecretName,
-				DefaultMode: &partialAccess,
-			},
-		},
-	}
-	return vol
-}
-
-func GetPgsqlCsiVolume() corev1.Volume {
-	vol := corev1.Volume{
-		Name: "pgsql-certs",
-		VolumeSource: corev1.VolumeSource{
-			CSI: &corev1.CSIVolumeSource{
-				Driver:   "secrets-store.csi.k8s.io",
-				ReadOnly: boolPtr(true),
-				VolumeAttributes: map[string]string{
-					"secretProviderClass": common.IMExtEDBSecretSpc,
-				},
-			},
-		},
-	}
-	return vol
-}
-
-func GetLdapBindCredCsiVolume() corev1.Volume {
-	vol := corev1.Volume{
-		Name: common.IMLdapBindPwdVolume,
-		VolumeSource: corev1.VolumeSource{
-			CSI: &corev1.CSIVolumeSource{
-				Driver:   "secrets-store.csi.k8s.io",
-				ReadOnly: boolPtr(true),
-				VolumeAttributes: map[string]string{
-					"secretProviderClass": common.IMLdapBindCredSpc,
-				},
-			},
-		},
-	}
-	return vol
-}
-
-func boolPtr(b bool) *bool {
-	return &b
-}
-
-// EnsureVolumePresent checks if a volume exists by name.
-// If not, it appends the new volume and returns the updated slice.
-func EnsureVolumePresent(volumes []corev1.Volume, newVol corev1.Volume) []corev1.Volume {
-	for _, v := range volumes {
-		if v.Name == newVol.Name {
-			return volumes // already exists
-		}
+// ensureVolumePresent checks if a volume exists by name.  If not, it appends
+// the new volume and returns the updated slice.
+func ensureVolumePresent(volumes []corev1.Volume, newVol corev1.Volume) []corev1.Volume {
+	if v := getVolumeByName(volumes, newVol.Name); v != nil {
+		return volumes
 	}
 	return append(volumes, newVol)
 }
 
-func GetVolumeByName(volumes []corev1.Volume, name string) (corev1.Volume, bool) {
+// getVolumeByName returns the pointer to the first volume in the slice that has
+// a name that matches the provided name. Returns nil if no matches are found.
+func getVolumeByName(volumes []corev1.Volume, name string) *corev1.Volume {
 	for _, v := range volumes {
 		if v.Name == name {
-			return v, true
+			return &v
 		}
 	}
-	return corev1.Volume{}, false
+	return nil
 }

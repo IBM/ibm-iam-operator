@@ -355,8 +355,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&corev1.Service{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&netv1.Ingress{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&appsv1.Deployment{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
-		Watches(&autoscalingv2.HorizontalPodAutoscaler{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
-		Watches(&sscsidriverv1.SecretProviderClass{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+		Watches(&autoscalingv2.HorizontalPodAutoscaler{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
 
 	//Add routes
 	if ctrlcommon.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
@@ -367,6 +366,30 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	if ctrlcommon.ClusterHasOperandBindInfoAPIResource(&r.DiscoveryClient) {
 		authCtrl.Watches(&operatorv1alpha1.OperandBindInfo{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+	}
+	if ctrlcommon.ClusterHasCSIGroupVersion(&r.DiscoveryClient) {
+		authCtrl.Watches(&sscsidriverv1.SecretProviderClass{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+		ldapSPCPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
+			return o.GetName() == ctrlcommon.IMLdapBindCredSpc
+		})
+		edbSPCPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
+			return o.GetName() == ctrlcommon.IMExtEDBSecretSpc
+		})
+
+		authCtrl.Watches(&sscsidriverv1.SecretProviderClass{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
+				authCR, _ := ctrlcommon.GetAuthentication(ctx, r.Client)
+				if authCR == nil {
+					return
+				}
+				return []reconcile.Request{
+					{NamespacedName: types.NamespacedName{
+						Name:      authCR.Name,
+						Namespace: authCR.Namespace,
+					}},
+				}
+			}), builder.WithPredicates(predicate.Or(ldapSPCPred, edbSPCPred)),
+		)
 	}
 
 	productCMPred := predicate.Funcs{
@@ -413,27 +436,6 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				}},
 			}
 		}), builder.WithPredicates(predicate.Or(globalCMPred, productCMPred)),
-	)
-	ldapSPCPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
-		return o.GetName() == ctrlcommon.IMLdapBindCredSpc
-	})
-	edbSPCPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
-		return o.GetName() == ctrlcommon.IMExtEDBSecretSpc
-	})
-
-	authCtrl.Watches(&sscsidriverv1.SecretProviderClass{},
-		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
-			authCR, _ := ctrlcommon.GetAuthentication(ctx, r.Client)
-			if authCR == nil {
-				return
-			}
-			return []reconcile.Request{
-				{NamespacedName: types.NamespacedName{
-					Name:      authCR.Name,
-					Namespace: authCR.Namespace,
-				}},
-			}
-		}), builder.WithPredicates(predicate.Or(ldapSPCPred, edbSPCPred)),
 	)
 	bootstrappedPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
 		return o.GetLabels()[ctrlcommon.ManagerVersionLabel] == version.Version

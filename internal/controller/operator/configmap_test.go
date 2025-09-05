@@ -686,6 +686,7 @@ var _ = Describe("ConfigMap handling", func() {
 					"SCIM_ASYNC_PARALLEL_LIMIT":          "100",
 					"SCIM_GET_DISPLAY_FOR_GROUP_USERS":   "true",
 					"IS_OPENSHIFT_ENV":                   "false",
+					"OAUTH_21_ENABLED":					  "false"
 				},
 			}
 		}
@@ -727,6 +728,12 @@ var _ = Describe("ConfigMap handling", func() {
 					[]string{
 						"AUDIT_URL",
 						"AUDIT_SECRET",
+					},
+				},
+				{
+					"OAUTH_21_ENABLED",
+					[]string{
+						"OAUTH_21_ENABLED",
 					},
 				},
 				{
@@ -1103,6 +1110,7 @@ var _ = Describe("ConfigMap handling", func() {
 						ClaimsMap:             "someclaims",
 						ScopeClaim:            "scopeclaimexample",
 						IsOpenshiftEnv:        false,
+						OAuth21Enabled:        ptr.To(false),
 					},
 				},
 			}

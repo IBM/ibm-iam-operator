@@ -310,6 +310,7 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"ATTR_MAPPING_FROM_CONFIG",
 			"AUDIT_URL",
 			"AUDIT_SECRET",
+			"OAUTH_21_ENABLED",
 		),
 		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("OS_TOKEN_LENGTH", "45"),
 			"OS_TOKEN_LENGTH"),
@@ -464,6 +465,12 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 			return
 		}
 
+		var oauth21Enabled bool
+		if authCR.Spec.Config.OAuth21Enabled != nil {
+			reqLogger.Info("Found OAuth 21 enablement", "OAuth 2.1 enabled", *authCR.Spec.Config.OAuth21Enabled)
+			oauth21Enabled = *authCR.Spec.Config.OAuth21Enabled
+		}
+
 		*generated = corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      s.GetName(),
@@ -554,6 +561,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"SCIM_AUTH_CACHE_TTL_VALUE":          "60",
 				"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
 				"IS_OPENSHIFT_ENV":                   strconv.FormatBool(isOSEnv),
+				"OAUTH_21_ENABLED":					  strconv.FormatBool(oauth21Enabled)
 			},
 		}
 

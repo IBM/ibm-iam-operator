@@ -329,8 +329,6 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"LDAP_RECURSIVE_SEARCH"),
 		updatesValuesWhen(not(observedKeyValueSetTo[*corev1.ConfigMap]("MASTER_HOST", generated.Data["MASTER_HOST"])),
 			"MASTER_HOST"),
-		updatesValuesWhen(not(observedKeyValueSetTo[*corev1.ConfigMap]("IAM_UM", generated.Data["IAM_UM"])),
-			"IAM_UM"),
 		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("DB_CONNECT_TIMEOUT")),
 			"DB_CONNECT_TIMEOUT",
 			"DB_IDLE_TIMEOUT",
@@ -367,10 +365,6 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 	if v, ok := generated.Data["IS_OPENSHIFT_ENV"]; ok {
 		updateFns = append(updateFns, updatesValuesWhen(
 			not(observedKeyValueSetTo[*corev1.ConfigMap]("IS_OPENSHIFT_ENV", v)), "IS_OPENSHIFT_ENV"))
-	}
-	if v, ok := generated.Data["IAM_UM"]; ok {
-		updateFns = append(updateFns, updatesValuesWhen(
-			not(observedKeyValueSetTo[*corev1.ConfigMap]("IAM_UM", v)), "IAM_UM"))
 	}
 
 	for _, update := range updateFns {

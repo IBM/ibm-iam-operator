@@ -160,6 +160,7 @@ type ConfigSpec struct {
 	ZenFrontDoor                bool           `json:"zenFrontDoor,omitempty"`
 	Ingress                     *IngressConfig `json:"ingress,omitempty"`
 	OAuth21Enabled              *bool          `json:"oauth21Enabled,omitempty"`
+	IamUm                       *bool          `json:"iamUm,omitempty"`
 }
 
 type ManagedResourceStatus struct {

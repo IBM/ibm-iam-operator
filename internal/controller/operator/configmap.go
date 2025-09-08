@@ -311,6 +311,7 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"AUDIT_URL",
 			"AUDIT_SECRET",
 			"OAUTH_21_ENABLED",
+			"IAM_UM",
 		),
 		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("OS_TOKEN_LENGTH", "45"),
 			"OS_TOKEN_LENGTH"),
@@ -469,6 +470,10 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 		if authCR.Spec.Config.OAuth21Enabled != nil {
 			reqLogger.Info("Found OAuth 21 enablement", "OAuth 2.1 enabled", *authCR.Spec.Config.OAuth21Enabled)
 			oauth21Enabled = *authCR.Spec.Config.OAuth21Enabled
+		var iamUm bool
+		if authCR.Spec.Config.IamUm != nil {
+			reqLogger.Info("Found user management install", "IamUm", *authCR.Spec.Config.IamUm)
+			iamUm = *authCR.Spec.Config.IamUm
 		}
 
 		*generated = corev1.ConfigMap{
@@ -498,6 +503,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"LOG_LEVEL_MW":                       "info",
 				"IDTOKEN_LIFETIME":                   "12h",
 				"SESSION_TIMEOUT":                    "43200",
+				"IAM_UM":                             strconv.FormatBool(iamUm),
 				"OIDC_ISSUER_URL":                    authCR.Spec.Config.OIDCIssuerURL,
 				"PDP_REDIS_CACHE_DEFAULT_TTL":        "600",
 				"FIPS_ENABLED":                       strconv.FormatBool(authCR.Spec.Config.FIPSEnabled),
@@ -1091,7 +1097,11 @@ func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, namespace 
 		return
 	}
 
-	if err = r.Delete(ctx, job); err != nil && !k8sErrors.IsNotFound(err) {
+	deleteOpts := []client.DeleteOption{
+		client.PropagationPolicy(metav1.DeletePropagationForeground),
+	}
+
+	if err = r.Delete(ctx, job, deleteOpts...); err != nil && !k8sErrors.IsNotFound(err) {
 		return "", fmt.Errorf("failed to delete Job %s in namespace %s after getting MASTER_PATH: %w", "im-has-saml", namespace, err)
 	}
 

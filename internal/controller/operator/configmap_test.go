@@ -734,6 +734,9 @@ var _ = Describe("ConfigMap handling", func() {
 					"OAUTH_21_ENABLED",
 					[]string{
 						"OAUTH_21_ENABLED",
+					"IAM_UM",
+					[]string{
+						"IAM_UM",
 					},
 				},
 				{

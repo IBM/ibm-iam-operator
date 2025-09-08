@@ -262,6 +262,9 @@ func (in *ConfigSpec) DeepCopyInto(out *ConfigSpec) {
 	}
 	if in.OAuth21Enabled != nil {
 		in, out := &in.OAuth21Enabled, &out.OAuth21Enabled
+		*out = new(bool)
+		**out = **in
+	}
 	if in.IamUm != nil {
 		in, out := &in.IamUm, &out.IamUm
 		*out = new(bool)

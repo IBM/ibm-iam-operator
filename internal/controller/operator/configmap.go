@@ -468,12 +468,12 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 
 		var oauth21Enabled bool
 		if authCR.Spec.Config.OAuth21Enabled != nil {
-			reqLogger.Info("Found OAuth 21 enablement, ", "OAuth 2.1 enabled ", *authCR.Spec.Config.OAuth21Enabled)
+			reqLogger.Info("Found OAuth 21 enablement", "OAuth 2.1 enabled", *authCR.Spec.Config.OAuth21Enabled)
 			oauth21Enabled = *authCR.Spec.Config.OAuth21Enabled
 		}
 		var iamUm bool
 		if authCR.Spec.Config.IamUm != nil {
-			reqLogger.Info("Found user management install, ", "IamUm ", *authCR.Spec.Config.IamUm)
+			reqLogger.Info("Found user management install", "IamUm", *authCR.Spec.Config.IamUm)
 			iamUm = *authCR.Spec.Config.IamUm
 		}
 

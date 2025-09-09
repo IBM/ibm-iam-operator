@@ -9,9 +9,7 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
-	dbconn "github.com/IBM/ibm-iam-operator/internal/database/connectors"
 	testutil "github.com/IBM/ibm-iam-operator/test/utils"
-	"github.com/jackc/pgx/v5/pgconn"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
@@ -52,44 +50,6 @@ func (d objectUpdater[T]) GetNamespace() string {
 
 func (d objectUpdater[T]) GetClient() client.Client {
 	return d.Client
-}
-
-type MockDBConn struct {
-	connect    func(context.Context) error
-	configure  func(...dbconn.DBOption) error
-	runDDL     func(context.Context, string) error
-	hasSchemas func(context.Context) (bool, error)
-	disconnect func(context.Context) error
-	logChanges func(context.Context, string, ...any) (pgconn.CommandTag, error)
-	hasSAML    func(context.Context) (bool, error)
-}
-
-func (m *MockDBConn) Connect(ctx context.Context) error {
-	return m.connect(ctx)
-}
-
-func (m *MockDBConn) Configure(opts ...dbconn.DBOption) error {
-	return m.configure(opts...)
-}
-
-func (m *MockDBConn) RunDDL(ctx context.Context, ddl string) error {
-	return m.runDDL(ctx, ddl)
-}
-
-func (m *MockDBConn) HasSchemas(ctx context.Context) (bool, error) {
-	return m.hasSchemas(ctx)
-}
-
-func (m *MockDBConn) Disconnect(ctx context.Context) error {
-	return m.disconnect(ctx)
-}
-
-func (m *MockDBConn) LogChanges(ctx context.Context, query string, args ...any) (pgconn.CommandTag, error) {
-	return m.logChanges(ctx, query, args...)
-}
-
-func (m *MockDBConn) HasSAML(ctx context.Context) (bool, error) {
-	return m.hasSAML(ctx)
 }
 
 var _ = Describe("ConfigMap handling", func() {

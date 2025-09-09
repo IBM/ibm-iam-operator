@@ -34,10 +34,12 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	sscsidriverv1 "sigs.k8s.io/secrets-store-csi-driver/apis/v1"
 )
 
 const RestartAnnotation string = "authentications.operator.ibm.com/restartedAt"
@@ -70,8 +72,6 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 		return subreconciler.RequeueWithError(err)
 	}
 
-	icpConsoleURL := consoleConfigMap.Data["cluster_address"]
-
 	auditSecretName, err := r.getAuditSecretNameIfExists(deployCtx, authCR)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
@@ -96,19 +96,21 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 		saasServiceIdCrn = saasTenantConfigMap.Data["service_crn_id"]
 	}
 
+	ldapSpcExists := r.CheckSPCExists(ctx, common.IMLdapBindCredSpc, authCR.Namespace)
+	edbSpcExists := r.CheckSPCExists(ctx, common.IMExtEDBSecretSpc, authCR.Namespace)
 	imagePullSecret := os.Getenv("IMAGE_PULL_SECRET")
 	builders := []*common.SecondaryReconcilerBuilder[*appsv1.Deployment]{
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-auth-service").
-			WithGenerateFns(generatePlatformAuthService(imagePullSecret, icpConsoleURL)).
+			WithGenerateFns(generatePlatformAuthService(imagePullSecret, ldapSpcExists, edbSpcExists)).
 			WithModifyFns(modifyDeployment(r.needsRollout)),
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-identity-management").
-			WithGenerateFns(generatePlatformIdentityManagement(imagePullSecret, auditSecretName)).
+			WithGenerateFns(generatePlatformIdentityManagement(imagePullSecret, auditSecretName, ldapSpcExists, edbSpcExists)).
 			WithModifyFns(modifyDeployment(r.needsRollout)),
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-identity-provider").
-			WithGenerateFns(generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn, auditSecretName)).
+			WithGenerateFns(generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn, auditSecretName, ldapSpcExists, edbSpcExists)).
 			WithModifyFns(modifyDeployment(r.needsRollout)),
 	}
 
@@ -204,7 +206,7 @@ func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Contex
 	return authCR.Spec.Config.AuditSecret, nil
 }
 
-func generatePlatformAuthService(imagePullSecret, icpConsoleURL string) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformAuthService(imagePullSecret string, ldapSpcExist bool, edbSpcExist bool) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		authServiceImage := common.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
@@ -360,13 +362,14 @@ func generatePlatformAuthService(imagePullSecret, icpConsoleURL string) common.G
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, nil),
-						Containers:     buildContainers(authCR, authServiceImage, icpConsoleURL),
+						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, nil, ldapSpcExist, edbSpcExist),
+						Containers:     buildContainers(authCR, authServiceImage, ldapSpcExist),
 						InitContainers: buildInitContainers(initContainerImage),
 					},
 				},
 			},
 		}
+
 		if imagePullSecret != "" {
 			deploy.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: imagePullSecret}}
 		}
@@ -380,7 +383,7 @@ func generatePlatformAuthService(imagePullSecret, icpConsoleURL string) common.G
 	}
 }
 
-func generatePlatformIdentityManagement(imagePullSecret string, auditSecretName *string) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformIdentityManagement(imagePullSecret string, auditSecretName *string, ldapSpcExist bool, edbSpcExist bool) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		identityManagerImage := common.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
@@ -535,8 +538,8 @@ func generatePlatformIdentityManagement(imagePullSecret string, auditSecretName 
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName),
-						Containers:     buildManagerContainers(authCR, identityManagerImage),
+						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSpcExist, edbSpcExist),
+						Containers:     buildManagerContainers(authCR, identityManagerImage, ldapSpcExist),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
 				},
@@ -554,7 +557,7 @@ func generatePlatformIdentityManagement(imagePullSecret string, auditSecretName 
 	}
 }
 
-func generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn string, auditSecretName *string) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn string, auditSecretName *string, ldapSpcExist bool, edbSpcExist bool) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		identityProviderImage := common.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
@@ -710,8 +713,8 @@ func generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn string, 
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName),
-						Containers:     buildProviderContainers(authCR, identityProviderImage, saasServiceIdCrn),
+						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSpcExist, edbSpcExist),
+						Containers:     buildProviderContainers(authCR, identityProviderImage, saasServiceIdCrn, ldapSpcExist),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
 				},
@@ -880,7 +883,7 @@ func hasDataField(fields metav1.ManagedFieldsEntry) bool {
 	return false
 }
 
-func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName *string) []corev1.Volume {
+func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName *string, ldapSpcExist bool, edbSpcExist bool) []corev1.Volume {
 	volumes := []corev1.Volume{
 		{
 			Name: "platform-identity-management",
@@ -1027,15 +1030,6 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName
 			},
 		},
 		{
-			Name: "pgsql-certs",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName:  common.DatastoreEDBSecretName,
-					DefaultMode: &partialAccess,
-				},
-			},
-		},
-		{
 			Name: "pgsql-client-cred",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
@@ -1090,5 +1084,74 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName
 		}
 		volumes = append(volumes, auditVolume)
 	}
+	if ldapSpcExist {
+		volumes = ensureVolumePresent(volumes, corev1.Volume{
+			Name: common.IMLdapBindPwdVolume,
+			VolumeSource: corev1.VolumeSource{
+				CSI: &corev1.CSIVolumeSource{
+					Driver:   "secrets-store.csi.k8s.io",
+					ReadOnly: ptr.To(true),
+					VolumeAttributes: map[string]string{
+						"secretProviderClass": common.IMLdapBindCredSpc,
+					},
+				},
+			},
+		})
+	}
+	if edbSpcExist {
+		volumes = ensureVolumePresent(volumes, corev1.Volume{
+			Name: "pgsql-certs",
+			VolumeSource: corev1.VolumeSource{
+				CSI: &corev1.CSIVolumeSource{
+					Driver:   "secrets-store.csi.k8s.io",
+					ReadOnly: ptr.To(true),
+					VolumeAttributes: map[string]string{
+						"secretProviderClass": common.IMExtEDBSecretSpc,
+					},
+				},
+			},
+		})
+	} else {
+		volumes = ensureVolumePresent(volumes, corev1.Volume{
+			Name: "pgsql-certs",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  common.DatastoreEDBSecretName,
+					DefaultMode: &partialAccess,
+				},
+			},
+		})
+	}
 	return volumes
+}
+
+// CheckSPCExists returns whether a SecretProviderClass with the given name
+// exists in the provided namespace.
+func (r *AuthenticationReconciler) CheckSPCExists(ctx context.Context, spcName string, namespace string) (exist bool) {
+	spc := &sscsidriverv1.SecretProviderClass{}
+	if common.ClusterHasCSIGroupVersion(&r.DiscoveryClient) {
+		err := r.Client.Get(ctx, types.NamespacedName{Name: spcName, Namespace: namespace}, spc)
+		return err == nil
+	}
+	return false
+}
+
+// ensureVolumePresent checks if a volume exists by name.  If not, it appends
+// the new volume and returns the updated slice.
+func ensureVolumePresent(volumes []corev1.Volume, newVol corev1.Volume) []corev1.Volume {
+	if v := getVolumeByName(volumes, newVol.Name); v != nil {
+		return volumes
+	}
+	return append(volumes, newVol)
+}
+
+// getVolumeByName returns the pointer to the first volume in the slice that has
+// a name that matches the provided name. Returns nil if no matches are found.
+func getVolumeByName(volumes []corev1.Volume, name string) *corev1.Volume {
+	for _, v := range volumes {
+		if v.Name == name {
+			return &v
+		}
+	}
+	return nil
 }

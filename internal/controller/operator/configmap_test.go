@@ -730,6 +730,12 @@ var _ = Describe("ConfigMap handling", func() {
 					},
 				},
 				{
+					"OAUTH_21_ENABLED",
+					[]string{
+						"OAUTH_21_ENABLED",
+					},
+				},
+				{
 					"IAM_UM",
 					[]string{
 						"IAM_UM",
@@ -1109,6 +1115,7 @@ var _ = Describe("ConfigMap handling", func() {
 						ClaimsMap:             "someclaims",
 						ScopeClaim:            "scopeclaimexample",
 						IsOpenshiftEnv:        false,
+						OAuth21Enabled:        ptr.To(false),
 					},
 				},
 			}

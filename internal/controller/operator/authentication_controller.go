@@ -261,10 +261,12 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	r.createRole(instance)
 	r.createRoleBinding(instance)
 
+	if subResult, err := r.ensureCommonServiceDBIsReady(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
 	if subResult, err := r.ensureMigrationJobRuns(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
 	}
-
 	if subResult, err := r.checkSAMLPresence(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
 	}

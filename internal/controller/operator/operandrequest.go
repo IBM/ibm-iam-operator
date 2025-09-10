@@ -18,7 +18,9 @@ package operator
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
+	"time"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
@@ -28,6 +30,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -309,4 +312,45 @@ func (r *AuthenticationReconciler) createEDBShareClaim(ctx context.Context, req 
 	}
 	reqLogger.Info("Created CommonService CR for shared EDB claim successfully")
 	return subreconciler.RequeueWithDelay(defaultLowerWait)
+}
+
+func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	log := logf.FromContext(ctx, "Object.Name", "common-service-db", "Object.Kind", "Cluster", "Object.APIVersion", "postgresql.k8s.enterprisedb.io/v1")
+	u := &unstructured.Unstructured{
+		Object: map[string]any{
+			"kind":       "Cluster",
+			"apiVersion": "postgresql.k8s.enterprisedb.io/v1",
+		},
+	}
+
+	if err = r.Get(ctx, types.NamespacedName{Name: "common-service-db", Namespace: req.Namespace}, u); k8sErrors.IsNotFound(err) {
+		log.Info("Cluster not found")
+		return subreconciler.Requeue()
+	} else if err != nil {
+		log.Error(err, "Cluster could not be retrieved")
+		return subreconciler.RequeueWithError(err)
+	}
+	type cluster struct {
+		metav1.ObjectMeta
+		metav1.TypeMeta
+		Status struct {
+			Conditions []metav1.Condition `json:"conditions,omitempty"`
+		} `json:"status"`
+	}
+	obj := &cluster{}
+	var objJSON []byte
+	if objJSON, err = u.MarshalJSON(); err != nil {
+		log.Error(err, "Failed to marshal unstructured Cluster into JSON")
+		return subreconciler.RequeueWithError(err)
+	}
+	if err = json.Unmarshal(objJSON, obj); err != nil {
+		log.Error(err, "Failed to unmarshal JSON into Cluster status")
+		return subreconciler.RequeueWithError(err)
+	}
+	if obj.Status.Conditions != nil && meta.IsStatusConditionPresentAndEqual(obj.Status.Conditions, "Ready", metav1.ConditionTrue) {
+		log.Info("Cluster is Ready")
+		return subreconciler.ContinueReconciling()
+	}
+	log.Info("Cluster is not Ready")
+	return subreconciler.RequeueWithDelay(30 * time.Second)
 }

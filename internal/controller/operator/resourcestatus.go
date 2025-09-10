@@ -70,7 +70,7 @@ func (r *AuthenticationReconciler) setAuthenticationStatus(ctx context.Context, 
 // MigrationsRunning metav1.Condition values within the Authentication CR's
 // status conditions.
 func (r *AuthenticationReconciler) setMigrationStatusConditions(ctx context.Context, authCR *operatorv1alpha1.Authentication) (err error) {
-	objKey := types.NamespacedName{Name: "ibm-im-db-migrator", Namespace: authCR.Namespace}
+	objKey := types.NamespacedName{Name: MigrationJobName, Namespace: authCR.Namespace}
 	job := &batchv1.Job{}
 	err = r.Get(ctx, objKey, job)
 	if k8sErrors.IsNotFound(err) {
@@ -128,14 +128,14 @@ func setMigratedStatus(authCR *operatorv1alpha1.Authentication, job *batchv1.Job
 		return
 	}
 	if jobHasFailed(job) {
-		meta.SetStatusCondition(&authCR.Status.Conditions, *operatorv1alpha1.NewMigrationFailureCondition())
+		meta.SetStatusCondition(&authCR.Status.Conditions, *operatorv1alpha1.NewMigrationFailureCondition(MigrationJobName))
 		return
 	}
 	currentCondition := meta.FindStatusCondition(
 		authCR.Status.Conditions,
 		operatorv1alpha1.ConditionMigrated)
 	if currentCondition == nil || currentCondition.Status == metav1.ConditionTrue {
-		meta.SetStatusCondition(&authCR.Status.Conditions, *operatorv1alpha1.NewMigrationYetToBeCompleteCondition())
+		meta.SetStatusCondition(&authCR.Status.Conditions, *operatorv1alpha1.NewMigrationYetToBeCompleteCondition(MigrationJobName))
 		return
 	}
 }
@@ -353,7 +353,7 @@ func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, 
 			f: getAllDeploymentStatus,
 		},
 		{
-			names: []string{"oidc-client-registration", "ibm-im-db-migration"},
+			names: []string{"oidc-client-registration", MigrationJobName},
 			f:     getAllJobStatus,
 		},
 	}

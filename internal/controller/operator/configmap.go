@@ -40,6 +40,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -89,7 +90,8 @@ func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctr
 		common.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
 			WithName("registration-script").
 			WithGenerateFns(generateRegisterClientScript).
-			WithModifyFns(updateRegisterClientScript),
+			WithModifyFns(updateRegisterClientScript).
+			WithOnWriteFns(replaceOIDCClientRegistrationJob),
 	}
 
 	subRecs := []common.SecondaryReconciler{}
@@ -460,9 +462,12 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 
 		// Set the path for SAML connections
 		var masterPath string
-		if masterPath, err = r.getMasterPath(ctx, s.GetNamespace()); err != nil {
+		if masterPath, err = r.getMasterPath(ctx, s.GetNamespace()); IsJobMissingResultError(err) {
+			reqLogger.Error(err, "Could not retrieve return codes from Job")
+			return fmt.Errorf("could not set MASTER_PATH: %w", err)
+		} else if err != nil {
 			reqLogger.Error(err, "Failed to determine whether a preexisting SAML exists")
-			err = fmt.Errorf("could not set MASTER_PATH")
+			err = fmt.Errorf("could not set MASTER_PATH: %w", err)
 			return
 		}
 
@@ -1036,6 +1041,129 @@ func readROKSURL(ctx context.Context) (issuer string, err error) {
 	return issuer, nil
 }
 
+type ReturnCoded interface {
+	GetRC() int32
+}
+
+type failedJobError struct {
+	rc int32 // the code returned by the failing container
+	client.ObjectKey
+	msg string
+}
+
+func (e *failedJobError) GetRC() int32 {
+	return e.rc
+}
+
+func (e *failedJobError) GetName() string {
+	return e.Name
+}
+
+func (e *failedJobError) GetNamespace() string {
+	return e.Namespace
+}
+
+func ReturnCodeForError(err error) int32 {
+	if rc, ok := err.(ReturnCoded); ok || errors.As(err, &rc) {
+		return rc.GetRC()
+	}
+	return -1
+}
+
+func ReturnNameForError(err error) string {
+	if n, ok := err.(common.Named); ok || errors.As(err, &n) {
+		return n.GetName()
+	}
+	return ""
+}
+
+func ReturnNamespaceForError(err error) string {
+	if ns, ok := err.(common.Namespaced); ok || errors.As(err, &ns) {
+		return ns.GetNamespace()
+	}
+	return ""
+}
+
+func IsFailingIMHasSAMLError(err error) bool {
+	return ReturnNameForError(err) == "im-has-saml" && ReturnCodeForError(err) > 1
+}
+
+func (e *failedJobError) Error() string {
+	return e.msg
+}
+
+func NewIMHasSAMLError(rc int32, objKey client.ObjectKey) *failedJobError {
+	if rc == 2 {
+		return &failedJobError{
+			rc:        rc,
+			ObjectKey: objKey,
+			msg:       fmt.Sprintf("failed to query for SAML connection; check Job %s in namespace %s for details, or delete the Job to rerun", objKey.Name, objKey.Namespace),
+		}
+	} else if rc > 2 {
+		return &failedJobError{
+			rc:        rc,
+			ObjectKey: objKey,
+			msg:       fmt.Sprintf("received unexpected error code while running SAML; check Job %s in namespace %s for details, or delete the Job to rerun", objKey.Name, objKey.Namespace),
+		}
+	}
+	return nil
+}
+
+type invalidMatchListError struct {
+	length int
+	gvk    *schema.GroupVersionKind
+}
+
+type Lengthed interface {
+	Length() int
+	IsEmpty() bool
+}
+
+func (e *invalidMatchListError) Length() int {
+	return e.length
+}
+
+func (e *invalidMatchListError) IsEmpty() bool {
+	return e.length == 0
+}
+
+func (e *invalidMatchListError) Error() string {
+	return fmt.Sprintf("received invalid number of matching %s (%d)", e.gvk.Kind, e.length)
+}
+
+func IsEmptyMatchListError(err error) bool {
+	if l, ok := err.(Lengthed); ok || errors.As(err, &l) {
+		return l.IsEmpty()
+	}
+	return false
+}
+
+func NewInvalidMatchListError(length int, gvk schema.GroupVersionKind) *invalidMatchListError {
+	return &invalidMatchListError{
+		length: length,
+		gvk:    &gvk,
+	}
+}
+
+type jobMissingResultError struct {
+	client.ObjectKey
+}
+
+func (e *jobMissingResultError) GetObjectKey() client.ObjectKey {
+	return e.ObjectKey
+}
+
+func (e *jobMissingResultError) Error() string {
+	return fmt.Sprintf("Pods for Job %s in namespace %s could not be found to determine result", e.Name, e.Namespace)
+}
+
+func IsJobMissingResultError(err error) bool {
+	if j, ok := err.(*jobMissingResultError); ok || errors.As(err, &j) {
+		return true
+	}
+	return false
+}
+
 func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, namespace string) (path string, err error) {
 	cmKey := types.NamespacedName{Name: "platform-auth-idp", Namespace: namespace}
 	cm := &corev1.ConfigMap{}
@@ -1064,34 +1192,40 @@ func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, namespace 
 		}),
 	}
 
+	var exitCode int32 = -1
 	if err = r.List(ctx, podList, opts...); err != nil {
 		return
-	} else if len(podList.Items) != 1 {
-		return "", fmt.Errorf("received invalid number of matching Pods (%d)", len(podList.Items))
+	} else if len(podList.Items) > 1 {
+		return "", NewInvalidMatchListError(len(podList.Items), podList.GetObjectKind().GroupVersionKind())
+	} else if len(podList.Items) == 1 {
+		po := podList.Items[0]
+		if len(po.Status.ContainerStatuses) != 1 {
+			return "", fmt.Errorf("received invalid number of containerStatuses (%d)", len(po.Status.ContainerStatuses))
+		}
+
+		containerState := podList.Items[0].Status.ContainerStatuses[0].State
+		if containerState.Terminated == nil {
+			return "", fmt.Errorf("container does not appear to have terminated yet")
+		}
+
+		exitCode = containerState.Terminated.ExitCode
 	}
 
-	po := podList.Items[0]
-	if len(po.Status.ContainerStatuses) != 1 {
-		return "", fmt.Errorf("received invalid number of containerStatuses (%d)", len(po.Status.ContainerStatuses))
-	}
-
-	containerState := podList.Items[0].Status.ContainerStatuses[0].State
-	if containerState.Terminated == nil {
-		return "", fmt.Errorf("container does not appear to have terminated yet")
-	}
-
-	exitCode := containerState.Terminated.ExitCode
 	var deleteJob bool
 	switch exitCode {
-	case 2:
-		err = fmt.Errorf("failed to query for SAML connection; check Job %s in namespace %s for details, or delete the Job to rerun", "im-has-saml", namespace)
 	case 1:
 		path = "/idauth"
 		deleteJob = true
 	case 0:
 		deleteJob = true
+	case -1:
+		err = &jobMissingResultError{jobKey}
+		deleteJob = true
 	default:
-		err = fmt.Errorf("received unexpected error code while running SAML; check Job %s in namespace %s for details, or delete the Job to rerun", "im-has-saml", namespace)
+		if job.Status.Failed == 1 {
+			deleteJob = true
+		}
+		err = NewIMHasSAMLError(exitCode, jobKey)
 	}
 
 	if !deleteJob {
@@ -1102,8 +1236,8 @@ func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, namespace 
 		client.PropagationPolicy(metav1.DeletePropagationForeground),
 	}
 
-	if err = r.Delete(ctx, job, deleteOpts...); err != nil && !k8sErrors.IsNotFound(err) {
-		return "", fmt.Errorf("failed to delete Job %s in namespace %s after getting MASTER_PATH: %w", "im-has-saml", namespace, err)
+	if delErr := r.Delete(ctx, job, deleteOpts...); delErr != nil && !k8sErrors.IsNotFound(delErr) {
+		return "", fmt.Errorf("failed to delete Job %s in namespace %s after getting MASTER_PATH: %w", "im-has-saml", namespace, delErr)
 	}
 
 	return

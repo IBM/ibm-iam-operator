@@ -95,12 +95,20 @@ type Secondary interface {
 	GetKind() string               // returns the kind of the implementer
 }
 
+type Named interface {
+	GetName() string
+}
+
+type Namespaced interface {
+	GetNamespace() string
+}
+
 // ObjectKeyed is a convenience interface for deriving types.NamespacedNames,
 // which are used as keys for Kubernetes client calls, from objects that already
 // have their name and namespace set on them.
 type ObjectKeyed interface {
-	GetName() string
-	GetNamespace() string
+	Named
+	Namespaced
 }
 
 // GetObjectKey returns a types.NamespacedName from an ObjectKeyed.
@@ -221,10 +229,11 @@ func (s *secondaryReconciler[T]) OnWrite(ctx context.Context) (err error) {
 // the secondary object that the secondaryReconciler is targeted for.
 func (s *secondaryReconciler[T]) Reconcile(ctx context.Context) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx, "Object.Namespace", s.GetNamespace(), "Object.Kind", s.GetKind(), "Object.Name", s.GetName())
-	debugLogger := logf.FromContext(ctx, "Object.Namespace", s.GetNamespace(), "Object.Kind", s.GetKind(), "Object.Name", s.GetName()).V(1)
+	debugLogger := reqLogger.V(1)
 	debugCtx := logf.IntoContext(ctx, debugLogger)
 	var observed client.Object = s.GetEmptyObject()
 	var generated client.Object = s.GetEmptyObject()
+	debugLogger.Info("Generating desired Object")
 	if err = s.Generate(debugCtx, generated); err != nil {
 		reqLogger.Error(err, "Failed to generate Object")
 		return subreconciler.RequeueWithError(err)

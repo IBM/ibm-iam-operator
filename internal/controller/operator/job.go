@@ -648,7 +648,7 @@ func buildMigratorVolumes(needsMongoDBMigration bool) (volumes []corev1.Volume) 
 					{
 						Secret: &corev1.SecretProjection{
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "mongo-root-ca-cert",
+								Name: "mongodb-root-ca-cert",
 							},
 							Items: []corev1.KeyToPath{
 								{Key: "ca.crt", Path: "ca.crt"},
@@ -672,7 +672,7 @@ func buildMigratorVolumes(needsMongoDBMigration bool) (volumes []corev1.Volume) 
 	}
 
 	mongoDBAdminCredsVol := corev1.Volume{
-		Name: "mongo-admin-creds",
+		Name: "mongodb-admin-creds",
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
 				SecretName: "icp-mongodb-admin",

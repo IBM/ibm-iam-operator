@@ -5,7 +5,7 @@
 **[![Go Report Card](https://goreportcard.com/badge/github.com/IBM/ibm-iam-operator)](https://goreportcard.com/report/github.com/IBM/ibm-iam-operator)**
 
 
-The `ibm-iam-operator` installs the IBM Cloud Platform Common Services Identity Management (IM) service.
+The `ibm-iam-operator` installs the IBM Cloud Platform Common Services Identity Management (IM) service. 
 
 **Important:** Do not install this operator directly. Install this operator only by using the IBM Common Service Operator. For more information about installing the IBM Common Service Operator operator, see [Installer documentation](http://ibm.biz/cpcs_opinstall) (https://www.ibm.com/support/knowledgecenter/SSHKN6/kc_welcome_cs.html).
 

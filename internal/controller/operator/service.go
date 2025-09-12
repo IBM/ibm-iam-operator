@@ -30,7 +30,6 @@ import (
 )
 
 func (r *AuthenticationReconciler) handleService(instance *operatorv1alpha1.Authentication, currentService *corev1.Service, needToRequeue *bool) error {
-
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: "platform-auth-service", Namespace: instance.Namespace}, currentService)
 	if err != nil && errors.IsNotFound(err) {
@@ -87,9 +86,37 @@ func (r *AuthenticationReconciler) handleService(instance *operatorv1alpha1.Auth
 		return err
 	} else {
 		r.validateCP3PodSelectorAndLabel(currentService, needToRequeue)
+		r.validateSessionAffinityIdMgmtService(currentService, needToRequeue)
 	}
 
 	return nil
+}
+
+func (r *AuthenticationReconciler) validateSessionAffinityIdMgmtService(currentService *corev1.Service, needToRequeue *bool) (err error) {
+
+	if currentService == nil || currentService.Name == "" || currentService.Namespace == "" {
+		return fmt.Errorf("received invalid Service")
+	}
+
+	reqLogger := log.WithValues("Instance.Namespace", currentService.Namespace, "Instance.Name", currentService.Name)
+
+	var changeSessionAffinityNone bool = false
+	var currentSessionAffinity = currentService.Spec.SessionAffinity
+	if(currentSessionAffinity != corev1.ServiceAffinityNone){
+		currentService.Spec.SessionAffinity = corev1.ServiceAffinityNone
+		changeSessionAffinityNone = true
+	}
+	if changeSessionAffinityNone {
+		err = r.Client.Update(context.Background(), currentService)
+		if err != nil {
+			reqLogger.Error(err, "Upgrade check : Failed to update service session affinity to None ", "Service.Namespace", currentService.Namespace, "Service.Name", currentService.Name, "Error.message", err)
+			*needToRequeue = true
+			return
+		} else {
+			reqLogger.Info("Upgrade check : Successfully updated service session affinity to None ", "Service.Name", currentService.Name)
+		}
+	}
+	return
 }
 
 // validateCP3ServicePodSelectorAndLabel takes a *Service and attempts to update that Service's selectors and
@@ -201,7 +228,7 @@ func (r *AuthenticationReconciler) identityManagementService(instance *operatorv
 				"k8s-app": "platform-identity-management",
 			},
 			Type:            "ClusterIP",
-			SessionAffinity: corev1.ServiceAffinityClientIP,
+			SessionAffinity: corev1.ServiceAffinityNone,
 		},
 	}
 

@@ -46,27 +46,35 @@ const registerClientScript = `#!/bin/sh
 WLP_CLIENT_ID="$(cat /etc/register/client_id)"
 WLP_CLIENT_REGISTRATION_SECRET="$(cat /etc/register/oauthadmin_passwd)"
 HTTP_CODE=""
-while true
+attempts=0
+max_attempts=5
+while [[ $attempts -lt $max_attempts ]]
 do
   HTTP_CODE=$(curl -k -o /dev/null -I  -w "%{http_code}"  -X GET -u oauthadmin:$WLP_CLIENT_REGISTRATION_SECRET -H "Content-Type: application/json" https://platform-auth-service:9443/oidc/endpoint/OP/registration/$WLP_CLIENT_ID)
   if [ $HTTP_CODE = "404" -o $HTTP_CODE = "200" ] ; then
-	 break;
+	  break
   fi
+  attempts=$((attempts + 1))
+  sleep 2
 done
-if [ $HTTP_CODE = "404" ]
+if [[ $HTTP_CODE == "404" ]]
 then
   echo "Running new client id registration"
   until curl -i -k -X POST -u oauthadmin:$WLP_CLIENT_REGISTRATION_SECRET \
-   -H "Content-Type: application/json" \
-   --data @/jsons/platform-oidc-registration.json \
-   https://platform-auth-service:9443/oidc/endpoint/OP/registration | grep '201 Created'; do sleep 1; done;
-else
+    -H "Content-Type: application/json" \
+    --data @/jsons/platform-oidc-registration.json \
+    https://platform-auth-service:9443/oidc/endpoint/OP/registration | grep '201 Created'; do sleep 1; done;
+    exit 0
+elif [[ $HTTP_CODE == "200" ]]
+then
   echo "Running update client id registration."
   until curl -i -k -X PUT -u oauthadmin:$WLP_CLIENT_REGISTRATION_SECRET \
-   -H "Content-Type: application/json" \
-   --data @/jsons/platform-oidc-registration.json \
-   https://platform-auth-service:9443/oidc/endpoint/OP/registration/$WLP_CLIENT_ID | grep '200 OK'; do sleep 1; done;
+    -H "Content-Type: application/json" \
+    --data @/jsons/platform-oidc-registration.json \
+    https://platform-auth-service:9443/oidc/endpoint/OP/registration/$WLP_CLIENT_ID | grep '200 OK'; do sleep 1; done;
+    exit 0
 fi
+exit 1
 `
 
 var registrationJson string = `{

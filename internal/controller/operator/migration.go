@@ -150,8 +150,8 @@ func (r *AuthenticationReconciler) handleMongoDBCleanup(ctx context.Context, req
 
 	// if retain annotation is unset or set to true - continue reconciling
 	if authCR.HasNotBeenMigrated() {
-		reqLogger.Info("Migrations have not completed yet; skipping")
-		return subreconciler.ContinueReconciling()
+		reqLogger.Info("Migrations have not completed yet; requeueing")
+		return subreconciler.Requeue()
 	}
 	reqLogger.Info("Condition indicates migrations have completed")
 

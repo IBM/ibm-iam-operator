@@ -102,7 +102,7 @@ func (r *AuthenticationReconciler) validateSessionAffinityIdMgmtService(currentS
 
 	var changeSessionAffinityNone bool = false
 	var currentSessionAffinity = currentService.Spec.SessionAffinity
-	if(currentSessionAffinity != corev1.ServiceAffinityNone){
+	if currentSessionAffinity != corev1.ServiceAffinityNone {
 		currentService.Spec.SessionAffinity = corev1.ServiceAffinityNone
 		changeSessionAffinityNone = true
 	}

@@ -258,6 +258,8 @@ spec:
           value: {{ .Values.cpfs.imagePullPrefix | default .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperand }}/icp-identity-manager:{{ .Values.operands.platformIdentityManagement.imageTag }}
         - name: IM_INITCONTAINER_IMAGE
           value: {{ .Values.cpfs.imagePullPrefix | default .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperand }}/im-initcontainer:{{ .Values.operands.imInitContainer.imageTag }}
+        - name: IM_DB_MIGRATOR_IMAGE
+          value: {{ .Values.cpfs.imagePullPrefix | default .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperand }}/ibm-im-db-migrator:{{ .Values.operands.imDBMigrator.imageTag }}
         - name: IMAGE_PULL_SECRET
           value: {{ .Values.global.imagePullSecret }}
         {{- $watchNamespaces := .Values.global.tetheredNamespaces | default list -}}

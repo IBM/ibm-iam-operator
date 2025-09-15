@@ -22,3 +22,5 @@ operands:
     imageTag: "4.14.0"
   imInitContainer:
     imageTag: "4.14.0"
+  imDBMigrator:
+    imageTag: "0.0.1"

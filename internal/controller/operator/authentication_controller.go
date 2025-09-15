@@ -261,10 +261,12 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	r.createRole(instance)
 	r.createRoleBinding(instance)
 
+	if subResult, err := r.ensureCommonServiceDBIsReady(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
 	if subResult, err := r.ensureMigrationJobRuns(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
 	}
-
 	if subResult, err := r.checkSAMLPresence(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
 	}
@@ -281,8 +283,7 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return
 	}
 
-	// Check if this Job already exists and create it if it doesn't
-	if subResult, err := r.ensureOIDCClientRegistrationJobRuns(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+	if subResult, err := r.handleOperandBindInfo(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
 	}
 
@@ -292,10 +293,6 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	if subResult, err := r.handleConfigMaps(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-		return subreconciler.Evaluate(subResult, err)
-	}
-
-	if subResult, err := r.handleOperandBindInfo(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
 	}
 
@@ -313,6 +310,11 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	r.handleServiceAccount(instance, &needToRequeue)
 
 	if subResult, err = r.ensureMigrationJobSucceeded(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+		return subreconciler.Evaluate(subResult, err)
+	}
+
+	// Check if this Job already exists and create it if it doesn't
+	if subResult, err := r.ensureOIDCClientRegistrationJobRuns(reconcileCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		return subreconciler.Evaluate(subResult, err)
 	}
 

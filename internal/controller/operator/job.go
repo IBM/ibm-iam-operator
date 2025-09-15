@@ -32,13 +32,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+const MigrationJobName string = "ibm-im-db-migration"
+
 func (r *AuthenticationReconciler) getMigrationJobSubreconciler(authCR *operatorv1alpha1.Authentication) (subRec common.Subreconciler) {
 	return common.NewSecondaryReconcilerBuilder[*batchv1.Job]().
-		WithName("ibm-im-db-migration").
+		WithName(MigrationJobName).
 		WithGenerateFns(removeJobIfFailedOrImageDifferent("IM_DB_MIGRATOR_IMAGE"),
 			generateMigratorJobObject).
 		WithClient(r.Client).
@@ -100,7 +103,7 @@ func (r *AuthenticationReconciler) ensureMigrationJobSucceeded(ctx context.Conte
 		log.Info("Failed to retrieve Authentication CR for status update; retrying")
 	}
 	job := &batchv1.Job{}
-	if err = r.Get(ctx, types.NamespacedName{Name: "ibm-im-db-migration", Namespace: authCR.Namespace}, job); err != nil {
+	if err = r.Get(ctx, types.NamespacedName{Name: MigrationJobName, Namespace: authCR.Namespace}, job); err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
 
@@ -123,17 +126,33 @@ func (r *AuthenticationReconciler) getOIDCClientRegistrationSubreconciler(authCR
 
 func removeJobIfFailedOrImageDifferent(imageRef string) common.GenerateFn[*batchv1.Job] {
 	return func(s common.SecondaryReconciler, ctx context.Context, job *batchv1.Job) (err error) {
+		log := logf.FromContext(ctx)
+		log.Info("Determine whether Job needs to be replaced")
 		if err = s.GetClient().Get(ctx, common.GetObjectKey(s), job); k8sErrors.IsNotFound(err) {
+			log.Info("Job not found, nothing to remove")
 			return nil
 		} else if err != nil {
+			log.Error(err, "Attempt to find Job failed")
 			return
 		}
 
-		if job.Spec.Template.Spec.Containers[0].Image == common.GetImageRef(imageRef) || job.Status.Failed != 1 {
+		// Leave the Job alone if the image refs haven't changed and the Job hasn't failed
+		if job.Spec.Template.Spec.Containers[0].Image == common.GetImageRef(imageRef) && job.Status.Failed == 0 {
+			log.Info("No changes found that warrant replacing the Job")
 			return
 		}
-		if err = s.GetClient().Delete(ctx, job); k8sErrors.IsNotFound(err) {
+
+		log.Info("Job needs to be replaced; deleting first")
+		deleteOpts := []client.DeleteOption{
+			client.PropagationPolicy(metav1.DeletePropagationForeground),
+		}
+		if err = s.GetClient().Delete(ctx, job, deleteOpts...); k8sErrors.IsNotFound(err) {
+			log.Info("No Job to delete")
 			return nil
+		} else if err != nil {
+			log.Error(err, "Failed to delete Job")
+		} else {
+			log.Info("Deleted Job")
 		}
 		return
 	}
@@ -604,7 +623,7 @@ func buildMigratorVolumes(needsMongoDBMigration bool) (volumes []corev1.Volume) 
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: "im-datastore-edb-cm",
 					},
-					DefaultMode: ptr.To(int32(400)),
+					DefaultMode: ptr.To(int32(420)),
 				},
 			},
 		},
@@ -617,20 +636,20 @@ func buildMigratorVolumes(needsMongoDBMigration bool) (volumes []corev1.Volume) 
 						{
 							Key:  "ca.crt",
 							Path: "ca.crt",
-							Mode: ptr.To(int32(400)),
+							Mode: ptr.To(int32(420)),
 						},
 						{
 							Key:  "tls.crt",
 							Path: "tls.crt",
-							Mode: ptr.To(int32(400)),
+							Mode: ptr.To(int32(420)),
 						},
 						{
 							Key:  "tls.key",
 							Path: "tls.key",
-							Mode: ptr.To(int32(400)),
+							Mode: ptr.To(int32(420)),
 						},
 					},
-					DefaultMode: ptr.To(int32(400)),
+					DefaultMode: ptr.To(int32(420)),
 				},
 			},
 		},

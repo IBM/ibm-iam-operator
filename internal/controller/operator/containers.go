@@ -397,7 +397,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 		LivenessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/oidc/endpoint/OP/jwk",
+					Path: "/oidc/endpoint/OP/.well-known/openid-configuration",
 					Port: intstr.IntOrString{
 						IntVal: authServicePort,
 					},

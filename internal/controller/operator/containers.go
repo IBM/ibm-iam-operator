@@ -382,11 +382,11 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/oidc/endpoint/OP/.well-known/openid-configuration",
+					Path: "/imauth/v1/healthStatus",
 					Port: intstr.IntOrString{
-						IntVal: authServicePort,
+						IntVal: authHealthCheckPort,
 					},
-					Scheme: "HTTPS",
+					Scheme: "HTTP",
 				},
 			},
 			InitialDelaySeconds: 40,

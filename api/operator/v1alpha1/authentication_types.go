@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sync"
 
@@ -159,7 +160,9 @@ type ConfigSpec struct {
 	AttrMappingFromConfig       bool           `json:"attrMappingFromConfig,omitempty"`
 	ZenFrontDoor                bool           `json:"zenFrontDoor,omitempty"`
 	Ingress                     *IngressConfig `json:"ingress,omitempty"`
+	OAuth21Enabled              *bool          `json:"oauth21Enabled,omitempty"`
 	IamUm                       *bool          `json:"iamUm,omitempty"`
+	LibertySSCookie             *string        `json:"libertySSCookie,omitempty"`
 }
 
 type ManagedResourceStatus struct {
@@ -256,8 +259,8 @@ func NewMigrationCompleteCondition() *metav1.Condition {
 // Creates a new ConditionMigrated condition for when the migration Job has yet
 // to run at all; should not be set unless the previous status is
 // `metav1.ConditionTrue`.
-func NewMigrationYetToBeCompleteCondition() *metav1.Condition {
-	message := "The \"ibm-im-db-migration\" Job is not yet complete"
+func NewMigrationYetToBeCompleteCondition(name string) *metav1.Condition {
+	message := fmt.Sprintf("The %q Job is not yet complete", name)
 	return &metav1.Condition{
 		Type:    ConditionMigrated,
 		Status:  metav1.ConditionFalse,
@@ -267,8 +270,8 @@ func NewMigrationYetToBeCompleteCondition() *metav1.Condition {
 }
 
 // Creates a new ConditionMigrated condition for when the migration Job fails.
-func NewMigrationFailureCondition() *metav1.Condition {
-	message := "Migration failed; review the \"ibm-im-db-migrator\" Job logs for more information"
+func NewMigrationFailureCondition(name string) *metav1.Condition {
+	message := fmt.Sprintf("Migration failed; review the %q Job logs for more information", name)
 	return &metav1.Condition{
 		Type:    ConditionMigrated,
 		Status:  metav1.ConditionFalse,

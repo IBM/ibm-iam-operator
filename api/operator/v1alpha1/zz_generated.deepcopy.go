@@ -21,7 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -260,9 +260,19 @@ func (in *ConfigSpec) DeepCopyInto(out *ConfigSpec) {
 		*out = new(IngressConfig)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.OAuth21Enabled != nil {
+		in, out := &in.OAuth21Enabled, &out.OAuth21Enabled
+		*out = new(bool)
+		**out = **in
+	}
 	if in.IamUm != nil {
 		in, out := &in.IamUm, &out.IamUm
 		*out = new(bool)
+		**out = **in
+	}
+	if in.LibertySSCookie != nil {
+		in, out := &in.LibertySSCookie, &out.LibertySSCookie
+		*out = new(string)
 		**out = **in
 	}
 }

@@ -93,7 +93,7 @@ var _ = Describe("AuthenticationReconciler", func() {
 				APIVersion: "batch/v1",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "ibm-im-db-migrator",
+				Name:      MigrationJobName,
 				Namespace: ns,
 			},
 		}
@@ -111,7 +111,7 @@ var _ = Describe("AuthenticationReconciler", func() {
 				APIVersion: "batch/v1",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "ibm-im-db-migrator",
+				Name:      MigrationJobName,
 				Namespace: ns,
 			},
 			Status: batchv1.JobStatus{
@@ -128,7 +128,7 @@ var _ = Describe("AuthenticationReconciler", func() {
 				APIVersion: "batch/v1",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "ibm-im-db-migrator",
+				Name:      MigrationJobName,
 				Namespace: ns,
 			},
 			Spec:   batchv1.JobSpec{},

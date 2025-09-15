@@ -62,6 +62,7 @@ var falseVar bool = false
 var seconds60 int64 = 60
 var partialAccess int32 = 420
 var authServicePort int32 = 9443
+var authHealthCheckPort int32 = 9080
 var identityProviderPort int32 = 4300
 var identityManagerPort int32 = 4500
 var serviceAccountName string = "ibm-iam-operand-restricted"

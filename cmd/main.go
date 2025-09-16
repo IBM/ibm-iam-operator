@@ -72,12 +72,15 @@ func init() {
 	}
 
 	if controllercommon.ClusterHasOperandRequestAPIResource(dc) {
+		setupLog.V(1).Info("OperandRequest API present; adding ODLM-enabled operator.ibm.com scheme")
 		utilruntime.Must(operatorv1alpha1.AddODLMEnabledToScheme(scheme))
 	} else {
+		setupLog.V(1).Info("OperandRequest not API present; adding base operator.ibm.com scheme")
 		utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
 	}
 
 	if controllercommon.ClusterHasRouteGroupVersion(dc) {
+		setupLog.V(1).Info("Route API present; adding Routes to scheme")
 		utilruntime.Must(routev1.AddToScheme(scheme))
 	}
 	//+kubebuilder:scaffold:scheme

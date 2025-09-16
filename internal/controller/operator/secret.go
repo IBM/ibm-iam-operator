@@ -39,8 +39,8 @@ import (
 )
 
 func (r *AuthenticationReconciler) handleSecrets(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx, "subreconciler", "handleSecrets")
-	sCtx := logf.IntoContext(ctx, reqLogger)
+	log := logf.FromContext(ctx)
+	sCtx := logf.IntoContext(ctx, log)
 
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(sCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
@@ -49,7 +49,7 @@ func (r *AuthenticationReconciler) handleSecrets(ctx context.Context, req ctrl.R
 
 	secretSubreconcilers, err := r.getSecretSubreconcilers(sCtx, authCR)
 	if err != nil {
-		reqLogger.Error(err, "Failed to generate updaters for Secrets")
+		log.Error(err, "Failed to generate updaters for Secrets")
 		return subreconciler.RequeueWithError(err)
 	}
 
@@ -181,21 +181,21 @@ func (r *AuthenticationReconciler) getSecretSubreconcilers(ctx context.Context, 
 }
 
 func (r *AuthenticationReconciler) waitForSecret(ctx context.Context, instance *operatorv1alpha1.Authentication, name string, secret *corev1.Secret) (err error) {
-	reqLogger := logf.FromContext(ctx)
+	log := logf.FromContext(ctx)
 
-	reqLogger.Info("Waiting for secret", "Certificate.Namespace", instance.Namespace, "Secret.Name", name)
+	log.Info("Waiting for secret", "Certificate.Namespace", instance.Namespace, "Secret.Name", name)
 
 	err = wait.PollUntilContextTimeout(ctx, 2*time.Second, 10*time.Minute, true, func(innerCtx context.Context) (done bool, err error) {
 		if innerErr := r.Get(innerCtx, types.NamespacedName{Name: name, Namespace: instance.Namespace}, secret); innerErr != nil {
-			reqLogger.Error(err, "Failed to get Secret")
+			log.Error(err, "Failed to get Secret")
 			return false, nil
 		}
-		reqLogger.Info("Got Secret")
+		log.Info("Got Secret")
 		return true, nil
 	})
 
 	if err != nil {
-		reqLogger.Error(err, "Encountered some error")
+		log.Error(err, "Encountered some error")
 	}
 
 	return
@@ -203,11 +203,11 @@ func (r *AuthenticationReconciler) waitForSecret(ctx context.Context, instance *
 
 func (r *AuthenticationReconciler) getPlatformAuthSecret(ctx context.Context, authCR *operatorv1alpha1.Authentication) (caCert []byte, err error) {
 	// get ca.crt from platform-auth-secret
-	reqLogger := logf.FromContext(ctx)
+	log := logf.FromContext(ctx)
 	secret := &corev1.Secret{}
 	err = r.waitForSecret(ctx, authCR, "platform-auth-secret", secret)
 	if err != nil {
-		reqLogger.Error(err, "Waiting for Secret failed")
+		log.Error(err, "Waiting for Secret failed")
 		return
 	}
 
@@ -267,7 +267,7 @@ func ensureChecksumAnnotation(s ctrlcommon.SecondaryReconciler, ctx context.Cont
 
 func generateSecretObject(data map[string][]byte, labels ...map[string]string) ctrlcommon.GenerateFn[*corev1.Secret] {
 	return func(s ctrlcommon.SecondaryReconciler, ctx context.Context, secret *corev1.Secret) (err error) {
-		reqLogger := logf.FromContext(ctx)
+		log := logf.FromContext(ctx)
 		var updatedLabels map[string]string
 		if len(labels) > 0 {
 			updatedLabels = ctrlcommon.MergeMaps(nil, labels...)
@@ -286,7 +286,7 @@ func generateSecretObject(data map[string][]byte, labels ...map[string]string) c
 		// Set Authentication instance as the owner and controller of the Secret
 		err = controllerutil.SetControllerReference(s.GetPrimary(), secret, s.GetClient().Scheme())
 		if err != nil {
-			reqLogger.Info("Failed to set owner for Secret")
+			log.Info("Failed to set owner for Secret")
 		}
 		return
 	}

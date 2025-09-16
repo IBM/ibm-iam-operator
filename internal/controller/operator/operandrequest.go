@@ -61,17 +61,14 @@ func (r *AuthenticationReconciler) addEmbeddedEDBIfNeeded(ctx context.Context, a
 // upon what the IM install needs. At a minimum, the UI Operator is included.
 func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	opReqName := "ibm-iam-request"
-	reqLogger := logf.FromContext(ctx).WithValues(
-		"subreconciler", "handleOperandRequest",
-		"OperandRequest.Name", opReqName,
-		"OperandRequest.Namespace", req.Namespace)
+	log := logf.FromContext(ctx, "OperandRequest.Name", opReqName)
 
 	if !ctrlcommon.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
-		reqLogger.Info("The OperandRequest API resource is not supported by this cluster; assuming EDB connection will be configured manually", "Secret", ctrlcommon.DatastoreEDBSecretName, "ConfigMap", ctrlcommon.DatastoreEDBCMName, "Namespace", req.Namespace)
+		log.Info("The OperandRequest API resource is not supported by this cluster; assuming EDB connection will be configured manually", "Secret", ctrlcommon.DatastoreEDBSecretName, "ConfigMap", ctrlcommon.DatastoreEDBCMName, "Namespace", req.Namespace)
 		return subreconciler.ContinueReconciling()
 	}
 
-	reqLogger.Info("Ensure that OperandRequest is updated with correct Operands")
+	log.Info("Ensure that OperandRequest is updated with correct Operands")
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
@@ -89,7 +86,7 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 	err = r.Get(ctx, types.NamespacedName{Name: opReqName, Namespace: authCR.Namespace}, observedOpReq)
 
 	if k8sErrors.IsNotFound(err) {
-		reqLogger.Info("OperandRequest not found, creating")
+		log.Info("OperandRequest not found, creating")
 		desiredRequests := []operatorv1alpha1.Request{
 			{Registry: "common-service", RegistryNamespace: authCR.Namespace, Operands: desiredOperands},
 		}
@@ -109,20 +106,20 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 		}
 
 		if err = controllerutil.SetOwnerReference(authCR, desiredOpReq, r.Scheme); err != nil {
-			reqLogger.Error(err, "Failed to set owner reference on OperandRequest")
+			log.Error(err, "Failed to set owner reference on OperandRequest")
 			return subreconciler.RequeueWithError(err)
 		}
 		if err = r.Create(ctx, desiredOpReq); k8sErrors.IsAlreadyExists(err) {
-			reqLogger.Info("OperandRequest already exists; continuing")
+			log.Info("OperandRequest already exists; continuing")
 			return subreconciler.ContinueReconciling()
 		} else if err != nil {
-			reqLogger.Error(err, "Failed to create OperandRequest")
+			log.Error(err, "Failed to create OperandRequest")
 			return subreconciler.RequeueWithError(err)
 		}
-		reqLogger.Info("Created OperandRequest")
+		log.Info("Created OperandRequest")
 		return subreconciler.RequeueWithDelay(opreqWait)
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get OperandRequest")
+		log.Error(err, "Failed to get OperandRequest")
 		return subreconciler.RequeueWithError(err)
 	}
 
@@ -145,7 +142,7 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 
 	needToMigrate, err := mongoIsPresent(r.Client, ctx, authCR)
 	if err != nil {
-		reqLogger.Info("Failed to determine whether there is a need to migrate from MongoDB", "err", err.Error())
+		log.Info("Failed to determine whether there is a need to migrate from MongoDB", "err", err.Error())
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
 
@@ -154,9 +151,9 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 		desiredOperands = append(desiredOperands, *observedMongoDBOperand)
 	}
 
-	reqLogger.V(1).Info("List Operands", "observedOperands", observedOperands, "desiredOperands", desiredOperands)
+	log.V(1).Info("List Operands", "observedOperands", observedOperands, "desiredOperands", desiredOperands)
 	if !operandsAreEqual(observedOperands, desiredOperands) {
-		reqLogger.V(1).Info("Operands are different, set to desired")
+		log.V(1).Info("Operands are different, set to desired")
 		observedOpReq.Spec.Requests[0].Operands = desiredOperands
 		changed = true
 	}
@@ -166,21 +163,21 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 		changed = true
 	}
 
-	if changed {
-		if err = controllerutil.SetOwnerReference(authCR, observedOpReq, r.Scheme); err != nil {
-			reqLogger.Error(err, "Failed to set owner reference on OperandRequest")
-			return subreconciler.RequeueWithError(err)
-		}
-		if err = r.Update(ctx, observedOpReq); err != nil {
-			reqLogger.Error(err, "Failed to update OperandRequest")
-			return subreconciler.RequeueWithError(err)
-		}
-		reqLogger.Info("Updated OperandRequest successfully")
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	if !changed {
+		log.Info("No changes to OperandRequest; continue")
+		return subreconciler.ContinueReconciling()
 	}
 
-	reqLogger.Info("No changes to OperandRequest; continue")
-	return subreconciler.ContinueReconciling()
+	if err = controllerutil.SetOwnerReference(authCR, observedOpReq, r.Scheme); err != nil {
+		log.Error(err, "Failed to set owner reference on OperandRequest")
+		return subreconciler.RequeueWithError(err)
+	}
+	if err = r.Update(ctx, observedOpReq); err != nil {
+		log.Error(err, "Failed to update OperandRequest")
+		return subreconciler.RequeueWithError(err)
+	}
+	log.Info("Updated OperandRequest successfully")
+	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
 // operandsAreEqual compares two lists of Operands and returns whether the lists contain the same elements.
@@ -209,14 +206,14 @@ func operandsAreEqual(operandsA, operandsB []operatorv1alpha1.Operand) bool {
 // ConfigMap.
 func (r *AuthenticationReconciler) isConfiguredForExternalEDB(ctx context.Context, authCR *operatorv1alpha1.Authentication) (isConfigured bool, err error) {
 	// stubbed until external EDB is supported
-	reqLogger := logf.FromContext(ctx)
+	log := logf.FromContext(ctx)
 	cm := &corev1.ConfigMap{}
 
 	err = r.Get(ctx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBCMName, Namespace: authCR.Namespace}, cm)
 	if err != nil && k8sErrors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get ConfigMap from services namespace", "name", ctrlcommon.DatastoreEDBCMName)
+		log.Error(err, "Failed to get ConfigMap from services namespace", "name", ctrlcommon.DatastoreEDBCMName)
 		return false, err
 	}
 
@@ -269,8 +266,9 @@ func hasMongoDBOperandFromOperands(operands []operatorv1alpha1.Operand) bool {
 
 // createEDBShareClaim requests a share of the embedded EDB Common Service via the creation of a CommonService object.
 func (r *AuthenticationReconciler) createEDBShareClaim(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := log.WithValues("Instance.Namespace", req.Namespace, "Instance.Name", req.Name)
-	reqLogger.Info("Create a CommonService CR for shared EDB claim")
+	csCRName := "im-common-service"
+	log := logf.FromContext(ctx)
+	log.Info("Create a CommonService CR for shared EDB claim")
 
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
@@ -278,13 +276,13 @@ func (r *AuthenticationReconciler) createEDBShareClaim(ctx context.Context, req 
 	}
 
 	if needsExternal, err := r.needsExternalEDB(ctx, authCR); err == nil && needsExternal {
-		reqLogger.Info("External EDB configuration details to be set up; skipping creation of CommonService CR for EDB share")
+		log.Info("External EDB configuration details to be set up; skipping creation of CommonService CR for EDB share")
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
 
-	csCRName := "im-common-service"
+	log = log.WithValues("CommonService.Name", csCRName)
 	unstructuredCS := map[string]interface{}{
 		"kind":       "CommonService",
 		"apiVersion": "operator.ibm.com/v3",
@@ -298,19 +296,19 @@ func (r *AuthenticationReconciler) createEDBShareClaim(ctx context.Context, req 
 	}
 	unstructuredObj := &unstructured.Unstructured{Object: unstructuredCS}
 	if err = controllerutil.SetControllerReference(authCR, unstructuredObj, r.Client.Scheme()); err != nil {
-		reqLogger.Error(err, "Failed to set owner for ConfigMap")
+		log.Error(err, "Failed to set owner for ConfigMap")
 		return subreconciler.RequeueWithError(err)
 	}
 
-	if err = r.Create(context.TODO(), unstructuredObj); k8sErrors.IsAlreadyExists(err) {
+	if err = r.Create(ctx, unstructuredObj); k8sErrors.IsAlreadyExists(err) {
 		// CommonService already exists from a previous reconcile
-		reqLogger.Info("CommonService CR for shared EDB claim already exists", "CommonServiceName", csCRName)
+		log.Info("CommonService CR for shared EDB claim already exists")
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to create CommonService CR for shared EDB claim", "CommonServiceName", csCRName)
+		log.Error(err, "Failed to create CommonService CR for shared EDB claim")
 		return subreconciler.RequeueWithError(err)
 	}
-	reqLogger.Info("Created CommonService CR for shared EDB claim successfully")
+	log.Info("Created CommonService CR for shared EDB claim successfully")
 	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 

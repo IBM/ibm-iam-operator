@@ -445,9 +445,12 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 	if authCR.SecretsStoreCSIEnabled() {
 		if err = getSecretProviderClassForVolume(s.GetClient(), ctx, authCR.Namespace, "pgsql-certs", edbspc); IsLabelConflictError(err) {
 			log.Error(err, "Multiple SecretProviderClasses are labeled to be mounted as the same volume; ensure that only one is labeled for the given volume name", "volumeName", common.IMLdapBindPwdVolume)
-			return err
+		} else if err != nil {
+			log.Error(err, "Unexpected error occurred while trying to get SecretProviderClass")
 		}
-		err = nil
+		if err != nil {
+			return
+		}
 	}
 
 	*job = batchv1.Job{

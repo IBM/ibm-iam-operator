@@ -102,13 +102,17 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 	if authCR.SecretsStoreCSIEnabled() {
 		if err = getSecretProviderClassForVolume(r.Client, ctx, req.Namespace, common.IMLdapBindPwdVolume, ldapSPC); IsLabelConflictError(err) {
 			reqLogger.Error(err, "Multiple SecretProviderClasses are labeled to be mounted as the same volume; ensure that only one is labeled for the given volume name", "volumeName", common.IMLdapBindPwdVolume)
-			return subreconciler.RequeueWithError(err)
+		} else if err != nil {
+			reqLogger.Error(err, "Unexpected error occurred while trying to get SecretProviderClass")
 		}
 		if err = getSecretProviderClassForVolume(r.Client, ctx, req.Namespace, "pgsql-certs", edbSPC); IsLabelConflictError(err) {
 			reqLogger.Error(err, "Multiple SecretProviderClasses are labeled to be mounted as the same volume; ensure that only one is labeled for the given volume name", "volumeName", common.IMLdapBindPwdVolume)
+		} else if err != nil {
+			reqLogger.Error(err, "Unexpected error occurred while trying to get SecretProviderClass")
+		}
+		if err != nil {
 			return subreconciler.RequeueWithError(err)
 		}
-		err = nil
 	}
 
 	imagePullSecret := os.Getenv("IMAGE_PULL_SECRET")

@@ -1047,6 +1047,17 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName
 			},
 		},
 		{
+			Name: "admin-auth",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: common.DatastoreEDBCMName,
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		},
+		{
 			Name: "scim-ldap-attributes-mapping",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{

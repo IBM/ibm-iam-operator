@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	sscsidriverv1 "sigs.k8s.io/secrets-store-csi-driver/apis/v1"
 )
 
 const MigrationJobName string = "ibm-im-db-migration"
@@ -440,6 +441,18 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 		}
 	}
 
+	edbspc := &sscsidriverv1.SecretProviderClass{}
+	if authCR.SecretsStoreCSIEnabled() {
+		if err = getSecretProviderClassForVolume(s.GetClient(), ctx, authCR.Namespace, "pgsql-certs", edbspc); IsLabelConflictError(err) {
+			log.Error(err, "Multiple SecretProviderClasses are labeled to be mounted as the same volume; ensure that only one is labeled for the given volume name", "volumeName", common.IMLdapBindPwdVolume)
+		} else if err != nil {
+			log.Error(err, "Unexpected error occurred while trying to get SecretProviderClass")
+		}
+		if err != nil {
+			return
+		}
+	}
+
 	*job = batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      s.GetName(),
@@ -537,7 +550,7 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 							Operator: corev1.TolerationOpExists,
 						},
 					},
-					Volumes:    buildMigratorVolumes(needsMongoDBMigration),
+					Volumes:    buildMigratorVolumes(needsMongoDBMigration, edbspc.Name),
 					Containers: buildMigratorContainer(s, image, resources, mongoHost),
 				},
 			},
@@ -583,7 +596,7 @@ func buildMigratorContainer(s common.SecondaryReconciler, image string, resource
 				ReadOnly:  true,
 			},
 			{
-				Name:      "postgres-tls",
+				Name:      "pgsql-certs",
 				MountPath: "/etc/postgres/certs",
 				ReadOnly:  true,
 			},
@@ -614,24 +627,40 @@ func buildMigratorContainer(s common.SecondaryReconciler, image string, resource
 	return []corev1.Container{container}
 }
 
-func buildMigratorVolumes(needsMongoDBMigration bool) (volumes []corev1.Volume) {
+func buildMigratorVolumes(needsMongoDBMigration bool, edbSPCName string) (volumes []corev1.Volume) {
 	volumes = []corev1.Volume{
 		{
 			Name: "postgres-config",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "im-datastore-edb-cm",
+						Name: common.DatastoreEDBCMName,
 					},
 					DefaultMode: ptr.To(int32(420)),
 				},
 			},
 		},
-		{
-			Name: "postgres-tls",
+	}
+
+	if edbSPCName != "" {
+		volumes = append(volumes, corev1.Volume{
+			Name: "pgsql-certs",
+			VolumeSource: corev1.VolumeSource{
+				CSI: &corev1.CSIVolumeSource{
+					Driver:   "secrets-store.csi.k8s.io",
+					ReadOnly: ptr.To(true),
+					VolumeAttributes: map[string]string{
+						"secretProviderClass": edbSPCName,
+					},
+				},
+			},
+		})
+	} else {
+		volumes = append(volumes, corev1.Volume{
+			Name: "pgsql-certs",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: "im-datastore-edb-secret",
+					SecretName: common.DatastoreEDBSecretName,
 					Items: []corev1.KeyToPath{
 						{
 							Key:  "ca.crt",
@@ -652,7 +681,7 @@ func buildMigratorVolumes(needsMongoDBMigration bool) (volumes []corev1.Volume) 
 					DefaultMode: ptr.To(int32(420)),
 				},
 			},
-		},
+		})
 	}
 
 	if !needsMongoDBMigration {

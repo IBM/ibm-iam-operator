@@ -47,6 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	sscsidriverv1 "sigs.k8s.io/secrets-store-csi-driver/apis/v1"
 )
 
 const AnnotationSHA1Sum string = "authentication.operator.ibm.com/sha1sum"
@@ -323,6 +324,7 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"AUDIT_SECRET",
 			"OAUTH_21_ENABLED",
 			"IAM_UM",
+			"SECRETS_STORE_AVAILABLE",
 		),
 		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("OS_TOKEN_LENGTH", "45"),
 			"OS_TOKEN_LENGTH"),
@@ -469,6 +471,21 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 			reqLogger.Info("Found audit variables", "AuditUrl", authCR.Spec.Config.AuditUrl, "AuditSecret", authCR.Spec.Config.AuditSecret)
 		}
 
+		secretsStoreAvailable := false
+		ldapSPC := &sscsidriverv1.SecretProviderClass{}
+		if authCR.SecretsStoreCSIEnabled() {
+			if err = getSecretProviderClassForVolume(r.Client, ctx, s.GetNamespace(), common.IMLdapBindPwdVolume, ldapSPC); IsLabelConflictError(err) {
+				reqLogger.Error(err, "Multiple SecretProviderClasses are labeled to be mounted as the same volume; ensure that only one is labeled for the given volume name", "volumeName", common.IMLdapBindPwdVolume)
+			} else if err != nil {
+				reqLogger.Error(err, "Unexpected error occurred while trying to get SecretProviderClass")
+			} else if ldapSPC.Name != "" {
+				secretsStoreAvailable = true
+			}
+			if err != nil {
+				return
+			}
+		}
+
 		// Set the path for SAML connections
 		var masterPath string
 		if masterPath, err = r.getMasterPath(ctx, s.GetNamespace()); IsJobMissingResultError(err) {
@@ -584,6 +601,10 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"IS_OPENSHIFT_ENV":                   strconv.FormatBool(isOSEnv),
 				"OAUTH_21_ENABLED":                   strconv.FormatBool(oauth21Enabled),
 			},
+		}
+
+		if secretsStoreAvailable {
+			generated.Data["SECRETS_STORE_AVAILABLE"] = strconv.FormatBool(secretsStoreAvailable)
 		}
 
 		// Set Authentication authCR as the owner and controller of the ConfigMap

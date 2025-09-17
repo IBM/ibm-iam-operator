@@ -1050,7 +1050,17 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName
 			Name: "admin-auth",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName:  common.DefaultAdminSecret,
+					SecretName: "platform-auth-idp-credentials",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "admin_username",
+							Path: "admin_username",
+						},
+						{
+							Key:  "admin_password",
+							Path: "admin_password",
+						},
+					},
 					DefaultMode: &partialAccess,
 				},
 			},

@@ -40,6 +40,9 @@ const DatastoreEDBCSName string = "im-common-service"
 // Name of default admin credentials secret created by IM Operator
 const DefaultAdminSecret String = "platform-auth-idp-credentials"
 
+// Name of default scim admin credentials secret created by IM Operator
+const DefaultSCIMAdminSecret String = "platform-auth-scim-credentials"
+
 type DeploymentName string
 
 // The current names of Deployments managed by this Operator

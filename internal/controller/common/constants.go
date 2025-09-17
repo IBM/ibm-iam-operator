@@ -37,6 +37,9 @@ const MongoStatefulsetName string = "icp-mongodb"
 // Name of CommonService created by IM Operator to provision EDB share
 const DatastoreEDBCSName string = "im-common-service"
 
+// Name of default admin credentials secret created by IM Operator
+const DefaultAdminSecret String = "platform-auth-idp-credentials"
+
 type DeploymentName string
 
 // The current names of Deployments managed by this Operator

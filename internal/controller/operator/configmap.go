@@ -57,18 +57,21 @@ const URL_PREFIX = "URL_PREFIX"
 // handleConfigMaps is a subreconciler.FnWithRequest that handles the
 // reconciliation of all ConfigMaps created for a given Authentication.
 func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	cmCtx := logf.IntoContext(ctx, reqLogger)
+	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+	log.Info("Ensure all ConfigMaps contain correct values")
 	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 
 	// Ensure that the ibmcloud-cluster-info configmap is created
 	ibmCloudClusterInfoCM := &corev1.ConfigMap{}
 
+	debugLog.Info("Handle cluster info ConfigMap", "ConfigMap.Name", ClusterInfoConfigmapName)
 	var subresult *ctrl.Result
-	subresult, err = r.handleIBMCloudClusterInfo(cmCtx, authCR, ibmCloudClusterInfoCM)
+	subresult, err = r.handleIBMCloudClusterInfo(debugCtx, authCR, ibmCloudClusterInfoCM)
 	if subreconciler.ShouldHaltOrRequeue(subresult, err) {
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
@@ -106,7 +109,7 @@ func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctr
 	subresults := []*ctrl.Result{}
 	errs := []error{}
 	for _, subRec := range subRecs {
-		subresult, err = subRec.Reconcile(cmCtx)
+		subresult, err = subRec.Reconcile(debugCtx)
 		subresults = append(subresults, subresult)
 		errs = append(errs, err)
 	}

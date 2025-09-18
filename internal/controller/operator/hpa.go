@@ -32,10 +32,13 @@ import (
 )
 
 func (r *AuthenticationReconciler) handleHPAs(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	hpaCtx := logf.IntoContext(ctx, reqLogger)
+	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+
+	log.Info("Ensure HPAs are present when requested")
 	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(hpaCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 	deployments := []string{"platform-auth-service", "platform-identity-provider", "platform-identity-management"}
@@ -44,6 +47,7 @@ func (r *AuthenticationReconciler) handleHPAs(ctx context.Context, req ctrl.Requ
 	autoScaleEnabled := authCR.Spec.AutoScaleConfig
 	replicas := authCR.Spec.Replicas
 	if autoScaleEnabled {
+		log.Info("Autoscaling is enabled; HPAs should be present")
 		subRecs := []common.SecondaryReconciler{}
 		results := []*ctrl.Result{}
 		errs := []error{}
@@ -53,7 +57,7 @@ func (r *AuthenticationReconciler) handleHPAs(ctx context.Context, req ctrl.Requ
 			builder := common.NewSecondaryReconcilerBuilder[*autoscalingv2.HorizontalPodAutoscaler]().
 				WithName(deployName + "-hpa").
 				WithGenerateFns(generateHPAObject(authCR, deployName)).
-				WithModifyFns(modifyHPA(r.needsRollout))
+				WithModifyFns(modifyHPA())
 
 			subRecs = append(subRecs, builder.
 				WithNamespace(authCRNS).
@@ -63,22 +67,24 @@ func (r *AuthenticationReconciler) handleHPAs(ctx context.Context, req ctrl.Requ
 		}
 
 		for _, subRec := range subRecs {
-			subResult, subErr := subRec.Reconcile(hpaCtx)
+			subResult, subErr := subRec.Reconcile(debugCtx)
 			results = append(results, subResult)
 			errs = append(errs, subErr)
 		}
 
 		result, err = common.ReduceSubreconcilerResultsAndErrors(results, errs)
 		if err == nil {
+			debugLog.Info("Cancel any pending rollouts of Deployments")
 			r.needsRollout = false
 		}
 		if subreconciler.ShouldRequeue(result, err) {
-			reqLogger.Info("Cluster state has been modified; requeueing")
+			log.Info("Cluster state has been modified; requeueing")
 			return
 		}
 		return subreconciler.ContinueReconciling()
 	} else {
 		// HPA is disabled - delete any existing HPA and set fixed replicas
+		log.Info("Autoscaling not enabled; remove any existing HPAs")
 		for _, deployName := range deployments {
 			hpa := &autoscalingv2.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{
@@ -86,11 +92,11 @@ func (r *AuthenticationReconciler) handleHPAs(ctx context.Context, req ctrl.Requ
 					Namespace: authCRNS,
 				},
 			}
-			err := r.Get(ctx, types.NamespacedName{Name: deployName + "-hpa", Namespace: authCRNS}, hpa)
+			err := r.Get(debugCtx, types.NamespacedName{Name: deployName + "-hpa", Namespace: authCRNS}, hpa)
 			if err == nil {
-				reqLogger.Info("HPA is disabled, Deleting existing HPAs")
-				if err := r.Delete(ctx, hpa); err == nil {
-					r.UpdateDeploymentReplicas(hpaCtx, deployName, authCRNS, replicas)
+				log.Info("HPA is disabled, Deleting existing HPAs")
+				if err := r.Delete(debugCtx, hpa); err == nil {
+					r.UpdateDeploymentReplicas(debugCtx, deployName, authCRNS, replicas)
 				}
 			} else if !errors.IsNotFound(err) {
 				return subreconciler.RequeueWithDelay(defaultLowerWait)
@@ -229,7 +235,7 @@ func (r *AuthenticationReconciler) UpdateDeploymentReplicas(ctx context.Context,
 // generated HPAs and makes modifications to the observed HPA when
 // such differences are found. Returns a boolean representing whether a
 // modification was made and an error if the operation could not be completed.
-func modifyHPA(needsRollout bool) common.ModifyFn[*autoscalingv2.HorizontalPodAutoscaler] {
+func modifyHPA() common.ModifyFn[*autoscalingv2.HorizontalPodAutoscaler] {
 	return func(s common.SecondaryReconciler, ctx context.Context, observed, generated *autoscalingv2.HorizontalPodAutoscaler) (modified bool, err error) {
 		authCR, ok := s.GetPrimary().(*operatorv1alpha1.Authentication)
 		if !ok {
@@ -250,9 +256,6 @@ func modifyHPA(needsRollout bool) common.ModifyFn[*autoscalingv2.HorizontalPodAu
 			modified = true
 		}
 
-		if !needsRollout {
-			return
-		}
 		return
 	}
 }

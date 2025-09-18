@@ -77,18 +77,21 @@ func (r *AuthenticationReconciler) finalizeMongoMigrationObject(ctx context.Cont
 
 // addMongoMigrationFinalizers is a subreconciler that adds finalizers to resources that are being retained during migration
 func (r *AuthenticationReconciler) addMongoMigrationFinalizers(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	reqLogger.Info("Add finalizers to MongoDB resources in case migration is needed")
+	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+
+	log.Info("Add finalizers to MongoDB resources in case migration is needed")
 	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 
-	if needToMigrate, err := mongoIsPresent(r.Client, ctx, authCR); !needToMigrate && err == nil {
-		reqLogger.Info("No MongoDB migration required, so no need for finalizers; continuing")
+	if needToMigrate, err := mongoIsPresent(r.Client, debugCtx, authCR); !needToMigrate && err == nil {
+		log.Info("No MongoDB migration required, so no need for finalizers; continuing")
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to determine whether migration from MongoDB is needed")
+		log.Error(err, "Failed to determine whether migration from MongoDB is needed")
 		return subreconciler.RequeueWithError(err)
 	}
 
@@ -111,29 +114,29 @@ func (r *AuthenticationReconciler) addMongoMigrationFinalizers(ctx context.Conte
 
 	for key, obj := range toAddFinalizer {
 		var objUpdated bool
-		if objUpdated, err = r.addMongoMigrationFinalizer(ctx, key, obj); k8sErrors.IsNotFound(err) {
-			reqLogger.Info("Object not found; not adding migration finalizer",
+		if objUpdated, err = r.addMongoMigrationFinalizer(debugCtx, key, obj); k8sErrors.IsNotFound(err) {
+			debugLog.Info("Object not found; not adding migration finalizer",
 				"Object.Name", key.Name,
 				"Object.Namespace", key.Namespace)
 		} else if err != nil {
-			reqLogger.Error(err, "Failed to update object due to an unexpected error",
+			log.Error(err, "Failed to update object due to an unexpected error",
 				"Object.Name", key.Name,
 				"Object.Namespace", key.Namespace)
 			return subreconciler.RequeueWithError(err)
 		} else if objUpdated {
-			reqLogger.Info("Migration finalizer written to object",
+			debugLog.Info("Migration finalizer written to object",
 				"Object.Name", key.Name,
 				"Object.Namespace", key.Namespace)
 			updated = true
 		} else {
-			reqLogger.Info("Object already had migration finalizer",
+			debugLog.Info("Object already had migration finalizer",
 				"Object.Name", key.Name,
 				"Object.Namespace", key.Namespace)
 		}
 	}
 
 	if updated {
-		reqLogger.Info("Resources updated with finalizers; requeueing")
+		log.Info("Resources updated with finalizers; requeueing")
 		subreconciler.Requeue()
 	}
 
@@ -141,19 +144,22 @@ func (r *AuthenticationReconciler) addMongoMigrationFinalizers(ctx context.Conte
 }
 
 func (r *AuthenticationReconciler) handleMongoDBCleanup(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	reqLogger.Info("Clean up MongoDB resources if no longer needed")
+	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+
+	log.Info("Clean up MongoDB resources if no longer needed")
 	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 
 	// if retain annotation is unset or set to true - continue reconciling
 	if authCR.HasNotBeenMigrated() {
-		reqLogger.Info("Migrations have not completed yet; requeueing")
+		log.Info("Migrations have not completed yet; requeueing")
 		return subreconciler.Requeue()
 	}
-	reqLogger.Info("Condition indicates migrations have completed")
+	log.Info("Condition indicates migrations have completed")
 
 	mongoDBServiceName := "mongodb"
 	mongoDBPreloadCMName := "mongodb-preload-endpoint"
@@ -198,17 +204,17 @@ func (r *AuthenticationReconciler) handleMongoDBCleanup(ctx context.Context, req
 	for _, kvp := range toFinalize {
 		var objUpdated bool
 		if objUpdated, err = r.finalizeMongoMigrationObject(ctx, kvp.key, kvp.obj); err != nil {
-			reqLogger.Error(err, "Failed to finalize object due to an unexpected error; requeueing",
+			log.Error(err, "Failed to finalize object due to an unexpected error; requeueing",
 				"Object.Name", kvp.key.Name,
 				"Object.Namespace", kvp.key.Namespace)
 			return subreconciler.RequeueWithError(err)
 		} else if objUpdated {
 			anyObjUpdated = true
-			reqLogger.V(1).Info("Object was finalized",
+			debugLog.Info("Object was finalized",
 				"Object.Name", kvp.key.Name,
 				"Object.Namespace", kvp.key.Namespace)
 		} else {
-			reqLogger.V(1).Info("Object was not found",
+			debugLog.Info("Object was not found",
 				"Object.Name", kvp.key.Name,
 				"Object.Namespace", kvp.key.Namespace)
 		}
@@ -221,18 +227,18 @@ func (r *AuthenticationReconciler) handleMongoDBCleanup(ctx context.Context, req
 
 	if curAnnotationCount != prevAnnotationCount {
 		if err = r.Update(ctx, authCR); err != nil {
-			reqLogger.Error(err, "Failed to remove annotations from Authentication")
+			log.Error(err, "Failed to remove annotations from Authentication")
 			return subreconciler.RequeueWithError(err)
 		}
 		anyObjUpdated = true
 	}
 
 	if anyObjUpdated {
-		reqLogger.Info("One or more objects were cleaned up; requeueing")
+		log.Info("One or more objects were cleaned up; requeueing")
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
 
-	reqLogger.Info("No cleanup was necessary; continuing")
+	debugLog.Info("No cleanup was necessary; continuing")
 	return subreconciler.ContinueReconciling()
 }
 
@@ -301,78 +307,85 @@ func mongoIsPresent(cl client.Client, ctx context.Context, authCR *operatorv1alp
 // ensureDatastoreSecretAndCM makes sure that the datastore Secret and ConfigMap are present in the services namespace;
 // these contain the configuration details that allow for connections to EDB
 func (r *AuthenticationReconciler) ensureDatastoreSecretAndCM(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	reqLogger.Info("Ensure EDB datastore configuration resources available")
+	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+
+	log.Info("Ensure EDB datastore configuration resources available")
 	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 
 	cm := &corev1.ConfigMap{}
-	if err = r.Get(ctx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBCMName, Namespace: authCR.Namespace}, cm); k8sErrors.IsNotFound(err) {
-		reqLogger.Info("ConfigMap not available yet; requeueing",
+	if err = r.Get(debugCtx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBCMName, Namespace: authCR.Namespace}, cm); k8sErrors.IsNotFound(err) {
+		log.Info("ConfigMap not available yet; requeueing",
 			"ConfigMap.Name", ctrlcommon.DatastoreEDBCMName,
 			"ConfigMap.Namespace", authCR.Namespace)
 		return subreconciler.RequeueWithDelay(opreqWait)
 	} else if err != nil {
-		reqLogger.Error(err, "Encountered an error when trying to get ConfigMap",
+		log.Error(err, "Encountered an error when trying to get ConfigMap",
 			"ConfigMap.Name", ctrlcommon.DatastoreEDBCMName,
 			"ConfigMap.Namespace", authCR.Namespace)
 		return subreconciler.RequeueWithError(err)
 	}
-	reqLogger.Info("ConfigMap found",
+	debugLog.Info("ConfigMap found",
 		"ConfigMap.Name", ctrlcommon.DatastoreEDBCMName,
 		"ConfigMap.Namespace", authCR.Namespace)
 
 	secret := &corev1.Secret{}
-	if err = r.Get(ctx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBSecretName, Namespace: authCR.Namespace}, secret); k8sErrors.IsNotFound(err) {
-		reqLogger.Info("Secret not available yet; requeueing",
+	if err = r.Get(debugCtx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBSecretName, Namespace: authCR.Namespace}, secret); k8sErrors.IsNotFound(err) {
+		log.Info("Secret not available yet; requeueing",
 			"Secret.Name", ctrlcommon.DatastoreEDBSecretName,
 			"Secret.Namespace", authCR.Namespace)
 		return subreconciler.RequeueWithDelay(opreqWait)
 	} else if err != nil {
-		reqLogger.Error(err, "Encountered an error when trying to get Secret",
+		log.Error(err, "Encountered an error when trying to get Secret",
 			"Secret.Name", ctrlcommon.DatastoreEDBSecretName,
 			"Secret.Namespace", authCR.Namespace)
 		return subreconciler.RequeueWithError(err)
 	}
-	reqLogger.Info("Secret found", "Secret.Name", ctrlcommon.DatastoreEDBSecretName)
+	debugLog.Info("Secret found", "Secret.Name", ctrlcommon.DatastoreEDBSecretName)
 
 	return subreconciler.ContinueReconciling()
 }
 
 func (r *AuthenticationReconciler) overrideMongoDBBootstrap(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
+	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+
 	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 	if needsMongoMigration, err := mongoIsPresent(r.Client, ctx, authCR); err != nil {
-		reqLogger.Error(err, "Failed to determine whether migration from MongoDB is needed")
+		log.Error(err, "Failed to determine whether migration from MongoDB is needed")
 		return subreconciler.RequeueWithError(err)
 	} else if !needsMongoMigration {
-		reqLogger.Info("Does not need MongoDB migration; skipping")
+		debugLog.Info("Does not need MongoDB migration; skipping")
 		return subreconciler.ContinueReconciling()
 	}
-
+	log.Info("MongoDB migration is needed; perform modifications to MongoDB, if present")
+	debugLog.Info("Get ConfigMap used by init container", "ConfigMap.Name", "icp-mongodb-init")
 	// find icp-mongodb-init
 	icpMongoDBInitCMKey := types.NamespacedName{Namespace: req.Namespace, Name: "icp-mongodb-init"}
 	icpMongoDBInitCM := &corev1.ConfigMap{}
-	reqLogger.V(1).Info("Get MongoDB bootstrap ConfigMap",
+	debugLog.Info("Get MongoDB bootstrap ConfigMap",
 		"ConfigMap.Name", icpMongoDBInitCMKey.Name,
 		"ConfigMap.Namespace", icpMongoDBInitCMKey.Namespace)
-	if err = r.Get(ctx, icpMongoDBInitCMKey, icpMongoDBInitCM); k8sErrors.IsNotFound(err) {
-		reqLogger.Info("No MongoDB bootstrap ConfigMap to patch; continuing")
+	if err = r.Get(debugCtx, icpMongoDBInitCMKey, icpMongoDBInitCM); k8sErrors.IsNotFound(err) {
+		debugLog.Info("No MongoDB bootstrap ConfigMap to patch; continuing")
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get MongoDB bootstrap ConfigMap")
+		log.Error(err, "Failed to get MongoDB bootstrap ConfigMap")
 		return subreconciler.RequeueWithError(err)
 	}
 
 	// scale down MongoDB Operator
 	mongoDeployKey := types.NamespacedName{Namespace: os.Getenv("POD_NAMESPACE"), Name: "ibm-mongodb-operator"}
 	mongoDeploy := &appsv1.Deployment{}
-	err = r.Get(ctx, mongoDeployKey, mongoDeploy)
+	err = r.Get(debugCtx, mongoDeployKey, mongoDeploy)
 	if k8sErrors.IsNotFound(err) {
 		// try to find mongodb operator in instance namespace.
 		// in LTSR -> CD Allnamespace upgrade scenario, CS operators and ibm-iam-operator stay in openshift-operators namespace
@@ -380,17 +393,20 @@ func (r *AuthenticationReconciler) overrideMongoDBBootstrap(ctx context.Context,
 		mongoDeployKey.Namespace = req.Namespace
 		err = r.Get(ctx, mongoDeployKey, mongoDeploy)
 		if err == nil {
-			reqLogger.Info("ibm-mongodb-operator found in instance namespace")
+			debugLog.Info("ibm-mongodb-operator found in instance namespace")
 		}
 	}
 	if err != nil && !k8sErrors.IsNotFound(err) {
+		log.Error(err, "Unexpected error occurred when trying to get MongoDB Operator Deployment", "Deployment.Name", "ibm-mongodb-operator")
 		return subreconciler.RequeueWithError(err)
 	}
 	if err == nil && mongoDeploy.Spec.Replicas != nil && *mongoDeploy.Spec.Replicas > 0 {
 		mongoDeploy.Spec.Replicas = ptr.To[int32](0)
-		if err = r.Update(ctx, mongoDeploy); err != nil {
+		if err = r.Update(debugCtx, mongoDeploy); err != nil {
+			log.Error(err, "Failed to update MongoDB Operator Deployment", "Deployment.Name", "ibm-mongodb-operator")
 			return subreconciler.RequeueWithError(err)
 		}
+		log.Info("Updated MongoDB Operator Deployment", "Deployment.Name", "ibm-mongodb-operator")
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
 	// update icp-mongodb-init ConfigMap .data["on-start.sh"]
@@ -401,49 +417,49 @@ func (r *AuthenticationReconciler) overrideMongoDBBootstrap(ctx context.Context,
 	bootstrapUpdateTpl := template.Must(template.New("bootstrapUpdate").Parse(bootstrapUpdateTplString))
 	var bootstrapUpdateBytes bytes.Buffer
 	if err = bootstrapUpdateTpl.Execute(&bootstrapUpdateBytes, vals); err != nil {
-		reqLogger.Error(err, "Failed to execute bootstrapUpdate template")
+		log.Error(err, "Failed to execute bootstrapUpdate template")
 		return subreconciler.RequeueWithError(err)
 	}
 	bootstrapUpdateString := bootstrapUpdateBytes.String()
 	if bootstrapUpdateString != currentOnStartScript {
 		icpMongoDBInitCM.Data["on-start.sh"] = bootstrapUpdateString
-		if err = r.Update(ctx, icpMongoDBInitCM); err != nil {
-			reqLogger.Error(err, "Failed to update bootstrap script in ConfigMap")
+		if err = r.Update(debugCtx, icpMongoDBInitCM); err != nil {
+			log.Error(err, "Failed to update bootstrap script in ConfigMap")
 			return subreconciler.RequeueWithError(err)
 		}
-		reqLogger.Info("Updated bootstrap script in ConfigMap; requeueing")
+		log.Info("Updated bootstrap script in ConfigMap; requeueing", "ConfigMap.Name", icpMongoDBInitCM.Name)
 		return subreconciler.RequeueWithDelay(time.Second * 3)
 	}
 
 	// update icp-mongodb StatefulSet .spec.template.metadata.labels
 	icpMongoDBStSKey := types.NamespacedName{Name: "icp-mongodb", Namespace: req.Namespace}
 	icpMongoDBStS := &appsv1.StatefulSet{}
-	if err = r.Get(ctx, icpMongoDBStSKey, icpMongoDBStS); k8sErrors.IsNotFound(err) {
-		reqLogger.Info("MongoDB StatefulSet not found; continuing")
+	if err = r.Get(debugCtx, icpMongoDBStSKey, icpMongoDBStS); k8sErrors.IsNotFound(err) {
+		log.Info("MongoDB StatefulSet not found; continuing", "StatefulSet.Name", icpMongoDBStSKey.Name)
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get MongoDB StatefulSet")
+		log.Error(err, "Failed to get MongoDB StatefulSet", "StatefulSet.Name", icpMongoDBStSKey.Name)
 		return subreconciler.RequeueWithError(err)
 	}
 
 	if icpMongoDBStS.ObjectMeta.Labels["migrating"] != "true" {
 		icpMongoDBStS.ObjectMeta.Labels["migrating"] = "true"
 		icpMongoDBStS.Spec.Template.Labels["migrating"] = "true"
-		if err = r.Update(ctx, icpMongoDBStS); err != nil {
-			reqLogger.Error(err, "Failed to label MongoDB StatefulSet and template")
+		if err = r.Update(debugCtx, icpMongoDBStS); err != nil {
+			log.Error(err, "Failed to label MongoDB StatefulSet and template")
 			return subreconciler.RequeueWithError(err)
 		}
-		reqLogger.Info("Labeled MongoDB StatefulSet and template")
+		log.Info("Labeled MongoDB StatefulSet and template; requeueing")
 		return subreconciler.RequeueWithDelay(time.Second * 3)
 	}
 
 	if icpMongoDBStS.Status.UpdatedReplicas == *icpMongoDBStS.Spec.Replicas &&
 		icpMongoDBStS.Status.AvailableReplicas == *icpMongoDBStS.Spec.Replicas {
-		reqLogger.Info("MongoDB StatefulSet Pods have been updated; proceeding")
+		log.Info("MongoDB StatefulSet Pods have been updated; proceeding")
 		return subreconciler.ContinueReconciling()
 	}
 
-	reqLogger.Info("MongoDB StatefulSet Pods have not been updated; requeueing")
+	log.Info("MongoDB StatefulSet Pods have not been updated; requeueing")
 	return subreconciler.RequeueWithDelay(time.Second * 3)
 }
 

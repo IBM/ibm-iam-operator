@@ -34,6 +34,7 @@ func (r *AuthenticationReconciler) handleClusterRoles(ctx context.Context, req c
 	debugLog := log.V(1)
 	debugCtx := logf.IntoContext(ctx, debugLog)
 
+	log.Info("Optionally create ClusterRole if OpenShift authentication is available on the cluster")
 	canCreateClusterRoles, err := r.hasAPIAccess(debugCtx, "", rbacv1.SchemeGroupVersion.Group, "clusterroles", []string{"create"})
 	if !canCreateClusterRoles {
 		log.Info("The Operator's ServiceAccount does not have the necessary accesses to create the ClusterRole; skipping")
@@ -50,7 +51,6 @@ func (r *AuthenticationReconciler) handleClusterRoles(ctx context.Context, req c
 
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		log.Error(err, "Failed to get the Authentication")
 		return
 	}
 
@@ -68,7 +68,7 @@ func (r *AuthenticationReconciler) handleClusterRoles(ctx context.Context, req c
 		},
 	}
 	log = log.WithValues("ClusterRole.Name", operandClusterRole.Name)
-	if err := r.Create(ctx, operandClusterRole); k8sErrors.IsAlreadyExists(err) {
+	if err := r.Create(debugCtx, operandClusterRole); k8sErrors.IsAlreadyExists(err) {
 		log.Info("ClusterRole already exists; continuing")
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {

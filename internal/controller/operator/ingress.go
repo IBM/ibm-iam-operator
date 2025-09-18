@@ -32,6 +32,9 @@ import (
 
 func (r *AuthenticationReconciler) removeIngresses(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+
 	log.Info("Ensure all Ingresses are deleted when Routes are supported")
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
@@ -57,7 +60,7 @@ func (r *AuthenticationReconciler) removeIngresses(ctx context.Context, req ctrl
 		r.removeIngress("social-login-callback", req.Namespace),
 	)
 
-	return subRec.Reconcile(ctx)
+	return subRec.Reconcile(debugCtx)
 }
 
 func (r *AuthenticationReconciler) removeIngress(name string, namespace string) common.SecondaryReconcilerFn {

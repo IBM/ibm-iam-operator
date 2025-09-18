@@ -34,9 +34,12 @@ import (
 // ibm-iam-operand-restricted ServiceAccount in the services namespace for this Authentication instance.
 func (r *AuthenticationReconciler) handleClusterRoleBindings(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
-	log.Info("Ensure that the ClusterRoleBinding is created")
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
 
-	canCreateCRB, err := r.hasAPIAccess(ctx, "", rbacv1.SchemeGroupVersion.Group, "clusterrolebindings", []string{"create"})
+	log.Info("Optionally create ClusterRoleBinding if OpenShift authentication is available on the cluster")
+
+	canCreateCRB, err := r.hasAPIAccess(debugCtx, "", rbacv1.SchemeGroupVersion.Group, "clusterrolebindings", []string{"create"})
 	if !canCreateCRB {
 		log.Info("The Operator's ServiceAccount does not have the necessary accesses to create the ClusterRoleBinding; skipping")
 		return subreconciler.ContinueReconciling()
@@ -50,7 +53,7 @@ func (r *AuthenticationReconciler) handleClusterRoleBindings(ctx context.Context
 	}
 
 	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 	name := fmt.Sprintf("ibm-iam-operand-restricted-%s", authCR.Namespace)
@@ -79,7 +82,7 @@ func (r *AuthenticationReconciler) handleClusterRoleBindings(ctx context.Context
 	}
 
 	log = log.WithValues("ClusterRoleBinding.Name", name)
-	if err = r.Create(ctx, operandCRB); k8sErrors.IsAlreadyExists(err) {
+	if err = r.Create(debugCtx, operandCRB); k8sErrors.IsAlreadyExists(err) {
 		log.Info("ClusterRoleBinding already exists, continuing")
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {

@@ -245,7 +245,7 @@ func (r *AuthenticationReconciler) handleAuthenticationFinalizer(ctx context.Con
 func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
 	log := logf.FromContext(rootCtx).WithName("controller_authentication")
 	ctx := logf.IntoContext(rootCtx, log)
-	log.Info("Reconciling Authentication")
+	log.Info("Reconciling Authentication CR")
 
 	// Fetch the Authentication instance
 	authCR := &operatorv1alpha1.Authentication{}
@@ -305,6 +305,8 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 		log.Info("Reconciliation for spec incomplete; requeueing")
 	} else if subreconciler.ShouldContinue(subResult, err) {
 		log.Info("Reconciliation for spec complete")
+	} else {
+		log.Info("Reconciling Authentication CR complete")
 	}
 
 	result, err = subreconciler.Evaluate(subResult, err)

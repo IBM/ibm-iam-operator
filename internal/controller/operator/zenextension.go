@@ -44,16 +44,20 @@ type ZenExtensionWithSpec struct {
 
 // handleZenExtension manages the generation of the ZenExtension when iam behind the zen front door is requested
 func (r *AuthenticationReconciler) handleZenFrontDoor(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	subLogger := logf.FromContext(ctx)
-	subCtx := logf.IntoContext(ctx, subLogger)
+	log := logf.FromContext(ctx)
+
+	log.Info("Remove ZenExtension if present")
+	if !common.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
+		log.Info("ZenExtension resource is not supported; skipping")
+		return subreconciler.ContinueReconciling()
+	}
+	log = log.WithValues("ZenExtension.Name", ImZenExtName)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
 
 	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(subCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
-	}
-	if !common.ClusterHasZenExtensionGroupVersion(&r.DiscoveryClient) {
-		subLogger.Info("ZenExtension resource is not supported; skipping")
-		return subreconciler.ContinueReconciling()
 	}
 
 	//In addition to reconciling the zen extension, we must set the proper value of
@@ -62,7 +66,7 @@ func (r *AuthenticationReconciler) handleZenFrontDoor(ctx context.Context, req c
 		r.removeZenExtension(authCR),
 	}
 
-	return subreconcilers.Reconcile(subCtx)
+	return subreconcilers.Reconcile(debugCtx)
 }
 
 func (zs *ZenExtensionWithSpec) ToUnstructured(s *runtime.Scheme) (u *unstructured.Unstructured, err error) {

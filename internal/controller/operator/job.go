@@ -41,6 +41,102 @@ import (
 
 const MigrationJobName string = "ibm-im-db-migration"
 
+func (r *AuthenticationReconciler) ensureMigrationJobRuns(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+	authCR := &operatorv1alpha1.Authentication{}
+	log.Info("Make sure that any new migrations are executed")
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		log.Info("Failed to retrieve Authentication CR for status update")
+		return
+	}
+	return r.getMigrationJobSubreconciler(authCR).Reconcile(debugCtx)
+}
+
+func (r *AuthenticationReconciler) checkSAMLPresence(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+	authCR := &operatorv1alpha1.Authentication{}
+	cmName := "platform-auth-idp"
+	jobName := "im-has-saml"
+	log.Info("Make sure that MASTER_PATH is set in ConfigMap", "ConfigMap.Name", cmName)
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		log.Info("Failed to retrieve Authentication CR for status update; retrying")
+		return
+	}
+	cm := &corev1.ConfigMap{}
+	objKey := types.NamespacedName{Name: cmName, Namespace: req.Namespace}
+	if err = r.Get(debugCtx, objKey, cm); k8sErrors.IsNotFound(err) {
+		log.Info("ConfigMap not found; creating Job to determine correct value", "ConfigMap.Name", cmName, "Job.Name", jobName)
+		return r.getSAMLQueryJob(authCR).Reconcile(debugCtx)
+	} else if err != nil {
+		log.Error(err, "Unexpected error was encountered while trying to get ConfigMap", "ConfigMap.Name", cmName)
+		return subreconciler.RequeueWithError(err)
+	}
+	if _, ok := cm.Data["MASTER_PATH"]; !ok {
+		log.Info("MASTER_PATH not found; creating Job to determine correct value", "ConfigMap.Name", cmName, "Job.Name", jobName)
+		return r.getSAMLQueryJob(authCR).Reconcile(debugCtx)
+	}
+
+	log.Info("MASTER_PATH is set; delete the Job, if present", "ConfigMap.Name", cmName)
+	return r.removeIMHasSAMLJob(debugCtx, req)
+}
+
+func (r *AuthenticationReconciler) ensureOIDCClientRegistrationJobRuns(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		log.Info("Failed to retrieve Authentication CR for status update; retrying")
+		return
+	}
+	log = log.WithValues("Deployment.Name", "platform-auth-service")
+	log.Info("Confirm that Deployment is available before handling default OIDC client")
+	deploy := &appsv1.Deployment{}
+	objKey := types.NamespacedName{Name: "platform-auth-service", Namespace: req.Namespace}
+	err = r.Get(ctx, objKey, deploy)
+	if err == nil &&
+		((deploy.Spec.Replicas != nil && deploy.Status.AvailableReplicas == *deploy.Spec.Replicas) ||
+			(deploy.Spec.Replicas == nil && deploy.Status.AvailableReplicas == 1)) {
+		log.Info("Deployment is available; ensure default OIDC client is registered")
+		return r.getOIDCClientRegistrationSubreconciler(authCR).Reconcile(ctx)
+	}
+	log.Info("Deployment is not available yet, requeueing")
+	if err != nil {
+		return subreconciler.RequeueWithError(fmt.Errorf("failed to verify availability of Deployment %s in namespace %s: %w", objKey.Name, objKey.Namespace, err))
+	}
+	return subreconciler.RequeueWithDelay(defaultLowerWait)
+}
+
+func (r *AuthenticationReconciler) ensureMigrationJobSucceeded(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+	authCR := &operatorv1alpha1.Authentication{}
+	log.Info("Make sure that migration Job has succeeded", "Job.Name", MigrationJobName)
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		log.Info("Failed to retrieve Authentication CR for status update; retrying")
+		return
+	}
+	job := &batchv1.Job{}
+	log = log.WithValues("Job.Name", MigrationJobName)
+	if err = r.Get(debugCtx, types.NamespacedName{Name: MigrationJobName, Namespace: authCR.Namespace}, job); err != nil {
+		log.Error(err, "Unexpected error while getting Job")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	if job.Status.Succeeded == 1 {
+		log.Info("Job succeeded")
+		return subreconciler.ContinueReconciling()
+	}
+
+	log.Info("Job has not succeeded yet")
+	return subreconciler.Requeue()
+}
+
 func (r *AuthenticationReconciler) getMigrationJobSubreconciler(authCR *operatorv1alpha1.Authentication) (subRec common.Subreconciler) {
 	return common.NewSecondaryReconcilerBuilder[*batchv1.Job]().
 		WithName(MigrationJobName).
@@ -58,36 +154,6 @@ func (r *AuthenticationReconciler) getSAMLQueryJob(authCR *operatorv1alpha1.Auth
 		WithClient(r.Client).
 		WithNamespace(authCR.Namespace).
 		WithPrimary(authCR).MustBuild()
-}
-
-func (r *AuthenticationReconciler) ensureMigrationJobRuns(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	log := logf.FromContext(ctx)
-	authCR := &operatorv1alpha1.Authentication{}
-	if result, err := r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		log.Info("Failed to retrieve Authentication CR for status update; retrying")
-	}
-	return r.getMigrationJobSubreconciler(authCR).Reconcile(ctx)
-}
-
-func (r *AuthenticationReconciler) checkSAMLPresence(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	log := logf.FromContext(ctx)
-	authCR := &operatorv1alpha1.Authentication{}
-	if result, err := r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		log.Info("Failed to retrieve Authentication CR for status update; retrying")
-	}
-	cm := &corev1.ConfigMap{}
-	objKey := types.NamespacedName{Name: "platform-auth-idp", Namespace: req.Namespace}
-	if err = r.Get(ctx, objKey, cm); k8sErrors.IsNotFound(err) {
-		return r.getSAMLQueryJob(authCR).Reconcile(ctx)
-	} else if err != nil {
-		return subreconciler.RequeueWithError(err)
-	}
-	if _, ok := cm.Data["MASTER_PATH"]; !ok {
-		return r.getSAMLQueryJob(authCR).Reconcile(ctx)
-	}
-
-	log.Info("MASTER_PATH is set; delete the Job, if present")
-	return r.removeIMHasSAMLJob(ctx, req)
 }
 
 func (r *AuthenticationReconciler) removeIMHasSAMLJob(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
@@ -180,48 +246,6 @@ func (r *AuthenticationReconciler) removeIMHasSAMLJob(ctx context.Context, req c
 
 	log.Info("Deletions of Job or Pods made; requeueing")
 	return subreconciler.RequeueWithDelay(defaultLowerWait)
-}
-
-func (r *AuthenticationReconciler) ensureOIDCClientRegistrationJobRuns(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	log := logf.FromContext(ctx)
-	authCR := &operatorv1alpha1.Authentication{}
-	if result, err := r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		log.Info("Failed to retrieve Authentication CR for status update; retrying")
-	}
-	log = log.WithValues("Deployment.Name", "platform-auth-service")
-	log.Info("Confirm that Deployment is available before handling default OIDC client")
-	deploy := &appsv1.Deployment{}
-	objKey := types.NamespacedName{Name: "platform-auth-service", Namespace: req.Namespace}
-	err = r.Get(ctx, objKey, deploy)
-	if err == nil &&
-		((deploy.Spec.Replicas != nil && deploy.Status.AvailableReplicas == *deploy.Spec.Replicas) ||
-			(deploy.Spec.Replicas == nil && deploy.Status.AvailableReplicas == 1)) {
-		log.Info("Deployment is available; ensure default OIDC client is registered")
-		return r.getOIDCClientRegistrationSubreconciler(authCR).Reconcile(ctx)
-	}
-	log.Info("Deployment is not available yet, requeueing")
-	if err != nil {
-		return subreconciler.RequeueWithError(fmt.Errorf("failed to verify availability of Deployment %s in namespace %s: %w", objKey.Name, objKey.Namespace, err))
-	}
-	return subreconciler.RequeueWithDelay(defaultLowerWait)
-}
-
-func (r *AuthenticationReconciler) ensureMigrationJobSucceeded(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	log := logf.FromContext(ctx)
-	authCR := &operatorv1alpha1.Authentication{}
-	if result, err := r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		log.Info("Failed to retrieve Authentication CR for status update; retrying")
-	}
-	job := &batchv1.Job{}
-	if err = r.Get(ctx, types.NamespacedName{Name: MigrationJobName, Namespace: authCR.Namespace}, job); err != nil {
-		return subreconciler.RequeueWithError(err)
-	}
-
-	if job.Status.Succeeded == 1 {
-		return subreconciler.ContinueReconciling()
-	}
-
-	return subreconciler.Requeue()
 }
 
 func (r *AuthenticationReconciler) getOIDCClientRegistrationSubreconciler(authCR *operatorv1alpha1.Authentication) (subRec common.Subreconciler) {

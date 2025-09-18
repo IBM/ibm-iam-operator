@@ -36,14 +36,16 @@ const bindInfoName = "ibm-iam-bindinfo"
 
 func (r *AuthenticationReconciler) handleOperandBindInfo(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
 
+	log.Info("Ensure OperandBindInfo is present when supported on the cluster")
 	if !ctrlcommon.ClusterHasOperandBindInfoAPIResource(&r.DiscoveryClient) {
 		log.Info("The OperandBindInfo API resource is not supported by this cluster")
 		return subreconciler.ContinueReconciling()
 	}
 
 	log = log.WithValues("OperandBindInfo.Name", bindInfoName)
-	log.Info("Ensure that OperandBindInfo is present")
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
@@ -56,21 +58,22 @@ func (r *AuthenticationReconciler) handleOperandBindInfo(ctx context.Context, re
 	}
 	observed := &operatorv1alpha1.OperandBindInfo{}
 
-	err = r.Get(ctx, types.NamespacedName{Name: bindInfoName, Namespace: req.Namespace}, observed)
+	err = r.Get(debugCtx, types.NamespacedName{Name: bindInfoName, Namespace: req.Namespace}, observed)
 	if k8sErrors.IsNotFound(err) {
-		if err = r.Create(ctx, generated); err != nil {
+		if err = r.Create(debugCtx, generated); err != nil {
 			log.Error(err, "Encountered an unexpected error while creating OperandBindInfo")
 			return subreconciler.RequeueWithError(err)
 		}
 		log.Info("OperandBindInfo created; requeueing")
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	} else if err != nil {
+		log.Error(err, "Unexpected error was encountered while trying to get OperandBindInfo")
 		return subreconciler.RequeueWithError(err)
 	}
 
 	updated := false
 	if !reflect.DeepEqual(observed.Spec, generated.Spec) {
-		log.Info("OperandBindInfo specs differ; updating")
+		debugLog.Info("OperandBindInfo specs differ; updating")
 		observed.Spec = generated.Spec
 		updated = true
 	}
@@ -88,7 +91,7 @@ func (r *AuthenticationReconciler) handleOperandBindInfo(ctx context.Context, re
 		return subreconciler.ContinueReconciling()
 	}
 
-	if err = r.Update(ctx, observed); err != nil {
+	if err = r.Update(debugCtx, observed); err != nil {
 		log.Error(err, "Encountered an unexpected error while updating OperandBindInfo")
 		return subreconciler.RequeueWithError(err)
 	}

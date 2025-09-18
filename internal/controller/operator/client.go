@@ -37,32 +37,37 @@ import (
 // the Operator and updates the hostnames present in their .spec.oidcLibertyClient fields.
 func (r *AuthenticationReconciler) syncClientHostnames(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+	log.Info("Syncing Client CRs to use latest Authentication configuration")
 	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		log.Info("Failed to retrieve Authentication CR for status update")
 		return
 	}
+	debugLog.Info("Listing Clients")
 	clientList := &oidcsecurityv1.ClientList{}
-	if err = r.List(ctx, clientList); err != nil {
+	if err = r.List(debugCtx, clientList); err != nil {
 		log.Error(err, "Failed to list Clients in all watch namespaces")
 		return subreconciler.RequeueWithError(err)
 	}
 
+	debugLog.Info("Get the cluster address from ConfigMap", "ConfigMap.Name", ClusterInfoConfigmapName)
 	var clusterAddress string
-	if result, err = r.getClusterAddress(authCR, &clusterAddress)(ctx); subreconciler.ShouldHaltOrRequeue(result, err) {
-		log.Error(err, "Could not get the cluster_address due to an unexpected error")
+	if result, err = r.getClusterAddress(authCR, &clusterAddress)(debugCtx); subreconciler.ShouldHaltOrRequeue(result, err) {
+		log.Error(err, "Could not get the cluster_address due to an unexpected error", "ConfigMap.Name", ClusterInfoConfigmapName)
 		return subreconciler.RequeueWithError(err)
 	}
 
 	subRecs := common.Subreconcilers{}
 	for _, clientCR := range clientList.Items {
-		//
 		if isOwnedByZenService(&clientCR) {
+			debugLog.Info("Client is for Zen; skipping", "Client.Name", clientCR.Name)
 			continue
 		}
 		subRecs = append(subRecs, r.updateClientCRURIs(&clientCR, clusterAddress))
 	}
-	return subRecs.Reconcile(ctx)
+	return subRecs.Reconcile(debugCtx)
 }
 
 func isOwnedByZenService(obj client.Object) bool {

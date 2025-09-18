@@ -136,6 +136,7 @@ func (r *BootstrapReconciler) writeConfigurationsToAuthenticationCR(ctx context.
 		"ATTR_MAPPING_FROM_CONFIG": &authCR.Spec.Config.AttrMappingFromConfig,
 		"AUDIT_URL":                &authCR.Spec.Config.AuditUrl,
 		"AUDIT_SECRET":             &authCR.Spec.Config.AuditSecret,
+		"LIBERTY_SAMESITE_COOKIE":  &authCR.Spec.Config.LibertySSCookie,
 	}
 
 	for key, crField := range keys {

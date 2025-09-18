@@ -324,6 +324,7 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"AUDIT_SECRET",
 			"OAUTH_21_ENABLED",
 			"IAM_UM",
+			"LIBERTY_SAMESITE_COOKIE",
 			"SECRETS_STORE_AVAILABLE",
 		),
 		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("OS_TOKEN_LENGTH", "45"),
@@ -507,6 +508,10 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 			reqLogger.Info("Found user management install", "IamUm", *authCR.Spec.Config.IamUm)
 			iamUm = *authCR.Spec.Config.IamUm
 		}
+		var libertySSCookie string
+		if authCR.Spec.Config.LibertySSCookie != nil && strings.EqualFold(*authCR.Spec.Config.LibertySSCookie, "none") {
+			libertySSCookie = *authCR.Spec.Config.LibertySSCookie
+		}
 
 		*generated = corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -599,6 +604,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"SCIM_AUTH_CACHE_TTL_VALUE":          "60",
 				"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
 				"IS_OPENSHIFT_ENV":                   strconv.FormatBool(isOSEnv),
+				"LIBERTY_SAMESITE_COOKIE":            libertySSCookie,
 				"OAUTH_21_ENABLED":                   strconv.FormatBool(oauth21Enabled),
 			},
 		}

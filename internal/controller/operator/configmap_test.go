@@ -702,6 +702,12 @@ var _ = Describe("ConfigMap handling", func() {
 					},
 				},
 				{
+					"LIBERTY_SAMESITE_COOKIE",
+					[]string{
+						"LIBERTY_SAMESITE_COOKIE",
+					},
+				},
+				{
 					"SCIM_LDAP_ATTRIBUTES_MAPPING",
 					[]string{
 						"SCIM_LDAP_ATTRIBUTES_MAPPING",

@@ -270,6 +270,11 @@ func (in *ConfigSpec) DeepCopyInto(out *ConfigSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.LibertySSCookie != nil {
+		in, out := &in.LibertySSCookie, &out.LibertySSCookie
+		*out = new(string)
+		**out = **in
+	}
 	if in.UseSecretsStoreCSI != nil {
 		in, out := &in.UseSecretsStoreCSI, &out.UseSecretsStoreCSI
 		*out = new(bool)

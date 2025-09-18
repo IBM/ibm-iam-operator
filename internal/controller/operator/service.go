@@ -32,9 +32,12 @@ import (
 
 func (r *AuthenticationReconciler) handleServices(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+
 	log.Info("Ensure Services are created")
 	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 
@@ -95,7 +98,7 @@ func (r *AuthenticationReconciler) handleServices(ctx context.Context, req ctrl.
 	results := []*ctrl.Result{}
 	errs := []error{}
 	for _, reconciler := range subRecs {
-		result, err = reconciler.Reconcile(ctx)
+		result, err = reconciler.Reconcile(debugCtx)
 		results = append(results, result)
 		errs = append(errs, err)
 	}

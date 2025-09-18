@@ -35,13 +35,17 @@ import (
 func (r *AuthenticationReconciler) createSA(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	operandSAKey := types.NamespacedName{Name: "ibm-iam-operand-restricted", Namespace: req.Namespace}
 	log := logf.FromContext(ctx, "ServiceAccount.Name", operandSAKey.Name)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+
+	log.Info("Ensure ServiceAccount is present")
 	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 
 	serviceAccount := &corev1.ServiceAccount{}
-	err = r.Client.Get(ctx, operandSAKey, serviceAccount)
+	err = r.Client.Get(debugCtx, operandSAKey, serviceAccount)
 	if err == nil {
 		log.Info("ServiceAccount already exists")
 		return subreconciler.ContinueReconciling()
@@ -49,11 +53,11 @@ func (r *AuthenticationReconciler) createSA(ctx context.Context, req ctrl.Reques
 		log.Error(err, "Failed to get ServiceAccount")
 		return subreconciler.RequeueWithError(err)
 	}
-	log.Info("Did not find ServiceAccount")
+	debugLog.Info("Did not find ServiceAccount")
 	// Define a new operand ServiceAccount
 	operandSA := generateSAObject(ctx, authCR, r.Scheme, operandSAKey.Name)
-	log.Info("Creating ServiceAccount")
-	err = r.Client.Create(ctx, operandSA)
+	debugLog.Info("Creating ServiceAccount")
+	err = r.Client.Create(debugCtx, operandSA)
 	if err != nil {
 		log.Error(err, "Failed to create ServiceAccount")
 		return
@@ -66,21 +70,23 @@ func (r *AuthenticationReconciler) createSA(ctx context.Context, req ctrl.Reques
 func (r *AuthenticationReconciler) handleServiceAccount(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	operandSAKey := types.NamespacedName{Name: "ibm-iam-operand-restricted", Namespace: req.Namespace}
 	log := logf.FromContext(ctx, "ServiceAccount.Name", operandSAKey.Name)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
 	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 
 	// step 1. Get console url to form redirecturi
 	var consoleURL string
-	if result, err = r.getClusterAddress(authCR, &consoleURL)(ctx); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err = r.getClusterAddress(authCR, &consoleURL)(debugCtx); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 	redirectURI := "https://" + consoleURL + "/auth/liberty/callback"
 
 	// Get existing annotations from SA
 	serviceAccount := &corev1.ServiceAccount{}
-	if err = r.Client.Get(ctx, operandSAKey, serviceAccount); err != nil {
+	if err = r.Client.Get(debugCtx, operandSAKey, serviceAccount); err != nil {
 		log.Error(err, "Failed to GET ServiceAccount")
 		return subreconciler.RequeueWithError(err)
 	}
@@ -91,7 +97,7 @@ func (r *AuthenticationReconciler) handleServiceAccount(ctx context.Context, req
 	serviceAccount.ObjectMeta.Annotations["serviceaccounts.openshift.io/oauth-redirecturi.first"] = redirectURI
 
 	// update the SAcc with this annotation
-	if err = r.Client.Update(ctx, serviceAccount); err != nil {
+	if err = r.Client.Update(debugCtx, serviceAccount); err != nil {
 		// error updating annotation
 		log.Error(err, "Error updating annotation in ServiceAccount")
 		return subreconciler.RequeueWithError(err)

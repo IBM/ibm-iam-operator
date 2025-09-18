@@ -45,10 +45,14 @@ const (
 
 func (r *AuthenticationReconciler) setAuthenticationStatus(ctx context.Context, authCR *operatorv1alpha1.Authentication) (modified bool, err error) {
 	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+
+	log.Info("Set Authentication status")
 	authCRCopy := authCR.DeepCopy()
 	var nodes []string
-	log.Info("Set nodes status")
-	nodes, err = r.getNodesStatus(ctx, authCR)
+	debugLog.Info("Set nodes status")
+	nodes, err = r.getNodesStatus(debugCtx, authCR)
 	if err != nil {
 		return
 	}
@@ -56,17 +60,17 @@ func (r *AuthenticationReconciler) setAuthenticationStatus(ctx context.Context, 
 		authCR.Status.Nodes = nodes
 	}
 
-	log.Info("Set migration status")
-	err = r.setMigrationStatusConditions(ctx, authCR)
+	debugLog.Info("Set migration status")
+	err = r.setMigrationStatusConditions(debugCtx, authCR)
 	if err != nil {
 		return
 	}
 
-	log.Info("Set service status")
-	authCR.Status.Service = r.getCurrentServiceStatus(ctx, r.Client, authCR)
+	debugLog.Info("Set service status")
+	authCR.Status.Service = r.getCurrentServiceStatus(debugCtx, r.Client, authCR)
 	expectedPodCount := int(authCR.Spec.Replicas) * 3
 	if len(nodes) != expectedPodCount {
-		log.Info("Number of nodes did not match expected count", "expected", expectedPodCount)
+		debugLog.Info("Number of nodes did not match expected count", "expected", expectedPodCount)
 		authCR.Status.Service.Status = ResourceNotReadyState
 	}
 	if !reflect.DeepEqual(authCR.Status, authCRCopy.Status) {

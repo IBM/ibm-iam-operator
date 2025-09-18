@@ -70,7 +70,9 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Re
 	log := logf.FromContext(ctx)
 	handleRouteCtx := logf.IntoContext(ctx, log)
 
+	log.Info("Ensure all Routes are present when supported on the cluster")
 	if !common.ClusterHasRouteGroupVersion(&r.DiscoveryClient) {
+		log.Info("The Route API resource is not supported by this cluster")
 		return subreconciler.ContinueReconciling()
 	}
 
@@ -116,6 +118,9 @@ func (r *AuthenticationReconciler) removeExistingRouteIfItHasDifferentHost() com
 
 func (r *AuthenticationReconciler) reconcileAllRoutes(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+
 	allRoutesFields := &map[string]*reconcileRouteFields{}
 	if result, err = r.getAllRoutesFields(authCR, allRoutesFields)(ctx); subreconciler.ShouldRequeue(result, err) {
 		return
@@ -123,10 +128,11 @@ func (r *AuthenticationReconciler) reconcileAllRoutes(ctx context.Context, authC
 
 	allRouteReconcilers, err := r.getRouteSubreconcilers(authCR, allRoutesFields)
 	if err != nil {
+		log.Error(err, "Unexpected error occurred while preparing Route handling")
 		return subreconciler.RequeueWithError(err)
 	}
 
-	if result, err = allRouteReconcilers.Reconcile(ctx); err != nil {
+	if result, err = allRouteReconcilers.Reconcile(debugCtx); err != nil {
 		log.Info("One or more errors were encountered while reconciling Routes; requeueing")
 	} else if subreconciler.ShouldRequeue(result, err) {
 		log.Info("One or more Routes were written to; requeueing")

@@ -30,14 +30,18 @@ import (
 
 func (r *AuthenticationReconciler) createRole(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	log := logf.FromContext(ctx, "Role.Name", "ibm-iam-operand-restricted")
-	log.Info("Ensure Role is created")
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+
+	log.Info("Ensure Role is present")
+
 	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 	// Define a new Role
 	operandRole := r.iamOperandRole(authCR)
-	err = r.Client.Create(ctx, operandRole)
+	err = r.Client.Create(debugCtx, operandRole)
 	if k8sErrors.IsAlreadyExists(err) {
 		log.Info("Role is already present")
 		return subreconciler.ContinueReconciling()

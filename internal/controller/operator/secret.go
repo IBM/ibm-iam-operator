@@ -40,14 +40,16 @@ import (
 
 func (r *AuthenticationReconciler) handleSecrets(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
-	sCtx := logf.IntoContext(ctx, log)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
 
+	log.Info("Ensure Secrets are present and updated")
 	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(sCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 
-	secretSubreconcilers, err := r.getSecretSubreconcilers(sCtx, authCR)
+	secretSubreconcilers, err := r.getSecretSubreconcilers(debugCtx, authCR)
 	if err != nil {
 		log.Error(err, "Failed to generate updaters for Secrets")
 		return subreconciler.RequeueWithError(err)
@@ -56,7 +58,7 @@ func (r *AuthenticationReconciler) handleSecrets(ctx context.Context, req ctrl.R
 	results := []*ctrl.Result{}
 	errs := []error{}
 	for _, secretSubreconciler := range secretSubreconcilers {
-		result, err = secretSubreconciler.Reconcile(sCtx)
+		result, err = secretSubreconciler.Reconcile(debugCtx)
 		results = append(results, result)
 		errs = append(errs, err)
 	}

@@ -61,14 +61,18 @@ func (r *AuthenticationReconciler) addEmbeddedEDBIfNeeded(ctx context.Context, a
 // upon what the IM install needs. At a minimum, the UI Operator is included.
 func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	opReqName := "ibm-iam-request"
-	log := logf.FromContext(ctx, "OperandRequest.Name", opReqName)
+	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
 
+	log.Info("Ensure OperandRequest is present when supported by cluster and contains correct Operands")
+
+	log = logf.FromContext(ctx, "OperandRequest.Name", opReqName)
 	if !ctrlcommon.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
 		log.Info("The OperandRequest API resource is not supported by this cluster; assuming EDB connection will be configured manually", "Secret", ctrlcommon.DatastoreEDBSecretName, "ConfigMap", ctrlcommon.DatastoreEDBCMName, "Namespace", req.Namespace)
 		return subreconciler.ContinueReconciling()
 	}
 
-	log.Info("Ensure that OperandRequest is updated with correct Operands")
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
@@ -78,15 +82,16 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 		{Name: "ibm-idp-config-ui-operator"},
 	}
 
-	if err = r.addEmbeddedEDBIfNeeded(ctx, authCR, &desiredOperands); err != nil {
+	if err = r.addEmbeddedEDBIfNeeded(debugCtx, authCR, &desiredOperands); err != nil {
+		log.Error(err, "Unexpected error was encountered while attempting to determine whether EDB needed")
 		return subreconciler.RequeueWithError(err)
 	}
 
 	observedOpReq := &operatorv1alpha1.OperandRequest{}
-	err = r.Get(ctx, types.NamespacedName{Name: opReqName, Namespace: authCR.Namespace}, observedOpReq)
+	err = r.Get(debugCtx, types.NamespacedName{Name: opReqName, Namespace: authCR.Namespace}, observedOpReq)
 
 	if k8sErrors.IsNotFound(err) {
-		log.Info("OperandRequest not found, creating")
+		debugLog.Info("OperandRequest not found, creating")
 		desiredRequests := []operatorv1alpha1.Request{
 			{Registry: "common-service", RegistryNamespace: authCR.Namespace, Operands: desiredOperands},
 		}
@@ -109,7 +114,7 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 			log.Error(err, "Failed to set owner reference on OperandRequest")
 			return subreconciler.RequeueWithError(err)
 		}
-		if err = r.Create(ctx, desiredOpReq); k8sErrors.IsAlreadyExists(err) {
+		if err = r.Create(debugCtx, desiredOpReq); k8sErrors.IsAlreadyExists(err) {
 			log.Info("OperandRequest already exists; continuing")
 			return subreconciler.ContinueReconciling()
 		} else if err != nil {
@@ -140,7 +145,7 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 	// If MongoDB is still needed, and observed OpReq has MongoDB, and the list of desired Operands does not have
 	// MongoDB listed
 
-	needToMigrate, err := mongoIsPresent(r.Client, ctx, authCR)
+	needToMigrate, err := mongoIsPresent(r.Client, debugCtx, authCR)
 	if err != nil {
 		log.Info("Failed to determine whether there is a need to migrate from MongoDB", "err", err.Error())
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
@@ -153,7 +158,7 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 
 	log.V(1).Info("List Operands", "observedOperands", observedOperands, "desiredOperands", desiredOperands)
 	if !operandsAreEqual(observedOperands, desiredOperands) {
-		log.V(1).Info("Operands are different, set to desired")
+		debugLog.Info("Operands are different, set to desired")
 		observedOpReq.Spec.Requests[0].Operands = desiredOperands
 		changed = true
 	}
@@ -172,7 +177,7 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 		log.Error(err, "Failed to set owner reference on OperandRequest")
 		return subreconciler.RequeueWithError(err)
 	}
-	if err = r.Update(ctx, observedOpReq); err != nil {
+	if err = r.Update(debugCtx, observedOpReq); err != nil {
 		log.Error(err, "Failed to update OperandRequest")
 		return subreconciler.RequeueWithError(err)
 	}
@@ -268,6 +273,9 @@ func hasMongoDBOperandFromOperands(operands []operatorv1alpha1.Operand) bool {
 func (r *AuthenticationReconciler) createEDBShareClaim(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	csCRName := "im-common-service"
 	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+
 	log.Info("Create a CommonService CR for shared EDB claim")
 
 	authCR := &operatorv1alpha1.Authentication{}
@@ -275,22 +283,23 @@ func (r *AuthenticationReconciler) createEDBShareClaim(ctx context.Context, req 
 		return
 	}
 
-	if needsExternal, err := r.needsExternalEDB(ctx, authCR); err == nil && needsExternal {
+	if needsExternal, err := r.needsExternalEDB(debugCtx, authCR); err == nil && needsExternal {
 		log.Info("External EDB configuration details to be set up; skipping creation of CommonService CR for EDB share")
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {
+		log.Error(err, "Unexpected error occurred while trying to determine whether external EDB is to be configured")
 		return subreconciler.RequeueWithError(err)
 	}
 
 	log = log.WithValues("CommonService.Name", csCRName)
-	unstructuredCS := map[string]interface{}{
+	unstructuredCS := map[string]any{
 		"kind":       "CommonService",
 		"apiVersion": "operator.ibm.com/v3",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      csCRName,
 			"namespace": authCR.Namespace,
 		},
-		"spec": map[string]interface{}{
+		"spec": map[string]any{
 			"sharedDBServices": "IM",
 		},
 	}
@@ -313,14 +322,33 @@ func (r *AuthenticationReconciler) createEDBShareClaim(ctx context.Context, req 
 }
 
 func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	log := logf.FromContext(ctx, "Object.Name", "common-service-db", "Object.Kind", "Cluster", "Object.APIVersion", "postgresql.k8s.enterprisedb.io/v1")
+	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+
+	log.Info("Ensure Cluster is present and available before connecting")
+
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+
+	if needsExternal, err := r.needsExternalEDB(debugCtx, authCR); err == nil && needsExternal {
+		log.Info("Configured to connect to external database; skipping this check")
+		return subreconciler.ContinueReconciling()
+	} else if err != nil {
+		log.Error(err, "Unexpected error occurred while trying to determine whether external EDB is to be configured")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	log = log.WithValues("Object.Name", "common-service-db", "Object.Kind", "Cluster", "Object.APIVersion", "postgresql.k8s.enterprisedb.io/v1")
+
 	u := &unstructured.Unstructured{
 		Object: map[string]any{
 			"kind":       "Cluster",
 			"apiVersion": "postgresql.k8s.enterprisedb.io/v1",
 		},
 	}
-
 	if err = r.Get(ctx, types.NamespacedName{Name: "common-service-db", Namespace: req.Namespace}, u); k8sErrors.IsNotFound(err) {
 		log.Info("Cluster not found")
 		return subreconciler.Requeue()

@@ -51,49 +51,52 @@ const IMAuditTLSVolume string = "audit-volume"
 const SecretProviderClassAsVolumeLabel string = "authentication.operator.ibm.com/as-volume"
 
 func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
-	deployCtx := logf.IntoContext(ctx, reqLogger)
+	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
 
+	log.Info("Ensure all Deployments are present and updated")
 	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(deployCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
-	if result, err = r.removeCP2Deployments(deployCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) && err != nil {
+	if result, err = r.removeCP2Deployments(debugCtx, req); subreconciler.ShouldHaltOrRequeue(result, err) && err != nil {
+		log.Error(err, "Failed to remove CP2 Deployments")
 		return
 	}
 
 	// Check for the presence of dependencies
 	consoleConfigMap := &corev1.ConfigMap{}
 	ibmCloudClusterInfoKey := types.NamespacedName{Name: common.IBMCloudClusterInfoCMName, Namespace: req.Namespace}
-	err = r.Client.Get(deployCtx, ibmCloudClusterInfoKey, consoleConfigMap)
+	err = r.Client.Get(debugCtx, ibmCloudClusterInfoKey, consoleConfigMap)
 	if k8sErrors.IsNotFound(err) {
-		reqLogger.Error(err, "The ConfigMap has not been created yet", "ConfigMap.Name", common.IBMCloudClusterInfoCMName)
+		log.Error(err, "The ConfigMap has not been created yet", "ConfigMap.Name", common.IBMCloudClusterInfoCMName)
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to get ConfigMap", common.IBMCloudClusterInfoCMName)
+		log.Error(err, "Failed to get ConfigMap", common.IBMCloudClusterInfoCMName)
 		return subreconciler.RequeueWithError(err)
 	}
 
-	auditSecretName, err := r.getAuditSecretNameIfExists(deployCtx, authCR)
+	auditSecretName, err := r.getAuditSecretNameIfExists(debugCtx, authCR)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
 
 	// Check for the presence of dependencies, for SAAS
-	reqLogger.Info("Is SAAS enabled?", "Instance spec config value", authCR.Spec.Config.IBMCloudSaas)
+	debugLog.Info("Is SAAS enabled?", "Instance spec config value", authCR.Spec.Config.IBMCloudSaas)
 	var saasServiceIdCrn string = ""
 	saasTenantConfigMapName := "cs-saas-tenant-config"
 	saasTenantConfigMap := &corev1.ConfigMap{}
 	if authCR.Spec.Config.IBMCloudSaas {
-		err := r.Client.Get(deployCtx, types.NamespacedName{Name: saasTenantConfigMapName, Namespace: authCR.Namespace}, saasTenantConfigMap)
+		err := r.Client.Get(debugCtx, types.NamespacedName{Name: saasTenantConfigMapName, Namespace: authCR.Namespace}, saasTenantConfigMap)
 		if k8sErrors.IsNotFound(err) {
-			reqLogger.Error(err, "SAAS is enabled, waiting for the configmap to be created", "ConfigMap.Name", saasTenantConfigMapName)
+			log.Error(err, "SAAS is enabled, waiting for the configmap to be created", "ConfigMap.Name", saasTenantConfigMapName)
 			return subreconciler.RequeueWithError(err)
 		} else if err != nil {
-			reqLogger.Error(err, "Failed to get ConfigMap", saasTenantConfigMapName)
+			log.Error(err, "Failed to get ConfigMap", saasTenantConfigMapName)
 			return subreconciler.RequeueWithError(err)
 		}
-		reqLogger.Info("SAAS tenant configmap was created; updating service_crn_id from configmap", "ConfigMap.Name", saasTenantConfigMapName)
+		debugLog.Info("SAAS tenant configmap was created; updating service_crn_id from configmap", "ConfigMap.Name", saasTenantConfigMapName)
 		saasServiceIdCrn = saasTenantConfigMap.Data["service_crn_id"]
 	}
 
@@ -101,14 +104,14 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 	edbSPC := &sscsidriverv1.SecretProviderClass{}
 	if authCR.SecretsStoreCSIEnabled() {
 		if err = getSecretProviderClassForVolume(r.Client, ctx, req.Namespace, common.IMLdapBindPwdVolume, ldapSPC); IsLabelConflictError(err) {
-			reqLogger.Error(err, "Multiple SecretProviderClasses are labeled to be mounted as the same volume; ensure that only one is labeled for the given volume name", "volumeName", common.IMLdapBindPwdVolume)
+			log.Error(err, "Multiple SecretProviderClasses are labeled to be mounted as the same volume; ensure that only one is labeled for the given volume name", "volumeName", common.IMLdapBindPwdVolume)
 		} else if err != nil {
-			reqLogger.Error(err, "Unexpected error occurred while trying to get SecretProviderClass")
+			log.Error(err, "Unexpected error occurred while trying to get SecretProviderClass")
 		}
 		if err = getSecretProviderClassForVolume(r.Client, ctx, req.Namespace, "pgsql-certs", edbSPC); IsLabelConflictError(err) {
-			reqLogger.Error(err, "Multiple SecretProviderClasses are labeled to be mounted as the same volume; ensure that only one is labeled for the given volume name", "volumeName", common.IMLdapBindPwdVolume)
+			log.Error(err, "Multiple SecretProviderClasses are labeled to be mounted as the same volume; ensure that only one is labeled for the given volume name", "volumeName", common.IMLdapBindPwdVolume)
 		} else if err != nil {
-			reqLogger.Error(err, "Unexpected error occurred while trying to get SecretProviderClass")
+			log.Error(err, "Unexpected error occurred while trying to get SecretProviderClass")
 		}
 		if err != nil {
 			return subreconciler.RequeueWithError(err)
@@ -143,7 +146,7 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 	results := []*ctrl.Result{}
 	errs := []error{}
 	for _, subRec := range subRecs {
-		subResult, subErr := subRec.Reconcile(deployCtx)
+		subResult, subErr := subRec.Reconcile(debugCtx)
 		results = append(results, subResult)
 		errs = append(errs, subErr)
 	}
@@ -152,7 +155,7 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 		r.needsRollout = false
 	}
 	if subreconciler.ShouldRequeue(result, err) {
-		reqLogger.Info("Cluster state has been modified; requeueing")
+		log.Info("Cluster state has been modified; requeueing")
 		return
 	}
 

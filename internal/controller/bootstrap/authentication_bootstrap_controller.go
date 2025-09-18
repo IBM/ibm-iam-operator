@@ -47,6 +47,7 @@ type BootstrapReconciler struct {
 func (r *BootstrapReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
 	log := logf.FromContext(ctx).WithName("controller_authentication_bootstrap")
 	subCtx := logf.IntoContext(ctx, log)
+	log.Info("Bootstrapping any existing Authentication CR")
 	if subResult, err := r.makeAuthenticationCorrections(subCtx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
 		if err != nil {
 			log.Error(err, "An error was encountered during Authentication bootstrap")
@@ -75,8 +76,11 @@ func (r *BootstrapReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // makeAuthenticationCorrections handles changes that need to happen to the Authentication CR for compatibility reasons.
 func (r *BootstrapReconciler) makeAuthenticationCorrections(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+
 	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 	if authCR.Labels[ctrlcommon.ManagerVersionLabel] == version.Version {
@@ -87,14 +91,14 @@ func (r *BootstrapReconciler) makeAuthenticationCorrections(ctx context.Context,
 		authCR.SetRequiredDummyData()
 	}
 
-	if err = r.writeConfigurationsToAuthenticationCR(ctx, authCR); err != nil {
+	if err = r.writeConfigurationsToAuthenticationCR(debugCtx, authCR); err != nil {
 		log.Error(err, "Failed to update the Authentication")
 		return subreconciler.RequeueWithError(err)
 	}
 
 	authCR.Labels[ctrlcommon.ManagerVersionLabel] = version.Version
 
-	err = r.Update(ctx, authCR)
+	err = r.Update(debugCtx, authCR)
 	if err != nil {
 		log.Error(err, "Failed to update the Authentication")
 		return subreconciler.RequeueWithError(err)

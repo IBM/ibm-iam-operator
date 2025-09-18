@@ -71,7 +71,6 @@ const controllerName = "controller_oidc_client"
 const baseAuthenticationWaitTime time.Duration = time.Minute
 
 var Clock clock.Clock = clock.RealClock{}
-var log = logf.Log.WithName(controllerName)
 
 // ClientReconciler reconciles a Client object
 type ClientReconciler struct {
@@ -92,10 +91,10 @@ func (r *ClientReconciler) Get(ctx context.Context, objkey runtimeClient.ObjectK
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
-	reqLogger := log.WithValues("Request.Namespace", req.Namespace, "Request.Name", req.Name)
-
-	reqLogger.Info("Reconciling Client CR")
+func (r *ClientReconciler) Reconcile(rootCtx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
+	log := logf.FromContext(rootCtx).WithName("controller_oidc_client")
+	ctx := logf.IntoContext(rootCtx, log)
+	log.Info("Reconciling Client CR")
 
 	subreconcilersForClient := []subreconciler.FnWithRequest{
 		r.confirmAuthenticationIsReady,
@@ -108,14 +107,14 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		r.updateStatus,
 	}
 
-	subreconcilerCtx := logf.IntoContext(ctx, reqLogger)
+	subreconcilerCtx := logf.IntoContext(ctx, log)
 	for _, f := range subreconcilersForClient {
 		if r, err := f(subreconcilerCtx, req); subreconciler.ShouldHaltOrRequeue(r, err) {
 			return subreconciler.Evaluate(r, err)
 		}
 	}
 
-	reqLogger.Info("Reconciling Client CR complete")
+	log.Info("Reconciling Client CR complete")
 
 	return subreconciler.Evaluate(subreconciler.DoNotRequeue())
 }
@@ -875,5 +874,6 @@ func (r *ClientReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&oidcsecurityv1.Client{}).
 		Owns(&corev1.Secret{}).
+		Named("controller_oidc_client").
 		Complete(r)
 }

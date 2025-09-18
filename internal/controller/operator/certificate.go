@@ -40,7 +40,10 @@ const Certv1alpha1APIVersion = "certmanager.k8s.io/v1alpha1"
 
 func (r *AuthenticationReconciler) handleCertificates(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	authCR := &operatorv1alpha1.Authentication{}
-	reqLogger := logf.FromContext(ctx)
+	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+	log.Info("Ensure all Certificates are present and the correct GVK")
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
@@ -51,10 +54,8 @@ func (r *AuthenticationReconciler) handleCertificates(ctx context.Context, req c
 		r.createV1CertificatesIfNotPresent(authCR, certificateFieldsList),
 		r.addLabelIfMissing(certificateFieldsList),
 	}
-	reqLogger.Info("Reconciling Certificates")
-	fnCtx := ctrl.LoggerInto(ctx, reqLogger)
 	for _, fn := range certificateSubreconcilers {
-		if result, err = fn(fnCtx); subreconciler.ShouldHaltOrRequeue(result, err) {
+		if result, err = fn(debugCtx); subreconciler.ShouldHaltOrRequeue(result, err) {
 			return
 		}
 	}
@@ -189,6 +190,7 @@ func (r *AuthenticationReconciler) removeV1Alpha1Cert(_ *operatorv1alpha1.Authen
 func (r *AuthenticationReconciler) createV1CertificatesIfNotPresent(authCR *operatorv1alpha1.Authentication, fieldsList []*reconcileCertificateFields) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		log := logf.FromContext(ctx)
+		log.Info("Create v1 Certificates if not present")
 
 		allV1CertReconcilers := make([]subreconciler.Fn, 0)
 		for _, fields := range fieldsList {
@@ -255,7 +257,7 @@ func (r *AuthenticationReconciler) createV1CertificateIfNotPresent(authCR *opera
 func (r *AuthenticationReconciler) addLabelIfMissing(fieldsList []*reconcileCertificateFields) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		log := logf.FromContext(ctx)
-
+		log.Info("Add any labels that are missing to Certificates")
 		allV1CertReconcilers := make([]subreconciler.Fn, 0)
 		for _, fields := range fieldsList {
 			allV1CertReconcilers = append(allV1CertReconcilers, r.updateCertWithLabel(fields))

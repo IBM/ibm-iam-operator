@@ -150,6 +150,7 @@ var _ = Describe("AuthenticationReconciler", func() {
 	Context("setAuthenticationStatus", func() {
 		It("should update the status when nodes change", func() {
 			r := getReconciler()
+			ctx = context.Background()
 			addNodePods(r.Client, ctx, "data-ns")
 			addJob(r.Client, ctx, "data-ns", false)
 			authCR := &operatorv1alpha1.Authentication{}
@@ -172,6 +173,7 @@ var _ = Describe("AuthenticationReconciler", func() {
 
 		It("should not update the status when nodes do not change", func() {
 			r := getReconciler()
+			ctx = context.Background()
 			authCR := &operatorv1alpha1.Authentication{}
 			Expect(r.Get(ctx, types.NamespacedName{Name: "example-authentication", Namespace: "data-ns"}, authCR)).To(Succeed())
 			modified, err := r.setAuthenticationStatus(ctx, authCR)
@@ -184,6 +186,7 @@ var _ = Describe("AuthenticationReconciler", func() {
 	Context("setMigrationStatusConditions", func() {
 		It("should set conditions when job is completed", func() {
 			r := getReconciler()
+			ctx = context.Background()
 			addCompletedJob(r.Client, ctx, "data-ns")
 			authCR := &operatorv1alpha1.Authentication{}
 			Expect(r.Get(ctx, types.NamespacedName{Name: "example-authentication", Namespace: "data-ns"}, authCR)).To(Succeed())
@@ -203,6 +206,7 @@ var _ = Describe("AuthenticationReconciler", func() {
 
 		It("should set conditions when job is running and conditions are not set", func() {
 			r := getReconciler()
+			ctx = context.Background()
 			addJob(r.Client, ctx, "data-ns", false)
 			authCR := &operatorv1alpha1.Authentication{}
 			Expect(r.Get(ctx, types.NamespacedName{Name: "example-authentication", Namespace: "data-ns"}, authCR)).To(Succeed())
@@ -222,6 +226,7 @@ var _ = Describe("AuthenticationReconciler", func() {
 
 		It("should set conditions when job is running again after a previous success", func() {
 			r := getReconciler()
+			ctx = context.Background()
 			addCompletedJob(r.Client, ctx, "data-ns")
 			authCR := &operatorv1alpha1.Authentication{}
 			Expect(r.Get(ctx, types.NamespacedName{Name: "example-authentication", Namespace: "data-ns"}, authCR)).To(Succeed())
@@ -255,6 +260,7 @@ var _ = Describe("AuthenticationReconciler", func() {
 
 		It("should preserve conditions when job is running again after a previous, incomplete failure", func() {
 			r := getReconciler()
+			ctx = context.Background()
 			addFailedJob(r.Client, ctx, "data-ns", false, nil)
 			authCR := &operatorv1alpha1.Authentication{}
 			Expect(r.Get(ctx, types.NamespacedName{Name: "example-authentication", Namespace: "data-ns"}, authCR)).To(Succeed())
@@ -288,6 +294,7 @@ var _ = Describe("AuthenticationReconciler", func() {
 
 		It("should preserve ReasonMigrationFailure reason when job is running again after a previous, complete failure", func() {
 			r := getReconciler()
+			ctx = context.Background()
 			addFailedJob(r.Client, ctx, "data-ns", true, nil)
 			authCR := &operatorv1alpha1.Authentication{}
 			Expect(r.Get(ctx, types.NamespacedName{Name: "example-authentication", Namespace: "data-ns"}, authCR)).To(Succeed())

@@ -107,9 +107,9 @@ func jobHasFailed(job *batchv1.Job) (hasFailed bool) {
 // hitting its BackoffLimit.
 func jobHasCompletelyFailed(job *batchv1.Job) (hasFailed bool) {
 	if job.Spec.BackoffLimit == nil {
-		return job.Status.Failed == 6
+		return job.Status.Failed >= 6
 	}
-	return job.Status.Failed == *job.Spec.BackoffLimit
+	return job.Status.Failed >= *job.Spec.BackoffLimit
 }
 
 // setMigrationsRunningStatus sets the appropriate metav1.Condition of type

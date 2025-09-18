@@ -1240,6 +1240,7 @@ func IsJobMissingResultError(err error) bool {
 }
 
 func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, namespace string) (path string, err error) {
+	log := logf.FromContext(ctx)
 	cmKey := types.NamespacedName{Name: "platform-auth-idp", Namespace: namespace}
 	cm := &corev1.ConfigMap{}
 	if err = r.Get(ctx, cmKey, cm); err != nil && !k8sErrors.IsNotFound(err) {
@@ -1255,64 +1256,66 @@ func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, namespace 
 	if err = r.Get(ctx, jobKey, job); err != nil {
 		return
 	}
+
 	jobUID := job.ObjectMeta.UID
 
 	podList := &corev1.PodList{}
 
-	opts := []client.ListOption{
+	podListOpts := []client.ListOption{
 		client.InNamespace(namespace),
 		client.MatchingLabels(map[string]string{
 			"batch.kubernetes.io/controller-uid": string(jobUID),
-			"batch.kubernetes.io/job-name":       "im-has-saml",
+			"batch.kubernetes.io/job-name":       jobKey.Name,
 		}),
 	}
 
-	var exitCode int32 = -1
-	if err = r.List(ctx, podList, opts...); err != nil {
+	depPodListOpts := []client.ListOption{
+		client.InNamespace(namespace),
+		client.MatchingLabels(map[string]string{
+			"controller-uid": string(jobUID),
+			"job-name":       jobKey.Name,
+		}),
+	}
+
+	if err = r.List(ctx, podList, podListOpts...); err != nil {
+		log.Error(err, "Failed to list Job Pods")
 		return
-	} else if len(podList.Items) > 1 {
-		return "", NewInvalidMatchListError(len(podList.Items), podList.GetObjectKind().GroupVersionKind())
-	} else if len(podList.Items) == 1 {
+	} else if len(podList.Items) == 0 {
+		log.Info("No Pods were found using prefixed Job labels; trying list with deprecated, non-prefixed Job labels")
+		if err = r.List(ctx, podList, depPodListOpts...); err != nil {
+			log.Error(err, "Failed to list Job Pods with deprecated Job labels")
+			return
+		}
+	}
+	var exitCode int32 = -1
+
+	if len(podList.Items) >= 1 {
 		po := podList.Items[0]
 		if len(po.Status.ContainerStatuses) != 1 {
 			return "", fmt.Errorf("received invalid number of containerStatuses (%d)", len(po.Status.ContainerStatuses))
 		}
 
 		containerState := podList.Items[0].Status.ContainerStatuses[0].State
-		if containerState.Terminated == nil {
-			return "", fmt.Errorf("container does not appear to have terminated yet")
+		if containerState.Terminated != nil {
+			exitCode = containerState.Terminated.ExitCode
 		}
-
-		exitCode = containerState.Terminated.ExitCode
+		lastTerminationState := po.Status.ContainerStatuses[0].LastTerminationState
+		if exitCode < 0 && lastTerminationState.Terminated == nil {
+			return "", fmt.Errorf("container does not appear to have terminated yet")
+		} else if exitCode < 0 {
+			exitCode = lastTerminationState.Terminated.ExitCode
+		}
 	}
 
-	var deleteJob bool
 	switch exitCode {
 	case 1:
 		path = "/idauth"
-		deleteJob = true
 	case 0:
-		deleteJob = true
+		path = ""
 	case -1:
 		err = &jobMissingResultError{jobKey}
-		deleteJob = true
 	default:
-		if job.Status.Failed == 1 {
-			deleteJob = true
-		}
 		err = NewIMHasSAMLError(exitCode, jobKey)
-	}
-
-	if !deleteJob {
-		return
-	}
-
-	deleteOpts := []client.DeleteOption{
-		client.PropagationPolicy(metav1.DeletePropagationForeground),
-	}
-
-	if delErr := r.Delete(ctx, job, deleteOpts...); delErr != nil && !k8sErrors.IsNotFound(delErr) {
-		return "", fmt.Errorf("failed to delete Job %s in namespace %s after getting MASTER_PATH: %w", "im-has-saml", namespace, delErr)
 	}
 
 	return

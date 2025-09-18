@@ -24,6 +24,7 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/internal/controller/common"
 	"github.com/opdev/subreconciler"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -35,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	sscsidriverv1 "sigs.k8s.io/secrets-store-csi-driver/apis/v1"
 )
 
 const MigrationJobName string = "ibm-im-db-migration"
@@ -75,16 +77,109 @@ func (r *AuthenticationReconciler) checkSAMLPresence(ctx context.Context, req ct
 	}
 	cm := &corev1.ConfigMap{}
 	objKey := types.NamespacedName{Name: "platform-auth-idp", Namespace: req.Namespace}
-	if err = r.Get(ctx, objKey, cm); err != nil && !k8sErrors.IsNotFound(err) {
+	if err = r.Get(ctx, objKey, cm); k8sErrors.IsNotFound(err) {
+		return r.getSAMLQueryJob(authCR).Reconcile(ctx)
+	} else if err != nil {
 		return subreconciler.RequeueWithError(err)
-	} else if err == nil {
-		// If MASTER_PATH set, skip creating this Job
-		if _, ok := cm.Data["MASTER_PATH"]; ok {
-			return subreconciler.ContinueReconciling()
+	}
+	if _, ok := cm.Data["MASTER_PATH"]; !ok {
+		return r.getSAMLQueryJob(authCR).Reconcile(ctx)
+	}
+
+	log.Info("MASTER_PATH is set; delete the Job, if present")
+	return r.removeIMHasSAMLJob(ctx, req)
+}
+
+func (r *AuthenticationReconciler) removeIMHasSAMLJob(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	jobName := "im-has-saml"
+	log := logf.FromContext(ctx, "Object.Name", jobName)
+	job := &batchv1.Job{}
+	objKey := types.NamespacedName{Name: jobName, Namespace: req.Namespace}
+	if err = r.Get(ctx, objKey, job); k8sErrors.IsNotFound(err) {
+		log.Info("No Job to delete; skipping")
+		return subreconciler.ContinueReconciling()
+	} else if err != nil {
+		err = fmt.Errorf("failed to get Job %s in namespace %s for removal: %w", objKey.Name, objKey.Namespace, err)
+		log.Error(err, "Encountered unexpected error while getting Job")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	deletionsMade := false
+
+	jobUID := job.ObjectMeta.UID
+
+	podList := &corev1.PodList{}
+
+	podListOpts := []client.ListOption{
+		client.InNamespace(req.Namespace),
+		client.MatchingLabels(map[string]string{
+			"batch.kubernetes.io/controller-uid": string(jobUID),
+			"batch.kubernetes.io/job-name":       jobName,
+		}),
+	}
+
+	depPodListOpts := []client.ListOption{
+		client.InNamespace(req.Namespace),
+		client.MatchingLabels(map[string]string{
+			"controller-uid": string(jobUID),
+			"job-name":       jobName,
+		}),
+	}
+
+	if err = r.Delete(ctx, job); k8sErrors.IsNotFound(err) {
+		log.Info("Job not found; continuing")
+	} else if err != nil {
+		err = fmt.Errorf("failed to delete Job %s in namespace %s after getting MASTER_PATH: %w", objKey.Name, req.Namespace, err)
+		log.Error(err, "Failed to delete Job")
+		return subreconciler.RequeueWithError(err)
+	} else {
+		log.Info("Job deleted")
+		deletionsMade = true
+	}
+
+	if err = r.List(ctx, podList, podListOpts...); err != nil {
+		log.Error(err, "Failed to list Job Pods")
+		return subreconciler.RequeueWithError(err)
+	} else if len(podList.Items) == 0 {
+		log.Info("No Pods were found using prefixed Job labels; trying list with deprecated, non-prefixed Job labels")
+		if err = r.List(ctx, podList, depPodListOpts...); err != nil {
+			log.Error(err, "Failed to list Job Pods with deprecated Job labels")
+			return subreconciler.RequeueWithError(err)
 		}
 	}
 
-	return r.getSAMLQueryJob(authCR).Reconcile(ctx)
+	if len(podList.Items) == 0 && deletionsMade {
+		log.Info("Job and Pods cleaned up; requeueing")
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	} else if len(podList.Items) == 0 && !deletionsMade {
+		log.Info("Job and Pods not found; continuing")
+		return subreconciler.ContinueReconciling()
+	}
+
+	podDeleteOpts := []client.DeleteOption{
+		client.GracePeriodSeconds(0),
+	}
+
+	log.Info("Deleting found Pods")
+	for _, po := range podList.Items {
+		if err = r.Delete(ctx, &po, podDeleteOpts...); k8sErrors.IsNotFound(err) {
+			log.Info("Pod not found", "Pod.Name", po.Name)
+		} else if err != nil {
+			log.Error(err, "Failed to delete Pod", "Pod.Name", po.Name)
+			return subreconciler.RequeueWithError(err)
+		} else {
+			log.Info("Pod deleted", "Pod.Name", po.Name)
+			deletionsMade = true
+		}
+	}
+
+	if !deletionsMade {
+		log.Info("No deletions needed for Job or Pods; continuing")
+		return subreconciler.ContinueReconciling()
+	}
+
+	log.Info("Deletions of Job or Pods made; requeueing")
+	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
 func (r *AuthenticationReconciler) ensureOIDCClientRegistrationJobRuns(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
@@ -93,7 +188,22 @@ func (r *AuthenticationReconciler) ensureOIDCClientRegistrationJobRuns(ctx conte
 	if result, err := r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		log.Info("Failed to retrieve Authentication CR for status update; retrying")
 	}
-	return r.getOIDCClientRegistrationSubreconciler(authCR).Reconcile(ctx)
+	log = log.WithValues("Deployment.Name", "platform-auth-service")
+	log.Info("Confirm that Deployment is available before handling default OIDC client")
+	deploy := &appsv1.Deployment{}
+	objKey := types.NamespacedName{Name: "platform-auth-service", Namespace: req.Namespace}
+	err = r.Get(ctx, objKey, deploy)
+	if err == nil &&
+		((deploy.Spec.Replicas != nil && deploy.Status.AvailableReplicas == *deploy.Spec.Replicas) ||
+			(deploy.Spec.Replicas == nil && deploy.Status.AvailableReplicas == 1)) {
+		log.Info("Deployment is available; ensure default OIDC client is registered")
+		return r.getOIDCClientRegistrationSubreconciler(authCR).Reconcile(ctx)
+	}
+	log.Info("Deployment is not available yet, requeueing")
+	if err != nil {
+		return subreconciler.RequeueWithError(fmt.Errorf("failed to verify availability of Deployment %s in namespace %s: %w", objKey.Name, objKey.Namespace, err))
+	}
+	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
 func (r *AuthenticationReconciler) ensureMigrationJobSucceeded(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
@@ -124,6 +234,29 @@ func (r *AuthenticationReconciler) getOIDCClientRegistrationSubreconciler(authCR
 		WithPrimary(authCR).MustBuild()
 }
 
+func getJobCondition(conditions []batchv1.JobCondition, conditionType batchv1.JobConditionType) (c *batchv1.JobCondition) {
+	if conditions == nil {
+		return
+	}
+	for _, condition := range conditions {
+		if condition.Type == conditionType {
+			return &condition
+		}
+	}
+	return
+}
+
+func jobFailedConditionIsTrue(job *batchv1.Job) bool {
+	condition := getJobCondition(job.Status.Conditions, batchv1.JobFailed)
+	if condition == nil {
+		return false
+	}
+	if condition.Status == corev1.ConditionTrue {
+		return true
+	}
+	return false
+}
+
 func removeJobIfFailedOrImageDifferent(imageRef string) common.GenerateFn[*batchv1.Job] {
 	return func(s common.SecondaryReconciler, ctx context.Context, job *batchv1.Job) (err error) {
 		log := logf.FromContext(ctx)
@@ -137,7 +270,7 @@ func removeJobIfFailedOrImageDifferent(imageRef string) common.GenerateFn[*batch
 		}
 
 		// Leave the Job alone if the image refs haven't changed and the Job hasn't failed
-		if job.Spec.Template.Spec.Containers[0].Image == common.GetImageRef(imageRef) && job.Status.Failed == 0 {
+		if job.Spec.Template.Spec.Containers[0].Image == common.GetImageRef(imageRef) && !jobFailedConditionIsTrue(job) {
 			log.Info("No changes found that warrant replacing the Job")
 			return
 		}
@@ -397,6 +530,9 @@ func generateSAMLQueryJobObject(s common.SecondaryReconciler, ctx context.Contex
 	log.Info("Set command for query job")
 	job.Spec.Template.Spec.Containers[0].Command = []string{"/usr/local/bin/migrator", "query", "--postgres-config", "/etc/postgres"}
 	job.Spec.Template.Spec.Containers[0].Name = s.GetName()
+	job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
+	job.Spec.Template.Spec.Containers[0].Env = nil
+	job.Spec.BackoffLimit = ptr.To(int32(1))
 	return
 }
 
@@ -436,6 +572,18 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 		return
 	} else if needsMongoDBMigration {
 		if mongoHost, err = getMongoHost(s.GetClient(), ctx, s.GetNamespace()); err != nil {
+			return
+		}
+	}
+
+	edbspc := &sscsidriverv1.SecretProviderClass{}
+	if authCR.SecretsStoreCSIEnabled() {
+		if err = getSecretProviderClassForVolume(s.GetClient(), ctx, authCR.Namespace, "pgsql-certs", edbspc); IsLabelConflictError(err) {
+			log.Error(err, "Multiple SecretProviderClasses are labeled to be mounted as the same volume; ensure that only one is labeled for the given volume name", "volumeName", common.IMLdapBindPwdVolume)
+		} else if err != nil {
+			log.Error(err, "Unexpected error occurred while trying to get SecretProviderClass")
+		}
+		if err != nil {
 			return
 		}
 	}
@@ -537,7 +685,7 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 							Operator: corev1.TolerationOpExists,
 						},
 					},
-					Volumes:    buildMigratorVolumes(needsMongoDBMigration),
+					Volumes:    buildMigratorVolumes(needsMongoDBMigration, edbspc.Name),
 					Containers: buildMigratorContainer(s, image, resources, mongoHost),
 				},
 			},
@@ -583,7 +731,7 @@ func buildMigratorContainer(s common.SecondaryReconciler, image string, resource
 				ReadOnly:  true,
 			},
 			{
-				Name:      "postgres-tls",
+				Name:      "pgsql-certs",
 				MountPath: "/etc/postgres/certs",
 				ReadOnly:  true,
 			},
@@ -614,24 +762,40 @@ func buildMigratorContainer(s common.SecondaryReconciler, image string, resource
 	return []corev1.Container{container}
 }
 
-func buildMigratorVolumes(needsMongoDBMigration bool) (volumes []corev1.Volume) {
+func buildMigratorVolumes(needsMongoDBMigration bool, edbSPCName string) (volumes []corev1.Volume) {
 	volumes = []corev1.Volume{
 		{
 			Name: "postgres-config",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "im-datastore-edb-cm",
+						Name: common.DatastoreEDBCMName,
 					},
 					DefaultMode: ptr.To(int32(420)),
 				},
 			},
 		},
-		{
-			Name: "postgres-tls",
+	}
+
+	if edbSPCName != "" {
+		volumes = append(volumes, corev1.Volume{
+			Name: "pgsql-certs",
+			VolumeSource: corev1.VolumeSource{
+				CSI: &corev1.CSIVolumeSource{
+					Driver:   "secrets-store.csi.k8s.io",
+					ReadOnly: ptr.To(true),
+					VolumeAttributes: map[string]string{
+						"secretProviderClass": edbSPCName,
+					},
+				},
+			},
+		})
+	} else {
+		volumes = append(volumes, corev1.Volume{
+			Name: "pgsql-certs",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: "im-datastore-edb-secret",
+					SecretName: common.DatastoreEDBSecretName,
 					Items: []corev1.KeyToPath{
 						{
 							Key:  "ca.crt",
@@ -652,7 +816,7 @@ func buildMigratorVolumes(needsMongoDBMigration bool) (volumes []corev1.Volume) 
 					DefaultMode: ptr.To(int32(420)),
 				},
 			},
-		},
+		})
 	}
 
 	if !needsMongoDBMigration {

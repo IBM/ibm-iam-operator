@@ -20,25 +20,37 @@ import (
 	"context"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
+	"github.com/opdev/subreconciler"
 	rbacv1 "k8s.io/api/rbac/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-func (r *AuthenticationReconciler) createRoleBinding(instance *operatorv1alpha1.Authentication) {
-
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+func (r *AuthenticationReconciler) createRoleBinding(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	log := logf.FromContext(ctx, "RoleBinding.Name", "ibm-iam-operand-restricted")
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
 	// Define a new RoleBinding
-	operandRB := r.iamOperandRB(instance)
-	reqLogger.Info("Creating ibm-iam-operand-restricted RoleBinding")
-	err := r.Client.Create(context.TODO(), operandRB)
-	if err != nil {
-		reqLogger.Info("Failed to create ibm-iam-operand-restricted RoleBinding or its already present")
+	operandRB := r.iamOperandRB(authCR)
+	log.Info("Creating RoleBinding")
+	err = r.Client.Create(ctx, operandRB)
+	if k8sErrors.IsAlreadyExists(err) {
+		log.Info("RoleBinding is already present")
+		return subreconciler.ContinueReconciling()
+	} else if err != nil {
+		log.Error(err, "Failed to create RoleBinding")
+		return subreconciler.RequeueWithError(err)
 	}
 
+	log.Info("Created RoleBinding successfully")
+	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
-func (r *AuthenticationReconciler) iamOperandRB(instance *operatorv1alpha1.Authentication) *rbacv1.RoleBinding {
 
-	// reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
+func (r *AuthenticationReconciler) iamOperandRB(instance *operatorv1alpha1.Authentication) *rbacv1.RoleBinding {
 	operandRB := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "ibm-iam-operand-restricted",
@@ -59,5 +71,4 @@ func (r *AuthenticationReconciler) iamOperandRB(instance *operatorv1alpha1.Authe
 		},
 	}
 	return operandRB
-
 }

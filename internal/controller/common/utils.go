@@ -37,6 +37,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	sscsidriverv1 "sigs.k8s.io/secrets-store-csi-driver/apis/v1"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
 	zenv1 "github.com/IBM/ibm-iam-operator/internal/api/zen.cpd.ibm.com/v1"
@@ -161,7 +162,6 @@ func clusterHasAPIResource(dc *discovery.DiscoveryClient, gv schema.GroupVersion
 	}
 
 	for _, resource := range resources.APIResources {
-		fmt.Printf("%v\n", resource)
 		if resource.Name == resourceName {
 			return true, nil
 		}
@@ -187,6 +187,11 @@ func ClusterHasOpenShiftConfigGroupVerison(dc *discovery.DiscoveryClient) (found
 
 func ClusterHasZenExtensionGroupVersion(dc *discovery.DiscoveryClient) (found bool) {
 	found, _ = clusterHasGroupVersion(dc, zenv1.GroupVersion)
+	return
+}
+
+func ClusterHasCSIGroupVersion(dc *discovery.DiscoveryClient) (found bool) {
+	found, _ = clusterHasGroupVersion(dc, sscsidriverv1.SchemeGroupVersion)
 	return
 }
 

@@ -76,7 +76,7 @@ func isOwnedByZenService(obj client.Object) bool {
 
 func (r *AuthenticationReconciler) updateClientCRURIs(clientCR *oidcsecurityv1.Client, clusterAddress string) common.SecondaryReconcilerFn {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		log := logf.FromContext(ctx, "Client.Name", clientCR.Name, "Client.Namespace", clientCR.Namespace, "hostname", clusterAddress)
+		log := logf.FromContext(ctx, "Client.Name", clientCR.Name, "hostname", clusterAddress)
 		modified := false
 		for _, uris := range []*[]string{
 			&clientCR.Spec.OidcLibertyClient.LogoutUris,

@@ -47,6 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	sscsidriverv1 "sigs.k8s.io/secrets-store-csi-driver/apis/v1"
 )
 
 const AnnotationSHA1Sum string = "authentication.operator.ibm.com/sha1sum"
@@ -56,7 +57,7 @@ const URL_PREFIX = "URL_PREFIX"
 // handleConfigMaps is a subreconciler.FnWithRequest that handles the
 // reconciliation of all ConfigMaps created for a given Authentication.
 func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleConfigMaps")
+	reqLogger := logf.FromContext(ctx)
 	cmCtx := logf.IntoContext(ctx, reqLogger)
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
@@ -153,7 +154,7 @@ func getCNCFDomain(ctx context.Context, cl client.Client, authCR *operatorv1alph
 
 // handleIBMCloudClusterInfo creates the ibmcloud-cluster-info configmap if not created already
 func (r *AuthenticationReconciler) handleIBMCloudClusterInfo(ctx context.Context, authCR *operatorv1alpha1.Authentication, observed *corev1.ConfigMap) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("ConfigMap.Namespace", authCR.Namespace, "ConfigMap.Name", common.IBMCloudClusterInfoCMName)
+	reqLogger := logf.FromContext(ctx).WithValues("ConfigMap.Name", common.IBMCloudClusterInfoCMName)
 	generated := &corev1.ConfigMap{}
 	if err = r.generateIBMCloudClusterInfoConfigMap(ctx, authCR, generated); err != nil {
 		return subreconciler.RequeueWithError(err)
@@ -324,6 +325,7 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"OAUTH_21_ENABLED",
 			"IAM_UM",
 			"LIBERTY_SAMESITE_COOKIE",
+			"SECRETS_STORE_AVAILABLE",
 		),
 		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("OS_TOKEN_LENGTH", "45"),
 			"OS_TOKEN_LENGTH"),
@@ -472,6 +474,21 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 			reqLogger.Info("Found audit variables", "AuditUrl", authCR.Spec.Config.AuditUrl, "AuditSecret", authCR.Spec.Config.AuditSecret)
 		}
 
+		secretsStoreAvailable := false
+		ldapSPC := &sscsidriverv1.SecretProviderClass{}
+		if authCR.SecretsStoreCSIEnabled() {
+			if err = getSecretProviderClassForVolume(r.Client, ctx, s.GetNamespace(), common.IMLdapBindPwdVolume, ldapSPC); IsLabelConflictError(err) {
+				reqLogger.Error(err, "Multiple SecretProviderClasses are labeled to be mounted as the same volume; ensure that only one is labeled for the given volume name", "volumeName", common.IMLdapBindPwdVolume)
+			} else if err != nil {
+				reqLogger.Error(err, "Unexpected error occurred while trying to get SecretProviderClass")
+			} else if ldapSPC.Name != "" {
+				secretsStoreAvailable = true
+			}
+			if err != nil {
+				return
+			}
+		}
+
 		// Set the path for SAML connections
 		var masterPath string
 		if masterPath, err = r.getMasterPath(ctx, s.GetNamespace()); IsJobMissingResultError(err) {
@@ -592,6 +609,10 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"LIBERTY_SAMESITE_COOKIE":            libertySSCookie,
 				"OAUTH_21_ENABLED":                   strconv.FormatBool(oauth21Enabled),
 			},
+		}
+
+		if secretsStoreAvailable {
+			generated.Data["SECRETS_STORE_AVAILABLE"] = strconv.FormatBool(secretsStoreAvailable)
 		}
 
 		// Set Authentication authCR as the owner and controller of the ConfigMap
@@ -1227,6 +1248,7 @@ func IsJobMissingResultError(err error) bool {
 }
 
 func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, namespace string) (path string, err error) {
+	log := logf.FromContext(ctx)
 	cmKey := types.NamespacedName{Name: "platform-auth-idp", Namespace: namespace}
 	cm := &corev1.ConfigMap{}
 	if err = r.Get(ctx, cmKey, cm); err != nil && !k8sErrors.IsNotFound(err) {
@@ -1242,64 +1264,66 @@ func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, namespace 
 	if err = r.Get(ctx, jobKey, job); err != nil {
 		return
 	}
+
 	jobUID := job.ObjectMeta.UID
 
 	podList := &corev1.PodList{}
 
-	opts := []client.ListOption{
+	podListOpts := []client.ListOption{
 		client.InNamespace(namespace),
 		client.MatchingLabels(map[string]string{
 			"batch.kubernetes.io/controller-uid": string(jobUID),
-			"batch.kubernetes.io/job-name":       "im-has-saml",
+			"batch.kubernetes.io/job-name":       jobKey.Name,
 		}),
 	}
 
-	var exitCode int32 = -1
-	if err = r.List(ctx, podList, opts...); err != nil {
+	depPodListOpts := []client.ListOption{
+		client.InNamespace(namespace),
+		client.MatchingLabels(map[string]string{
+			"controller-uid": string(jobUID),
+			"job-name":       jobKey.Name,
+		}),
+	}
+
+	if err = r.List(ctx, podList, podListOpts...); err != nil {
+		log.Error(err, "Failed to list Job Pods")
 		return
-	} else if len(podList.Items) > 1 {
-		return "", NewInvalidMatchListError(len(podList.Items), podList.GetObjectKind().GroupVersionKind())
-	} else if len(podList.Items) == 1 {
+	} else if len(podList.Items) == 0 {
+		log.Info("No Pods were found using prefixed Job labels; trying list with deprecated, non-prefixed Job labels")
+		if err = r.List(ctx, podList, depPodListOpts...); err != nil {
+			log.Error(err, "Failed to list Job Pods with deprecated Job labels")
+			return
+		}
+	}
+	var exitCode int32 = -1
+
+	if len(podList.Items) >= 1 {
 		po := podList.Items[0]
 		if len(po.Status.ContainerStatuses) != 1 {
 			return "", fmt.Errorf("received invalid number of containerStatuses (%d)", len(po.Status.ContainerStatuses))
 		}
 
 		containerState := podList.Items[0].Status.ContainerStatuses[0].State
-		if containerState.Terminated == nil {
-			return "", fmt.Errorf("container does not appear to have terminated yet")
+		if containerState.Terminated != nil {
+			exitCode = containerState.Terminated.ExitCode
 		}
-
-		exitCode = containerState.Terminated.ExitCode
+		lastTerminationState := po.Status.ContainerStatuses[0].LastTerminationState
+		if exitCode < 0 && lastTerminationState.Terminated == nil {
+			return "", fmt.Errorf("container does not appear to have terminated yet")
+		} else if exitCode < 0 {
+			exitCode = lastTerminationState.Terminated.ExitCode
+		}
 	}
 
-	var deleteJob bool
 	switch exitCode {
 	case 1:
 		path = "/idauth"
-		deleteJob = true
 	case 0:
-		deleteJob = true
+		path = ""
 	case -1:
 		err = &jobMissingResultError{jobKey}
-		deleteJob = true
 	default:
-		if job.Status.Failed == 1 {
-			deleteJob = true
-		}
 		err = NewIMHasSAMLError(exitCode, jobKey)
-	}
-
-	if !deleteJob {
-		return
-	}
-
-	deleteOpts := []client.DeleteOption{
-		client.PropagationPolicy(metav1.DeletePropagationForeground),
-	}
-
-	if delErr := r.Delete(ctx, job, deleteOpts...); delErr != nil && !k8sErrors.IsNotFound(delErr) {
-		return "", fmt.Errorf("failed to delete Job %s in namespace %s after getting MASTER_PATH: %w", "im-has-saml", namespace, delErr)
 	}
 
 	return

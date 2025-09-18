@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	sscsidriverv1 "sigs.k8s.io/secrets-store-csi-driver/apis/v1"
 
 	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/api/oidc.security/v1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
@@ -60,6 +61,8 @@ func init() {
 	utilruntime.Must(oidcsecurityv1.AddToScheme(scheme))
 	utilruntime.Must(certmgrv1.AddToScheme(scheme))
 	utilruntime.Must(zenv1.AddToScheme(scheme))
+	utilruntime.Must(sscsidriverv1.AddToScheme(scheme))
+
 	// Add the Route scheme if found on the cluster
 	cfg, err := config.GetConfig()
 	if err != nil {
@@ -72,13 +75,20 @@ func init() {
 	}
 
 	if controllercommon.ClusterHasOperandRequestAPIResource(dc) {
+		setupLog.V(1).Info("OperandRequest API present; adding ODLM-enabled operator.ibm.com scheme")
 		utilruntime.Must(operatorv1alpha1.AddODLMEnabledToScheme(scheme))
 	} else {
+		setupLog.V(1).Info("OperandRequest not API present; adding base operator.ibm.com scheme")
 		utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
 	}
 
 	if controllercommon.ClusterHasRouteGroupVersion(dc) {
+		setupLog.V(1).Info("Route API present; adding Routes to scheme")
 		utilruntime.Must(routev1.AddToScheme(scheme))
+	}
+
+	if controllercommon.ClusterHasCSIGroupVersion(dc) {
+		utilruntime.Must(sscsidriverv1.AddToScheme(scheme))
 	}
 	//+kubebuilder:scaffold:scheme
 }

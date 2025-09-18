@@ -67,8 +67,8 @@ type reconcileRouteFields struct {
 }
 
 func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx, "subreconciler", "handleRoutes", "Namespace", req.Namespace)
-	handleRouteCtx := logf.IntoContext(ctx, reqLogger)
+	log := logf.FromContext(ctx)
+	handleRouteCtx := logf.IntoContext(ctx, log)
 
 	if !common.ClusterHasRouteGroupVersion(&r.DiscoveryClient) {
 		return subreconciler.ContinueReconciling()
@@ -115,7 +115,7 @@ func (r *AuthenticationReconciler) removeExistingRouteIfItHasDifferentHost() com
 }
 
 func (r *AuthenticationReconciler) reconcileAllRoutes(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx)
+	log := logf.FromContext(ctx)
 	allRoutesFields := &map[string]*reconcileRouteFields{}
 	if result, err = r.getAllRoutesFields(authCR, allRoutesFields)(ctx); subreconciler.ShouldRequeue(result, err) {
 		return
@@ -127,11 +127,11 @@ func (r *AuthenticationReconciler) reconcileAllRoutes(ctx context.Context, authC
 	}
 
 	if result, err = allRouteReconcilers.Reconcile(ctx); err != nil {
-		reqLogger.Info("One or more errors were encountered while reconciling Routes; requeueing")
+		log.Info("One or more errors were encountered while reconciling Routes; requeueing")
 	} else if subreconciler.ShouldRequeue(result, err) {
-		reqLogger.Info("One or more Routes were written to; requeueing")
+		log.Info("One or more Routes were written to; requeueing")
 	} else {
-		reqLogger.Info("Routes already up-to-date")
+		log.Info("Routes already up-to-date")
 	}
 	return
 }
@@ -274,7 +274,7 @@ func (r *AuthenticationReconciler) updateCPConsoleCertificates(authCR *operatorv
 // Routes that the Operator wants to exist.
 func (r *AuthenticationReconciler) removeExtraRoutes(authCR *operatorv1alpha1.Authentication, allRoutesFields *map[string]*reconcileRouteFields) (fn common.SecondaryReconcilerFn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		reqLogger := logf.FromContext(ctx)
+		log := logf.FromContext(ctx)
 		routesList := &routev1.RouteList{}
 		desiredRoutesNames := func(rrf *map[string]*reconcileRouteFields) []string {
 			n := []string{}
@@ -288,20 +288,20 @@ func (r *AuthenticationReconciler) removeExtraRoutes(authCR *operatorv1alpha1.Au
 		changed := false
 		for _, item := range routesList.Items {
 			if !common.ContainsString(desiredRoutesNames, item.Name) {
-				reqLogger.Info("Removing extra Route", "Name", item.Name)
+				log.Info("Removing extra Route", "Name", item.Name)
 				if err = r.Delete(ctx, &item); k8sErrors.IsNotFound(err) {
-					reqLogger.Info("Route was not found; continuing", "Name", item.Name)
+					log.Info("Route was not found; continuing", "Name", item.Name)
 					err = nil
 				} else if err != nil {
-					reqLogger.Info("Failed to delete extra Route for unexpected reason", "reason", err.Error(), "Name", item.Name)
+					log.Info("Failed to delete extra Route for unexpected reason", "reason", err.Error(), "Name", item.Name)
 					return subreconciler.RequeueWithDelay(defaultLowerWait)
 				}
-				reqLogger.Info("Successfully deleted extra Route", "Name", item.Name)
+				log.Info("Successfully deleted extra Route", "Name", item.Name)
 				changed = true
 			}
 		}
 		if changed {
-			reqLogger.Info("Deleted all extra Routes; requeuing")
+			log.Info("Deleted all extra Routes; requeuing")
 			return subreconciler.RequeueWithDelay(defaultLowerWait)
 		}
 
@@ -535,15 +535,15 @@ func shouldUseCPDHost(authCR *operatorv1alpha1.Authentication, dc *discovery.Dis
 // Check annotations and Spec.
 // If there are any differences, return false. Otherwise, return true.
 func IsRouteEqual(ctx context.Context, oldRoute, newRoute *routev1.Route) bool {
-	logger := logf.FromContext(ctx, "name", oldRoute.Name, "namespace", oldRoute.Namespace).V(1)
+	log := logf.FromContext(ctx, "Route.Name", oldRoute.Name).V(1)
 
 	if !reflect.DeepEqual(oldRoute.Name, newRoute.Name) {
-		logger.Info("Names not equal", "old", oldRoute.Name, "new", newRoute.Name)
+		log.Info("Names not equal", "old", oldRoute.Name, "new", newRoute.Name)
 		return false
 	}
 
 	if !reflect.DeepEqual(oldRoute.Annotations, newRoute.Annotations) {
-		logger.Info("Annotations not equal",
+		log.Info("Annotations not equal",
 			"old", fmt.Sprintf("%v", oldRoute.Annotations),
 			"new", fmt.Sprintf("%v", newRoute.Annotations))
 		return false
@@ -601,7 +601,7 @@ func IsRouteEqual(ctx context.Context, oldRoute, newRoute *routev1.Route) bool {
 			loggedValues = append(loggedValues, "unset")
 		}
 
-		logger.Info("Specs not equal", loggedValues...)
+		log.Info("Specs not equal", loggedValues...)
 		return false
 	}
 
@@ -610,7 +610,7 @@ func IsRouteEqual(ctx context.Context, oldRoute, newRoute *routev1.Route) bool {
 
 func generateRouteObject(fields *reconcileRouteFields) common.GenerateFn[*routev1.Route] {
 	return func(s common.SecondaryReconciler, ctx context.Context, route *routev1.Route) (err error) {
-		reqLogger := logf.FromContext(ctx)
+		log := logf.FromContext(ctx)
 		weight := int32(100)
 
 		commonLabel := map[string]string{"app": "im"}
@@ -649,7 +649,7 @@ func generateRouteObject(fields *reconcileRouteFields) common.GenerateFn[*routev
 		// Set Authentication instance as the owner and controller of the Route
 		err = controllerutil.SetControllerReference(s.GetPrimary(), route, s.GetClient().Scheme())
 		if err != nil {
-			reqLogger.Info("Failed to set owner for Route")
+			log.Info("Failed to set owner for Route")
 		}
 		return
 	}
@@ -684,34 +684,26 @@ func (r *AuthenticationReconciler) getClusterAddress(authCR *operatorv1alpha1.Au
 
 func (r *AuthenticationReconciler) getClusterInfoConfigMap(authCR *operatorv1alpha1.Authentication, cm *corev1.ConfigMap) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		reqLogger := logf.FromContext(ctx).V(1)
+		log := logf.FromContext(ctx).V(1)
 		err = r.Get(ctx, types.NamespacedName{Name: ClusterInfoConfigmapName, Namespace: authCR.Namespace}, cm)
 		if k8sErrors.IsNotFound(err) {
-			reqLogger.Info("ConfigMap was not found",
-				"ConfigMap.Name", ClusterInfoConfigmapName,
-				"ConfigMap.Namespace", authCR.Namespace)
+			log.Info("ConfigMap was not found", "ConfigMap.Name", ClusterInfoConfigmapName)
 			return subreconciler.RequeueWithDelay(defaultLowerWait)
 		} else if err != nil {
-			reqLogger.Error(err, "Failed to get ConfigMap",
-				"ConfigMap.Name", ClusterInfoConfigmapName,
-				"ConfigMap.Namespace", authCR.Namespace)
+			log.Error(err, "Failed to get ConfigMap", "ConfigMap.Name", ClusterInfoConfigmapName)
 			return subreconciler.RequeueWithError(err)
 		}
 
-		reqLogger.Info("ConfigMap found",
-			"ConfigMap.Name", cm.Name,
-			"ConfigMap.Namespace", cm.Namespace)
+		log.Info("ConfigMap found", "ConfigMap.Name", cm.Name)
 		return subreconciler.ContinueReconciling()
 	}
 }
 
 func (r *AuthenticationReconciler) verifyConfigMapHasCorrectOwnership(authCR *operatorv1alpha1.Authentication, cm *corev1.ConfigMap) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		reqLogger := logf.FromContext(ctx)
+		log := logf.FromContext(ctx)
 		if !common.IsOwnerOf(r.Client.Scheme(), authCR, cm) {
-			reqLogger.Info("ConfigMap is not owned by this Authentication",
-				"ConfigMap.Name", cm.Name,
-				"ConfigMap.Namespace", cm.Namespace)
+			log.Info("ConfigMap is not owned by this Authentication", "ConfigMap.Name", cm.Name)
 			return subreconciler.RequeueWithDelay(defaultLowerWait)
 		}
 
@@ -732,7 +724,7 @@ func (r *AuthenticationReconciler) verifyConfigMapHasField(_ *operatorv1alpha1.A
 
 func (r *AuthenticationReconciler) ensureConfigMapHasEqualFields(_ *operatorv1alpha1.Authentication, fields map[string]string, cm *corev1.ConfigMap) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		reqLogger := logf.FromContext(ctx)
+		log := logf.FromContext(ctx)
 		changed := false
 		if cm.Data == nil {
 			cm.Data = fields
@@ -747,36 +739,32 @@ func (r *AuthenticationReconciler) ensureConfigMapHasEqualFields(_ *operatorv1al
 			changed = true
 		}
 		if !changed {
-			reqLogger.Info("No changes to ConfigMap data fields needed", "ConfigMap.Name", cm.Name, "ConfigMap.Namespace", cm.Namespace)
+			log.Info("No changes to ConfigMap data fields needed", "ConfigMap.Name", cm.Name)
 			return subreconciler.ContinueReconciling()
 		}
 	update:
 		if err = r.Update(ctx, cm); err != nil {
-			reqLogger.Error(err, "Failed to update ConfigMap data fields", "ConfigMap.Name", cm.Name, "ConfigMap.Namespace", cm.Namespace)
+			log.Error(err, "Failed to update ConfigMap data fields", "ConfigMap.Name", cm.Name)
 			return subreconciler.RequeueWithError(err)
 		}
-		reqLogger.Info("Updated ConfigMap data fields successfully", "ConfigMap.Name", cm.Name, "ConfigMap.Namespace", cm.Namespace)
+		log.Info("Updated ConfigMap data fields successfully", "ConfigMap.Name", cm.Name)
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
 }
 
 func (r *AuthenticationReconciler) getWlpClientID(authCR *operatorv1alpha1.Authentication, wlpClientID *string) (fn common.SecondaryReconcilerFn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		reqLogger := logf.FromContext(ctx)
+		log := logf.FromContext(ctx)
 
 		PlatformOIDCCredentialsSecretName := "platform-oidc-credentials"
 		secret := &corev1.Secret{}
 		err = r.Get(ctx, types.NamespacedName{Name: PlatformOIDCCredentialsSecretName, Namespace: authCR.Namespace}, secret)
 
 		if k8sErrors.IsNotFound(err) {
-			reqLogger.Info("Secret was not found",
-				"Secret.Name", PlatformOIDCCredentialsSecretName,
-				"Secret.Namespace", authCR.Namespace)
+			log.Info("Secret was not found", "Secret.Name", PlatformOIDCCredentialsSecretName)
 			return subreconciler.RequeueWithDelay(defaultLowerWait)
 		} else if err != nil {
-			reqLogger.Error(err, "Failed to get secret",
-				"Secret.Name", PlatformOIDCCredentialsSecretName,
-				"Secret.Namespace", authCR.Namespace)
+			log.Error(err, "Failed to get secret", "Secret.Name", PlatformOIDCCredentialsSecretName)
 			return subreconciler.RequeueWithError(err)
 		}
 
@@ -790,7 +778,7 @@ func (r *AuthenticationReconciler) getWlpClientID(authCR *operatorv1alpha1.Authe
 // data and returns it.
 func (r *AuthenticationReconciler) getCertificateForService(serviceName string, authCR *operatorv1alpha1.Authentication, certificate *[]byte) (fn common.SecondaryReconcilerFn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		reqLogger := logf.FromContext(ctx, "func", "getCertificateForService", "namespace", authCR.Namespace)
+		log := logf.FromContext(ctx)
 		secret := &corev1.Secret{}
 		var secretName string
 		switch serviceName {
@@ -806,10 +794,10 @@ func (r *AuthenticationReconciler) getCertificateForService(serviceName string, 
 		}
 		err = r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: authCR.Namespace}, secret)
 		if k8sErrors.IsNotFound(err) {
-			reqLogger.Info("unable to get Route destination certificate, Secret does exist. Requeue and try again", "secretName", secretName)
+			log.Info("unable to get Route destination certificate, Secret does exist. Requeue and try again", "Secret.Name", secretName)
 			return subreconciler.RequeueWithDelay(defaultLowerWait)
 		} else if err != nil {
-			reqLogger.Error(err, "failed to get Route destination certificate", "secretName", secretName)
+			log.Error(err, "failed to get Route destination certificate", "secretName", secretName)
 			subreconciler.RequeueWithError(err)
 		}
 

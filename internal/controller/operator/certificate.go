@@ -40,7 +40,7 @@ const Certv1alpha1APIVersion = "certmanager.k8s.io/v1alpha1"
 
 func (r *AuthenticationReconciler) handleCertificates(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	authCR := &operatorv1alpha1.Authentication{}
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleCertificates")
+	reqLogger := logf.FromContext(ctx)
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
@@ -115,11 +115,11 @@ func generateCertificateFieldsList(authCR *operatorv1alpha1.Authentication) []*r
 // removeV1Alpha1Certs removes v1alpha1 Certificates for IM so that they can be replaced with cert-manager.io/v1 Certificates.
 func (r *AuthenticationReconciler) removeV1Alpha1Certs(authCR *operatorv1alpha1.Authentication, fieldsList []*reconcileCertificateFields) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		reqLogger := ctrl.LoggerFrom(ctx)
-		reqLogger.Info("Removing v1alpha1 Certificates for IM, if present")
+		log := logf.FromContext(ctx)
+		log.Info("Removing v1alpha1 Certificates for IM, if present")
 
 		if !ctrlcommon.ClusterHasCertificateV1Alpha1(&r.DiscoveryClient) {
-			reqLogger.Info("Cluster does not have v1alpha1 Certificate API; skipping")
+			log.Info("Cluster does not have v1alpha1 Certificate API; skipping")
 			return subreconciler.ContinueReconciling()
 		}
 
@@ -137,11 +137,11 @@ func (r *AuthenticationReconciler) removeV1Alpha1Certs(authCR *operatorv1alpha1.
 
 		result, err = ctrlcommon.ReduceSubreconcilerResultsAndErrors(results, errs)
 		if subreconciler.ShouldContinue(result, err) {
-			reqLogger.Info("No v1alpha1 Certificates exist for IM")
+			log.Info("No v1alpha1 Certificates exist for IM")
 		} else if subreconciler.ShouldRequeue(result, err) && err == nil {
-			reqLogger.Info("v1alpha1 Certificates were removed; requeueing")
+			log.Info("v1alpha1 Certificates were removed; requeueing")
 		} else if err != nil {
-			reqLogger.Info("Encountered an issue while trying to remove v1alpha1 Certificates for IM")
+			log.Info("Encountered an issue while trying to remove v1alpha1 Certificates for IM")
 		}
 
 		return
@@ -150,9 +150,9 @@ func (r *AuthenticationReconciler) removeV1Alpha1Certs(authCR *operatorv1alpha1.
 
 func (r *AuthenticationReconciler) removeV1Alpha1Cert(_ *operatorv1alpha1.Authentication, fields *reconcileCertificateFields) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		reqLogger := ctrl.LoggerFrom(ctx, "Certificate.Name", fields.Name, "Certificate.Namespace", fields.Namespace)
+		log := logf.FromContext(ctx, "Certificate.Name", fields.Name)
 
-		reqLogger.Info("Cluster has certmanager.k8s.io/v1alpha1 API; replacing v1alpha1 Certificate if present")
+		log.Info("Cluster has certmanager.k8s.io/v1alpha1 API; replacing v1alpha1 Certificate if present")
 
 		gvk := schema.GroupVersionKind{
 			Group:   "certmanager.k8s.io",
@@ -164,25 +164,23 @@ func (r *AuthenticationReconciler) removeV1Alpha1Cert(_ *operatorv1alpha1.Authen
 		unstrCert.SetGroupVersionKind(gvk)
 
 		if err = r.Get(ctx, fields.NamespacedName, unstrCert); k8sErrors.IsNotFound(err) {
-			reqLogger.Info("No v1alpha1 Certificate to delete; continue")
+			log.Info("No v1alpha1 Certificate to delete; continue")
 			return subreconciler.ContinueReconciling()
 		} else if err != nil {
-			reqLogger.Error(err, "Failed to retrieve v1alpha1 Certificate")
+			log.Error(err, "Failed to retrieve v1alpha1 Certificate")
 			return subreconciler.RequeueWithError(err)
 		}
-		if unstrCert.GetAPIVersion() == Certv1alpha1APIVersion {
-			reqLogger.Info("API version is v1alpha1; deleting Certificate")
-			err = r.Delete(ctx, unstrCert)
-			if err != nil {
-				reqLogger.Error(err, "Failed to delete")
-				return subreconciler.RequeueWithError(err)
-			} else {
-				reqLogger.Info("Successfully deleted")
-				return subreconciler.RequeueWithDelay(defaultLowerWait)
-			}
+		if unstrCert.GetAPIVersion() != Certv1alpha1APIVersion {
+			log.Info("API version is not v1alpha1, continue")
+			return subreconciler.ContinueReconciling()
 		}
-		reqLogger.Info("API version is not v1alpha1, continue")
-		return subreconciler.ContinueReconciling()
+		log.Info("API version is v1alpha1; deleting Certificate")
+		if err = r.Delete(ctx, unstrCert); err != nil {
+			log.Error(err, "Failed to delete")
+			return subreconciler.RequeueWithError(err)
+		}
+		log.Info("Successfully deleted")
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
 }
 
@@ -190,7 +188,7 @@ func (r *AuthenticationReconciler) removeV1Alpha1Cert(_ *operatorv1alpha1.Authen
 // IM if they do not already exist.
 func (r *AuthenticationReconciler) createV1CertificatesIfNotPresent(authCR *operatorv1alpha1.Authentication, fieldsList []*reconcileCertificateFields) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		reqLogger := ctrl.LoggerFrom(ctx)
+		log := logf.FromContext(ctx)
 
 		allV1CertReconcilers := make([]subreconciler.Fn, 0)
 		for _, fields := range fieldsList {
@@ -206,11 +204,11 @@ func (r *AuthenticationReconciler) createV1CertificatesIfNotPresent(authCR *oper
 
 		result, err = ctrlcommon.ReduceSubreconcilerResultsAndErrors(results, errs)
 		if subreconciler.ShouldContinue(result, err) {
-			reqLogger.Info("No v1 Certificates to create for IM")
+			log.Info("No v1 Certificates to create for IM")
 		} else if subreconciler.ShouldRequeue(result, err) && err == nil {
-			reqLogger.Info("v1 Certificates were created; requeueing")
+			log.Info("v1 Certificates were created; requeueing")
 		} else if err != nil {
-			reqLogger.Info("Encountered an issue while trying to create v1 Certificates for IM")
+			log.Info("Encountered an issue while trying to create v1 Certificates for IM")
 		}
 
 		return
@@ -222,40 +220,41 @@ func (r *AuthenticationReconciler) createV1CertificatesIfNotPresent(authCR *oper
 // than the ones provided.
 func (r *AuthenticationReconciler) createV1CertificateIfNotPresent(authCR *operatorv1alpha1.Authentication, fields *reconcileCertificateFields) subreconciler.Fn {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		reqLogger := ctrl.LoggerFrom(ctx, "Certificate.Name", fields.Name, "Certificate.Namespace", fields.Namespace)
+		log := logf.FromContext(ctx, "Certificate.Name", fields.Name)
 		cert := &certmgrv1.Certificate{}
 		err = r.Get(ctx, fields.NamespacedName, cert)
-		if k8sErrors.IsNotFound(err) {
-			// Define a new Certificate
-			newCertificate := r.generateCertificateObject(authCR, fields)
-			if newCertificate == nil {
-				err = fmt.Errorf("failed to generate a new Certificate object")
-				return
-			}
-			reqLogger.Info("Creating a new Certificate")
-			err = r.Create(ctx, newCertificate)
-			if k8sErrors.IsAlreadyExists(err) {
-				reqLogger.Info("Certificate already exists; continuing")
-				return subreconciler.ContinueReconciling()
-			} else if err != nil {
-				reqLogger.Error(err, "Failed to create new Certificate")
-				return subreconciler.RequeueWithError(err)
-			}
-			reqLogger.Info("Certificate created")
-			// Certificate created successfully - return and requeue
-			return subreconciler.RequeueWithDelay(defaultLowerWait)
-		} else if err != nil {
-			reqLogger.Error(err, "Failed to get Certificate")
+		if err == nil {
+			return subreconciler.ContinueReconciling()
+		} else if !k8sErrors.IsNotFound(err) {
+			log.Error(err, "Failed to get Certificate")
 			return subreconciler.RequeueWithError(err)
 		}
-		return subreconciler.ContinueReconciling()
+		// Define a new Certificate
+		var newCertificate *certmgrv1.Certificate
+		newCertificate, err = r.generateCertificateObject(authCR, fields)
+		if err != nil {
+			err = fmt.Errorf("failed to generate a new Certificate object: %w", err)
+			return
+		}
+		log.Info("Creating a new Certificate")
+		err = r.Create(ctx, newCertificate)
+		if k8sErrors.IsAlreadyExists(err) {
+			log.Info("Certificate already exists; continuing")
+			return subreconciler.ContinueReconciling()
+		} else if err != nil {
+			log.Error(err, "Failed to create new Certificate")
+			return subreconciler.RequeueWithError(err)
+		}
+		log.Info("Certificate created")
+		// Certificate created successfully - return and requeue
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
 }
 
 // addLabelIfMissing adds "manage-cert-rotation": "true" label to the certificate if not exist
 func (r *AuthenticationReconciler) addLabelIfMissing(fieldsList []*reconcileCertificateFields) (fn subreconciler.Fn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		reqLogger := ctrl.LoggerFrom(ctx)
+		log := logf.FromContext(ctx)
 
 		allV1CertReconcilers := make([]subreconciler.Fn, 0)
 		for _, fields := range fieldsList {
@@ -271,11 +270,11 @@ func (r *AuthenticationReconciler) addLabelIfMissing(fieldsList []*reconcileCert
 
 		result, err = ctrlcommon.ReduceSubreconcilerResultsAndErrors(results, errs)
 		if subreconciler.ShouldContinue(result, err) {
-			reqLogger.Info("No certificates to be labeled")
+			log.Info("No certificates to be labeled")
 		} else if subreconciler.ShouldRequeue(result, err) && err == nil {
-			reqLogger.Info("Certificates were labeled; requeueing")
+			log.Info("Certificates were labeled; requeueing")
 		} else if err != nil {
-			reqLogger.Info("Encountered an issue while trying to label certificates")
+			log.Info("Encountered an issue while trying to label certificates")
 		}
 
 		return
@@ -284,32 +283,31 @@ func (r *AuthenticationReconciler) addLabelIfMissing(fieldsList []*reconcileCert
 
 func (r *AuthenticationReconciler) updateCertWithLabel(fields *reconcileCertificateFields) subreconciler.Fn {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		reqLogger := ctrl.LoggerFrom(ctx, "Certificate.Name", fields.Name, "Certificate.Namespace", fields.Namespace)
+		log := logf.FromContext(ctx, "Certificate.Name", fields.Name)
 		cert := &certmgrv1.Certificate{}
 		err = r.Get(ctx, fields.NamespacedName, cert)
-		if err == nil {
-			certRotationKey := "manage-cert-rotation"
-			labelValue, exists := cert.Labels[certRotationKey]
-			if !exists || labelValue == "yes" {
-				reqLogger.Info("Updating Certificate with label manage-cert-rotation: true")
-				cert.Labels[certRotationKey] = "true"
-				err = r.Update(ctx, cert)
-				if err != nil {
-					reqLogger.Error(err, "Failed to update Certificate with label")
-					return subreconciler.RequeueWithError(err)
-				}
-				// Certificate label updated successfully - return and requeue
-				return subreconciler.RequeueWithDelay(defaultLowerWait)
-			}
-			return subreconciler.ContinueReconciling()
-		} else {
-			reqLogger.Error(err, "Failed to get Certificate for labelling")
+		if err != nil {
+			log.Error(err, "Failed to get Certificate for labelling")
 			return subreconciler.RequeueWithError(err)
 		}
+		certRotationKey := "manage-cert-rotation"
+		labelValue, exists := cert.Labels[certRotationKey]
+		if exists && labelValue != "yes" {
+			return subreconciler.ContinueReconciling()
+		}
+		log.Info("Updating Certificate with label manage-cert-rotation: true")
+		cert.Labels[certRotationKey] = "true"
+		err = r.Update(ctx, cert)
+		if err != nil {
+			log.Error(err, "Failed to update Certificate with label")
+			return subreconciler.RequeueWithError(err)
+		}
+		// Certificate label updated successfully - return and requeue
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
 }
 
-func (r *AuthenticationReconciler) generateCertificateObject(authCR *operatorv1alpha1.Authentication, fields *reconcileCertificateFields) *certmgrv1.Certificate {
+func (r *AuthenticationReconciler) generateCertificateObject(authCR *operatorv1alpha1.Authentication, fields *reconcileCertificateFields) (certificate *certmgrv1.Certificate, err error) {
 	metaLabels := map[string]string{
 		"app":                          fields.CommonName,
 		"app.kubernetes.io/instance":   "ibm-iam-operator",
@@ -318,7 +316,7 @@ func (r *AuthenticationReconciler) generateCertificateObject(authCR *operatorv1a
 		"manage-cert-rotation":         "yes",
 	}
 
-	certificate := &certmgrv1.Certificate{
+	certificate = &certmgrv1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fields.Name,
 			Labels:    metaLabels,
@@ -344,9 +342,7 @@ func (r *AuthenticationReconciler) generateCertificateObject(authCR *operatorv1a
 	}
 
 	// Set Authentication instance as the owner and controller of the Certificate
-	err := controllerutil.SetControllerReference(authCR, certificate, r.Client.Scheme())
-	if err != nil {
-		return nil
-	}
-	return certificate
+	err = controllerutil.SetControllerReference(authCR, certificate, r.Client.Scheme())
+
+	return
 }

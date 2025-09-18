@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"time"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
@@ -34,10 +35,12 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	sscsidriverv1 "sigs.k8s.io/secrets-store-csi-driver/apis/v1"
 )
 
 const RestartAnnotation string = "authentications.operator.ibm.com/restartedAt"
@@ -45,9 +48,10 @@ const RestartAnnotation string = "authentications.operator.ibm.com/restartedAt"
 // Name of Secret containing certificates for Common Audit Logging
 const AuditTLSSecretName string = "audit-tls"
 const IMAuditTLSVolume string = "audit-volume"
+const SecretProviderClassAsVolumeLabel string = "authentication.operator.ibm.com/as-volume"
 
 func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleDeployments")
+	reqLogger := logf.FromContext(ctx)
 	deployCtx := logf.IntoContext(ctx, reqLogger)
 
 	authCR := &operatorv1alpha1.Authentication{}
@@ -70,13 +74,10 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 		return subreconciler.RequeueWithError(err)
 	}
 
-	icpConsoleURL := consoleConfigMap.Data["cluster_address"]
-
 	auditSecretName, err := r.getAuditSecretNameIfExists(deployCtx, authCR)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
-	reqLogger.Info("Does audit-tls secret exist?", "Deployment.Namespace", req.Namespace, "Secret exists", auditSecretName)
 
 	// Check for the presence of dependencies, for SAAS
 	reqLogger.Info("Is SAAS enabled?", "Instance spec config value", authCR.Spec.Config.IBMCloudSaas)
@@ -96,19 +97,37 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 		saasServiceIdCrn = saasTenantConfigMap.Data["service_crn_id"]
 	}
 
+	ldapSPC := &sscsidriverv1.SecretProviderClass{}
+	edbSPC := &sscsidriverv1.SecretProviderClass{}
+	if authCR.SecretsStoreCSIEnabled() {
+		if err = getSecretProviderClassForVolume(r.Client, ctx, req.Namespace, common.IMLdapBindPwdVolume, ldapSPC); IsLabelConflictError(err) {
+			reqLogger.Error(err, "Multiple SecretProviderClasses are labeled to be mounted as the same volume; ensure that only one is labeled for the given volume name", "volumeName", common.IMLdapBindPwdVolume)
+		} else if err != nil {
+			reqLogger.Error(err, "Unexpected error occurred while trying to get SecretProviderClass")
+		}
+		if err = getSecretProviderClassForVolume(r.Client, ctx, req.Namespace, "pgsql-certs", edbSPC); IsLabelConflictError(err) {
+			reqLogger.Error(err, "Multiple SecretProviderClasses are labeled to be mounted as the same volume; ensure that only one is labeled for the given volume name", "volumeName", common.IMLdapBindPwdVolume)
+		} else if err != nil {
+			reqLogger.Error(err, "Unexpected error occurred while trying to get SecretProviderClass")
+		}
+		if err != nil {
+			return subreconciler.RequeueWithError(err)
+		}
+	}
+
 	imagePullSecret := os.Getenv("IMAGE_PULL_SECRET")
 	builders := []*common.SecondaryReconcilerBuilder[*appsv1.Deployment]{
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-auth-service").
-			WithGenerateFns(generatePlatformAuthService(imagePullSecret, icpConsoleURL)).
+			WithGenerateFns(generatePlatformAuthService(imagePullSecret, ldapSPC.Name, edbSPC.Name)).
 			WithModifyFns(modifyDeployment(r.needsRollout)),
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-identity-management").
-			WithGenerateFns(generatePlatformIdentityManagement(imagePullSecret, auditSecretName)).
+			WithGenerateFns(generatePlatformIdentityManagement(imagePullSecret, auditSecretName, ldapSPC.Name, edbSPC.Name)).
 			WithModifyFns(modifyDeployment(r.needsRollout)),
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-identity-provider").
-			WithGenerateFns(generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn, auditSecretName)).
+			WithGenerateFns(generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn, auditSecretName, ldapSPC.Name, edbSPC.Name)).
 			WithModifyFns(modifyDeployment(r.needsRollout)),
 	}
 
@@ -178,12 +197,12 @@ func (r *AuthenticationReconciler) removeCP2Deployments(ctx context.Context, req
 // cluster, or an empty string when the Secret isn't found or cannot otherwise
 // be retrieved. If an error other than NotFound is received when trying to get
 // the Secret, that is returned as well.
-func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Context, authCR *operatorv1alpha1.Authentication) (*string, error) {
+func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Context, authCR *operatorv1alpha1.Authentication) (string, error) {
 	reqLogger := logf.FromContext(ctx)
 
 	if authCR.Spec.Config.AuditUrl == nil || authCR.Spec.Config.AuditSecret == nil {
 		reqLogger.Info("Audit URL or Audit Secret is not specified in Authentication CR", "key", "AUDIT_URL")
-		return nil, nil
+		return "", nil
 	}
 
 	reqLogger.Info("Fetched audit URL and audit Secret from Authentication CR", "AUDIT_SECRET", authCR.Spec.Config.AuditSecret, "AUDIT_URL", authCR.Spec.Config.AuditUrl)
@@ -194,17 +213,17 @@ func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Contex
 		err1 := r.Get(ctx, auditTLSSecretStruct, auditTLSSecret)
 		if k8sErrors.IsNotFound(err1) {
 			reqLogger.Info("Secret for audit configuration not found")
-			return nil, nil
+			return "", nil
 		} else if err1 != nil {
 			reqLogger.Error(err1, "Failed to retrieve the secret for audit configuration")
-			return nil, err1
+			return "", err1
 		}
 	}
 	reqLogger.Info("Secret found for audit configuration")
-	return authCR.Spec.Config.AuditSecret, nil
+	return *authCR.Spec.Config.AuditSecret, nil
 }
 
-func generatePlatformAuthService(imagePullSecret, icpConsoleURL string) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformAuthService(imagePullSecret, ldapSPCName, edbSPCName string) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		authServiceImage := common.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
@@ -216,6 +235,7 @@ func generatePlatformAuthService(imagePullSecret, icpConsoleURL string) common.G
 		replicas := authCR.Spec.Replicas
 		ldapCACert := authCR.Spec.AuthService.LdapsCACert
 		routerCertSecret := authCR.Spec.AuthService.RouterCertSecret
+		ldapSPCExists := ldapSPCName != ""
 
 		deployLabels := common.MergeMaps(nil,
 			authCR.Spec.Labels,
@@ -360,13 +380,14 @@ func generatePlatformAuthService(imagePullSecret, icpConsoleURL string) common.G
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, nil),
-						Containers:     buildContainers(authCR, authServiceImage, icpConsoleURL),
+						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, "", ldapSPCName, edbSPCName),
+						Containers:     buildContainers(authCR, authServiceImage, ldapSPCExists),
 						InitContainers: buildInitContainers(initContainerImage),
 					},
 				},
 			},
 		}
+
 		if imagePullSecret != "" {
 			deploy.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: imagePullSecret}}
 		}
@@ -380,7 +401,7 @@ func generatePlatformAuthService(imagePullSecret, icpConsoleURL string) common.G
 	}
 }
 
-func generatePlatformIdentityManagement(imagePullSecret string, auditSecretName *string) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformIdentityManagement(imagePullSecret, auditSecretName, ldapSPCName, edbSPCName string) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		identityManagerImage := common.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
@@ -392,6 +413,7 @@ func generatePlatformIdentityManagement(imagePullSecret string, auditSecretName 
 		replicas := authCR.Spec.Replicas
 		ldapCACert := authCR.Spec.AuthService.LdapsCACert
 		routerCertSecret := authCR.Spec.AuthService.RouterCertSecret
+		ldapSPCExists := ldapSPCName != ""
 
 		deployLabels := common.MergeMaps(nil,
 			authCR.Spec.Labels,
@@ -535,8 +557,8 @@ func generatePlatformIdentityManagement(imagePullSecret string, auditSecretName 
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName),
-						Containers:     buildManagerContainers(authCR, identityManagerImage),
+						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName, edbSPCName),
+						Containers:     buildManagerContainers(authCR, identityManagerImage, ldapSPCExists),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
 				},
@@ -554,7 +576,7 @@ func generatePlatformIdentityManagement(imagePullSecret string, auditSecretName 
 	}
 }
 
-func generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn string, auditSecretName *string) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn, auditSecretName, ldapSPCName, edbSPCName string) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		identityProviderImage := common.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
@@ -566,6 +588,7 @@ func generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn string, 
 		replicas := authCR.Spec.Replicas
 		ldapCACert := authCR.Spec.AuthService.LdapsCACert
 		routerCertSecret := authCR.Spec.AuthService.RouterCertSecret
+		ldapSPCExists := ldapSPCName != ""
 
 		deployLabels := common.MergeMaps(nil,
 			authCR.Spec.Labels,
@@ -710,8 +733,8 @@ func generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn string, 
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName),
-						Containers:     buildProviderContainers(authCR, identityProviderImage, saasServiceIdCrn),
+						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName, edbSPCName),
+						Containers:     buildProviderContainers(authCR, identityProviderImage, saasServiceIdCrn, ldapSPCExists),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
 				},
@@ -880,7 +903,7 @@ func hasDataField(fields metav1.ManagedFieldsEntry) bool {
 	return false
 }
 
-func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName *string) []corev1.Volume {
+func buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName, edbSPCName string) []corev1.Volume {
 	volumes := []corev1.Volume{
 		{
 			Name: "platform-identity-management",
@@ -1027,15 +1050,6 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName
 			},
 		},
 		{
-			Name: "pgsql-certs",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName:  common.DatastoreEDBSecretName,
-					DefaultMode: &partialAccess,
-				},
-			},
-		},
-		{
 			Name: "pgsql-client-cred",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
@@ -1063,13 +1077,49 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName
 				},
 			},
 		},
+		{
+			Name: "liberty-serverdir-vol",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name: "liberty-outputdir-vol",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name: "liberty-logs-vol",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name: "liberty-tmp-vol",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name: "auth-service-data-vol",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name: "provider-data-vol",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
 	}
-	if auditSecretName != nil && *auditSecretName != "" {
+	if auditSecretName != "" {
 		auditVolume := corev1.Volume{
 			Name: IMAuditTLSVolume,
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: *auditSecretName,
+					SecretName: auditSecretName,
 					Items: []corev1.KeyToPath{
 						{
 							Key:  "tls.crt",
@@ -1090,5 +1140,138 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName
 		}
 		volumes = append(volumes, auditVolume)
 	}
+	if ldapSPCName != "" {
+		volumes = ensureVolumePresent(volumes, corev1.Volume{
+			Name: common.IMLdapBindPwdVolume,
+			VolumeSource: corev1.VolumeSource{
+				CSI: &corev1.CSIVolumeSource{
+					Driver:   "secrets-store.csi.k8s.io",
+					ReadOnly: ptr.To(true),
+					VolumeAttributes: map[string]string{
+						"secretProviderClass": ldapSPCName,
+					},
+				},
+			},
+		})
+	}
+	if edbSPCName != "" {
+		volumes = ensureVolumePresent(volumes, corev1.Volume{
+			Name: "pgsql-certs",
+			VolumeSource: corev1.VolumeSource{
+				CSI: &corev1.CSIVolumeSource{
+					Driver:   "secrets-store.csi.k8s.io",
+					ReadOnly: ptr.To(true),
+					VolumeAttributes: map[string]string{
+						"secretProviderClass": edbSPCName,
+					},
+				},
+			},
+		})
+	} else {
+		volumes = ensureVolumePresent(volumes, corev1.Volume{
+			Name: "pgsql-certs",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  common.DatastoreEDBSecretName,
+					DefaultMode: &partialAccess,
+				},
+			},
+		})
+	}
 	return volumes
+}
+
+// getSecretProviderClassForVolume returns whether a SecretProviderClass with the given name
+// exists in the provided namespace.
+func getSecretProviderClassForVolume(cl client.Client, ctx context.Context, namespace, volumeName string, spc *sscsidriverv1.SecretProviderClass) (err error) {
+	spcs := &sscsidriverv1.SecretProviderClassList{}
+	opts := []client.ListOption{
+		client.MatchingLabels{
+			SecretProviderClassAsVolumeLabel: volumeName,
+		},
+		client.InNamespace(namespace),
+	}
+	if err = cl.List(ctx, spcs, opts...); err != nil {
+		return
+	}
+
+	switch resultCount := len(spcs.Items); resultCount {
+	case 0:
+		return
+	case 1:
+		*spc = spcs.Items[0]
+		return
+	default:
+		objs := []client.Object{}
+		for i := range spcs.Items {
+			objs = append(objs, &spcs.Items[i])
+		}
+		return &LabelConflictError{
+			objs:  objs,
+			label: SecretProviderClassAsVolumeLabel,
+			value: volumeName,
+		}
+	}
+}
+
+type LabelConflictError struct {
+	objs  []client.Object
+	label string
+	value string
+}
+
+func (e *LabelConflictError) GetObjects() []client.Object {
+	return e.objs
+}
+
+func (e *LabelConflictError) GetLabel() string {
+	return e.label
+}
+
+func (e *LabelConflictError) GetValue() string {
+	return e.value
+}
+
+func IsLabelConflictError(err error) (ok bool) {
+	_, ok = err.(*LabelConflictError)
+	return
+}
+
+func (e *LabelConflictError) Error() string {
+	conflicts := []string{}
+	kind := ""
+	sameKind := true
+	for _, obj := range e.objs {
+		curKind := obj.GetObjectKind().GroupVersionKind().Kind
+		if sameKind && kind != "" && kind != curKind {
+			sameKind = false
+		} else if kind == "" {
+			kind = curKind
+		}
+		conflicts = append(conflicts, fmt.Sprintf("%s in namespace %s", obj.GetName(), obj.GetNamespace()))
+	}
+	if !sameKind {
+		kind = "Object"
+	}
+	return fmt.Sprintf("more than one %s has label %q with matching value %q: %s", kind, e.label, e.value, strings.Join(conflicts, ", "))
+}
+
+// ensureVolumePresent checks if a volume exists by name.  If not, it appends
+// the new volume and returns the updated slice.
+func ensureVolumePresent(volumes []corev1.Volume, newVol corev1.Volume) []corev1.Volume {
+	if v := getVolumeByName(volumes, newVol.Name); v != nil {
+		return volumes
+	}
+	return append(volumes, newVol)
+}
+
+// getVolumeByName returns the pointer to the first volume in the slice that has
+// a name that matches the provided name. Returns nil if no matches are found.
+func getVolumeByName(volumes []corev1.Volume, name string) *corev1.Volume {
+	for _, v := range volumes {
+		if v.Name == name {
+			return &v
+		}
+	}
+	return nil
 }

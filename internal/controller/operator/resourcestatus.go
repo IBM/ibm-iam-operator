@@ -44,8 +44,10 @@ const (
 )
 
 func (r *AuthenticationReconciler) setAuthenticationStatus(ctx context.Context, authCR *operatorv1alpha1.Authentication) (modified bool, err error) {
+	log := logf.FromContext(ctx)
 	authCRCopy := authCR.DeepCopy()
 	var nodes []string
+	log.Info("Set nodes status")
 	nodes, err = r.getNodesStatus(ctx, authCR)
 	if err != nil {
 		return
@@ -54,13 +56,21 @@ func (r *AuthenticationReconciler) setAuthenticationStatus(ctx context.Context, 
 		authCR.Status.Nodes = nodes
 	}
 
+	log.Info("Set migration status")
 	err = r.setMigrationStatusConditions(ctx, authCR)
 	if err != nil {
 		return
 	}
 
+	log.Info("Set service status")
 	authCR.Status.Service = r.getCurrentServiceStatus(ctx, r.Client, authCR)
+	expectedPodCount := int(authCR.Spec.Replicas) * 3
+	if len(nodes) != expectedPodCount {
+		log.Info("Number of nodes did not match expected count", "expected", expectedPodCount)
+		authCR.Status.Service.Status = ResourceNotReadyState
+	}
 	if !reflect.DeepEqual(authCR.Status, authCRCopy.Status) {
+		log.Info("Status has changed since previous reconciliation")
 		modified = true
 	}
 	return
@@ -72,7 +82,7 @@ func (r *AuthenticationReconciler) setAuthenticationStatus(ctx context.Context, 
 func (r *AuthenticationReconciler) setMigrationStatusConditions(ctx context.Context, authCR *operatorv1alpha1.Authentication) (err error) {
 	objKey := types.NamespacedName{Name: MigrationJobName, Namespace: authCR.Namespace}
 	job := &batchv1.Job{}
-	err = r.Get(ctx, objKey, job)
+	err = r.Client.Get(ctx, objKey, job)
 	if k8sErrors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
@@ -97,9 +107,9 @@ func jobHasFailed(job *batchv1.Job) (hasFailed bool) {
 // hitting its BackoffLimit.
 func jobHasCompletelyFailed(job *batchv1.Job) (hasFailed bool) {
 	if job.Spec.BackoffLimit == nil {
-		return job.Status.Failed == 6
+		return job.Status.Failed >= 6
 	}
-	return job.Status.Failed == *job.Spec.BackoffLimit
+	return job.Status.Failed >= *job.Spec.BackoffLimit
 }
 
 // setMigrationsRunningStatus sets the appropriate metav1.Condition of type
@@ -155,24 +165,24 @@ func (r *AuthenticationReconciler) getNodesStatus(ctx context.Context, authCR *o
 			log.Info("Failed to list pods by label and namespace", "k8s-app", appName, "namespace", authCR.Namespace)
 			return
 		}
-		nodes = append(nodes, getPodNames(podList.Items)...)
+		nodes = append(nodes, getPodNames(ctx, podList.Items)...)
 	}
 	slices.Sort(nodes)
 	return
 }
 
-func getPodNames(pods []corev1.Pod) []string {
-	reqLogger := log.WithValues("Request.Namespace", "CS??? namespace", "Request.Name", "CS???")
+func getPodNames(ctx context.Context, pods []corev1.Pod) []string {
+	reqLogger := logf.FromContext(ctx)
 	var podNames []string
 	for _, pod := range pods {
 		podNames = append(podNames, pod.Name)
-		reqLogger.Info("CS??? pod name=" + pod.Name)
+		reqLogger.Info("Found Pod", "Pod.Name", pod.Name)
 	}
 	return podNames
 }
 
 func getServiceStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getServiceStatus").V(1)
+	reqLogger := logf.FromContext(ctx)
 	kind := "Service"
 	status = operatorv1alpha1.ManagedResourceStatus{
 		ObjectName: namespacedName.Name,
@@ -183,16 +193,15 @@ func getServiceStatus(ctx context.Context, k8sClient client.Client, namespacedNa
 	}
 	service := &corev1.Service{}
 	err := k8sClient.Get(ctx, namespacedName, service)
-	if err != nil {
-		if k8sErrors.IsNotFound(err) {
-			reqLogger.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
-		} else {
-			reqLogger.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
-		}
+	if err == nil {
+		status.APIVersion = service.APIVersion
+		status.Status = ResourceReadyState
 		return
+	} else if k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
+	} else {
+		reqLogger.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
 	}
-	status.APIVersion = service.APIVersion
-	status.Status = ResourceReadyState
 	return
 }
 
@@ -218,12 +227,11 @@ func getDeploymentStatus(ctx context.Context, k8sClient client.Client, namespace
 	}
 	deployment := &appsv1.Deployment{}
 	err := k8sClient.Get(ctx, namespacedName, deployment)
-	if err != nil {
-		if k8sErrors.IsNotFound(err) {
-			reqLogger.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
-		} else {
-			reqLogger.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
-		}
+	if k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
+		return
+	} else if err != nil {
+		reqLogger.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
 		return
 	}
 	status.APIVersion = deployment.APIVersion

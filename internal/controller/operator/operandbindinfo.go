@@ -35,17 +35,15 @@ import (
 const bindInfoName = "ibm-iam-bindinfo"
 
 func (r *AuthenticationReconciler) handleOperandBindInfo(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues(
-		"subreconciler", "handleOperandBindInfo",
-		"OperandBindInfo.Name", bindInfoName,
-		"OperandBindInfo.Namespace", req.Namespace)
+	log := logf.FromContext(ctx)
 
 	if !ctrlcommon.ClusterHasOperandBindInfoAPIResource(&r.DiscoveryClient) {
-		reqLogger.Info("The OperandBindInfo API resource is not supported by this cluster")
+		log.Info("The OperandBindInfo API resource is not supported by this cluster")
 		return subreconciler.ContinueReconciling()
 	}
 
-	reqLogger.Info("Ensure that OperandBindInfo is present")
+	log = log.WithValues("OperandBindInfo.Name", bindInfoName)
+	log.Info("Ensure that OperandBindInfo is present")
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
@@ -53,7 +51,7 @@ func (r *AuthenticationReconciler) handleOperandBindInfo(ctx context.Context, re
 
 	generated := &operatorv1alpha1.OperandBindInfo{}
 	if err = generateOperandBindInfo(authCR, r.Client.Scheme(), generated); err != nil {
-		reqLogger.Error(err, "Failed to generate OperandBindInfo")
+		log.Error(err, "Failed to generate OperandBindInfo")
 		return subreconciler.RequeueWithError(err)
 	}
 	observed := &operatorv1alpha1.OperandBindInfo{}
@@ -61,10 +59,10 @@ func (r *AuthenticationReconciler) handleOperandBindInfo(ctx context.Context, re
 	err = r.Get(ctx, types.NamespacedName{Name: bindInfoName, Namespace: req.Namespace}, observed)
 	if k8sErrors.IsNotFound(err) {
 		if err = r.Create(ctx, generated); err != nil {
-			reqLogger.Error(err, "Encountered an unexpected error while creating OperandBindInfo")
+			log.Error(err, "Encountered an unexpected error while creating OperandBindInfo")
 			return subreconciler.RequeueWithError(err)
 		}
-		reqLogger.Info("OperandBindInfo created; requeueing")
+		log.Info("OperandBindInfo created; requeueing")
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	} else if err != nil {
 		return subreconciler.RequeueWithError(err)
@@ -72,30 +70,30 @@ func (r *AuthenticationReconciler) handleOperandBindInfo(ctx context.Context, re
 
 	updated := false
 	if !reflect.DeepEqual(observed.Spec, generated.Spec) {
-		reqLogger.Info("OperandBindInfo specs differ; updating")
+		log.Info("OperandBindInfo specs differ; updating")
 		observed.Spec = generated.Spec
 		updated = true
 	}
 
 	if !ctrlcommon.IsOwnerOf(r.Client.Scheme(), authCR, observed) {
 		if err = controllerutil.SetOwnerReference(authCR, observed, r.Client.Scheme()); err != nil {
-			reqLogger.Error(err, "Failed to set owner reference on OperandBindInfo")
+			log.Error(err, "Failed to set owner reference on OperandBindInfo")
 			return subreconciler.RequeueWithError(err)
 		}
 		updated = true
 	}
 
-	if updated {
-		if err = r.Update(ctx, observed); err != nil {
-			reqLogger.Error(err, "Encountered an unexpected error while updating OperandBindInfo")
-			return subreconciler.RequeueWithError(err)
-		}
-		reqLogger.Info("Updated the OperandBindInfo; requeueing")
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	if !updated {
+		log.Info("No changes to OperandBindInfo; continue")
+		return subreconciler.ContinueReconciling()
 	}
 
-	reqLogger.Info("No changes to OperandBindInfo; continue")
-	return subreconciler.ContinueReconciling()
+	if err = r.Update(ctx, observed); err != nil {
+		log.Error(err, "Encountered an unexpected error while updating OperandBindInfo")
+		return subreconciler.RequeueWithError(err)
+	}
+	log.Info("Updated the OperandBindInfo; requeueing")
+	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
 func generateOperandBindInfo(authCR *operatorv1alpha1.Authentication, scheme *runtime.Scheme, generated *operatorv1alpha1.OperandBindInfo) (err error) {

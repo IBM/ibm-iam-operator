@@ -77,7 +77,7 @@ func (r *AuthenticationReconciler) finalizeMongoMigrationObject(ctx context.Cont
 
 // addMongoMigrationFinalizers is a subreconciler that adds finalizers to resources that are being retained during migration
 func (r *AuthenticationReconciler) addMongoMigrationFinalizers(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx, "subreconciler", "addFinalizers")
+	reqLogger := logf.FromContext(ctx)
 	reqLogger.Info("Add finalizers to MongoDB resources in case migration is needed")
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
@@ -141,7 +141,7 @@ func (r *AuthenticationReconciler) addMongoMigrationFinalizers(ctx context.Conte
 }
 
 func (r *AuthenticationReconciler) handleMongoDBCleanup(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx, "subreconciler", "handleMongoDBCleanup")
+	reqLogger := logf.FromContext(ctx)
 	reqLogger.Info("Clean up MongoDB resources if no longer needed")
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
@@ -301,7 +301,7 @@ func mongoIsPresent(cl client.Client, ctx context.Context, authCR *operatorv1alp
 // ensureDatastoreSecretAndCM makes sure that the datastore Secret and ConfigMap are present in the services namespace;
 // these contain the configuration details that allow for connections to EDB
 func (r *AuthenticationReconciler) ensureDatastoreSecretAndCM(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "ensureDatastoreSecretAndCM")
+	reqLogger := logf.FromContext(ctx)
 	reqLogger.Info("Ensure EDB datastore configuration resources available")
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
@@ -336,15 +336,13 @@ func (r *AuthenticationReconciler) ensureDatastoreSecretAndCM(ctx context.Contex
 			"Secret.Namespace", authCR.Namespace)
 		return subreconciler.RequeueWithError(err)
 	}
-	reqLogger.Info("Secret found",
-		"Secret.Name", ctrlcommon.DatastoreEDBSecretName,
-		"Secret.Namespace", authCR.Namespace)
+	reqLogger.Info("Secret found", "Secret.Name", ctrlcommon.DatastoreEDBSecretName)
 
 	return subreconciler.ContinueReconciling()
 }
 
 func (r *AuthenticationReconciler) overrideMongoDBBootstrap(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "overrideMongoDBBootstrap")
+	reqLogger := logf.FromContext(ctx)
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return

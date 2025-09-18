@@ -1139,6 +1139,26 @@ func buildAuthSvcVolumeMounts(ldapSpcExist bool) []corev1.VolumeMount {
 			Name:      "pgsql-client-cred",
 			MountPath: "/pgsql/clientinfo",
 		},
+		{
+			Name:      "liberty-serverdir-vol",
+			MountPath: "/opt/ibm/wlp/usr/servers/defaultServer",
+		},
+		{
+			Name:      "liberty-outputdir-vol",
+			MountPath: "/opt/ibm/wlp/output/defaultServer",
+		},
+		{
+			Name:      "liberty-logs-vol",
+			MountPath: "/logs",
+		},
+		{
+			Name:      "liberty-tmp-vol",
+			MountPath: "/tmp",
+		},
+		{
+			Name:      "auth-service-data-vol",
+			MountPath: "/opt/ibm/auth-service",
+		},
 	}
 	if ldapSpcExist {
 		volumeMounts = EnsureVolumeMountPresent(volumeMounts, GetLdapBindPwdVolumeMount())

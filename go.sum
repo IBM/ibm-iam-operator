@@ -90,6 +90,8 @@ github.com/opdev/subreconciler v0.0.0-20230302151718-c4c8b5ec17c5 h1:ObusmubWjKa
 github.com/opdev/subreconciler v0.0.0-20230302151718-c4c8b5ec17c5/go.mod h1:E4wuRlHBNn/V04QINCioS7538YoaODQA8Phmooz18lU=
 github.com/openshift/api v0.0.0-20250916150132-83b017b06367 h1:bG88JdzHVMY/o3b0iGlxjoAieRv2gQlAGKIK7CBGDAw=
 github.com/openshift/api v0.0.0-20250916150132-83b017b06367/go.mod h1:SPLf21TYPipzCO67BURkCfK6dcIIxx0oNRVWaOyRcXM=
+github.com/openshift/api v0.0.0-20250919093554-588d5490d187 h1:mmWVIXa3npsAIZgFTgzniKhCXeL6xHN5kLp7KCJGibg=
+github.com/openshift/api v0.0.0-20250919093554-588d5490d187/go.mod h1:SPLf21TYPipzCO67BURkCfK6dcIIxx0oNRVWaOyRcXM=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

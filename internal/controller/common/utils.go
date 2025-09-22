@@ -72,10 +72,9 @@ func GetClusterType(ctx context.Context, k8sClient client.Client, cmName string)
 	logger.Info("Get cluster config")
 
 	var namespaces []string
-	// TODO Clean this up for switch back to using Authentication CR
 	servicesNamespace, err := GetServicesNamespace(ctx, k8sClient)
 	if err != nil {
-		logger.Error(err, "Could not get services namespace from CommonService", "name", CommonServiceName)
+		logger.Error(err, "Could not get services namespace from Authentication", "name", CommonServiceName)
 		err = nil
 	} else {
 		logger.Info("Got services namespace", "namespace", servicesNamespace)
@@ -433,6 +432,29 @@ type FallbackClient struct {
 func (f *FallbackClient) Get(ctx context.Context, objkey client.ObjectKey, obj client.Object, opts ...client.GetOption) (err error) {
 	if err = f.Client.Get(ctx, objkey, obj, opts...); k8sErrors.IsNotFound(err) {
 		return f.Reader.Get(ctx, objkey, obj, opts...)
+	}
+	return
+}
+
+func Scrub(b []byte) (n int) {
+	if b == nil {
+		return
+	}
+	for i := range b {
+		b[i] = 0
+		n++
+	}
+	b = nil
+	return
+}
+
+func ScrubMap(m map[string][]byte) (n int) {
+	if m == nil {
+		return
+	}
+	for key := range m {
+		n += Scrub(m[key])
+		m[key] = nil
 	}
 	return
 }

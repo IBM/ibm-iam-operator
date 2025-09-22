@@ -27,6 +27,7 @@ import (
 	"time"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
+	"github.com/IBM/ibm-iam-operator/internal/controller/common"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
 	"github.com/opdev/subreconciler"
 	corev1 "k8s.io/api/core/v1"
@@ -66,6 +67,18 @@ func (r *AuthenticationReconciler) handleSecrets(ctx context.Context, req ctrl.R
 	return ctrlcommon.ReduceSubreconcilerResultsAndErrors(results, errs)
 }
 
+func scrubSecretValues(s common.SecondaryReconciler, ctx context.Context, observed, generated *corev1.Secret) error {
+	if observed != nil && observed.Data != nil {
+		common.ScrubMap(observed.Data)
+	}
+	if generated != nil && generated.Data != nil {
+		common.ScrubMap(generated.Data)
+	}
+	observed = nil
+	generated = nil
+	return nil
+}
+
 func (r *AuthenticationReconciler) getSecretSubreconcilers(ctx context.Context, authCR *operatorv1alpha1.Authentication) (subRecs []ctrlcommon.Subreconciler, err error) {
 	var caCert []byte
 	caCert, err = r.getPlatformAuthSecret(ctx, authCR)
@@ -73,18 +86,34 @@ func (r *AuthenticationReconciler) getSecretSubreconcilers(ctx context.Context, 
 		return
 	}
 
-	ruleAlphaLowerNum32 := `^([a-z0-9]){32,}$`
-	wlpClientID := ctrlcommon.GenerateRandomString(ruleAlphaLowerNum32)
-	wlpClientSecret := ctrlcommon.GenerateRandomString(ruleAlphaLowerNum32)
-
-	ruleAlphaNum32 := `^([a-zA-Z0-9]){32,}$`
-	adminPassword := ctrlcommon.GenerateRandomString(ruleAlphaNum32)
-	scimAdminPassword := ctrlcommon.GenerateRandomString(ruleAlphaNum32)
-	encryptionKey := ctrlcommon.GenerateRandomString(ruleAlphaNum32)
-	wlpClientRegistrationSecret := ctrlcommon.GenerateRandomString(ruleAlphaNum32)
-
-	ruleAlphaNum16 := `^([a-zA-Z0-9]){16,}$`
-	encryptionIV := ctrlcommon.GenerateRandomString(ruleAlphaNum16)
+	wlpClientID, err := ctrlcommon.GenerateRandomBytes(ctrlcommon.LowerAlphaNum, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate wlpClientID: %w", err)
+	}
+	wlpClientSecret, err := ctrlcommon.GenerateRandomBytes(ctrlcommon.LowerAlphaNum, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate wlpClientSecret: %w", err)
+	}
+	adminPassword, err := ctrlcommon.GenerateRandomBytes(ctrlcommon.AlphaNum, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate adminPassword: %w", err)
+	}
+	scimAdminPassword, err := ctrlcommon.GenerateRandomBytes(ctrlcommon.AlphaNum, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate scimAdminPassword: %w", err)
+	}
+	encryptionKey, err := ctrlcommon.GenerateRandomBytes(ctrlcommon.AlphaNum, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate encryptionKey: %w", err)
+	}
+	wlpClientRegistrationSecret, err := ctrlcommon.GenerateRandomBytes(ctrlcommon.AlphaNum, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate wlpClientRegistrationSecret: %w", err)
+	}
+	encryptionIV, err := ctrlcommon.GenerateRandomBytes(ctrlcommon.AlphaNum, 16)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate encryptionIV: %w", err)
+	}
 
 	builders := []*ctrlcommon.SecondaryReconcilerBuilder[*corev1.Secret]{
 		ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.Secret]().
@@ -100,7 +129,7 @@ func (r *AuthenticationReconciler) getSecretSubreconcilers(ctx context.Context, 
 			WithGenerateFns(generateSecretObject(
 				map[string][]byte{
 					"admin_username": []byte(authCR.Spec.Config.DefaultAdminUser),
-					"admin_password": []byte(adminPassword),
+					"admin_password": adminPassword,
 				})).
 			WithModifyFns(ensureSecretLabels, ensureChecksumAnnotation).
 			WithOnWriteFns(signalNeedRolloutFn[*corev1.Secret](r)),
@@ -109,7 +138,7 @@ func (r *AuthenticationReconciler) getSecretSubreconcilers(ctx context.Context, 
 			WithGenerateFns(generateSecretObject(
 				map[string][]byte{
 					"scim_admin_username": []byte(authCR.Spec.Config.ScimAdminUser),
-					"scim_admin_password": []byte(scimAdminPassword),
+					"scim_admin_password": scimAdminPassword,
 				})).
 			WithModifyFns(ensureSecretLabels, ensureChecksumAnnotation).
 			WithOnWriteFns(signalNeedRolloutFn[*corev1.Secret](r)),
@@ -117,8 +146,8 @@ func (r *AuthenticationReconciler) getSecretSubreconcilers(ctx context.Context, 
 			WithName("platform-auth-idp-encryption").
 			WithGenerateFns(generateSecretObject(
 				map[string][]byte{
-					"ENCRYPTION_KEY": []byte(encryptionKey),
-					"ENCRYPTION_IV":  []byte(encryptionIV),
+					"ENCRYPTION_KEY": encryptionKey,
+					"ENCRYPTION_IV":  encryptionIV,
 					"algorithm":      []byte("aes256"),
 					"inputEncoding":  []byte("utf8"),
 					"outputEncoding": []byte("hex"),
@@ -128,7 +157,7 @@ func (r *AuthenticationReconciler) getSecretSubreconcilers(ctx context.Context, 
 			WithName("oauth-client-secret").
 			WithGenerateFns(generateSecretObject(
 				map[string][]byte{
-					"WLP_CLIENT_REGISTRATION_SECRET": []byte(wlpClientRegistrationSecret),
+					"WLP_CLIENT_REGISTRATION_SECRET": wlpClientRegistrationSecret,
 					"DEFAULT_ADMIN_USER":             []byte(authCR.Spec.Config.DefaultAdminUser),
 				})).
 			WithModifyFns(ensureSecretLabels),
@@ -136,10 +165,10 @@ func (r *AuthenticationReconciler) getSecretSubreconcilers(ctx context.Context, 
 			WithName("platform-oidc-credentials").
 			WithGenerateFns(generateSecretObject(
 				map[string][]byte{
-					"WLP_CLIENT_ID":                     []byte(wlpClientID),
-					"WLP_CLIENT_SECRET":                 []byte(wlpClientSecret),
+					"WLP_CLIENT_ID":                     wlpClientID,
+					"WLP_CLIENT_SECRET":                 wlpClientSecret,
 					"WLP_SCOPE":                         []byte("openid+profile+email"),
-					"OAUTH2_CLIENT_REGISTRATION_SECRET": []byte(wlpClientRegistrationSecret),
+					"OAUTH2_CLIENT_REGISTRATION_SECRET": wlpClientRegistrationSecret,
 					"IBMID_CLIENT_SECRET":               []byte("903305fb599c8328a4d86d4cbdd07368"),
 					"IBMID_PROFILE_CLIENT_SECRET":       []byte("C1bR0rO7kE0cE3xM2tV1gI0mG1cH3jK4dD7iQ8rW6pF1aF4mQ5"),
 				})).
@@ -174,6 +203,7 @@ func (r *AuthenticationReconciler) getSecretSubreconcilers(ctx context.Context, 
 	for i := range builders {
 		subRecs = append(subRecs, builders[i].
 			WithNamespace(authCR.Namespace).
+			WithOnFinishedFns(scrubSecretValues).
 			WithPrimary(authCR).
 			WithClient(r.Client).
 			MustBuild())

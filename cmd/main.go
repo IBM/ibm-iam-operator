@@ -182,7 +182,10 @@ func main() {
 	const clientControllerName = "controller_oidc_client"
 
 	clientReconciler := &oidcsecuritycontrollers.ClientReconciler{
-		Client:   mgr.GetClient(),
+		Client: &controllercommon.FallbackClient{
+			Client: mgr.GetClient(),
+			Reader: mgr.GetAPIReader(),
+		},
 		Reader:   mgr.GetAPIReader(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor(clientControllerName),

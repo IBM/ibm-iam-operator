@@ -19,7 +19,7 @@ package oidcsecurity
 import (
 	"context"
 	"maps"
-	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -27,13 +27,14 @@ import (
 	"github.com/IBM/ibm-iam-operator/internal/controller/common"
 
 	"fmt"
+	"runtime"
 
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	k8sRuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
@@ -76,7 +77,7 @@ var Clock clock.Clock = clock.RealClock{}
 type ClientReconciler struct {
 	runtimeClient.Client
 	Reader   runtimeClient.Reader
-	Scheme   *runtime.Scheme
+	Scheme   *k8sRuntime.Scheme
 	Recorder record.EventRecorder
 }
 
@@ -89,6 +90,27 @@ func (r *ClientReconciler) Get(ctx context.Context, objkey runtimeClient.ObjectK
 	return
 }
 
+func GetFunctionName(fn any) string {
+	fnStrs := strings.Split(runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name(), ".")
+	return strings.Split(fnStrs[len(fnStrs)-1], "-")[0]
+}
+
+// withResultLog is a helper function that logs the result of a subreconciler
+func withResultLog(fn subreconciler.FnWithRequest) func(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	return func(rootCtx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+		fnName := GetFunctionName(fn)
+		log := logf.FromContext(rootCtx, "subreconciler", fnName)
+		ctx := logf.IntoContext(rootCtx, log)
+		log.V(1).Info("Running subreconciler")
+		if result, err = fn(ctx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+			log.V(1).Info("Result: should halt or requeue ", "result", result, "err", err)
+			return
+		}
+		log.V(1).Info("Result: no requeue necessary", "result", result, "err", err)
+		return
+	}
+}
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *ClientReconciler) Reconcile(rootCtx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
@@ -96,7 +118,9 @@ func (r *ClientReconciler) Reconcile(rootCtx context.Context, req ctrl.Request) 
 	ctx := logf.IntoContext(rootCtx, log)
 	log.Info("Reconciling Client CR")
 
-	subreconcilersForClient := []subreconciler.FnWithRequest{
+	var subResult *ctrl.Result
+
+	fns := []subreconciler.FnWithRequest{
 		r.confirmAuthenticationIsReady,
 		r.addFinalizer,
 		r.handleDeletion,
@@ -107,22 +131,28 @@ func (r *ClientReconciler) Reconcile(rootCtx context.Context, req ctrl.Request) 
 		r.updateStatus,
 	}
 
-	subreconcilerCtx := logf.IntoContext(ctx, log)
-	for _, f := range subreconcilersForClient {
-		if r, err := f(subreconcilerCtx, req); subreconciler.ShouldHaltOrRequeue(r, err) {
-			return subreconciler.Evaluate(r, err)
+	for _, fn := range fns {
+		if subResult, err = withResultLog(fn)(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
+			break
 		}
 	}
 
-	log.Info("Reconciling Client CR complete")
+	if subreconciler.ShouldRequeue(subResult, err) {
+		log.Info("Reconciliation for Client CR spec incomplete; requeueing")
+	} else {
+		log.Info("Reconciliation for Client CR spec complete")
+		subResult = &ctrl.Result{Requeue: false}
+	}
 
-	return subreconciler.Evaluate(subreconciler.DoNotRequeue())
+	result, err = subreconciler.Evaluate(subResult, err)
+	log.V(1).Info("Reconciliation return", "result", result, "err", err)
+	return
 }
 
 // Begin subreconcilers
 
 func (r *ClientReconciler) confirmAuthenticationIsReady(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "confirmAuthenticationIsReady")
+	reqLogger := logf.FromContext(ctx)
 	reqLogger.Info("Confirm that Authentication CR for IM is ready before reconciling Client")
 
 	var authCR *operatorv1alpha1.Authentication
@@ -143,7 +173,7 @@ func (r *ClientReconciler) confirmAuthenticationIsReady(ctx context.Context, req
 // addFinalizer first performs any required migration steps on the Client if it was created using
 // icp-oidcclient-watcher, then adds this controller's finalizer to it.
 func (r *ClientReconciler) addFinalizer(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "addFinalizer")
+	reqLogger := logf.FromContext(ctx)
 	reqLogger.Info("Add finalizer to Client if not already present")
 
 	clientCR := &oidcsecurityv1.Client{}
@@ -180,11 +210,10 @@ func (r *ClientReconciler) addFinalizer(ctx context.Context, req ctrl.Request) (
 // handleDeletion performs finalizing tasks and removes any finalizers set by this Operator to allow for safe deletion
 // of a Client if it has been marked for deletion.
 func (r *ClientReconciler) handleDeletion(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "handleDeletion")
+	reqLogger := logf.FromContext(ctx)
 	reqLogger.Info("Handle cleanup of Client if it has been marked for deletion")
 
 	clientCR := &oidcsecurityv1.Client{}
-	requestMethod := http.MethodDelete
 
 	if _, err = r.getLatestClient(ctx, req, clientCR); err != nil {
 		if k8sErrors.IsNotFound(err) {
@@ -193,7 +222,7 @@ func (r *ClientReconciler) handleDeletion(ctx context.Context, req ctrl.Request)
 		}
 		reqLogger.Error(err, "Failed to get latest Client")
 		reqLogger.Info("Updating status")
-		if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, requestMethod); err != nil {
+		if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err); err != nil {
 			reqLogger.Error(err, "Failed to update Client status")
 			return subreconciler.RequeueWithError(err)
 		}
@@ -213,7 +242,7 @@ func (r *ClientReconciler) handleDeletion(ctx context.Context, req ctrl.Request)
 		}
 		reqLogger.Error(err, "Error occurred while finalizing Client")
 		reqLogger.Info("Updating status")
-		if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, requestMethod); err != nil {
+		if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err); err != nil {
 			reqLogger.Error(err, "Failed to update Client status")
 			return subreconciler.RequeueWithError(err)
 		}
@@ -221,7 +250,7 @@ func (r *ClientReconciler) handleDeletion(ctx context.Context, req ctrl.Request)
 	}
 
 	reqLogger.Info("Updating status")
-	if err = r.writeErrorConditionsAndEvents(ctx, clientCR, err, requestMethod); err != nil {
+	if err = r.writeErrorConditionsAndEvents(ctx, clientCR, err); err != nil {
 		reqLogger.Error(err, "Failed to update Client status")
 		return subreconciler.RequeueWithError(err)
 	}
@@ -247,7 +276,7 @@ func (r *ClientReconciler) handleDeletion(ctx context.Context, req ctrl.Request)
 // ensureSecretAndClientIdSet checks a Client CR to be sure that its corresponding Secret containing the client ID and
 // client secret has been created and that the ID on the CR itself has been set to match the value in the Secret.
 func (r *ClientReconciler) ensureSecretAndClientIdSet(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "ensureSecretAndClientIdSet")
+	reqLogger := logf.FromContext(ctx)
 	reqLogger.Info("Ensuring Secret and Client ID are set")
 
 	clientCR := &oidcsecurityv1.Client{}
@@ -267,7 +296,7 @@ func (r *ClientReconciler) ensureSecretAndClientIdSet(ctx context.Context, req c
 		if err != nil && !k8sErrors.IsNotFound(err) {
 			reqLogger.Error(err, "Failed to get Secret from Client", "secretName", clientCR.Spec.Secret)
 			reqLogger.Info("Updating status")
-			if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, ""); err != nil {
+			if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err); err != nil {
 				reqLogger.Error(err, "Failed to write status to Client")
 				return subreconciler.RequeueWithError(err)
 			}
@@ -286,7 +315,7 @@ func (r *ClientReconciler) ensureSecretAndClientIdSet(ctx context.Context, req c
 			}
 			reqLogger.Error(err, "Failed to get Secret from Client", "secretName", clientCR.Spec.Secret)
 			reqLogger.Info("Updating status")
-			if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, ""); err != nil {
+			if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err); err != nil {
 				reqLogger.Error(err, "Failed to write status to Client")
 				return subreconciler.RequeueWithError(err)
 			}
@@ -312,7 +341,7 @@ func (r *ClientReconciler) ensureSecretAndClientIdSet(ctx context.Context, req c
 		if err = r.Update(ctx, clientCR); err != nil {
 			reqLogger.Error(err, "Failed to update ClientId on Client")
 			reqLogger.Info("Updating status")
-			if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, ""); err != nil {
+			if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err); err != nil {
 				reqLogger.Error(err, "Failed to write status to Client")
 				return subreconciler.RequeueWithError(err)
 			}
@@ -327,54 +356,45 @@ func (r *ClientReconciler) ensureSecretAndClientIdSet(ctx context.Context, req c
 // processOidcRegistration creates a new OIDC client or updates an existing one with whatever state is observed in the
 // Client CR.
 func (r *ClientReconciler) processOidcRegistration(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "processOidcRegistration")
+	reqLogger := logf.FromContext(ctx)
 	reqLogger.Info("Processing OIDC client registration")
 
-	var requestMethod string
 	clientCR := &oidcsecurityv1.Client{}
 
 	if result, err = r.getLatestClient(ctx, req, clientCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 
-	config := &AuthenticationConfig{}
-	err = GetConfig(ctx, r, config)
-	if err != nil {
-		reqLogger.Error(err, "Failed to gather Authentication configuration")
-		return subreconciler.RequeueWithError(err)
-	}
-
-	var authenticationNamespace string
-	if authenticationNamespace, err = config.GetAuthenticationNamespace(); err != nil {
+	var servicesNamespace string
+	if servicesNamespace, err = common.GetServicesNamespace(ctx, r.Client); err != nil {
 		reqLogger.Error(err, "No Authentication CR found to determine services namespace")
 		return subreconciler.RequeueWithError(err)
 	}
 
-	available, err := r.isDeploymentAvailable(ctx, common.PlatformIdentityProvider, authenticationNamespace)
+	available, err := r.isDeploymentAvailable(ctx, common.PlatformIdentityProvider, servicesNamespace)
 	if err != nil {
 		reqLogger.Error(err, "Deployment needed for OIDC registration could not be retrieved",
 			"Deployment.Name", common.PlatformIdentityProvider,
-			"Deployment.Namespace", authenticationNamespace)
+			"Deployment.Namespace", servicesNamespace)
 		return subreconciler.RequeueWithDelayAndError(wait.Jitter(baseAuthenticationWaitTime, 1.0), err)
 	} else if !available {
 		reqLogger.Info("Deployment is not available yet; requeueing",
 			"Deployment.Name", common.PlatformIdentityProvider,
-			"Deployment.Namespace", authenticationNamespace)
+			"Deployment.Namespace", servicesNamespace)
 		return subreconciler.RequeueWithDelay(wait.Jitter(baseAuthenticationWaitTime, 1.0))
 	}
 
 	reqLogger.Info("Deployment is available",
 		"Deployment.Name", common.PlatformIdentityProvider,
-		"Deployment.Namespace", authenticationNamespace)
+		"Deployment.Namespace", servicesNamespace)
 
 	// Attempt to get the Client registration; if it isn't there, create a new one, otherwise, update
-	_, err = r.getClientRegistration(ctx, clientCR, config)
+	_, err = r.getClientRegistration(ctx, clientCR, servicesNamespace)
 	if err != nil {
 		reqLogger.Info("Client not found, create new Client")
-		requestMethod = http.MethodPost
-		if _, err = r.createClientRegistration(ctx, clientCR, config); err != nil {
+		if _, err = r.createClientRegistration(ctx, clientCR, servicesNamespace); err != nil {
 			reqLogger.Error(err, "Failed to create OIDC client registration")
-			if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, http.MethodPost); err != nil {
+			if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err); err != nil {
 				reqLogger.Error(err, "Failed to update Client status")
 				return subreconciler.RequeueWithError(err)
 			}
@@ -384,10 +404,9 @@ func (r *ClientReconciler) processOidcRegistration(ctx context.Context, req ctrl
 		r.Recorder.Event(clientCR, corev1.EventTypeNormal, ReasonCreateClientSuccessful, MessageCreateClientSuccessful)
 	} else {
 		reqLogger.Info("Client found, update Client")
-		requestMethod = http.MethodPut
-		if _, err = r.updateClientRegistration(ctx, clientCR, config); err != nil {
+		if _, err = r.updateClientRegistration(ctx, clientCR, servicesNamespace); err != nil {
 			reqLogger.Error(err, "Failed to update OIDC client registration")
-			if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, requestMethod); err != nil {
+			if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err); err != nil {
 				reqLogger.Error(err, "Failed to update Client status")
 				return subreconciler.RequeueWithError(err)
 			}
@@ -409,7 +428,7 @@ func (r *ClientReconciler) processOidcRegistration(ctx context.Context, req ctrl
 // annotateServiceAccount updates ibm-iam-operand-restricted SA with redirecturi's present in the Client CR for
 // updateClient Call
 func (r *ClientReconciler) annotateServiceAccount(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "annotateServiceAccount")
+	reqLogger := logf.FromContext(ctx)
 	reqLogger.Info("Add any missing Client annotations to ibm-iam-operand-restricted ServiceAccount")
 
 	clientCR := &oidcsecurityv1.Client{}
@@ -474,7 +493,7 @@ func (r *ClientReconciler) annotateServiceAccount(ctx context.Context, req ctrl.
 // processZenRegistration registers the OIDC client credentials for use with the Zen instance that has the same ID as
 // the one specified on the Client CR's .spec.ZenInstanceId.
 func (r *ClientReconciler) processZenRegistration(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "processZenRegistration")
+	reqLogger := logf.FromContext(ctx)
 	reqLogger.Info("Processing Zen instance registration for Client, if configured")
 	clientCR := &oidcsecurityv1.Client{}
 
@@ -487,41 +506,39 @@ func (r *ClientReconciler) processZenRegistration(ctx context.Context, req ctrl.
 		return subreconciler.ContinueReconciling()
 	}
 
-	config := &AuthenticationConfig{}
-	err = GetConfig(ctx, r, config)
 	if err != nil {
 		reqLogger.Error(err, "Failed to gather Authentication configuration")
 		return subreconciler.RequeueWithError(err)
 	}
 
-	var authenticationNamespace string
-	if authenticationNamespace, err = config.GetAuthenticationNamespace(); err != nil {
+	var servicesNamespace string
+	if servicesNamespace, err = common.GetServicesNamespace(ctx, r.Client); err != nil {
 		reqLogger.Error(err, "No Authentication CR found to determine services namespace")
 		return subreconciler.RequeueWithError(err)
 	}
 
-	available, err := r.isDeploymentAvailable(ctx, common.PlatformIdentityManagement, authenticationNamespace)
+	available, err := r.isDeploymentAvailable(ctx, common.PlatformIdentityManagement, servicesNamespace)
 	if err != nil {
 		reqLogger.Error(err, "Deployment needed for OIDC registration could not be retrieved",
 			"Deployment.Name", common.PlatformIdentityManagement,
-			"Deployment.Namespace", authenticationNamespace)
+			"Deployment.Namespace", servicesNamespace)
 		return subreconciler.RequeueWithDelayAndError(wait.Jitter(baseAuthenticationWaitTime, 1.0), err)
 	} else if !available {
 		reqLogger.Info("Deployment is not available yet; requeueing",
 			"Deployment.Name", common.PlatformIdentityManagement,
-			"Deployment.Namespace", authenticationNamespace)
+			"Deployment.Namespace", servicesNamespace)
 		return subreconciler.RequeueWithDelay(wait.Jitter(baseAuthenticationWaitTime, 1.0))
 	}
 
 	reqLogger.Info("Deployment is available",
 		"Deployment.Name", common.PlatformIdentityManagement,
-		"Deployment.Namespace", authenticationNamespace)
+		"Deployment.Namespace", servicesNamespace)
 
 	var zenReg *ZenInstance
-	zenReg, err = r.getZenInstanceRegistration(ctx, clientCR, config)
+	zenReg, err = r.getZenInstanceRegistration(ctx, clientCR, servicesNamespace)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get Zen instance")
-		if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, http.MethodPost); err != nil {
+		if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err); err != nil {
 			reqLogger.Error(err, "Failed ot update Client status")
 			return subreconciler.RequeueWithError(err)
 		}
@@ -535,15 +552,19 @@ func (r *ClientReconciler) processZenRegistration(ctx context.Context, req ctrl.
 		reqLogger.Info("Updating status")
 		return subreconciler.RequeueWithError(err)
 	}
+	defer func() {
+		common.Scrub(clientCreds.ClientID)
+		common.Scrub(clientCreds.ClientSecret)
+	}()
 
 	//Zen registration exist, update
 	if zenReg != nil {
 		//Zen registration exists - going to update zen instance registration
 		reqLogger.Info("Zen registration already exists for oidc client - the zen instance will be updated",
 			"clientId", clientCR.Spec.ClientId, "zenInstanceId", clientCR.Spec.ZenInstanceId)
-		if err = r.registerZenInstance(ctx, clientCR, clientCreds, config); err != nil {
+		if err = r.registerZenInstance(ctx, clientCR, clientCreds, servicesNamespace); err != nil {
 			reqLogger.Error(err, "Failed to update Zen registration")
-			if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, http.MethodPost); err != nil {
+			if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err); err != nil {
 				reqLogger.Error(err, "Failed ot update Client status")
 				return subreconciler.RequeueWithError(err)
 			}
@@ -554,9 +575,9 @@ func (r *ClientReconciler) processZenRegistration(ctx context.Context, req ctrl.
 
 	//Zen registration does not exist, create
 	reqLogger.Info("Creating Zen registration for client")
-	if err = r.registerZenInstance(ctx, clientCR, clientCreds, config); err != nil {
+	if err = r.registerZenInstance(ctx, clientCR, clientCreds, servicesNamespace); err != nil {
 		reqLogger.Error(err, "Failed to create Zen registration")
-		if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err, http.MethodPost); err != nil {
+		if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err); err != nil {
 			reqLogger.Error(err, "Failed ot update Client status")
 			return subreconciler.RequeueWithError(err)
 		}
@@ -569,7 +590,7 @@ func (r *ClientReconciler) processZenRegistration(ctx context.Context, req ctrl.
 
 // updateStatus sets success-related conditions in the Client CR's status.
 func (r *ClientReconciler) updateStatus(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	reqLogger := logf.FromContext(ctx).WithValues("subreconciler", "updateStatus")
+	reqLogger := logf.FromContext(ctx)
 	reqLogger.Info("Marking Client Ready condition as \"True\"")
 
 	clientCR := &oidcsecurityv1.Client{}
@@ -618,18 +639,6 @@ func isNotMarkedForDeletion(client *oidcsecurityv1.Client) bool {
 	return !isMarkedForDeletion(client)
 }
 
-// createPostfixedName creates a new name that stays below the Kubernetes max length for a name with a postfix.
-func createPostfixedName(original, postfix string) (newName string) {
-	const k8sMaxNameLength int = 253
-	const separator = "-"
-	if len(original)+len(postfix)+1 > k8sMaxNameLength {
-		// Max length minus postfix length with separator
-		truncLen := k8sMaxNameLength - len(postfix) - 1
-		return strings.Join([]string{original[:truncLen], postfix}, separator)
-	}
-	return strings.Join([]string{original, postfix}, separator)
-}
-
 // finalizeClient performs all clean up that needs to be performed before a Client CR can be deleted safely.
 func (r *ClientReconciler) finalizeClient(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx)
@@ -643,16 +652,15 @@ func (r *ClientReconciler) finalizeClient(ctx context.Context, req ctrl.Request)
 		return subreconciler.RequeueWithError(err)
 	}
 
-	config := &AuthenticationConfig{}
-	err = GetConfig(ctx, r, config)
-	if err != nil {
-		reqLogger.Error(err, "Failed to gather Authentication configuration")
+	var servicesNamespace string
+	if servicesNamespace, err = common.GetServicesNamespace(ctx, r.Client); err != nil {
+		reqLogger.Error(err, "No Authentication CR found to determine services namespace")
 		return subreconciler.RequeueWithError(err)
 	}
 
 	if clientCR.Spec.ZenInstanceId != "" {
 		reqLogger.Info("Client has a zenInstanceId, attempt to delete the matching Zen instance")
-		err = r.unregisterZenInstance(ctx, clientCR, config)
+		err = r.unregisterZenInstance(ctx, clientCR, servicesNamespace)
 		if err != nil {
 			reqLogger.Error(err, "Zen instance registration deletion failed", "zenInstanceId", clientCR.Spec.ZenInstanceId)
 			return subreconciler.RequeueWithError(err)
@@ -666,7 +674,7 @@ func (r *ClientReconciler) finalizeClient(ctx context.Context, req ctrl.Request)
 	}
 
 	reqLogger.Info("Attempting deletion of the OIDC client registration")
-	_, err = r.deleteClientRegistration(ctx, clientCR, config)
+	_, err = r.deleteClientRegistration(ctx, clientCR, servicesNamespace)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
@@ -721,15 +729,6 @@ func migrateCP2Client(ctx context.Context, clientCR *oidcsecurityv1.Client) (cli
 	return false
 }
 
-func containsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
-}
-
 // getSecretFromClient attempts to read the secret named in the provided Client resource and returns its contents if
 // found. Returns an error if the attempt to read the Secret off of the cluster fails for any reason.
 func (r *ClientReconciler) getSecretFromClient(ctx context.Context, client *oidcsecurityv1.Client) (secret *corev1.Secret, err error) {
@@ -760,10 +759,11 @@ func getClientCredsFromSecret(secret *corev1.Secret) (clientCreds *ClientCredent
 	if clientSecret, ok = secret.Data["CLIENT_SECRET"]; !ok {
 		return nil, fmt.Errorf(`"CLIENT_SECRET" not set`)
 	}
-	return &ClientCredentials{
-		ClientID:     string(clientId[:]),
-		ClientSecret: string(clientSecret[:]),
-	}, nil
+	clientCreds = &ClientCredentials{
+		ClientID:     clientId[:],
+		ClientSecret: clientSecret[:],
+	}
+	return
 }
 
 func (r *ClientReconciler) createNewSecretForClient(ctx context.Context, client *oidcsecurityv1.Client) (*corev1.Secret, error) {
@@ -787,7 +787,11 @@ func (r *ClientReconciler) createNewSecretForClient(ctx context.Context, client 
 	}
 
 	reqLogger.Info("Generating client credentials for new Secret")
-	clientCreds := r.generateClientCredentials(client.Spec.ClientId)
+	clientCreds, err := r.generateClientCredentials([]byte(client.Spec.ClientId))
+	if err != nil {
+		reqLogger.Error(err, "Error occurred during client creds creation")
+		return nil, err
+	}
 	if secret.Data == nil {
 		secret.Data = map[string][]byte{}
 	}
@@ -796,7 +800,7 @@ func (r *ClientReconciler) createNewSecretForClient(ctx context.Context, client 
 	secret.Data["CLIENT_ID"] = []byte(clientId)
 	secret.Data["CLIENT_SECRET"] = []byte(clientSecret)
 
-	err := r.Create(ctx, secret)
+	err = r.Create(ctx, secret)
 	if err != nil {
 		reqLogger.Error(err, "Error occurred during secret creation")
 		return nil, err

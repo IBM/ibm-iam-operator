@@ -85,6 +85,20 @@ type WriteResponder interface {
 // creates or updates its object on a cluster.
 type OnWriteFn[T client.Object] func(SecondaryReconciler, context.Context) error
 
+// WriteResponder is an interface that wraps the OnWrite method.
+//
+// It takes a context assumed to be scoped to the current reconcile loop and
+// performs any work that needs to be done after a write is performed.
+//
+// Returns an error if something goes wrong.
+type Finisher interface {
+	OnFinished(context.Context, client.Object, client.Object) error
+}
+
+// OnWriteFn is a type of function used when a SecondaryReconciler either
+// creates or updates its object on a cluster.
+type OnFinishedFn[T client.Object] func(SecondaryReconciler, context.Context, T, T) error
+
 // Secondary is used to denote a relationship between a primary object/resource
 // and a secondary one.
 type Secondary interface {
@@ -132,6 +146,7 @@ type SecondaryReconciler interface {
 	Generator
 	Modifier
 	WriteResponder
+	Finisher
 }
 
 type secondaryReconciler[T client.Object] struct {
@@ -143,6 +158,7 @@ type secondaryReconciler[T client.Object] struct {
 	generate      GenerateFn[T]           // function that generates a new copy of this secondary object with calculated values
 	modify        ModifyFn[T]             // function that makes modifications to an observed secondary object
 	onWrite       OnWriteFn[T]            // function that is run after a write is made to this secondary object
+	onFinished    OnFinishedFn[T]         // function that is run before returning from reconciliation
 }
 
 // GetName returns the name of the secondary object.
@@ -225,6 +241,27 @@ func (s *secondaryReconciler[T]) OnWrite(ctx context.Context) (err error) {
 	return s.onWrite(s, ctx)
 }
 
+// OnFinished is a function that is executed before the subreconciler returns.
+func (s *secondaryReconciler[T]) OnFinished(ctx context.Context, observed, generated client.Object) (err error) {
+	if s.onFinished == nil {
+		return
+	}
+	observedT, ok := observed.(T)
+	if !ok {
+		panic("received a mismatched client.Object")
+	} else if observed == nil {
+		panic("expected non-nil client.Object")
+	}
+	generatedT, ok := generated.(T)
+	if !ok {
+		panic("received a mismatched client.Object")
+	} else if generated == nil {
+		panic("expected non-nil client.Object")
+	}
+
+	return s.onFinished(s, ctx, observedT, generatedT)
+}
+
 // Reconcile performs reconciliation related to the creation or modification of
 // the secondary object that the secondaryReconciler is targeted for.
 func (s *secondaryReconciler[T]) Reconcile(ctx context.Context) (result *ctrl.Result, err error) {
@@ -233,6 +270,7 @@ func (s *secondaryReconciler[T]) Reconcile(ctx context.Context) (result *ctrl.Re
 	debugCtx := logf.IntoContext(ctx, debugLogger)
 	var observed client.Object = s.GetEmptyObject()
 	var generated client.Object = s.GetEmptyObject()
+	defer s.OnFinished(ctx, observed, generated)
 	debugLogger.Info("Generating desired Object")
 	if err = s.Generate(debugCtx, generated); err != nil {
 		reqLogger.Error(err, "Failed to generate Object")
@@ -386,6 +424,23 @@ func (b *SecondaryReconcilerBuilder[T]) WithOnWriteFns(fns ...OnWriteFn[T]) *Sec
 	b.s.onWrite = func(s SecondaryReconciler, ctx context.Context) (err error) {
 		for _, fn := range fns {
 			err = fn(s, ctx)
+			if err != nil {
+				return
+			}
+		}
+		return
+	}
+
+	return b
+}
+
+// WithOnFinishedFns defines the SecondaryReconciler's OnFinished as a single
+// OnFinishedFn[T] composed of the provided OnFinishedFn[T] arguments in the
+// order that they appear.
+func (b *SecondaryReconcilerBuilder[T]) WithOnFinishedFns(fns ...OnFinishedFn[T]) *SecondaryReconcilerBuilder[T] {
+	b.s.onFinished = func(s SecondaryReconciler, ctx context.Context, observed, generated T) (err error) {
+		for _, fn := range fns {
+			err = fn(s, ctx, observed, generated)
 			if err != nil {
 				return
 			}

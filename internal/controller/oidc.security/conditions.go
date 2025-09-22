@@ -46,7 +46,7 @@ const (
 
 // writeErrorConditionsAndEvents updates a Client CR's`.status.conditions` and writes an event related to the outcome.
 // It is a no-op if err is nil.
-func (r *ClientReconciler) writeErrorConditionsAndEvents(ctx context.Context, clientCR *oidcsecurityv1.Client, err error, requestMethod string) (statusUpdateErr error) {
+func (r *ClientReconciler) writeErrorConditionsAndEvents(ctx context.Context, clientCR *oidcsecurityv1.Client, err error) (statusUpdateErr error) {
 	//reqLogger := logf.FromContext(ctx).WithValues("clientId", clientCR.Spec.ClientId, "namespace", clientCR.Namespace)
 	var condition metav1.Condition
 	if err == nil {

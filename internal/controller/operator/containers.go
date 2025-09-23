@@ -631,7 +631,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
-					Command: []string{"curl", "-k", "https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration"},
+					Command: []string{"curl", "-k", "https://localhost:4300/readyz"},
 				},
 			},
 			InitialDelaySeconds: 20,

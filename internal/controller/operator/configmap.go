@@ -514,7 +514,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 		}
 		var accountIamURL string
 		if authCR.Spec.Config.AccountIamURL != nil {
-			reqLogger.Info("Found AccountIamURL URL has been set", "AccountIamURL set", *authCR.Spec.Config.AccountIamURL)
+			reqLogger.Info("Found AccountIamURL URL configured", "AccountIamURL", *authCR.Spec.Config.AccountIamURL)
 			accountIamURL = *authCR.Spec.Config.AccountIamURL
 		}
 		var libertySSCookie string

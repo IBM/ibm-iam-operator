@@ -258,6 +258,8 @@ spec:
                     x-kubernetes-preserve-unknown-fields: true
                   useSecretsStoreCSI:
                     type: boolean
+                  accountIamURL:
+                    type: string
                 required:
                 - authUniqueHosts
                 - clusterCADomain

@@ -327,6 +327,7 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"AUDIT_SECRET",
 			"OAUTH_21_ENABLED",
 			"IAM_UM",
+			"ACCOUNT_IAM_URL",
 			"LIBERTY_SAMESITE_COOKIE",
 			"SECRETS_STORE_AVAILABLE",
 		),
@@ -511,6 +512,11 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 			reqLogger.Info("Found user management install", "IamUm", *authCR.Spec.Config.IamUm)
 			iamUm = *authCR.Spec.Config.IamUm
 		}
+		var accountIamURL string
+		if authCR.Spec.Config.AccountIamURL != nil {
+			reqLogger.Info("Found AccountIamURL URL configured", "AccountIamURL", *authCR.Spec.Config.AccountIamURL)
+			accountIamURL = *authCR.Spec.Config.AccountIamURL
+		}
 		var libertySSCookie string
 		if authCR.Spec.Config.LibertySSCookie != nil && strings.EqualFold(*authCR.Spec.Config.LibertySSCookie, "none") {
 			libertySSCookie = *authCR.Spec.Config.LibertySSCookie
@@ -544,6 +550,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"IDTOKEN_LIFETIME":                   "12h",
 				"SESSION_TIMEOUT":                    "43200",
 				"IAM_UM":                             strconv.FormatBool(iamUm),
+				"ACCOUNT_IAM_URL":                    accountIamURL,
 				"OIDC_ISSUER_URL":                    authCR.Spec.Config.OIDCIssuerURL,
 				"PDP_REDIS_CACHE_DEFAULT_TTL":        "600",
 				"FIPS_ENABLED":                       strconv.FormatBool(authCR.Spec.Config.FIPSEnabled),

@@ -162,6 +162,7 @@ type ConfigSpec struct {
 	Ingress                     *IngressConfig `json:"ingress,omitempty"`
 	OAuth21Enabled              *bool          `json:"oauth21Enabled,omitempty"`
 	IamUm                       *bool          `json:"iamUm,omitempty"`
+	AccountIamURL               *string        `json:"accountIamURL,omitempty"`
 	LibertySSCookie             *string        `json:"libertySSCookie,omitempty"`
 	UseSecretsStoreCSI          *bool          `json:"useSecretsStoreCSI,omitempty"`
 }

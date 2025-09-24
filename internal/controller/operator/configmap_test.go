@@ -702,6 +702,12 @@ var _ = Describe("ConfigMap handling", func() {
 					},
 				},
 				{
+					"ACCOUNT_IAM_URL",
+					[]string{
+						"ACCOUNT_IAM_URL",
+					},
+				},
+				{
 					"LIBERTY_SAMESITE_COOKIE",
 					[]string{
 						"LIBERTY_SAMESITE_COOKIE",

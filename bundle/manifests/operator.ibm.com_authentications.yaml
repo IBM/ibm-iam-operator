@@ -170,6 +170,8 @@ spec:
                 type: object
               config:
                 properties:
+                  accountIamURL:
+                    type: string
                   attrMappingFromConfig:
                     type: boolean
                   auditSecret:

@@ -61,7 +61,6 @@ func init() {
 	utilruntime.Must(oidcsecurityv1.AddToScheme(scheme))
 	utilruntime.Must(certmgrv1.AddToScheme(scheme))
 	utilruntime.Must(zenv1.AddToScheme(scheme))
-	utilruntime.Must(sscsidriverv1.AddToScheme(scheme))
 
 	// Add the Route scheme if found on the cluster
 	cfg, err := config.GetConfig()
@@ -88,6 +87,7 @@ func init() {
 	}
 
 	if controllercommon.ClusterHasCSIGroupVersion(dc) {
+		setupLog.V(1).Info("SSCSI API present; adding SSCSI driver to scheme")
 		utilruntime.Must(sscsidriverv1.AddToScheme(scheme))
 	}
 	//+kubebuilder:scaffold:scheme

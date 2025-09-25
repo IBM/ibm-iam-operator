@@ -79,6 +79,8 @@ type ClientReconciler struct {
 	Reader   runtimeClient.Reader
 	Scheme   *k8sRuntime.Scheme
 	Recorder record.EventRecorder
+	RunMode  common.RunModeType
+	common.ByteGenerator
 }
 
 // Get first tries to GET the object from the cache; if this fails, it attempts
@@ -578,7 +580,7 @@ func (r *ClientReconciler) processZenRegistration(ctx context.Context, req ctrl.
 	if err = r.registerZenInstance(ctx, clientCR, clientCreds, servicesNamespace); err != nil {
 		reqLogger.Error(err, "Failed to create Zen registration")
 		if err := r.writeErrorConditionsAndEvents(ctx, clientCR, err); err != nil {
-			reqLogger.Error(err, "Failed ot update Client status")
+			reqLogger.Error(err, "Failed to update Client status")
 			return subreconciler.RequeueWithError(err)
 		}
 

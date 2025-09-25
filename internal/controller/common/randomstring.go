@@ -26,7 +26,17 @@ const (
 	LowerAlphaNum string = "abcdefghijklmnopqrstuvwxyz0123456789"
 )
 
-func GenerateRandomBytes(charset string, n int) (b []byte, err error) {
+type ByteGenerator interface {
+	GenerateBytes(charset string, n int) (b []byte, err error)
+}
+
+type RandomByteGenerator struct{}
+
+func (g *RandomByteGenerator) GenerateBytes(charset string, n int) (b []byte, err error) {
+	return generateRandomBytes(charset, n)
+}
+
+func generateRandomBytes(charset string, n int) (b []byte, err error) {
 	b = make([]byte, n)
 	for i := range n {
 		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))

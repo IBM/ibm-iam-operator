@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/api/oidc.security/v1"
+	"github.com/IBM/ibm-iam-operator/internal/controller/common"
 	"github.com/IBM/ibm-iam-operator/test/utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -150,14 +151,16 @@ var _ = Describe("OIDC Security Controller", func() {
 		})
 	})
 
-	Describe("#GetServiceURL", func() {
+	Describe("#getServiceURL", func() {
 		It("should return the correct URL", func() {
 			namespace := utils.GetRandomizedNamespace("test")
 			cl := getClient([]func(*runtime.Scheme) error{
 				corev1.AddToScheme, oidcsecurityv1.AddToScheme, batchv1.AddToScheme,
 			}, []client.Object{generatePlatformAuthIDPCM(namespace, false)})
+			r.Client = cl
+			r.RunMode = common.ClusterRunMode
 			for _, key := range []ServiceURLKey{AuthServiceURLKey, IdentityManagementURLKey, IdentityProviderURLKey} {
-				url, err := GetServiceURL(cl, ctx, namespace, key)
+				url, err := r.getServiceURL(ctx, namespace, key)
 				Expect(err).ToNot(HaveOccurred())
 				switch key {
 				case AuthServiceURLKey:
@@ -175,8 +178,10 @@ var _ = Describe("OIDC Security Controller", func() {
 			cl := getClient([]func(*runtime.Scheme) error{
 				corev1.AddToScheme, oidcsecurityv1.AddToScheme, batchv1.AddToScheme,
 			}, []client.Object{generatePlatformAuthIDPCM(namespace, true)})
+			r.Client = cl
+			r.RunMode = common.ClusterRunMode
 			for _, key := range []ServiceURLKey{AuthServiceURLKey, IdentityManagementURLKey, IdentityProviderURLKey} {
-				url, err := GetServiceURL(cl, ctx, namespace, key)
+				url, err := r.getServiceURL(ctx, namespace, key)
 				Expect(url).To(BeEmpty())
 				Expect(err).To(HaveOccurred())
 				Expect(errors.Is(err, &CP2ServiceURLFormatError{})).To(BeTrue())

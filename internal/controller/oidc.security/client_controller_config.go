@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/IBM/ibm-iam-operator/internal/controller/common"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -238,11 +239,14 @@ func getClusterDomainNameForServiceURL(url string, namespace string) string {
 	return everythingBeforePort + "." + namespace + suffix + ":" + port
 }
 
-func GetServiceURL(cl client.Client, ctx context.Context, namespace string, key ServiceURLKey) (value string, err error) {
+func (r *ClientReconciler) getServiceURL(ctx context.Context, namespace string, key ServiceURLKey) (value string, err error) {
 	objKey := types.NamespacedName{Name: PlatformAuthIDPConfigMapName, Namespace: namespace}
-	values, err := mustGetValuesFromConfigMap(cl, ctx, objKey, key)
+	values, err := mustGetValuesFromConfigMap(r.Client, ctx, objKey, key)
 	if err != nil {
 		return
+	}
+	if r.RunMode == common.LocalRunMode {
+		return values[0], nil
 	}
 	if strings.Contains(values[0], "127.0.0.1") {
 		return "", NewCP2ServiceURLFormatError()

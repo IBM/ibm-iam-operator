@@ -41,6 +41,7 @@ import (
 	certmgrv1 "github.com/IBM/ibm-iam-operator/internal/api/certmanager/v1"
 	zenv1 "github.com/IBM/ibm-iam-operator/internal/api/zen.cpd.ibm.com/v1"
 	bootstrapcontrollers "github.com/IBM/ibm-iam-operator/internal/controller/bootstrap"
+	"github.com/IBM/ibm-iam-operator/internal/controller/common"
 	controllercommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
 	oidcsecuritycontrollers "github.com/IBM/ibm-iam-operator/internal/controller/oidc.security"
 	operatorcontrollers "github.com/IBM/ibm-iam-operator/internal/controller/operator"
@@ -186,9 +187,15 @@ func main() {
 			Client: mgr.GetClient(),
 			Reader: mgr.GetAPIReader(),
 		},
-		Reader:   mgr.GetAPIReader(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor(clientControllerName),
+		Reader:        mgr.GetAPIReader(),
+		Scheme:        mgr.GetScheme(),
+		Recorder:      mgr.GetEventRecorderFor(clientControllerName),
+		ByteGenerator: &common.RandomByteGenerator{},
+	}
+	if os.Getenv(common.ForceRunModeEnv) == string(common.LocalRunMode) {
+		clientReconciler.RunMode = common.LocalRunMode
+	} else {
+		clientReconciler.RunMode = common.ClusterRunMode
 	}
 	if err = (clientReconciler).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Client")
@@ -208,6 +215,7 @@ func main() {
 		},
 		DiscoveryClient: *dc,
 		Scheme:          mgr.GetScheme(),
+		ByteGenerator:   &common.RandomByteGenerator{},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Authentication")
 		os.Exit(1)

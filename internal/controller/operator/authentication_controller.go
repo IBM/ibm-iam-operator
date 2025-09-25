@@ -150,6 +150,7 @@ type AuthenticationReconciler struct {
 	Mutex           sync.Mutex
 	clusterType     common.ClusterType
 	needsRollout    bool
+	common.ByteGenerator
 }
 
 func GetFunctionName(fn any) string {

@@ -66,7 +66,7 @@ type OidcClientResponse struct {
 func (r *ClientReconciler) createClientRegistration(ctx context.Context, client *oidcsecurityv1.Client, servicesNamespace string) (response *http.Response, err error) {
 	log := logf.FromContext(ctx).V(1)
 	var url, identityProviderURL string
-	identityProviderURL, err = GetServiceURL(r.Client, ctx, servicesNamespace, IdentityProviderURLKey)
+	identityProviderURL, err = r.getServiceURL(ctx, servicesNamespace, IdentityProviderURLKey)
 	if err != nil {
 		log.Error(err, "Tried to get identity provider url while getting client registration but failed")
 		return
@@ -96,7 +96,7 @@ func (r *ClientReconciler) createClientRegistration(ctx context.Context, client 
 func (r *ClientReconciler) getClientRegistration(ctx context.Context, client *oidcsecurityv1.Client, servicesNamespace string) (response *http.Response, err error) {
 	log := logf.FromContext(ctx).V(1)
 	var url, identityProviderURL string
-	identityProviderURL, err = GetServiceURL(r.Client, ctx, servicesNamespace, IdentityProviderURLKey)
+	identityProviderURL, err = r.getServiceURL(ctx, servicesNamespace, IdentityProviderURLKey)
 	if err != nil {
 		log.Error(err, "Tried to get identity provider url while getting client registration but failed")
 		return
@@ -131,8 +131,7 @@ func (r *ClientReconciler) updateClientRegistration(ctx context.Context, client 
 		return
 	}
 	payload := r.generateClientRegistrationPayload(client, clientCreds)
-	log.Info("Created payload", "payload", payload)
-	identityProviderURL, err = GetServiceURL(r.Client, ctx, servicesNamespace, IdentityProviderURLKey)
+	identityProviderURL, err = r.getServiceURL(ctx, servicesNamespace, IdentityProviderURLKey)
 	if err != nil {
 		log.Error(err, "Tried to get identity provider url while getting client registration but failed")
 		return
@@ -168,7 +167,7 @@ func (r *ClientReconciler) deleteClientRegistration(ctx context.Context, client 
 	}
 
 	var url, identityProviderURL string
-	identityProviderURL, err = GetServiceURL(r.Client, ctx, servicesNamespace, IdentityProviderURLKey)
+	identityProviderURL, err = r.getServiceURL(ctx, servicesNamespace, IdentityProviderURLKey)
 	if err != nil {
 		log.Error(err, "Tried to get identity provider url while getting client registration but failed")
 		return
@@ -194,9 +193,7 @@ func (r *ClientReconciler) deleteClientRegistration(ctx context.Context, client 
 
 func (r *ClientReconciler) invokeClientRegistrationAPI(ctx context.Context, servicesNamespace string, requestType string, requestURL string, payload []byte) (response *http.Response, err error) {
 	reqLogger := logf.FromContext(ctx).V(1)
-	reqLogger.Info("OIDC registration parameters", "requestType", requestType, "requestURL", requestURL, "payload", payload)
 	username, password, err := GetOAuthAdminCredentials(r.Client, ctx, servicesNamespace)
-	reqLogger.Info("OIDC Credentials", "username", username, "password", password)
 	if err != nil {
 		return
 	}
@@ -251,7 +248,6 @@ func (r *ClientReconciler) GetClientCreds(ctx context.Context, client *oidcsecur
 		return
 	}
 	clientCreds, err = getClientCredsFromSecret(secret)
-	reqLogger.Info("Retrieved client creds", "ClientID", clientCreds.ClientID, "ClientSecret", clientCreds.ClientSecret)
 	if err != nil {
 		reqLogger.Error(err, "Retrieved Secret did not have correct Client ID and Secret keys", "Secret.Name", client.Spec.Secret)
 		return nil, fmt.Errorf("could not create new ClientCredentials struct: %w", err)
@@ -262,12 +258,12 @@ func (r *ClientReconciler) GetClientCreds(ctx context.Context, client *oidcsecur
 func (r *ClientReconciler) generateClientCredentials(clientID []byte) (creds *ClientCredentials, err error) {
 	// If clientID is empty, generate a new Client ID
 	if len(clientID) == 0 {
-		clientID, err = common.GenerateRandomBytes(common.LowerAlphaNum, 32)
+		clientID, err = r.GenerateBytes(common.LowerAlphaNum, 32)
 	}
 	if err != nil {
 		return
 	}
-	clientSecret, err := common.GenerateRandomBytes(common.LowerAlphaNum, 32)
+	clientSecret, err := r.GenerateBytes(common.LowerAlphaNum, 32)
 	if err != nil {
 		return
 	}

@@ -86,31 +86,31 @@ func (r *AuthenticationReconciler) getSecretSubreconcilers(ctx context.Context, 
 		return
 	}
 
-	wlpClientID, err := ctrlcommon.GenerateRandomBytes(ctrlcommon.LowerAlphaNum, 32)
+	wlpClientID, err := r.GenerateBytes(ctrlcommon.LowerAlphaNum, 32)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate wlpClientID: %w", err)
 	}
-	wlpClientSecret, err := ctrlcommon.GenerateRandomBytes(ctrlcommon.LowerAlphaNum, 32)
+	wlpClientSecret, err := r.GenerateBytes(ctrlcommon.LowerAlphaNum, 32)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate wlpClientSecret: %w", err)
 	}
-	adminPassword, err := ctrlcommon.GenerateRandomBytes(ctrlcommon.AlphaNum, 32)
+	adminPassword, err := r.GenerateBytes(ctrlcommon.AlphaNum, 32)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate adminPassword: %w", err)
 	}
-	scimAdminPassword, err := ctrlcommon.GenerateRandomBytes(ctrlcommon.AlphaNum, 32)
+	scimAdminPassword, err := r.GenerateBytes(ctrlcommon.AlphaNum, 32)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate scimAdminPassword: %w", err)
 	}
-	encryptionKey, err := ctrlcommon.GenerateRandomBytes(ctrlcommon.AlphaNum, 32)
+	encryptionKey, err := r.GenerateBytes(ctrlcommon.AlphaNum, 32)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate encryptionKey: %w", err)
 	}
-	wlpClientRegistrationSecret, err := ctrlcommon.GenerateRandomBytes(ctrlcommon.AlphaNum, 32)
+	wlpClientRegistrationSecret, err := r.GenerateBytes(ctrlcommon.AlphaNum, 32)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate wlpClientRegistrationSecret: %w", err)
 	}
-	encryptionIV, err := ctrlcommon.GenerateRandomBytes(ctrlcommon.AlphaNum, 16)
+	encryptionIV, err := r.GenerateBytes(ctrlcommon.AlphaNum, 16)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate encryptionIV: %w", err)
 	}

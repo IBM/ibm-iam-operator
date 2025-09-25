@@ -244,11 +244,11 @@ const (
 	ClusterRunMode RunModeType = "cluster"
 )
 
-func isRunModeLocal() bool {
+func IsRunModeLocal() bool {
 	return os.Getenv(ForceRunModeEnv) == string(LocalRunMode)
 }
 
-func isOperatorNsForced() (string, bool) {
+func IsOperatorNsForced() (string, bool) {
 	value := os.Getenv(ForceOperatorNsEnv)
 	return value, value != ""
 }
@@ -263,9 +263,9 @@ var ErrRunLocal = fmt.Errorf("operator run mode forced to local")
 
 // GetOperatorNamespace returns the namespace the Operator should be running in.
 func GetOperatorNamespace() (string, error) {
-	if ns, isNsForced := isOperatorNsForced(); isRunModeLocal() && isNsForced {
+	if ns, isNsForced := IsOperatorNsForced(); IsRunModeLocal() && isNsForced {
 		return ns, nil
-	} else if isRunModeLocal() {
+	} else if IsRunModeLocal() {
 		return "", ErrRunLocal
 	}
 	nsBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")

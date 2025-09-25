@@ -46,7 +46,7 @@ func (r *ClientReconciler) getZenInstanceRegistration(ctx context.Context, clien
 	}
 
 	var identityManagementURL string
-	identityManagementURL, err = GetServiceURL(r.Client, ctx, servicesNamespace, IdentityManagementURLKey)
+	identityManagementURL, err = r.getServiceURL(ctx, servicesNamespace, IdentityManagementURLKey)
 	if err != nil {
 		log.Error(err, "Tried to get identity provider url while getting client registration but failed")
 		return
@@ -121,7 +121,7 @@ func (r *ClientReconciler) unregisterZenInstance(ctx context.Context, clientCR *
 	}
 
 	var identityManagementURL string
-	identityManagementURL, err = GetServiceURL(r.Client, ctx, servicesNamespace, IdentityManagementURLKey)
+	identityManagementURL, err = r.getServiceURL(ctx, servicesNamespace, IdentityManagementURLKey)
 	if err != nil {
 		log.Error(err, "Tried to get identity provider url while getting client registration but failed")
 		return
@@ -176,7 +176,7 @@ func (r *ClientReconciler) registerZenInstance(ctx context.Context, clientCR *oi
 	payload := string(payloadBytes[:])
 
 	var identityManagementURL string
-	identityManagementURL, err = GetServiceURL(r.Client, ctx, servicesNamespace, IdentityManagementURLKey)
+	identityManagementURL, err = r.getServiceURL(ctx, servicesNamespace, IdentityManagementURLKey)
 	if err != nil {
 		log.Error(err, "Tried to get identity provider url while getting client registration but failed")
 		return

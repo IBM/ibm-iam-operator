@@ -60,7 +60,7 @@ metadata:
               "accountIamURL": "",
               "auditSecret": "",
               "auditUrl": "",
-              "useSecretsStoreCSI": false
+              "useSecretsStoreCSI": false,
               "authUniqueHosts": "internal-ip1 internal-ip2 mycluster.icp",
               "bootstrapUserId": "kubeadmin",
               "claimsMap": "name=\"givenName\" family_name=\"givenName\" given_name=\"givenName\" preferred_username=\"displayName\" display_name=\"displayName\"",

@@ -65,6 +65,7 @@ spec:
     auditSecret: ''
     providerIssuerURL: ''
     accountIamURL: ''
+    useSecretsStoreCSI: false
     claimsSupported: name,family_name,display_name,given_name,preferred_username
     claimsMap: name="givenName" family_name="givenName" given_name="givenName" preferred_username="displayName"
       display_name="displayName"

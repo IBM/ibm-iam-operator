@@ -17,18 +17,23 @@
 package common
 
 import (
-	"math/rand"
-	"time"
-
-	regen "github.com/zach-klippenstein/goregen"
+	"crypto/rand"
+	"math/big"
 )
 
-// GenerateRandomString generates a random string based upon a string that is a valid regex pattern.
-func GenerateRandomString(rule string) string {
+const (
+	AlphaNum      string = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+	LowerAlphaNum string = "abcdefghijklmnopqrstuvwxyz0123456789"
+)
 
-	generator, _ := regen.NewGenerator(rule, &regen.GeneratorArgs{
-		RngSource:               rand.NewSource(time.Now().UnixNano()),
-		MaxUnboundedRepeatCount: 1})
-	randomString := generator.Generate()
-	return randomString
+func GenerateRandomBytes(charset string, n int) (b []byte, err error) {
+	b = make([]byte, n)
+	for i := range n {
+		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			return nil, err
+		}
+		b[i] = charset[num.Int64()]
+	}
+	return
 }

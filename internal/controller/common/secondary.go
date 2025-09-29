@@ -85,18 +85,19 @@ type WriteResponder interface {
 // creates or updates its object on a cluster.
 type OnWriteFn[T client.Object] func(SecondaryReconciler, context.Context) error
 
-// WriteResponder is an interface that wraps the OnWrite method.
+// Finisher is an interface that wraps the OnFinished method.
 //
-// It takes a context assumed to be scoped to the current reconcile loop and
-// performs any work that needs to be done after a write is performed.
+// It takes a context assumed to be scoped to the current reconcile loop, the
+// observed and generated client.Objects, and performs any work that needs to be
+// done at the end of the subreconciler.
 //
 // Returns an error if something goes wrong.
 type Finisher interface {
 	OnFinished(context.Context, client.Object, client.Object) error
 }
 
-// OnWriteFn is a type of function used when a SecondaryReconciler either
-// creates or updates its object on a cluster.
+// Finisher is a type of function used when a SecondaryReconciler is about to
+// finish running.
 type OnFinishedFn[T client.Object] func(SecondaryReconciler, context.Context, T, T) error
 
 // Secondary is used to denote a relationship between a primary object/resource

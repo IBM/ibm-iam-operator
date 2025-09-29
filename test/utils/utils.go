@@ -21,10 +21,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
+
+	regen "github.com/zach-klippenstein/goregen"
 
 	. "github.com/onsi/ginkgo/v2" //nolint:golint,revive
 	. "github.com/onsi/gomega"    //nolint:golint,revive
@@ -380,3 +383,13 @@ func (f *FakeTimeoutClient) Delete(ctx context.Context, obj client.Object, opts 
 }
 
 var _ client.Client = &FakeTimeoutClient{}
+
+func GetRandomizedNamespace(base string) string {
+	length := 253 - len(base) - 1
+	rule := fmt.Sprintf(`^([a-z0-9]-.){%d,}([a-z0-9])$`, length-1)
+	generator, _ := regen.NewGenerator(rule, &regen.GeneratorArgs{
+		RngSource:               rand.NewSource(time.Now().UnixNano()),
+		MaxUnboundedRepeatCount: 1})
+	randomString := generator.Generate()
+	return fmt.Sprintf("%s-%s", base, randomString)
+}

@@ -150,6 +150,7 @@ type AuthenticationReconciler struct {
 	Mutex           sync.Mutex
 	clusterType     common.ClusterType
 	needsRollout    bool
+	common.ByteGenerator
 }
 
 func GetFunctionName(fn any) string {
@@ -302,9 +303,9 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 
 	subResult, err = r.updateAuthenticationStatus(ctx, req)
 	if subreconciler.ShouldRequeue(subResult, err) {
-		log.Info("Reconciliation for spec incomplete; requeueing")
+		log.Info("Reconciliation for Authentication CR spec incomplete; requeueing")
 	} else if subreconciler.ShouldContinue(subResult, err) {
-		log.Info("Reconciliation for spec complete")
+		log.Info("Reconciliation for Authentication CR spec complete")
 	} else {
 		log.Info("Reconciling Authentication CR complete")
 	}

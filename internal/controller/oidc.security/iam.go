@@ -29,16 +29,38 @@ import (
 	"unicode/utf8"
 
 	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/api/oidc.security/v1"
+	"github.com/IBM/ibm-iam-operator/internal/controller/common"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type TokenInfo struct {
-	AccessToken  string `json:"access_token"`
-	TokenType    string `json:"token_type"`
-	ExpiresIn    int    `json:"expires_in"`
-	Scope        string `json:"scope"`
-	RefreshToken string `json:"refresh_token"`
-	IdToken      string `json:"id_token"`
+	AccessToken  json.RawMessage `json:"access_token"`
+	TokenType    json.RawMessage `json:"token_type"`
+	ExpiresIn    int             `json:"expires_in"`
+	Scope        json.RawMessage `json:"scope"`
+	RefreshToken json.RawMessage `json:"refresh_token"`
+	IdToken      json.RawMessage `json:"id_token"`
+}
+
+// removeDoubleQuotesFromBytes identifies whether the first and last rune are
+// the '"' character and removes both if they are. If only the first or last
+// character are '"', then the slice is left unmodified. Returns a bool
+// reflecting whether any of the passed []byte were modified.
+func removeDoubleQuotesFromBytes(bSlices ...*json.RawMessage) (modified bool) {
+	for _, bSlice := range bSlices {
+		firstChar, _ := utf8.DecodeRune(*bSlice)
+		lastChar, _ := utf8.DecodeLastRune(*bSlice)
+		if firstChar != '"' || lastChar != '"' {
+			continue
+		}
+		newCopy := make(json.RawMessage, len(*bSlice)-2)
+
+		copy(newCopy, (*bSlice)[1:len(*bSlice)-1])
+		common.Scrub(*bSlice)
+		*bSlice = newCopy
+		modified = true
+	}
+	return
 }
 
 func getTokenInfoFromResponse(response *http.Response) (tokenInfo *TokenInfo, err error) {
@@ -50,7 +72,7 @@ func getTokenInfoFromResponse(response *http.Response) (tokenInfo *TokenInfo, er
 	buf := new(bytes.Buffer)
 	numBytes, err := buf.ReadFrom(response.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read from response body due: %w", err)
+		return nil, fmt.Errorf("failed to read from response body: %w", err)
 	}
 	if numBytes == 0 {
 		return nil, fmt.Errorf("response body was not set")
@@ -62,10 +84,11 @@ func getTokenInfoFromResponse(response *http.Response) (tokenInfo *TokenInfo, er
 	if r != '{' {
 		return nil, fmt.Errorf("failed to get token info: %s", string(bodyBytes))
 	}
-
-	if err = json.Unmarshal(bodyBytes, tokenInfo); err != nil {
-		return nil, fmt.Errorf("%s", string(bodyBytes[:]))
+	tokenDecoder := json.NewDecoder(buf)
+	if err = tokenDecoder.Decode(tokenInfo); err != nil {
+		return nil, fmt.Errorf("failed to decode token info: %w", err)
 	}
+	removeDoubleQuotesFromBytes(&tokenInfo.AccessToken, &tokenInfo.TokenType, &tokenInfo.RefreshToken, &tokenInfo.Scope, &tokenInfo.IdToken)
 	return tokenInfo, nil
 }
 
@@ -73,15 +96,18 @@ func getTokenInfoFromResponse(response *http.Response) (tokenInfo *TokenInfo, er
 // configured for the cpclient_credentials authorization grant type, the v1/auth/token endpoint is used with the
 // Client's corresponding ClientCredentials. Otherwise, the password grant type is used with the OP admin credentials
 // configured in platform-auth-idp-credentials.
-func (r *ClientReconciler) getAuthnTokens(ctx context.Context, client *oidcsecurityv1.Client, config *AuthenticationConfig) (tokenInfo *TokenInfo, err error) {
-	reqLogger := logf.FromContext(ctx).V(1)
-	identityProviderURL, err := config.GetIdentityProviderURL()
+func (r *ClientReconciler) getAuthnTokens(ctx context.Context, client *oidcsecurityv1.Client, servicesNamespace string, httpClient *http.Client) (tokenInfo *TokenInfo, err error) {
+	log := logf.FromContext(ctx).V(1)
+	var identityProviderURL string
+	identityProviderURL, err = r.getServiceURL(ctx, servicesNamespace, IdentityProviderURLKey)
 	if err != nil {
-		return nil, err
+		log.Error(err, "Tried to get identity provider url while getting client registration but failed")
+		return
 	}
-	var requestURL, grantType, tokenType, defaultAdminUser, defaultAdminPassword string
+	var requestURL, grantType, tokenType string
+	var defaultAdminUser, defaultAdminPassword []byte
 	var clientCreds *ClientCredentials
-	payload := "scope=openid"
+	payload := []byte("scope=openid")
 	requestURLSplit := []string{identityProviderURL, "v1", "auth"}
 	if client.IsCPClientCredentialsEnabled() {
 		tokenType = "token"
@@ -90,60 +116,76 @@ func (r *ClientReconciler) getAuthnTokens(ctx context.Context, client *oidcsecur
 		if err != nil {
 			return nil, fmt.Errorf("failed to get Client credentials: %w", err)
 		}
-		reqLogger.Info("Retrieved client creds", "client_id", clientCreds.ClientID)
-		payload = fmt.Sprintf("%s&grant_type=%s&client_id=%s&client_secret=%s", payload, grantType, clientCreds.ClientID, clientCreds.ClientSecret)
+		defer func() {
+			common.Scrub(clientCreds.ClientID)
+			common.Scrub(clientCreds.ClientSecret)
+			clientCreds = nil
+		}()
+		payload = fmt.Appendf(payload, "&grant_type=%s&client_id=%s&client_secret=%s", grantType, clientCreds.ClientID, clientCreds.ClientSecret)
+		defer func() {
+			payload = nil
+		}()
 	} else {
 		tokenType = "identitytoken"
 		grantType = "password"
-		defaultAdminUser, err = config.GetDefaultAdminUser()
+		defaultAdminUser, defaultAdminPassword, err = GetDefaultAdminCredentials(r.Client, ctx, servicesNamespace)
 		if err != nil {
 			return
 		}
-		defaultAdminPassword, err = config.GetDefaultAdminPassword()
-		if err != nil {
-			return
-		}
-		payload = fmt.Sprintf("%s&grant_type=%s&username=%s&password=%s", payload, grantType, defaultAdminUser, defaultAdminPassword)
+		payload = fmt.Appendf(payload, "&grant_type=%s&username=%s&password=%s", grantType, defaultAdminUser, defaultAdminPassword)
+		defer func() {
+			common.Scrub(defaultAdminUser)
+			defaultAdminPassword = nil
+			common.Scrub(defaultAdminPassword)
+			defaultAdminPassword = nil
+			common.Scrub(payload)
+			payload = nil
+		}()
 	}
 	requestURL = strings.Join(append(requestURLSplit, tokenType), "/")
 
 	var tResp *http.Response
 	var req *http.Request
-	var httpClient *http.Client
-	oAuthAdminPassword, err := config.GetOAuthAdminPassword()
+	defer func() {
+		if tResp != nil {
+			tResp.Request = nil
+		}
+		req = nil
+	}()
+	username, password, err := GetOAuthAdminCredentials(r.Client, ctx, servicesNamespace)
 	if err != nil {
 		return
 	}
+	defer func() {
+		common.Scrub(username)
+		username = nil
+		common.Scrub(password)
+		password = nil
+	}()
 	maxAttempts := 3
-	for tIndex := 0; tIndex < maxAttempts; tIndex++ {
+	for tIndex := range maxAttempts {
 		err = nil
-		reqLogger.Info("Attempt to retrieve token from id provider", "requestURL", requestURL, "tokenType", tokenType, "attempt", tIndex+1, "maxAttempts", maxAttempts)
-		req, err = http.NewRequest("POST", requestURL, bytes.NewBuffer([]byte(payload)))
+		log.Info("Attempt to retrieve token from id provider", "requestURL", requestURL, "grant_type", grantType, "tokenType", tokenType, "attempt", tIndex+1, "maxAttempts", maxAttempts)
+		req, err = http.NewRequest("POST", requestURL, bytes.NewBuffer(payload))
 		if err != nil {
 			return
 		}
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8")
 		if client.IsCPClientCredentialsEnabled() {
-			req.SetBasicAuth("oauthadmin", oAuthAdminPassword)
+			req.SetBasicAuth(string(username), string(password))
+			defer func() {
+				req.Header.Del("Authorization")
+			}()
 		}
 
-		var caCert []byte
-		caCert, err = config.GetCSCATLSKey()
-		if err != nil {
-			return
-		}
-		httpClient, err = createHTTPClient(caCert)
-		if err != nil {
-			return
-		}
 		tResp, err = httpClient.Do(req)
 		if err != nil {
-			reqLogger.Error(err, "Failed to request token from id provider")
+			log.Error(err, "Failed to request token from id provider")
 			goto sleep
 		}
 		tokenInfo, err = getTokenInfoFromResponse(tResp)
 		if err != nil {
-			reqLogger.Error(err, "Failed to get token from id provider HTTP response")
+			log.Error(err, "Failed to get token from id provider HTTP response")
 		} else if tokenInfo != nil {
 			return
 		}
@@ -172,33 +214,42 @@ func createHTTPClient(caCert []byte) (httpClient *http.Client, err error) {
 }
 
 // Invoke an IAM API.  This function will obtain the required token before calling
-func (r *ClientReconciler) invokeIamApi(ctx context.Context, client *oidcsecurityv1.Client, requestType string, requestURL string, payload string, config *AuthenticationConfig) (response *http.Response, err error) {
-	// First, check to see if OIDC client is registered before trying to get a token; if an issue is encountered,
-	// bubble that up.
-	if _, err = r.getClientRegistration(ctx, client, config); err != nil {
+func (r *ClientReconciler) invokeIamApi(ctx context.Context, client *oidcsecurityv1.Client, requestType string, requestURL string, payload string, servicesNamespace string) (response *http.Response, err error) {
+	if _, err = r.getClientRegistration(ctx, client, servicesNamespace); err != nil {
 		return
 	}
 
-	tokenInfo, err := r.getAuthnTokens(ctx, client, config)
+	var caCert []byte
+	caCert, err = GetCommonServiceCATLSKey(r.Client, ctx, servicesNamespace)
 	if err != nil {
 		return
 	}
-
-	bearer := strings.Join([]string{"Bearer ", tokenInfo.AccessToken}, "")
+	httpClient, err := createHTTPClient(caCert)
+	if err != nil {
+		return
+	}
+	tokenInfo, err := r.getAuthnTokens(ctx, client, servicesNamespace, httpClient)
+	if err != nil {
+		return
+	}
+	bearer := strings.Join([]string{"Bearer ", string(tokenInfo.AccessToken)}, "")
 	request, _ := http.NewRequest(requestType, requestURL, bytes.NewBuffer([]byte(payload)))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", bearer)
 	request.Header.Set("Accept", "application/json")
-
-	caCert, err := config.GetCSCATLSKey()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get certificate Secret: %w", err)
-	}
-
-	httpClient, err := createHTTPClient(caCert)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create IAM API HTTP client: %w", err)
-	}
+	defer func() {
+		common.Scrub(tokenInfo.AccessToken)
+		tokenInfo.AccessToken = nil
+		common.Scrub(tokenInfo.IdToken)
+		tokenInfo.IdToken = nil
+		common.Scrub(tokenInfo.RefreshToken)
+		tokenInfo.RefreshToken = nil
+		common.Scrub(tokenInfo.Scope)
+		tokenInfo.Scope = nil
+		common.Scrub(tokenInfo.TokenType)
+		tokenInfo.TokenType = nil
+		request.Header.Del("Authorization")
+	}()
 
 	response, err = httpClient.Do(request)
 	return

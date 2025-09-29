@@ -126,6 +126,11 @@ func (r *AuthenticationReconciler) reconcileAllRoutes(ctx context.Context, authC
 		return
 	}
 
+	defer func() {
+		for _, fields := range *allRoutesFields {
+			fields.TLS = nil
+		}
+	}()
 	allRouteReconcilers, err := r.getRouteSubreconcilers(authCR, allRoutesFields)
 	if err != nil {
 		log.Error(err, "Unexpected error occurred while preparing Route handling")
@@ -176,6 +181,12 @@ func modifyRoute(s common.SecondaryReconciler, ctx context.Context, observed, ge
 	return
 }
 
+func dropRouteTLS(_ common.SecondaryReconciler, ctx context.Context, observed, generated *routev1.Route) error {
+	observed.Spec.TLS = nil
+	generated.Spec.TLS = nil
+	return nil
+}
+
 func (r *AuthenticationReconciler) getRouteSubreconcilers(authCR *operatorv1alpha1.Authentication, allFields *map[string]*reconcileRouteFields) (subRecs common.Subreconcilers, err error) {
 	subRecs = common.Subreconcilers{
 		r.removeExtraRoutes(authCR, allFields),
@@ -194,6 +205,7 @@ func (r *AuthenticationReconciler) getRouteSubreconcilers(authCR *operatorv1alph
 	for i := range builders {
 		subRecs = append(subRecs, builders[i].
 			WithNamespace(authCR.Namespace).
+			WithOnFinishedFns(dropRouteTLS).
 			WithPrimary(authCR).
 			WithClient(r.Client).
 			MustBuild())
@@ -224,6 +236,9 @@ func (r *AuthenticationReconciler) updateCPConsoleCertificates(authCR *operatorv
 			log.Error(err, "Failed to get Route")
 			return subreconciler.RequeueWithError(fmt.Errorf("unable to configure cp-console with custom TLS: %w", err))
 		}
+		defer func() {
+			cpConsoleRoute.Spec.TLS = nil
+		}()
 
 		modified := false
 		if !authCR.HasCustomIngressCertificate() {
@@ -259,6 +274,7 @@ func (r *AuthenticationReconciler) updateCPConsoleCertificates(authCR *operatorv
 				cpConsoleRoute.Spec.TLS.CACertificate = string(secret.Data["ca.crt"])
 				modified = true
 			}
+			common.ScrubMap(secret.Data)
 		}
 
 		if !modified {

@@ -8,16 +8,18 @@ metadata:
     app.kubernetes.io/managed-by: ibm-iam-operator
     app.kubernetes.io/name: ibm-iam-operator
     component-id: {{ .Chart.Name }}
-    {{- if .Values.cpfs.labels }}
-      {{- with .Values.cpfs.labels }}
-        {{- toYaml . | nindent 4 }}
+    {{- if .Values.cpfs }}
+      {{- if .Values.cpfs.labels }}
+        {{- with .Values.cpfs.labels }}
+          {{- toYaml . | nindent 4 }}
+        {{- end }}
       {{- end }}
-    {{- end}}
-    {{- if .Values.cpfs.clusterLabels }}
-      {{- with .Values.cpfs.clusterLabels }}
-        {{- toYaml . | nindent 4 }}
+      {{- if .Values.cpfs.clusterLabels }}
+        {{- with .Values.cpfs.clusterLabels }}
+          {{- toYaml . | nindent 4 }}
+        {{- end }}
       {{- end }}
-    {{- end}}
+    {{- end }}
 rules:
 - apiGroups:
   - rbac.authorization.k8s.io

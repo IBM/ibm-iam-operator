@@ -23,6 +23,7 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
 	"github.com/opdev/subreconciler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	sscsidriverv1 "sigs.k8s.io/secrets-store-csi-driver/apis/v1"
 )
 
 // FinalizerMigration is the finalizer appended to resources that are being retained during migration
@@ -333,19 +334,41 @@ func (r *AuthenticationReconciler) ensureDatastoreSecretAndCM(ctx context.Contex
 		"ConfigMap.Name", ctrlcommon.DatastoreEDBCMName,
 		"ConfigMap.Namespace", authCR.Namespace)
 
-	secret := &corev1.Secret{}
-	if err = r.Get(debugCtx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBSecretName, Namespace: authCR.Namespace}, secret); k8sErrors.IsNotFound(err) {
-		log.Info("Secret not available yet; requeueing",
-			"Secret.Name", ctrlcommon.DatastoreEDBSecretName,
-			"Secret.Namespace", authCR.Namespace)
-		return subreconciler.RequeueWithDelay(opreqWait)
-	} else if err != nil {
-		log.Error(err, "Encountered an error when trying to get Secret",
-			"Secret.Name", ctrlcommon.DatastoreEDBSecretName,
-			"Secret.Namespace", authCR.Namespace)
-		return subreconciler.RequeueWithError(err)
+	useVaultForExtEDB := false
+	if isExternal, err := r.isConfiguredForExternalEDB(ctx, authCR); err == nil && isExternal {
+		edbSPC := &sscsidriverv1.SecretProviderClass{}
+		if authCR.SecretsStoreCSIEnabled() {
+			if err = getSecretProviderClassForVolume(r.Client, ctx, req.Namespace, "pgsql-certs", edbSPC); IsLabelConflictError(err) {
+				log.Error(err, "Multiple SecretProviderClasses are labeled to be mounted as the same volume; ensure that only one is labeled for the given volume name", "volumeName", "pgsql-certs")
+			} else if err != nil {
+				log.Error(err, "Unexpected error occurred while trying to get SecretProviderClass")
+			}
+			if err != nil {
+				return subreconciler.RequeueWithError(err)
+			}
+		}
+		if edbSPC != nil && edbSPC.Name != "" {
+			useVaultForExtEDB = true
+		}
 	}
-	debugLog.Info("Secret found", "Secret.Name", ctrlcommon.DatastoreEDBSecretName)
+
+	if !useVaultForExtEDB {
+		secret := &corev1.Secret{}
+		if err = r.Get(debugCtx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBSecretName, Namespace: authCR.Namespace}, secret); k8sErrors.IsNotFound(err) {
+			log.Info("Secret not available yet; requeueing",
+				"Secret.Name", ctrlcommon.DatastoreEDBSecretName,
+				"Secret.Namespace", authCR.Namespace)
+			return subreconciler.RequeueWithDelay(opreqWait)
+		} else if err != nil {
+			log.Error(err, "Encountered an error when trying to get Secret",
+				"Secret.Name", ctrlcommon.DatastoreEDBSecretName,
+				"Secret.Namespace", authCR.Namespace)
+			return subreconciler.RequeueWithError(err)
+		}
+		debugLog.Info("Secret found", "Secret.Name", ctrlcommon.DatastoreEDBSecretName)
+	} else {
+		log.Info("vault in place for external edb, skipped checking for secret")
+	}
 
 	return subreconciler.ContinueReconciling()
 }

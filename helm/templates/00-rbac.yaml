@@ -11,7 +11,7 @@ metadata:
       {{- with .Values.cpfs.labels }}
         {{- toYaml . | nindent 4 }}
       {{- end }}
-    {{- end}}
+    {{- end }}
   name: ibm-iam-operator
   namespace: {{ .Values.global.operatorNamespace }}
 {{- $watchNamespaces := .Values.global.tetheredNamespaces | default list -}}
@@ -33,7 +33,7 @@ metadata:
       {{- with $.Values.cpfs.labels }}
         {{- toYaml . | nindent 4 }}
       {{- end }}
-    {{- end}}
+    {{- end }}
   name: ibm-iam-operator
   namespace: {{ $namespace }}
 rules:
@@ -317,7 +317,7 @@ metadata:
       {{- with $.Values.cpfs.labels }}
         {{- toYaml . | nindent 4 }}
       {{- end }}
-    {{- end}}
+    {{- end }}
   name: ibm-iam-operator
   namespace: {{ $namespace }}
 roleRef:

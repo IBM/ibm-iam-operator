@@ -517,7 +517,7 @@ func buildContainer(jobName string, image string, resources *corev1.ResourceRequ
 				},
 				Privileged:               &falseVar,
 				RunAsNonRoot:             &trueVar,
-				ReadOnlyRootFilesystem:   &falseVar,
+				ReadOnlyRootFilesystem:   ptr.To(true),
 				AllowPrivilegeEscalation: &falseVar,
 				Capabilities: &corev1.Capabilities{
 					Drop: []corev1.Capability{"ALL"},

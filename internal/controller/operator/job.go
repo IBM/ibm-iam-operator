@@ -772,6 +772,7 @@ func buildMigratorContainer(s common.SecondaryReconciler, image string, resource
 		{Name: "MONGODB_HOST", Value: mongoHost},
 		{Name: "MONGODB_PORT", Value: "27017"},
 		{Name: "MONGODB_NAME", Value: "platform-db"},
+		{Name: "POD_NAMESPACE", Value: s.GetNamespace()},
 	}
 	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
 		Name:      "mongodb-admin-creds",

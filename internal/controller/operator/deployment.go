@@ -1137,7 +1137,7 @@ func buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName,
 			},
 		},
 		{
-			Name: "liberty-tmp-vol",
+			Name: "tmp-vol",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},

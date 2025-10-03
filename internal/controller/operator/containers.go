@@ -1109,7 +1109,7 @@ func buildAuthSvcVolumeMounts(ldapSpcExist bool) []corev1.VolumeMount {
 			MountPath: "/logs",
 		},
 		{
-			Name:      "liberty-tmp-vol",
+			Name:      "tmp-vol",
 			MountPath: "/tmp",
 		},
 		{
@@ -1155,6 +1155,10 @@ func buildIdentityManagerVolumeMounts(auditSecretName *string, ldapSpcExist bool
 			Name:      "pgsql-client-cred",
 			MountPath: "/pgsql/clientinfo",
 		},
+		{
+			Name:		"tmp-vol",
+			MountPath: 	"/tmp",
+		},
 	}
 
 	if auditSecretName != nil && *auditSecretName != "" {
@@ -1196,6 +1200,10 @@ func buildIdentityProviderVolumeMounts(auditSecretName *string, ldapSpcExist boo
 		{
 			Name:      "provider-data-vol",
 			MountPath: "/opt/ibm/provider-data",
+		},
+		{
+			Name:		"tmp-vol",
+			MountPath: 	"/tmp",
 		},
 	}
 	if auditSecretName != nil && *auditSecretName != "" {

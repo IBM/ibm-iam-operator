@@ -1154,6 +1154,12 @@ func buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName,
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		},
+		{
+			Name: "tmp",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
 	}
 	if auditSecretName != "" {
 		auditVolume := corev1.Volume{

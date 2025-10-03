@@ -1155,6 +1155,10 @@ func buildIdentityManagerVolumeMounts(auditSecretName *string, ldapSpcExist bool
 			Name:      "pgsql-client-cred",
 			MountPath: "/pgsql/clientinfo",
 		},
+		{
+			Name:		"tmp",
+			MountPath: 	"/tmp",
+		},
 	}
 
 	if auditSecretName != nil && *auditSecretName != "" {
@@ -1196,6 +1200,10 @@ func buildIdentityProviderVolumeMounts(auditSecretName *string, ldapSpcExist boo
 		{
 			Name:      "provider-data-vol",
 			MountPath: "/opt/ibm/provider-data",
+		},
+		{
+			Name:		"tmp",
+			MountPath: 	"/tmp",
 		},
 	}
 	if auditSecretName != nil && *auditSecretName != "" {

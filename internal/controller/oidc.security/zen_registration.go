@@ -166,7 +166,7 @@ func (r *ClientReconciler) registerZenInstance(ctx context.Context, clientCR *oi
 	log := logf.FromContext(ctx)
 	payloadJSON := map[string]interface{}{
 		"clientId":       clientCR.Spec.ClientId,
-		"clientSecret":   clientCreds.ClientSecret,
+		"clientSecret":   string(clientCreds.ClientSecret),
 		"instanceId":     clientCR.Spec.ZenInstanceId,
 		"productNameUrl": clientCR.Spec.ZenProductNameUrl,
 		"namespace":      clientCR.Namespace,

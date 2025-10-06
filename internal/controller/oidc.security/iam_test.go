@@ -420,16 +420,16 @@ kgg1AGBe2QS+
 				RunMode: common.LocalRunMode,
 			}
 			ctx = context.Background()
-			httpClient, err := createHTTPClient(caCert)
+			httpClient, err := r.GetHTTPClient(caCert)
 			Expect(err).ToNot(HaveOccurred())
 			_, tokenErr = r.getAuthnTokens(ctx, &oidcsecurityv1.Client{}, servicesNS, httpClient)
 			Expect(tokenErr).To(HaveOccurred())
 		})
 	})
 
-	Describe("#createHTTPClient", func() {
+	Describe("#GetHTTPClient", func() {
 		It("should create a valid HTTP client", func() {
-			client, err := createHTTPClient(caCert)
+			client, err := r.GetHTTPClient(caCert)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(client.Timeout).To(Equal(10 * time.Second))
 		})

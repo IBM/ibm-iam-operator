@@ -346,12 +346,12 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 		return subreconciler.RequeueWithError(err)
 	}
 
-	log = log.WithValues("Object.Name", "common-service-db", "Object.Kind", "Cluster", "Object.APIVersion", "postgresql.k8s.enterprisedb.io/v1")
-
 	clusterAPIVersion := "postgresql.k8s.enterprisedb.io/v1"
 	if authCR.Spec.Database != nil && authCR.Spec.Database.OperandRequest != nil && *authCR.Spec.Database.OperandRequest == "ibm-cnpg-postgres-operator" {
 		clusterAPIVersion = "postgresql.cnpg.ibm.com/v1"
 	}
+
+	log = log.WithValues("Object.Name", "common-service-db", "Object.Kind", "Cluster", "Object.APIVersion", clusterAPIVersion)
 
 	u := &unstructured.Unstructured{
 		Object: map[string]any{

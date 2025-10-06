@@ -631,7 +631,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
-					Command: []string{"curl", "-k", "https://localhost:4300/readyz"},
+					Command: []string{"curl", "-k", "https://platform-auth-service:9443/oidc/endpoint/OP/.well-known/openid-configuration"},
 				},
 			},
 			InitialDelaySeconds: 20,
@@ -1156,8 +1156,8 @@ func buildIdentityManagerVolumeMounts(auditSecretName *string, ldapSpcExist bool
 			MountPath: "/pgsql/clientinfo",
 		},
 		{
-			Name:		"tmp-vol",
-			MountPath: 	"/tmp",
+			Name:      "tmp-vol",
+			MountPath: "/tmp",
 		},
 	}
 
@@ -1202,8 +1202,8 @@ func buildIdentityProviderVolumeMounts(auditSecretName *string, ldapSpcExist boo
 			MountPath: "/opt/ibm/provider-data",
 		},
 		{
-			Name:		"tmp-vol",
-			MountPath: 	"/tmp",
+			Name:      "tmp-vol",
+			MountPath: "/tmp",
 		},
 	}
 	if auditSecretName != nil && *auditSecretName != "" {

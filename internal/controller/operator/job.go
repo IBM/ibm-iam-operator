@@ -81,7 +81,7 @@ func (r *AuthenticationReconciler) checkSAMLPresence(ctx context.Context, req ct
 	}
 
 	log.Info("MASTER_PATH is set; delete the Job, if present", "ConfigMap.Name", cmName)
-	return r.removeIMHasSAMLJob(debugCtx, req)
+	return removeIMHasSAMLJob(r.Client, debugCtx, req)
 }
 
 func (r *AuthenticationReconciler) ensureOIDCClientRegistrationJobRuns(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
@@ -150,18 +150,48 @@ func (r *AuthenticationReconciler) getMigrationJobSubreconciler(authCR *operator
 func (r *AuthenticationReconciler) getSAMLQueryJob(authCR *operatorv1alpha1.Authentication) (subRec common.Subreconciler) {
 	return common.NewSecondaryReconcilerBuilder[*batchv1.Job]().
 		WithName("im-has-saml").
-		WithGenerateFns(generateSAMLQueryJobObject).
+		WithGenerateFns(deleteJobIfFailedWithGreaterThan1, generateSAMLQueryJobObject).
 		WithClient(r.Client).
 		WithNamespace(authCR.Namespace).
 		WithPrimary(authCR).MustBuild()
 }
 
-func (r *AuthenticationReconciler) removeIMHasSAMLJob(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+func deleteJobIfFailedWithGreaterThan1(s common.SecondaryReconciler, ctx context.Context, job *batchv1.Job) (err error) {
+	jobName := s.GetName()
+	log := logf.FromContext(ctx, "Job.Name", jobName)
+	namespace := s.GetNamespace()
+	objKey := types.NamespacedName{Name: jobName, Namespace: namespace}
+	cl := s.GetClient()
+	if err = cl.Get(ctx, objKey, job); k8sErrors.IsNotFound(err) {
+		log.Info("Job not found; skipping")
+		return nil
+	} else if err != nil {
+		err = fmt.Errorf("failed to get Job: %w", err)
+		log.Error(err, "Encountered unexpected error while getting Object")
+		return
+	}
+	if !jobFailedConditionIsTrue(job) {
+		return nil
+	}
+	exitCode, _ := getSAMLJobResult(cl, ctx, namespace)
+	if exitCode == 0 || exitCode == 1 {
+		return nil
+	}
+	log.Info("Removing Job with failing exit code", "exitCode", exitCode)
+	_, err = removeIMHasSAMLJob(cl, ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: s.GetPrimary().GetName(), Namespace: namespace}})
+	if err != nil {
+		log.Error(err, "Failed to remove Job")
+	}
+	log.Info("Successfully removed Job")
+	return
+}
+
+func removeIMHasSAMLJob(cl client.Client, ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	jobName := "im-has-saml"
 	log := logf.FromContext(ctx, "Object.Name", jobName)
 	job := &batchv1.Job{}
 	objKey := types.NamespacedName{Name: jobName, Namespace: req.Namespace}
-	if err = r.Get(ctx, objKey, job); k8sErrors.IsNotFound(err) {
+	if err = cl.Get(ctx, objKey, job); k8sErrors.IsNotFound(err) {
 		log.Info("No Job to delete; skipping")
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {
@@ -192,7 +222,7 @@ func (r *AuthenticationReconciler) removeIMHasSAMLJob(ctx context.Context, req c
 		}),
 	}
 
-	if err = r.Delete(ctx, job); k8sErrors.IsNotFound(err) {
+	if err = cl.Delete(ctx, job); k8sErrors.IsNotFound(err) {
 		log.Info("Job not found; continuing")
 	} else if err != nil {
 		err = fmt.Errorf("failed to delete Job %s in namespace %s after getting MASTER_PATH: %w", objKey.Name, req.Namespace, err)
@@ -203,12 +233,12 @@ func (r *AuthenticationReconciler) removeIMHasSAMLJob(ctx context.Context, req c
 		deletionsMade = true
 	}
 
-	if err = r.List(ctx, podList, podListOpts...); err != nil {
+	if err = cl.List(ctx, podList, podListOpts...); err != nil {
 		log.Error(err, "Failed to list Job Pods")
 		return subreconciler.RequeueWithError(err)
 	} else if len(podList.Items) == 0 {
 		log.Info("No Pods were found using prefixed Job labels; trying list with deprecated, non-prefixed Job labels")
-		if err = r.List(ctx, podList, depPodListOpts...); err != nil {
+		if err = cl.List(ctx, podList, depPodListOpts...); err != nil {
 			log.Error(err, "Failed to list Job Pods with deprecated Job labels")
 			return subreconciler.RequeueWithError(err)
 		}
@@ -228,7 +258,7 @@ func (r *AuthenticationReconciler) removeIMHasSAMLJob(ctx context.Context, req c
 
 	log.Info("Deleting found Pods")
 	for _, po := range podList.Items {
-		if err = r.Delete(ctx, &po, podDeleteOpts...); k8sErrors.IsNotFound(err) {
+		if err = cl.Delete(ctx, &po, podDeleteOpts...); k8sErrors.IsNotFound(err) {
 			log.Info("Pod not found", "Pod.Name", po.Name)
 		} else if err != nil {
 			log.Error(err, "Failed to delete Pod", "Pod.Name", po.Name)

@@ -1255,21 +1255,12 @@ func IsJobMissingResultError(err error) bool {
 	return false
 }
 
-func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, namespace string) (path string, err error) {
+func getSAMLJobResult(cl client.Client, ctx context.Context, namespace string) (exitCode int32, err error) {
+	exitCode = -1
 	log := logf.FromContext(ctx)
-	cmKey := types.NamespacedName{Name: "platform-auth-idp", Namespace: namespace}
-	cm := &corev1.ConfigMap{}
-	if err = r.Get(ctx, cmKey, cm); err != nil && !k8sErrors.IsNotFound(err) {
-		return
-	} else if err == nil {
-		if v, ok := cm.Data["MASTER_PATH"]; ok {
-			return v, nil
-		}
-	}
-
 	jobKey := types.NamespacedName{Name: "im-has-saml", Namespace: namespace}
 	job := &batchv1.Job{}
-	if err = r.Get(ctx, jobKey, job); err != nil {
+	if err = cl.Get(ctx, jobKey, job); err != nil {
 		return
 	}
 
@@ -1293,22 +1284,20 @@ func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, namespace 
 		}),
 	}
 
-	if err = r.List(ctx, podList, podListOpts...); err != nil {
+	if err = cl.List(ctx, podList, podListOpts...); err != nil {
 		log.Error(err, "Failed to list Job Pods")
 		return
 	} else if len(podList.Items) == 0 {
 		log.Info("No Pods were found using prefixed Job labels; trying list with deprecated, non-prefixed Job labels")
-		if err = r.List(ctx, podList, depPodListOpts...); err != nil {
+		if err = cl.List(ctx, podList, depPodListOpts...); err != nil {
 			log.Error(err, "Failed to list Job Pods with deprecated Job labels")
 			return
 		}
 	}
-	var exitCode int32 = -1
-
 	if len(podList.Items) >= 1 {
 		po := podList.Items[0]
 		if len(po.Status.ContainerStatuses) != 1 {
-			return "", fmt.Errorf("received invalid number of containerStatuses (%d)", len(po.Status.ContainerStatuses))
+			return exitCode, fmt.Errorf("received invalid number of containerStatuses (%d)", len(po.Status.ContainerStatuses))
 		}
 
 		containerState := podList.Items[0].Status.ContainerStatuses[0].State
@@ -1317,21 +1306,44 @@ func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, namespace 
 		}
 		lastTerminationState := po.Status.ContainerStatuses[0].LastTerminationState
 		if exitCode < 0 && lastTerminationState.Terminated == nil {
-			return "", fmt.Errorf("container does not appear to have terminated yet")
+			return exitCode, fmt.Errorf("container does not appear to have terminated yet")
 		} else if exitCode < 0 {
 			exitCode = lastTerminationState.Terminated.ExitCode
 		}
 	}
+
+	if exitCode == 0 || exitCode == 1 {
+		return
+	}
+
+	switch exitCode {
+	case -1:
+		err = &jobMissingResultError{jobKey}
+	default:
+		err = NewIMHasSAMLError(exitCode, jobKey)
+	}
+
+	return
+}
+
+func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, namespace string) (path string, err error) {
+	cmKey := types.NamespacedName{Name: "platform-auth-idp", Namespace: namespace}
+	cm := &corev1.ConfigMap{}
+	if err = r.Get(ctx, cmKey, cm); err != nil && !k8sErrors.IsNotFound(err) {
+		return
+	} else if err == nil {
+		if v, ok := cm.Data["MASTER_PATH"]; ok {
+			return v, nil
+		}
+	}
+
+	exitCode, err := getSAMLJobResult(r.Client, ctx, namespace)
 
 	switch exitCode {
 	case 1:
 		path = "/idauth"
 	case 0:
 		path = ""
-	case -1:
-		err = &jobMissingResultError{jobKey}
-	default:
-		err = NewIMHasSAMLError(exitCode, jobKey)
 	}
 
 	return

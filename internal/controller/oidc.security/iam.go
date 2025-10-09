@@ -117,8 +117,10 @@ func (r *ClientReconciler) getAuthnTokens(ctx context.Context, client *oidcsecur
 			return nil, fmt.Errorf("failed to get Client credentials: %w", err)
 		}
 		defer func() {
-			common.Scrub(clientCreds.ClientID)
-			common.Scrub(clientCreds.ClientSecret)
+			if clientCreds != nil {
+				common.Scrub(clientCreds.ClientID)
+				common.Scrub(clientCreds.ClientSecret)
+			}
 			clientCreds = nil
 		}()
 		payload = fmt.Appendf(payload, "&grant_type=%s&client_id=%s&client_secret=%s", grantType, clientCreds.ClientID, clientCreds.ClientSecret)
@@ -203,9 +205,9 @@ func (r *ClientReconciler) getAuthnTokens(ctx context.Context, client *oidcsecur
 	return
 }
 
-// createHTTPClient handles boilerplate of creating an http.Client configured for TLS using the Common Services CA
+// GetHTTPClient handles boilerplate of creating an http.Client configured for TLS using the Common Services CA
 // certificate.
-func createHTTPClient(caCert []byte) (httpClient *http.Client, err error) {
+func (r *ClientReconciler) GetHTTPClient(caCert []byte) (httpClient *http.Client, err error) {
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCert)
 	transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: caCertPool}}
@@ -224,7 +226,7 @@ func (r *ClientReconciler) invokeIamApi(ctx context.Context, client *oidcsecurit
 	if err != nil {
 		return
 	}
-	httpClient, err := createHTTPClient(caCert)
+	httpClient, err := r.GetHTTPClient(caCert)
 	if err != nil {
 		return
 	}

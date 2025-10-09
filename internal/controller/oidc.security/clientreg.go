@@ -175,7 +175,9 @@ func (r *ClientReconciler) deleteClientRegistration(ctx context.Context, client 
 	url = strings.Join([]string{identityProviderURL, "v1", "auth", "registration", clientId}, "/")
 	response, err = r.invokeClientRegistrationAPI(ctx, servicesNamespace, http.MethodDelete, url, nil)
 	defer func() {
-		response.Request = nil
+		if response != nil {
+			response.Request = nil
+		}
 	}()
 	if err != nil {
 		return nil, NewOIDCClientRegistrationError(client.Spec.ClientId, http.MethodDelete, err.Error(), response)
@@ -221,7 +223,7 @@ func (r *ClientReconciler) invokeClientRegistrationAPI(ctx context.Context, serv
 	}
 	reqLogger.Info("Read certificate from Secret", "Secret.Name", CSCACertificateSecretName, "Secret.Namespace", servicesNamespace)
 
-	httpClient, err := createHTTPClient(caCert)
+	httpClient, err := r.GetHTTPClient(caCert)
 	if err != nil {
 		return
 	}

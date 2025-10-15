@@ -48,6 +48,9 @@ func (r *AuthenticationReconciler) addEmbeddedDBIfNeeded(ctx context.Context, au
 	}
 	name := "common-service-postgresql"
 	if authCR.Spec.Database != nil && authCR.Spec.Database.OperandRequest != nil && *authCR.Spec.Database.OperandRequest != "" {
+		if *authCR.Spec.Database.OperandRequest == "ibm-cnpg-postgres-operator" {
+			name = "common-service-cnpg"
+		}
 		name = *authCR.Spec.Database.OperandRequest
 	}
 	*operands = append(*operands, operatorv1alpha1.Operand{

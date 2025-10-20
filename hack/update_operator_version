@@ -33,10 +33,6 @@ echo "Update go files"
 current_version="$(grep 'Version =' "${REPO_ROOT}/internal/version/version.go" | cut -f2 -d\")" 
 sed s/$current_version/$VERSION/ $REPO_ROOT/internal/version/version.go > $REPO_ROOT/internal/version/version.go.new
 mv $REPO_ROOT/internal/version/version.go.new $REPO_ROOT/internal/version/version.go
-sed s/$current_version/$VERSION/ $REPO_ROOT/internal/database/schema/v1/tables_test.go > $REPO_ROOT/internal/database/schema/v1/tables_test.go.new
-mv $REPO_ROOT/internal/database/schema/v1/tables_test.go.new $REPO_ROOT/internal/database/schema/v1/tables_test.go
-
-
 
 echo "Update the containerImage and olm.skipRange annotations in dev and patch"
 $LOCALBIN/yq -i 'with(.[] | select(.path == "/metadata/annotations/containerImage") ; .value |= env(PRODUCTION_IMAGE) + ":" + env(VERSION))' \

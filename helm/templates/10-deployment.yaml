@@ -35,7 +35,7 @@ metadata:
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.14.0",
+              "imageTag": "4.15.0",
               "ldapsCACert": "platform-auth-ldaps-ca-cert",
               "resources": {
                 "limits": {
@@ -54,7 +54,7 @@ metadata:
             "clientRegistration": {
               "imageName": "im-initcontainer",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.14.0",
+              "imageTag": "4.15.0",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -106,7 +106,7 @@ metadata:
             "identityManager": {
               "imageName": "icp-identity-manager",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.14.0",
+              "imageTag": "4.15.0",
               "masterNodesList": "10.0.0.1",
               "resources": {
                 "limits": {
@@ -124,7 +124,7 @@ metadata:
             "identityProvider": {
               "imageName": "icp-identity-provider",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.14.0",
+              "imageTag": "4.15.0",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -141,7 +141,7 @@ metadata:
             "initMongodb": {
               "imageName": "im-initcontainer",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.14.0",
+              "imageTag": "4.15.0",
               "resources": {
                 "limits": {
                   "cpu": "100m",

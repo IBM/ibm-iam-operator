@@ -67,9 +67,10 @@ func GetClusterType(ctx context.Context, k8sClient *client.Client, cmName string
 	logger.Info("Get cluster config")
 
 	var namespaces []string
+	// TODO Clean this up for switch back to using Authentication CR
 	servicesNamespace, err := GetServicesNamespace(ctx, k8sClient)
 	if err != nil {
-		logger.Error(err, "Could not get services namespace from Authentication", "name", CommonServiceName)
+		logger.Error(err, "Could not get services namespace from CommonService", "name", CommonServiceName)
 		err = nil
 	} else {
 		logger.Info("Got services namespace", "namespace", servicesNamespace)
@@ -187,11 +188,11 @@ const (
 	ClusterRunMode RunModeType = "cluster"
 )
 
-func IsRunModeLocal() bool {
+func isRunModeLocal() bool {
 	return os.Getenv(ForceRunModeEnv) == string(LocalRunMode)
 }
 
-func IsOperatorNsForced() (string, bool) {
+func isOperatorNsForced() (string, bool) {
 	value := os.Getenv(ForceOperatorNsEnv)
 	return value, value != ""
 }
@@ -206,9 +207,9 @@ var ErrRunLocal = fmt.Errorf("operator run mode forced to local")
 
 // GetOperatorNamespace returns the namespace the Operator should be running in.
 func GetOperatorNamespace() (string, error) {
-	if ns, isNsForced := IsOperatorNsForced(); IsRunModeLocal() && isNsForced {
+	if ns, isNsForced := isOperatorNsForced(); isRunModeLocal() && isNsForced {
 		return ns, nil
-	} else if IsRunModeLocal() {
+	} else if isRunModeLocal() {
 		return "", ErrRunLocal
 	}
 	nsBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
@@ -321,41 +322,4 @@ func GetCommonLabels() (l map[string]string) {
 		"app.kubernetes.io/part-of":    "im",
 		"app.kubernetes.io/managed-by": "ibm-iam-operator",
 	}
-}
-
-func Scrub(b []byte) (n int) {
-	if b == nil {
-		return
-	}
-	for i := range b {
-		b[i] = 0
-		n++
-	}
-	b = nil
-	return
-}
-
-func ScrubMap(m map[string][]byte) (n int) {
-	if m == nil {
-		return
-	}
-	for key := range m {
-		n += Scrub(m[key])
-		m[key] = nil
-	}
-	return
-}
-
-// RawStringBytes is for unmarshaling JSON string values as []byte
-type RawStringBytes []byte
-
-// UnmarshalJSON implements the json.Unmarshaler interface for RawStringBytes
-func (m *RawStringBytes) UnmarshalJSON(data []byte) error {
-	// Remove the surrounding quotes if the JSON value is a string
-	if len(data) >= 2 && data[0] == '"' && data[len(data)-1] == '"' {
-		*m = data[1 : len(data)-1]
-	} else {
-		*m = data
-	}
-	return nil
 }

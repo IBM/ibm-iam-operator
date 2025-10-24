@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/apis/oidc.security/v1"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // ZenInstance represents the zen instance model (response from post, get)
@@ -38,23 +37,22 @@ type ZenInstance struct {
 }
 
 // getZenInstanceRegistration gets the requested Zen instance registration using the ID Management API.
-func (r *ClientReconciler) getZenInstanceRegistration(ctx context.Context, clientCR *oidcsecurityv1.Client, servicesNamespace string) (zenInstance *ZenInstance, err error) {
-	log := logf.FromContext(ctx)
+func (r *ClientReconciler) getZenInstanceRegistration(ctx context.Context, clientCR *oidcsecurityv1.Client, config *AuthenticationConfig) (zenInstance *ZenInstance, err error) {
+	//reqLogger := logf.FromContext(ctx).WithName("GetZenInstance")
 	var response *http.Response
 	if clientCR.Spec.ZenInstanceId == "" {
 		return nil, fmt.Errorf("Zen instance id is required to query a Zen instance")
 	}
 
-	var identityManagementURL string
-	identityManagementURL, err = r.getServiceURL(ctx, servicesNamespace, IdentityManagementURLKey)
+	identityManagementURL, err := config.GetIdentityManagementURL()
 	if err != nil {
-		log.Error(err, "Tried to get identity provider url while getting client registration but failed")
+		return
 	}
 
 	requestURLSplit := []string{identityManagementURL, "identity", "api", "v1", "zeninstance", clientCR.Spec.ZenInstanceId}
 	requestURL := strings.Join(requestURLSplit, "/")
 
-	response, err = r.invokeIamApi(ctx, clientCR, http.MethodGet, requestURL, "", servicesNamespace)
+	response, err = r.invokeIamApi(ctx, clientCR, http.MethodGet, requestURL, "", config)
 	switch v := err.(type) {
 	case *OIDCClientRegistrationError:
 		// Return no response or error if the OIDC client isn't found given a token couldn't be retrieved
@@ -114,22 +112,19 @@ func (r *ClientReconciler) getZenInstanceRegistration(ctx context.Context, clien
 }
 
 // unregisterZenInstance deletes the requested zen instance registration using the ID Management API.
-func (r *ClientReconciler) unregisterZenInstance(ctx context.Context, clientCR *oidcsecurityv1.Client, servicesNamespace string) (err error) {
-	log := logf.FromContext(ctx)
+func (r *ClientReconciler) unregisterZenInstance(ctx context.Context, clientCR *oidcsecurityv1.Client, config *AuthenticationConfig) (err error) {
 	if clientCR.Spec.ZenInstanceId == "" {
 		return fmt.Errorf("Zen instance id is required to delete a Zen instance registration")
 	}
 
 	// Get the platform-auth-idp ConfigMap to obtain constant values
-	var identityManagementURL string
-	identityManagementURL, err = r.getServiceURL(ctx, servicesNamespace, IdentityManagementURLKey)
+	identityManagementURL, err := config.GetIdentityManagementURL()
 	if err != nil {
-		log.Error(err, "Tried to get identity provider url while getting client registration but failed")
 		return
 	}
 	requestURLSplit := []string{identityManagementURL, "identity", "api", "v1", "zeninstance", clientCR.Spec.ZenInstanceId}
 	requestURL := strings.Join(requestURLSplit, "/")
-	response, err := r.invokeIamApi(ctx, clientCR, http.MethodDelete, requestURL, "", servicesNamespace)
+	response, err := r.invokeIamApi(ctx, clientCR, http.MethodDelete, requestURL, "", config)
 	switch v := err.(type) {
 	case *OIDCClientRegistrationError:
 		// Return no response or error if the OIDC client isn't found given a token couldn't be retrieved
@@ -163,8 +158,7 @@ func (r *ClientReconciler) unregisterZenInstance(ctx context.Context, clientCR *
 }
 
 // registerZenInstance registers a Zen instance with the ID Management API.
-func (r *ClientReconciler) registerZenInstance(ctx context.Context, clientCR *oidcsecurityv1.Client, clientCreds *ClientCredentials, servicesNamespace string) (err error) {
-	log := logf.FromContext(ctx)
+func (r *ClientReconciler) registerZenInstance(ctx context.Context, clientCR *oidcsecurityv1.Client, clientCreds *ClientCredentials, config *AuthenticationConfig) (err error) {
 	payloadJSON := map[string]interface{}{
 		"clientId":       clientCR.Spec.ClientId,
 		"clientSecret":   clientCreds.ClientSecret,
@@ -176,16 +170,14 @@ func (r *ClientReconciler) registerZenInstance(ctx context.Context, clientCR *oi
 	payloadBytes, _ := json.Marshal(payloadJSON)
 	payload := string(payloadBytes[:])
 
-	var identityManagementURL string
-	identityManagementURL, err = r.getServiceURL(ctx, servicesNamespace, IdentityManagementURLKey)
+	identityManagementURL, err := config.GetIdentityManagementURL()
 	if err != nil {
-		log.Error(err, "Tried to get identity provider url while getting client registration but failed")
 		return
 	}
 	requestURLSplit := []string{identityManagementURL, "identity", "api", "v1", "zeninstance"}
 	requestURL := strings.Join(requestURLSplit, "/")
 
-	response, err := r.invokeIamApi(ctx, clientCR, http.MethodPost, requestURL, payload, servicesNamespace)
+	response, err := r.invokeIamApi(ctx, clientCR, http.MethodPost, requestURL, payload, config)
 	switch v := err.(type) {
 	case *OIDCClientRegistrationError:
 		// Return no response or error if the OIDC client isn't found given a token couldn't be retrieved

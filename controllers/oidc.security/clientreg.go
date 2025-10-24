@@ -33,18 +33,44 @@ import (
 )
 
 type ClientCredentials struct {
-	ClientID     common.RawStringBytes `json:"CLIENT_ID"`
-	ClientSecret common.RawStringBytes `json:"CLIENT_SECRET"`
+	ClientID     string `json:"CLIENT_ID"`
+	ClientSecret string `json:"CLIENT_SECRET"`
+}
+
+type OidcClientResponse struct {
+	ClientIDIssuedAt        int      `json:"client_id_issued_at"`
+	RegistrationClientURI   string   `json:"registration_client_uri"`
+	ClientSecretExpiresAt   int      `json:"client_secret_expires_at"`
+	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method"`
+	Scope                   string   `json:"scope"`
+	GrantTypes              []string `json:"grant_types"`
+	ResponseTypes           []string `json:"response_types"`
+	ApplicationType         string   `json:"application_type"`
+	SubjectType             string   `json:"subject_type"`
+	PostLogoutRedirectUris  []string `json:"post_logout_redirect_uris"`
+	PreauthorizedScope      string   `json:"preauthorized_scope"`
+	IntrospectTokens        bool     `json:"introspect_tokens"`
+	TrustedURIPrefixes      []string `json:"trusted_uri_prefixes"`
+	ResourceIds             []string `json:"resource_ids"`
+	FunctionalUserGroupIds  []string `json:"functional_user_groupIds"`
+	FunctionalUserID        string   `json:"functional_user_id"`
+	AppPasswordAllowed      bool     `json:"appPasswordAllowed"`
+	AppTokenAllowed         bool     `json:"appTokenAllowed"`
+	ClientID                string   `json:"client_id"`
+	ClientSecret            string   `json:"client_secret"`
+	ClientName              string   `json:"client_name"`
+	RedirectUris            []string `json:"redirect_uris"`
+	AllowRegexpRedirects    bool     `json:"allow_regexp_redirects"`
 }
 
 // CreateClientRegistration registers a new OIDC Client on the OP using information provided in the provided Client CR;
 // it does so via a call to the IM Identity Provider service.
-func (r *ClientReconciler) createClientRegistration(ctx context.Context, client *oidcsecurityv1.Client, servicesNamespace string) (response *http.Response, err error) {
-	log := logf.FromContext(ctx).V(1)
+func (r *ClientReconciler) createClientRegistration(ctx context.Context, client *oidcsecurityv1.Client, config *AuthenticationConfig) (response *http.Response, err error) {
+	reqLogger := logf.FromContext(ctx)
 	var url, identityProviderURL string
-	identityProviderURL, err = r.getServiceURL(ctx, servicesNamespace, IdentityProviderURLKey)
+	identityProviderURL, err = config.GetIdentityProviderURL()
 	if err != nil {
-		log.Error(err, "Tried to get identity provider url while getting client registration but failed")
+		reqLogger.Error(err, "Tried to get identity provider url but failed")
 		return
 	}
 	url = strings.Join([]string{identityProviderURL, "v1", "auth", "registration"}, "/")
@@ -53,7 +79,7 @@ func (r *ClientReconciler) createClientRegistration(ctx context.Context, client 
 		return
 	}
 	payload := r.generateClientRegistrationPayload(client, clientCreds)
-	response, err = r.invokeClientRegistrationAPI(ctx, servicesNamespace, http.MethodPost, url, payload)
+	response, err = r.invokeClientRegistrationAPI(ctx, client, http.MethodPost, url, payload, config)
 	if err == nil && response.Status != "201 Created" {
 		return nil, NewOIDCClientRegistrationError(
 			client.Spec.ClientId,
@@ -69,16 +95,13 @@ func (r *ClientReconciler) createClientRegistration(ctx context.Context, client 
 
 // GetClientRegistration gets the registered OIDC client from the OP, if it is there; it does so via a call to the IM
 // Identity Provider service.
-func (r *ClientReconciler) getClientRegistration(ctx context.Context, client *oidcsecurityv1.Client, servicesNamespace string) (response *http.Response, err error) {
-	log := logf.FromContext(ctx).V(1)
-	var url, identityProviderURL string
-	identityProviderURL, err = r.getServiceURL(ctx, servicesNamespace, IdentityProviderURLKey)
+func (r *ClientReconciler) getClientRegistration(ctx context.Context, client *oidcsecurityv1.Client, config *AuthenticationConfig) (response *http.Response, err error) {
+	identityProviderURL, err := config.GetIdentityProviderURL()
 	if err != nil {
-		log.Error(err, "Tried to get identity provider url while getting client registration but failed")
 		return
 	}
-	url = strings.Join([]string{identityProviderURL, "v1", "auth", "registration", client.Spec.ClientId}, "/")
-	response, err = r.invokeClientRegistrationAPI(ctx, servicesNamespace, http.MethodGet, url, nil)
+	url := strings.Join([]string{identityProviderURL, "v1", "auth", "registration", client.Spec.ClientId}, "/")
+	response, err = r.invokeClientRegistrationAPI(ctx, client, http.MethodGet, url, "", config)
 	if err != nil {
 		err = NewOIDCClientRegistrationError(
 			client.Spec.ClientId,
@@ -99,20 +122,20 @@ func (r *ClientReconciler) getClientRegistration(ctx context.Context, client *oi
 
 // UpdateClientRegistration updates a registered OIDC client's credentials to use those stored in the Client CR's
 // Secret; it does so via a call to the IM Identity Provider service.
-func (r *ClientReconciler) updateClientRegistration(ctx context.Context, client *oidcsecurityv1.Client, servicesNamespace string) (response *http.Response, err error) {
-	log := logf.FromContext(ctx).V(1)
+func (r *ClientReconciler) updateClientRegistration(ctx context.Context, client *oidcsecurityv1.Client, config *AuthenticationConfig) (response *http.Response, err error) {
+	logger := logf.FromContext(ctx)
 	var url, identityProviderURL string
 	clientCreds, err := r.GetClientCreds(ctx, client)
 	if err != nil {
 		return
 	}
 	payload := r.generateClientRegistrationPayload(client, clientCreds)
-	identityProviderURL, err = r.getServiceURL(ctx, servicesNamespace, IdentityProviderURLKey)
+	identityProviderURL, err = config.GetIdentityProviderURL()
 	if err != nil {
 		return
 	}
-	url = strings.Join([]string{identityProviderURL, "v1", "auth", "registration", string(clientCreds.ClientID)}, "/")
-	response, err = r.invokeClientRegistrationAPI(ctx, servicesNamespace, http.MethodPut, url, payload)
+	url = strings.Join([]string{identityProviderURL, "v1", "auth", "registration", clientCreds.ClientID}, "/")
+	response, err = r.invokeClientRegistrationAPI(ctx, client, http.MethodPut, url, payload, config)
 	if err == nil && response.Status != "200 OK" {
 		return nil, NewOIDCClientRegistrationError(
 			client.Spec.ClientId,
@@ -128,34 +151,29 @@ func (r *ClientReconciler) updateClientRegistration(ctx context.Context, client 
 			response,
 		)
 	}
-	log.Info("Client registration update successful")
+	logger.Info("Client registration update successful")
 	return
 }
 
 // DeleteClientRegistration deletes the OIDC client registration represented by the Client CR; it does so via a call to
 // the IM Identity Provider service.
-func (r *ClientReconciler) deleteClientRegistration(ctx context.Context, client *oidcsecurityv1.Client, servicesNamespace string) (response *http.Response, err error) {
-	log := logf.FromContext(ctx).V(1)
+func (r *ClientReconciler) deleteClientRegistration(ctx context.Context, client *oidcsecurityv1.Client, config *AuthenticationConfig) (response *http.Response, err error) {
 	clientId := client.Spec.ClientId
 	if clientId == "" {
 		return nil, nil
 	}
 
 	var url, identityProviderURL string
-	identityProviderURL, err = r.getServiceURL(ctx, servicesNamespace, IdentityProviderURLKey)
+	identityProviderURL, err = config.GetIdentityProviderURL()
 	if err != nil {
-		log.Error(err, "Tried to get identity provider url while getting client registration but failed")
 		return
 	}
 	url = strings.Join([]string{identityProviderURL, "v1", "auth", "registration", clientId}, "/")
-	response, err = r.invokeClientRegistrationAPI(ctx, servicesNamespace, http.MethodDelete, url, nil)
-	defer func() {
-		response.Request = nil
-	}()
+	response, err = r.invokeClientRegistrationAPI(ctx, client, http.MethodDelete, url, "", config)
 	if err != nil {
 		return nil, NewOIDCClientRegistrationError(client.Spec.ClientId, http.MethodDelete, err.Error(), response)
 	}
-	if response.Status != "204 No Content" && response.Status != "404 Not Found" {
+	if err == nil && response.Status != "204 No Content" && response.Status != "404 Not Found" {
 		return nil, NewOIDCClientRegistrationError(
 			client.Spec.ClientId,
 			http.MethodDelete,
@@ -166,36 +184,34 @@ func (r *ClientReconciler) deleteClientRegistration(ctx context.Context, client 
 	return
 }
 
-func (r *ClientReconciler) invokeClientRegistrationAPI(ctx context.Context, servicesNamespace string, requestType string, requestURL string, payload []byte) (response *http.Response, err error) {
+func (r *ClientReconciler) invokeClientRegistrationAPI(ctx context.Context, client *oidcsecurityv1.Client, requestType string, requestURL string, payload string, config *AuthenticationConfig) (response *http.Response, err error) {
 	reqLogger := logf.FromContext(ctx).V(1)
-
-	username, password, err := GetOAuthAdminCredentials(r.Client, ctx, servicesNamespace)
+	reqLogger.Info("OIDC registration parameters", "requestType", requestType, "requestURL", requestURL)
+	oauthAdmin := "oauthadmin"
+	var clientRegistrationSecret string
+	clientRegistrationSecret, err = config.GetOAuthAdminPassword()
 	if err != nil {
 		return
 	}
-	defer func() {
-		common.Scrub(username)
-		username = nil
-		common.Scrub(password)
-		password = nil
-	}()
 
 	request, err := http.NewRequest(requestType, requestURL, bytes.NewBuffer([]byte(payload)))
 	if err != nil {
 		return
 	}
 	request.Header.Set("Content-Type", "application/json")
-	request.SetBasicAuth(string(username), string(password))
-	defer func() {
-		request.Header.Del("Authorization")
-	}()
+	request.SetBasicAuth(oauthAdmin, clientRegistrationSecret)
 
-	caCert, err := GetCommonServiceCATLSKey(r.Client, ctx, servicesNamespace)
+	servicesNamespace, err := config.GetAuthenticationNamespace()
 	if err != nil {
-		reqLogger.Error(err, "Failed to read certificate from Secret", "Secret.Name", CSCACertificateSecretName, "Secret.Namespace", servicesNamespace)
+		reqLogger.Error(err, "Could not find services namespace")
 		return
 	}
-	reqLogger.Info("Read certificate from Secret", "Secret.Name", CSCACertificateSecretName, "Secret.Namespace", servicesNamespace)
+	caCert, err := config.GetCSCATLSKey()
+	if err != nil {
+		reqLogger.Error(err, "Failed to read certificate from Secret", "secretName", CSCACertificateSecretName, "secretNamespace", servicesNamespace)
+		return
+	}
+	reqLogger.Info("Read certificate from Secret", "secretName", CSCACertificateSecretName, "secretNamespace", servicesNamespace)
 
 	httpClient, err := createHTTPClient(caCert)
 	if err != nil {
@@ -248,30 +264,37 @@ func (r *ClientReconciler) GetClientCreds(ctx context.Context, client *oidcsecur
 	return
 }
 
-func (r *ClientReconciler) generateClientCredentials(clientID []byte) (clientCreds *ClientCredentials, err error) {
-	// If clientID is empty, generate a new Client ID
-	if len(clientID) == 0 {
-		clientID, err = r.GenerateBytes(common.LowerAlphaNum, 32)
-	}
-	if err != nil {
-		return
-	}
-	clientSecret, err := r.GenerateBytes(common.LowerAlphaNum, 32)
-	if err != nil {
-		return
-	}
-	return &ClientCredentials{
-		ClientID:     clientID[:],
-		ClientSecret: clientSecret[:],
-	}, nil
+// unmarshalClientCreds unmarshals the Client ID and Secret from an Authorization Service *http.Response into a
+// *ClientCredentials struct.
+func (r *ClientReconciler) unmarshalClientCreds(response *http.Response) (clientCreds *ClientCredentials, err error) {
+	clientCreds = &ClientCredentials{}
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(response.Body)
+	defer response.Body.Close()
+	registrationAPIResponse := buf.String()
+	err = json.Unmarshal([]byte(registrationAPIResponse), clientCreds)
+	return
 }
 
-func (r *ClientReconciler) generateClientRegistrationPayload(client *oidcsecurityv1.Client, clientCred *ClientCredentials) (payload []byte) {
-	payloadJSON := map[string]any{
+func (r *ClientReconciler) generateClientCredentials(clientID string) *ClientCredentials {
+	rule := `^([a-z0-9]){32,}$`
+	// If clientID is empty, generate a new Client ID
+	if len(clientID) == 0 {
+		clientID = common.GenerateRandomString(rule)
+	}
+	clientSecret := common.GenerateRandomString(rule)
+	return &ClientCredentials{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+	}
+}
+
+func (r *ClientReconciler) generateClientRegistrationPayload(client *oidcsecurityv1.Client, clientCred *ClientCredentials) (payload string) {
+	payloadJSON := map[string]interface{}{
 		"token_endpoint_auth_method": "client_secret_basic",
 		"scope":                      "openid profile email",
-		"client_id":                  string(clientCred.ClientID),
-		"client_secret":              string(clientCred.ClientSecret),
+		"client_id":                  clientCred.ClientID,
+		"client_secret":              clientCred.ClientSecret,
 		"grant_types": []string{
 			"authorization_code",
 			"client_credentials",
@@ -297,15 +320,13 @@ func (r *ClientReconciler) generateClientRegistrationPayload(client *oidcsecurit
 	if client.IsCPClientCredentialsEnabled() {
 		grant_types, ok := payloadJSON["grant_types"].([]string)
 		if !ok {
-			payload, _ = json.Marshal(payloadJSON)
-			return
+			goto marshal
 		}
 		payloadJSON["grant_types"] = append(grant_types, "cpclient_credentials")
 		payloadJSON["functional_user_groupIds"] = client.Spec.Roles
 	}
-	payload, _ = json.Marshal(payloadJSON)
-	payloadJSON["client_id"] = ""
-	payloadJSON["client_secret"] = ""
-	payloadJSON = nil
-	return
+marshal:
+	payloadBytes, _ := json.Marshal(payloadJSON)
+	payload = string(payloadBytes[:])
+	return payload
 }

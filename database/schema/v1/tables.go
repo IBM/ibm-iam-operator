@@ -33,20 +33,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// RawStringBytes is for unmarshaling JSON string values as []byte
-type RawStringBytes []byte
-
-// UnmarshalJSON implements the json.Unmarshaler interface for RawStringBytes
-func (m *RawStringBytes) UnmarshalJSON(data []byte) error {
-	// Remove the surrounding quotes if the JSON value is a string
-	if len(data) >= 2 && data[0] == '"' && data[len(data)-1] == '"' {
-		*m = data[1 : len(data)-1]
-	} else {
-		*m = data
-	}
-	return nil
-}
-
 // Row represents a row in a table, whether that be one directly retrieved from a database or one being used as part of
 // a write or other query to that database.
 type RowData interface {
@@ -66,6 +52,9 @@ func RowDataToAnyMap(r RowData) map[string]any {
 }
 
 // GetNamedArgsFromRow generates a pgx.NamedArgs for use with the pgx's Conn functions.
+// e.g.
+//
+//	conn.Exec(ctx, rowData.GetInsertSQL(), GetNamedArgsFromRow(rowData))
 func GetNamedArgsFromRow(r RowData) pgx.NamedArgs {
 	args := pgx.NamedArgs{}
 	for k, v := range RowDataToAnyMap(r) {
@@ -92,13 +81,37 @@ func translateMongoDBFieldsToPostgresColumns(fieldMap map[string]string, m map[s
 }
 
 type OIDCClient struct {
-	ID           *uuid.UUID      `json:"_id"`
-	ClientID     string          `json:"clientid"`
-	ProviderID   string          `json:"providerid"`
-	ClientSecret RawStringBytes  `json:"clientsecret"`
-	DisplayName  string          `json:"displayname"`
-	Enabled      bool            `json:"enabled"`
-	Metadata     json.RawMessage `json:"metadata"`
+	ID           string `json:"_id"`
+	ClientID     string `json:"clientid"`
+	ProviderID   string `json:"providerid"`
+	ClientSecret string `json:"clientsecret"`
+	DisplayName  string `json:"displayname"`
+	Enabled      bool   `json:"enabled"`
+	Metadata     string `json:"metadata"`
+}
+
+func ConvertToOIDCClient(clientMap map[string]any, oc *OIDCClient) (err error) {
+	var jsonBytes []byte
+	if jsonBytes, err = json.Marshal(clientMap); err != nil {
+		return
+	}
+
+	if err = json.Unmarshal(jsonBytes, oc); err != nil {
+		return
+	}
+
+	return nil
+}
+
+func ConvertToOIDCClients(clientMaps []map[string]any, ocRows []OIDCClient) (err error) {
+	for i, clientMap := range clientMaps {
+		oc := &OIDCClient{}
+		if err = ConvertToOIDCClient(clientMap, oc); err != nil {
+			return fmt.Errorf("failed to convert map to OIDCClient: %w", err)
+		}
+		ocRows[i] = *oc
+	}
+	return
 }
 
 func (oc *OIDCClient) GetColumnNames() []string {
@@ -521,12 +534,12 @@ func ConvertToUsersAttributes(usersAttrsMaps []map[string]any, usersAttrs []User
 
 // ZenInstance is a row from the `platformdb.zen_instances` table
 type ZenInstance struct {
-	InstanceID     string         `bson:"_id"`
-	ClientID       string         `bson:"clientId"`
-	ClientSecret   RawStringBytes `bson:"clientSecret"`
-	ProductNameURL string         `bson:"productNameUrl"`
-	ZenAuditURL    string         `bson:"zenAuditUrl,omitempty"`
-	Namespace      string         `bson:"namespace"`
+	InstanceID     string `json:"instance_id"`
+	ClientID       string `json:"client_id"`
+	ClientSecret   string `json:"client_secret"`
+	ProductNameURL string `json:"product_name_url"`
+	ZenAuditURL    string `json:"zen_audit_url,omitempty"`
+	Namespace      string `json:"namespace"`
 }
 
 var ZenInstanceColumnNames []string = []string{
@@ -565,6 +578,38 @@ func (z *ZenInstance) GetInsertSQL() string {
 		(instance_id, namespace, product_name_url, client_id, client_secret, zen_audit_url)
 		VALUES (@instance_id, @namespace, @product_name_url, @client_id, @client_secret, @zen_audit_url)
 		ON CONFLICT DO NOTHING;`
+}
+
+func ConvertToZenInstance(zenInstanceMap map[string]any, zenInstance *ZenInstance) (err error) {
+	fieldMap := map[string]string{
+		"_id":            "instance_id",
+		"clientId":       "client_id",
+		"clientSecret":   "client_secret",
+		"productNameUrl": "product_name_url",
+		"zenAuditUrl":    "zen_audit_url",
+	}
+	translateMongoDBFieldsToPostgresColumns(fieldMap, zenInstanceMap)
+	var jsonBytes []byte
+	if jsonBytes, err = json.Marshal(zenInstanceMap); err != nil {
+		return
+	}
+
+	if err = json.Unmarshal(jsonBytes, zenInstance); err != nil {
+		return
+	}
+
+	return nil
+}
+
+func ConvertToZenInstances(zenInstanceMaps []map[string]any, zenInstances []ZenInstance) (err error) {
+	for i, zenInstanceMap := range zenInstanceMaps {
+		zenInstance := &ZenInstance{}
+		if err = ConvertToZenInstance(zenInstanceMap, zenInstance); err != nil {
+			return fmt.Errorf("failed to convert map to ZenInstance: %w", err)
+		}
+		zenInstances[i] = *zenInstance
+	}
+	return
 }
 
 // ZenInstanceUser is a row from the `platformdb.zen_instances_users` table

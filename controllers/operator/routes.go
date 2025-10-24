@@ -67,13 +67,10 @@ func (r *AuthenticationReconciler) getCertificateForService(ctx context.Context,
 		reqLogger.Error(err, "failed to get route destination certificate", "secretName", secretName)
 		return
 	}
-	_, ok := secret.Data["ca.crt"]
-	if !ok {
+	certificate, ok := secret.Data["ca.crt"]
+	if !ok || len(certificate) == 0 {
 		err = fmt.Errorf("found secret %q, but \"ca.crt\" was empty", secretName)
 	}
-	certificate = make([]byte, len(secret.Data["ca.crt"]))
-	copy(certificate, secret.Data["ca.crt"])
-	common.ScrubMap(secret.Data)
 	return
 }
 
@@ -153,25 +150,16 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, instance *o
 		reqLogger.Info("Unable to get certificate for service", "serviceName", PlatformAuthServiceName, "requeueNeeded", *needToRequeue)
 		return
 	}
-	defer func() {
-		common.Scrub(platformAuthCert)
-	}()
 	platformIdentityManagementCert, err = r.getCertificateForService(ctx, PlatformIdentityManagementServiceName, instance, needToRequeue)
 	if err != nil {
 		reqLogger.Info("Unable to get certificate for service", "serviceName", PlatformIdentityManagementServiceName, "requeueNeeded", *needToRequeue)
 		return
 	}
-	defer func() {
-		common.Scrub(platformIdentityManagementCert)
-	}()
 	platformIdentityProviderCert, err = r.getCertificateForService(ctx, PlatformIdentityProviderServiceName, instance, needToRequeue)
 	if err != nil {
 		reqLogger.Info("Unable to get certificate for service", "serviceName", PlatformIdentityProviderServiceName, "requeueNeeded", *needToRequeue)
 		return
 	}
-	defer func() {
-		common.Scrub(platformIdentityProviderCert)
-	}()
 
 	allRoutesFields := map[string]*reconcileRouteFields{
 		"id-mgmt": {
@@ -300,12 +288,6 @@ func (r *AuthenticationReconciler) reconcileRoute(ctx context.Context, instance 
 		reqLogger.Error(err, "Error creating desired route for reconcilition")
 		return
 	}
-	defer func() {
-		calculatedRoute.Spec.TLS.CACertificate = ""
-		calculatedRoute.Spec.TLS.Certificate = ""
-		calculatedRoute.Spec.TLS.Key = ""
-		calculatedRoute.Spec.TLS = nil
-	}()
 
 	observedRoute := &routev1.Route{}
 	err = r.Client.Get(ctx, types.NamespacedName{Name: fields.Name, Namespace: namespace}, observedRoute)
@@ -333,12 +315,6 @@ func (r *AuthenticationReconciler) reconcileRoute(ctx context.Context, instance 
 			*needToRequeue = true
 		}
 	} else {
-		defer func() {
-			observedRoute.Spec.TLS.CACertificate = ""
-			observedRoute.Spec.TLS.Certificate = ""
-			observedRoute.Spec.TLS.Key = ""
-			observedRoute.Spec.TLS = nil
-		}()
 		// Determine if current route has changed
 		reqLogger.Info("Comparing current and desired routes")
 

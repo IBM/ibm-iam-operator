@@ -303,7 +303,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GO) test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GO) test ./... -coverprofile cover.out
 
 .PHONY: update-version
 update-version: manifests kustomize yq ## Update the Operator SemVer across the project.
@@ -458,4 +458,4 @@ clean-licenses: ## Remove licenses directory used for manager image builds.
 clean-all: clean-bin clean-dev clean-licenses ## Runs all cleanup targets.
 
 
-.PHONY: all build run check install uninstall code-dev test coverage images csv clean-all clean-bin clean-dev clean-licenses help
+.PHONY: all build run check install uninstall code-dev test test-e2e coverage images csv clean-all clean-bin clean-dev clean-licenses help

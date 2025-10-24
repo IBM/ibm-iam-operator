@@ -24,7 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/IBM/ibm-iam-operator/controllers/common"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	"github.com/IBM/ibm-iam-operator/database/migration"
 	certmgr "github.com/ibm/ibm-cert-manager-operator/apis/cert-manager/v1"
@@ -81,6 +80,10 @@ var opreqWait time.Duration = 100 * time.Millisecond
 
 // defaultLowerWait is used in instances where a requeue is needed quickly, regardless of previous requeues
 var defaultLowerWait time.Duration = 5 * time.Millisecond
+
+var rule = `^([a-z0-9]){32,}$`
+var wlpClientID = ctrlcommon.GenerateRandomString(rule)
+var wlpClientSecret = ctrlcommon.GenerateRandomString(rule)
 
 // finalizerName is the finalizer appended to the Authentication CR
 var finalizerName = "authentication.operator.ibm.com"
@@ -182,7 +185,6 @@ type AuthenticationReconciler struct {
 	clusterType     ctrlcommon.ClusterType
 	dbSetupChan     chan *migration.Result
 	needsRollout    bool
-	common.ByteGenerator
 }
 
 // GetFromCacheOrAPI first tries to GET the object from the cache; if this
@@ -354,14 +356,14 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// Check if this Secret already exists and create it if it doesn't
 	currentSecret := &corev1.Secret{}
-	err = r.handleSecret(instance, currentSecret, &needToRequeue)
+	err = r.handleSecret(instance, wlpClientID, wlpClientSecret, currentSecret, &needToRequeue)
 	if err != nil {
 		return
 	}
 
 	//Check if this ConfigMap already exists and create it if it doesn't
 	currentConfigMap := &corev1.ConfigMap{}
-	err = r.handleConfigMap(instance, currentConfigMap, &needToRequeue)
+	err = r.handleConfigMap(instance, wlpClientID, wlpClientSecret, currentConfigMap, &needToRequeue)
 	if err != nil {
 		return
 	}

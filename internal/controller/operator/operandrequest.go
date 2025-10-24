@@ -37,23 +37,32 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// addEmbeddedEDBIfNeeded appends the common-service-postgresql Operand to the list of Operands when the IM install is
+// addEmbeddedDBIfNeeded appends the common-service-postgresql Operand to the list of Operands when the IM install is
 // configured to use an embedded EDB. If there is an error while trying to obtain the relevant IM configuration for EDB,
 // it will skip adding the Operand and return the encountered error.
-func (r *AuthenticationReconciler) addEmbeddedEDBIfNeeded(ctx context.Context, authCR *operatorv1alpha1.Authentication,
+func (r *AuthenticationReconciler) addEmbeddedDBIfNeeded(ctx context.Context, authCR *operatorv1alpha1.Authentication,
 	operands *[]operatorv1alpha1.Operand) (err error) {
 	var usingExternal bool
-	if usingExternal, err = r.isConfiguredForExternalEDB(ctx, authCR); err == nil && !usingExternal {
-		*operands = append(*operands, operatorv1alpha1.Operand{
-			Name: "common-service-postgresql",
-			Bindings: map[string]operatorv1alpha1.Bindable{
-				"protected-im-db": {
-					Secret:    ctrlcommon.DatastoreEDBSecretName,
-					Configmap: ctrlcommon.DatastoreEDBCMName,
-				},
-			},
-		})
+	if usingExternal, err = r.isConfiguredForExternalEDB(ctx, authCR); err != nil || usingExternal {
+		return
 	}
+	name := "common-service-postgresql"
+	if authCR.Spec.Database != nil && authCR.Spec.Database.OperandRequest != nil && *authCR.Spec.Database.OperandRequest != "" {
+		if *authCR.Spec.Database.OperandRequest == "ibm-cnpg-postgres-operator" {
+			name = "common-service-cnpg"
+		} else {
+			name = *authCR.Spec.Database.OperandRequest
+		}
+	}
+	*operands = append(*operands, operatorv1alpha1.Operand{
+		Name: name,
+		Bindings: map[string]operatorv1alpha1.Bindable{
+			"protected-im-db": {
+				Secret:    ctrlcommon.DatastoreEDBSecretName,
+				Configmap: ctrlcommon.DatastoreEDBCMName,
+			},
+		},
+	})
 	return
 }
 
@@ -82,7 +91,7 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 		{Name: "ibm-idp-config-ui-operator"},
 	}
 
-	if err = r.addEmbeddedEDBIfNeeded(debugCtx, authCR, &desiredOperands); err != nil {
+	if err = r.addEmbeddedDBIfNeeded(debugCtx, authCR, &desiredOperands); err != nil {
 		log.Error(err, "Unexpected error was encountered while attempting to determine whether EDB needed")
 		return subreconciler.RequeueWithError(err)
 	}
@@ -341,12 +350,17 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 		return subreconciler.RequeueWithError(err)
 	}
 
-	log = log.WithValues("Object.Name", "common-service-db", "Object.Kind", "Cluster", "Object.APIVersion", "postgresql.k8s.enterprisedb.io/v1")
+	clusterAPIVersion := "postgresql.k8s.enterprisedb.io/v1"
+	if authCR.Spec.Database != nil && authCR.Spec.Database.OperandRequest != nil && *authCR.Spec.Database.OperandRequest == "ibm-cnpg-postgres-operator" {
+		clusterAPIVersion = "postgresql.cnpg.ibm.com/v1"
+	}
+
+	log = log.WithValues("Object.Name", "common-service-db", "Object.Kind", "Cluster", "Object.APIVersion", clusterAPIVersion)
 
 	u := &unstructured.Unstructured{
 		Object: map[string]any{
 			"kind":       "Cluster",
-			"apiVersion": "postgresql.k8s.enterprisedb.io/v1",
+			"apiVersion": clusterAPIVersion,
 		},
 	}
 	if err = r.Get(ctx, types.NamespacedName{Name: "common-service-db", Namespace: req.Namespace}, u); k8sErrors.IsNotFound(err) {

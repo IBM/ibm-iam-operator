@@ -181,30 +181,30 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 	defer func() {
 		common.ScrubMap(platformOIDCCredentialsSecret.Data)
 	}()
-	var wlpClientID []byte
-	_, ok = platformOIDCCredentialsSecret.Data["WLP_CLIENT_ID"]
-	if !ok {
-		err = fmt.Errorf("Client ID not found in Secret")
-		reqLogger.Error(err, "ConfigMap reconciliation failed due to invalid Secret content in WLP_CLIENT_ID", "Secret.Name", "platform-oidc-credentials", "Secret.Namespace", instance.Namespace)
-		*needToRequeue = true
-		return
-	}
-	copy(wlpClientID, platformOIDCCredentialsSecret.Data["WLP_CLIENT_ID"])
-	defer func() {
-		common.Scrub(wlpClientID)
-	}()
-	var wlpClientSecret []byte
-	_, ok = platformOIDCCredentialsSecret.Data["WLP_CLIENT_SECRET"]
-	if !ok {
-		err = fmt.Errorf("Client Secret not found in Secret")
-		reqLogger.Error(err, "ConfigMap reconciliation failed due to invalid Secret content in WLP_CLIENT_SECRET", "Secret.Name", "platform-oidc-credentials", "Secret.Namespace", instance.Namespace)
-		*needToRequeue = true
-		return
-	}
-	copy(wlpClientSecret, platformOIDCCredentialsSecret.Data["WLP_CLIENT_SECRET"])
-	defer func() {
-		common.Scrub(wlpClientSecret)
-	}()
+	//var wlpClientID []byte
+	//_, ok = platformOIDCCredentialsSecret.Data["WLP_CLIENT_ID"]
+	//if !ok {
+	//	err = fmt.Errorf("Client ID not found in Secret")
+	//	reqLogger.Error(err, "ConfigMap reconciliation failed due to invalid Secret content in WLP_CLIENT_ID", "Secret.Name", "platform-oidc-credentials", "Secret.Namespace", instance.Namespace)
+	//	*needToRequeue = true
+	//	return
+	//}
+	//copy(wlpClientID, platformOIDCCredentialsSecret.Data["WLP_CLIENT_ID"])
+	//defer func() {
+	//common.Scrub(wlpClientID)
+	//}()
+	//var wlpClientSecret []byte
+	//_, ok = platformOIDCCredentialsSecret.Data["WLP_CLIENT_SECRET"]
+	//if !ok {
+	//	err = fmt.Errorf("Client Secret not found in Secret")
+	//	reqLogger.Error(err, "ConfigMap reconciliation failed due to invalid Secret content in WLP_CLIENT_SECRET", "Secret.Name", "platform-oidc-credentials", "Secret.Namespace", instance.Namespace)
+	//	*needToRequeue = true
+	//	return
+	//}
+	//copy(wlpClientSecret, platformOIDCCredentialsSecret.Data["WLP_CLIENT_SECRET"])
+	//defer func() {
+	//common.Scrub(wlpClientSecret)
+	//}()
 
 	// Creation the default configmaps
 	for index, configMap := range configMapList {
@@ -213,7 +213,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 			// Define a new ConfigMap
 			switch configMapList[index] {
 			case "registration-json":
-				newConfigMap = registrationJsonConfigMap(instance, wlpClientID, wlpClientSecret, icpConsoleURL, r.Scheme)
+				newConfigMap = registrationJsonConfigMap(instance, platformOIDCCredentialsSecret.Data["WLP_CLIENT_ID"], platformOIDCCredentialsSecret.Data["WLP_CLIENT_SECRET"], icpConsoleURL, r.Scheme)
 				if newConfigMap == nil {
 					err = fmt.Errorf("an error occurred during registration-json generation")
 					return
@@ -487,7 +487,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 				r.needsRollout = true
 			}
 		case "registration-json":
-			newConfigMap = registrationJsonConfigMap(instance, wlpClientID, wlpClientSecret, icpConsoleURL, r.Scheme)
+			newConfigMap = registrationJsonConfigMap(instance, platformOIDCCredentialsSecret.Data["WLP_CLIENT_ID"], platformOIDCCredentialsSecret.Data["WLP_CLIENT_SECRET"], icpConsoleURL, r.Scheme)
 			if newConfigMap == nil {
 				err = fmt.Errorf("an error occurred during registration-json generation")
 				return err
@@ -734,6 +734,7 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 		icpConsoleURL,
 		icpRegistrationConsoleURIs,
 	}
+	reqLogger.Info("tmpRegistrationJsonVals", "wlpClientID", vals.WLPClientID, "wlpClientSecret", wlpClientSecret)
 	defer func() {
 		vals.WLPClientID = ""
 		vals.WLPClientSecret = ""

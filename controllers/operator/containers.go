@@ -234,17 +234,6 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			},
 		},
 		{
-			Name: "DEFAULT_ADMIN_USER",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp-credentials",
-					},
-					Key: "admin_username",
-				},
-			},
-		},
-		{
 			Name: "DEFAULT_ADMIN_PASSWORD",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{

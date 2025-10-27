@@ -555,8 +555,10 @@ func (r *ClientReconciler) processZenRegistration(ctx context.Context, req ctrl.
 		return subreconciler.RequeueWithError(err)
 	}
 	defer func() {
-		common.Scrub(clientCreds.ClientID)
-		common.Scrub(clientCreds.ClientSecret)
+		if clientCreds != nil {
+			common.Scrub(clientCreds.ClientID)
+			common.Scrub(clientCreds.ClientSecret)
+		}
 	}()
 
 	//Zen registration exist, update

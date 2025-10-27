@@ -181,31 +181,6 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 	defer func() {
 		common.ScrubMap(platformOIDCCredentialsSecret.Data)
 	}()
-	//var wlpClientID []byte
-	//_, ok = platformOIDCCredentialsSecret.Data["WLP_CLIENT_ID"]
-	//if !ok {
-	//	err = fmt.Errorf("Client ID not found in Secret")
-	//	reqLogger.Error(err, "ConfigMap reconciliation failed due to invalid Secret content in WLP_CLIENT_ID", "Secret.Name", "platform-oidc-credentials", "Secret.Namespace", instance.Namespace)
-	//	*needToRequeue = true
-	//	return
-	//}
-	//copy(wlpClientID, platformOIDCCredentialsSecret.Data["WLP_CLIENT_ID"])
-	//defer func() {
-	//common.Scrub(wlpClientID)
-	//}()
-	//var wlpClientSecret []byte
-	//_, ok = platformOIDCCredentialsSecret.Data["WLP_CLIENT_SECRET"]
-	//if !ok {
-	//	err = fmt.Errorf("Client Secret not found in Secret")
-	//	reqLogger.Error(err, "ConfigMap reconciliation failed due to invalid Secret content in WLP_CLIENT_SECRET", "Secret.Name", "platform-oidc-credentials", "Secret.Namespace", instance.Namespace)
-	//	*needToRequeue = true
-	//	return
-	//}
-	//copy(wlpClientSecret, platformOIDCCredentialsSecret.Data["WLP_CLIENT_SECRET"])
-	//defer func() {
-	//common.Scrub(wlpClientSecret)
-	//}()
-
 	// Creation the default configmaps
 	for index, configMap := range configMapList {
 		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: instance.Namespace}, currentConfigMap)

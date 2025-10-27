@@ -1118,6 +1118,25 @@ func buildIdpVolumes(ldapCACert string, routerCertSecret string, auditSecretName
 			},
 		},
 		{
+			Name: "admin-auth",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-auth-idp-credentials",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "admin_username",
+							Path: "admin_username",
+						},
+						{
+							Key:  "admin_password",
+							Path: "admin_password",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		},
+		{
 			Name: "scim-ldap-attributes-mapping",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{

@@ -313,6 +313,14 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 				Name:      "pgsql-client-cred",
 				MountPath: "/pgsql/clientinfo",
 			},
+			{
+				Name:      "admin-auth",
+				MountPath: "/auth/admin-auth",
+			},
+			{
+				Name:      "scim-admin-auth",
+				MountPath: "/auth/scim-admin-auth",
+			},
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{

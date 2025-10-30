@@ -273,7 +273,7 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			},
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
-			ReadOnlyRootFilesystem:   &falseVar,
+			ReadOnlyRootFilesystem:   &trueVar,
 			AllowPrivilegeEscalation: &falseVar,
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
@@ -320,6 +320,26 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			{
 				Name:      "scim-admin-auth",
 				MountPath: "/auth/scim-admin-auth",
+      },
+      {
+				Name:      "liberty-serverdir-vol",
+				MountPath: "/opt/ibm/wlp/usr/servers/defaultServer",
+			},
+			{
+				Name:      "liberty-outputdir-vol",
+				MountPath: "/opt/ibm/wlp/output/defaultServer",
+			},
+			{
+				Name:      "liberty-logs-vol",
+				MountPath: "/logs",
+			},
+			{
+				Name:      "tmp-vol",
+				MountPath: "/tmp",
+			},
+			{
+				Name:      "auth-service-data-vol",
+				MountPath: "/opt/ibm/auth-service",
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
@@ -611,7 +631,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			},
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
-			ReadOnlyRootFilesystem:   &falseVar,
+			ReadOnlyRootFilesystem:   &trueVar,
 			AllowPrivilegeEscalation: &falseVar,
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
@@ -921,7 +941,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			},
 			Privileged:               &falseVar,
 			RunAsNonRoot:             &trueVar,
-			ReadOnlyRootFilesystem:   &falseVar,
+			ReadOnlyRootFilesystem:   &trueVar,
 			AllowPrivilegeEscalation: &falseVar,
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
@@ -1049,6 +1069,10 @@ func buildIdentityManagerVolumeMounts(auditSecretName string) []corev1.VolumeMou
 			Name:      "pgsql-client-cred",
 			MountPath: "/pgsql/clientinfo",
 		},
+		{
+			Name:      "tmp-vol",
+			MountPath: "/tmp",
+		},
 	}
 	if len(auditSecretName) > 0 {
 		newVolMount := corev1.VolumeMount{
@@ -1086,6 +1110,14 @@ func buildIdentityProviderVolumeMounts(auditSecretName string) []corev1.VolumeMo
 		{
 			Name:      "pgsql-client-cred",
 			MountPath: "/pgsql/clientinfo",
+		},
+		{
+			Name:      "provider-data-vol",
+			MountPath: "/opt/ibm/provider-data",
+		},
+		{
+			Name:      "tmp-vol",
+			MountPath: "/tmp",
 		},
 	}
 	if len(auditSecretName) > 0 {

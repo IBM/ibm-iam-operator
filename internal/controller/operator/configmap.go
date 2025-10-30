@@ -548,7 +548,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"LOG_LEVEL_IDMGMT":                   "info",
 				"LOG_LEVEL_MW":                       "info",
 				"IDTOKEN_LIFETIME":                   "12h",
-				"SESSION_TIMEOUT":                    "43200",
+				"SESSION_TIMEOUT":                    "43200s",
 				"IAM_UM":                             strconv.FormatBool(iamUm),
 				"ACCOUNT_IAM_URL":                    accountIamURL,
 				"OIDC_ISSUER_URL":                    authCR.Spec.Config.OIDCIssuerURL,

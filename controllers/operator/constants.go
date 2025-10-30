@@ -52,17 +52,15 @@ done
 if [ $HTTP_CODE = "404" ]
 then
   echo "Running new client id registration"
-  cp /jsons/platform-oidc-registration.json platform-oidc-registration.json
   until curl -i -k -X POST -u oauthadmin:$WLP_CLIENT_REGISTRATION_SECRET \
    -H "Content-Type: application/json" \
-   --data @platform-oidc-registration.json \
+   --data @/jsons/platform-oidc-registration.json \
    https://platform-auth-service:9443/oidc/endpoint/OP/registration | grep '201 Created'; do sleep 1; done;
 else
   echo "Running update client id registration."
-  cp /jsons/platform-oidc-registration.json platform-oidc-registration.json
   until curl -i -k -X PUT -u oauthadmin:$WLP_CLIENT_REGISTRATION_SECRET \
    -H "Content-Type: application/json" \
-   --data @platform-oidc-registration.json \
+   --data @/jsons/platform-oidc-registration.json \
    https://platform-auth-service:9443/oidc/endpoint/OP/registration/$WLP_CLIENT_ID | grep '200 OK'; do sleep 1; done;
 fi
 `

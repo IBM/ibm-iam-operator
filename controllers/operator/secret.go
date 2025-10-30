@@ -27,7 +27,7 @@ import (
 	"time"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
-	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
+	"github.com/IBM/ibm-iam-operator/controllers/common"
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,14 +40,36 @@ import (
 
 var rule2 = `^([a-zA-Z0-9]){32,}$`
 var rule3 = `^([a-zA-Z0-9]){16,}$`
-var adminPassword = ctrlCommon.GenerateRandomString(rule2)
-var scimAdminPassword = ctrlCommon.GenerateRandomString(rule2)
-var encryptionKey = ctrlCommon.GenerateRandomString(rule2)
-var wlpClientRegistrationSecret = ctrlCommon.GenerateRandomString(rule2)
-var encryptionIV = ctrlCommon.GenerateRandomString(rule3)
 
-func generateSecretData(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string) map[string]map[string][]byte {
-
+func (r *AuthenticationReconciler) generateSecretData(instance *operatorv1alpha1.Authentication) (map[string]map[string][]byte, error) {
+	wlpClientID, err := r.GenerateBytes(common.LowerAlphaNum, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate wlpClientID: %w", err)
+	}
+	wlpClientSecret, err := r.GenerateBytes(common.LowerAlphaNum, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate wlpClientSecret: %w", err)
+	}
+	adminPassword, err := r.GenerateBytes(common.AlphaNum, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate adminPassword: %w", err)
+	}
+	scimAdminPassword, err := r.GenerateBytes(common.AlphaNum, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate scimAdminPassword: %w", err)
+	}
+	encryptionKey, err := r.GenerateBytes(common.AlphaNum, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate encryptionKey: %w", err)
+	}
+	wlpClientRegistrationSecret, err := r.GenerateBytes(common.AlphaNum, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate wlpClientRegistrationSecret: %w", err)
+	}
+	encryptionIV, err := r.GenerateBytes(common.AlphaNum, 16)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate encryptionIV: %w", err)
+	}
 	secretData := map[string]map[string][]byte{
 		"platform-auth-ldaps-ca-cert": {
 			"certificate": []byte(""),
@@ -87,15 +109,16 @@ func generateSecretData(instance *operatorv1alpha1.Authentication, wlpClientID s
 			"cert": []byte(""),
 		},
 	}
-	return secretData
+	return secretData, nil
 }
 
-func (r *AuthenticationReconciler) handleSecret(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentSecret *corev1.Secret, needToRequeue *bool) error {
-
-	secretData := generateSecretData(instance, wlpClientID, wlpClientSecret)
-
+func (r *AuthenticationReconciler) handleSecret(instance *operatorv1alpha1.Authentication, currentSecret *corev1.Secret, needToRequeue *bool) error {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	var err error
+	secretData, err := r.generateSecretData(instance)
+	if err != nil {
+		reqLogger.Error(err, "Failed to generate Secrets")
+		return err
+	}
 
 	for secretName := range secretData {
 		secretLog := reqLogger.WithValues("Secret.Name", secretName)
@@ -121,7 +144,7 @@ func (r *AuthenticationReconciler) handleSecret(instance *operatorv1alpha1.Authe
 		} else {
 			secretLog.Info("Need to update Secret")
 			secretUpdateRequired := false
-			generatedLabels := ctrlCommon.MergeMaps(nil, currentSecret.Labels, ctrlCommon.GetCommonLabels())
+			generatedLabels := common.MergeMaps(nil, currentSecret.Labels, common.GetCommonLabels())
 			if !maps.Equal(generatedLabels, currentSecret.Labels) {
 				currentSecret.Labels = generatedLabels
 				secretUpdateRequired = true
@@ -174,7 +197,7 @@ func (r *AuthenticationReconciler) handleSecret(instance *operatorv1alpha1.Authe
 
 func generateSecretObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, secretName string, secretData map[string][]byte) *corev1.Secret {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name, "Secret.Name", secretName)
-	labels := ctrlCommon.MergeMaps(nil, ctrlCommon.GetCommonLabels())
+	labels := common.MergeMaps(nil, common.GetCommonLabels())
 	newSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
@@ -217,7 +240,7 @@ func (r *AuthenticationReconciler) createClusterCACert(i *operatorv1alpha1.Authe
 	reqLogger := log.WithValues("Instance.Namespace", i.Namespace, "Instance.Name", i.Name, "Secret.Name", secretName)
 
 	// create ibmcloud-cluster-ca-cert
-	labels := ctrlCommon.MergeMaps(nil,
+	labels := common.MergeMaps(nil,
 		map[string]string{
 			"app":                          "platform-auth-service",
 			"component":                    "platform-auth-service",
@@ -226,7 +249,7 @@ func (r *AuthenticationReconciler) createClusterCACert(i *operatorv1alpha1.Authe
 			"app.kubernetes.io/instance":   "platform-auth-service",
 			"app.kubernetes.io/managed-by": "",
 		},
-		ctrlCommon.GetCommonLabels())
+		common.GetCommonLabels())
 	clusterSecret := &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "Secret",
@@ -274,7 +297,7 @@ func (r *AuthenticationReconciler) createClusterCACert(i *operatorv1alpha1.Authe
 		Group:   "operator.ibm.com",
 		Version: "v1alpha1",
 	}
-	if !ctrlCommon.IsControllerOf(gvk, i, current) {
+	if !common.IsControllerOf(gvk, i, current) {
 		reqLogger.Info("The secret is already controlled by another object; deleting it and recreating in another loop")
 		err = r.Client.Delete(context.TODO(), current)
 		if err != nil {

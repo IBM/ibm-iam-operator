@@ -16,6 +16,7 @@
 package v1
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -99,17 +100,9 @@ func insertOIDCClients(ctx context.Context, mongodb *dbconn.MongoDB, postgres *d
 	errCount := 0
 	migrateCount := 0
 	for cursor.Next(ctx) {
-		var result map[string]interface{}
-		if err = cursor.Decode(&result); err != nil {
-			reqLogger.Error(err, "Failed to decode Mongo document")
-			errCount++
-			err = nil
-			continue
-		}
-
 		oc := &OIDCClient{}
-		if err = ConvertToOIDCClient(result, oc); err != nil {
-			reqLogger.Error(err, "Failed to unmarshal oauthclient")
+		if err = cursor.Decode(&oc); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document")
 			errCount++
 			err = nil
 			continue
@@ -120,14 +113,21 @@ func insertOIDCClients(ctx context.Context, mongodb *dbconn.MongoDB, postgres *d
 		err = postgres.Conn.QueryRow(ctx, query, args).Scan(&id)
 		if errors.Is(err, pgx.ErrNoRows) {
 			reqLogger.Info("Row already exists in EDB")
+			err = nil
 		} else if err != nil {
 			reqLogger.Error(err, "Failed to INSERT into table", "table", "oauthdbschema.oauthclient")
 			errCount++
+			Scrub(oc.ClientSecret)
+			Scrub(oc.Metadata)
+			oc = nil
 			continue
 		}
 		updateFilter := bson.D{{Key: "CLIENTID", Value: oc.ClientID}}
 		update := bson.D{{Key: "$set", Value: bson.D{{Key: migrationKey, Value: true}}}}
 		updateResult, err := mongodb.Client.Database(dbName).Collection(collectionName).UpdateOne(ctx, updateFilter, update)
+		Scrub(oc.ClientSecret)
+		Scrub(oc.Metadata)
+		oc = nil
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
 			errCount++
@@ -644,22 +644,22 @@ func migrateUserPreferencesRowForUser(ctx context.Context, mongodb *dbconn.Mongo
 }
 
 // xorDecode decodes an xor-encoded string
-func xorDecode(e string) (d string, err error) {
-	xorPrefix := "{xor}"
-	eWithoutPrefix := strings.TrimPrefix(e, xorPrefix)
-	var decodedFromBase64 []byte
-	if decodedFromBase64, err = base64.StdEncoding.DecodeString(eWithoutPrefix); err != nil {
-		return "", fmt.Errorf("failed to decode xor string: %w", err)
+func xorDecode(e []byte) (d []byte, err error) {
+	xorPrefix := []byte("{xor}")
+	eWithoutPrefix := bytes.TrimPrefix(e, xorPrefix)
+	decodedFromBase64 := make([]byte, base64.StdEncoding.DecodedLen(len(eWithoutPrefix)))
+	if _, err = base64.StdEncoding.Decode(decodedFromBase64, eWithoutPrefix); err != nil {
+		return nil, fmt.Errorf("failed to decode xor bytes: %w", err)
 	}
 	var dBytes []byte
 	for _, b := range decodedFromBase64 {
 		dBytes = append(dBytes, b^'_')
 	}
-	return string(dBytes), nil
+	return dBytes, nil
 }
 
 func setClientSecretIfEmpty(ctx context.Context, mongodb *dbconn.MongoDB, zenInstance *ZenInstance) (set bool, err error) {
-	if zenInstance.ClientSecret != "" {
+	if len(zenInstance.ClientSecret) > 0 {
 		return
 	}
 
@@ -745,17 +745,9 @@ func insertZenInstances(ctx context.Context, mongodb *dbconn.MongoDB, postgres *
 	migrateCount := 0
 	skipped := []string{}
 	for cursor.Next(ctx) {
-		var result map[string]interface{}
-		if err = cursor.Decode(&result); err != nil {
-			reqLogger.Error(err, "Failed to decode Mongo document")
-			errCount++
-			err = nil
-			continue
-		}
-
 		zenInstance := &ZenInstance{}
-		if err = ConvertToZenInstance(result, zenInstance); err != nil {
-			reqLogger.Error(err, "Failed to unmarshal ZenInstance")
+		if err = cursor.Decode(zenInstance); err != nil {
+			reqLogger.Error(err, "Failed to decode Mongo document")
 			errCount++
 			err = nil
 			continue
@@ -773,15 +765,20 @@ func insertZenInstances(ctx context.Context, mongodb *dbconn.MongoDB, postgres *
 		_, err := postgres.Conn.Exec(ctx, query, args)
 		if errors.Is(err, pgx.ErrNoRows) {
 			reqLogger.Info("Row already exists in EDB")
+			err = nil
 		} else if err != nil {
 			reqLogger.Error(err, "Failed to INSERT into table", "table", "platformdb.zen_instances")
 			errCount++
+			Scrub(zenInstance.ClientSecret)
+			zenInstance = nil
 			continue
 		}
 
-		updateFilter := bson.D{{Key: "_id", Value: result["_id"]}}
+		updateFilter := bson.D{{Key: "_id", Value: zenInstance.InstanceID}}
 		update := bson.D{{Key: "$set", Value: bson.D{{Key: migrationKey, Value: true}}}}
 		updateResult, err := mongodb.Client.Database("platform-db").Collection("ZenInstance").UpdateOne(ctx, updateFilter, update)
+		Scrub(zenInstance.ClientSecret)
+		zenInstance = nil
 		if err != nil {
 			reqLogger.Error(err, "Failed to write back migration completion to Mongo")
 			errCount++
@@ -1584,3 +1581,12 @@ func insertGroupsAndMemberRefs(ctx context.Context, mongodb *dbconn.MongoDB, pos
 }
 
 type copyFunc func(context.Context, *dbconn.MongoDB, *dbconn.PostgresDB) error
+
+func Scrub(b []byte) (n int) {
+	for i := range b {
+		b[i] = 0
+		n++
+	}
+	b = nil
+	return
+}

@@ -34,6 +34,7 @@ import (
 	"text/template"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
+	"github.com/IBM/ibm-iam-operator/controllers/common"
 	ctrlCommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	osconfigv1 "github.com/openshift/api/config/v1"
 	"gopkg.in/yaml.v2"
@@ -54,7 +55,7 @@ import (
 
 const AnnotationSHA1Sum string = "authentication.operator.ibm.com/sha1sum"
 
-func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, currentConfigMap *corev1.ConfigMap, needToRequeue *bool) (err error) {
+func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Authentication, currentConfigMap *corev1.ConfigMap, needToRequeue *bool) (err error) {
 
 	var isOSEnv bool
 	var domainName string
@@ -171,7 +172,15 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 		*needToRequeue = true
 		return
 	}
-
+	platformOIDCCredentialsSecret := &corev1.Secret{}
+	if err = r.Get(context.TODO(), types.NamespacedName{Name: "platform-oidc-credentials", Namespace: instance.Namespace}, platformOIDCCredentialsSecret); err != nil {
+		reqLogger.Error(err, "Missing Secret required for ConfigMap reconciliation; requeueing", "Secret.Name", "platform-oidc-credentials", "Secret.Namespace", instance.Namespace)
+		*needToRequeue = true
+		return
+	}
+	defer func() {
+		common.ScrubMap(platformOIDCCredentialsSecret.Data)
+	}()
 	// Creation the default configmaps
 	for index, configMap := range configMapList {
 		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: configMap, Namespace: instance.Namespace}, currentConfigMap)
@@ -179,7 +188,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 			// Define a new ConfigMap
 			switch configMapList[index] {
 			case "registration-json":
-				newConfigMap = registrationJsonConfigMap(instance, wlpClientID, wlpClientSecret, icpConsoleURL, r.Scheme)
+				newConfigMap = registrationJsonConfigMap(instance, platformOIDCCredentialsSecret.Data["WLP_CLIENT_ID"], platformOIDCCredentialsSecret.Data["WLP_CLIENT_SECRET"], icpConsoleURL, r.Scheme)
 				if newConfigMap == nil {
 					err = fmt.Errorf("an error occurred during registration-json generation")
 					return
@@ -453,22 +462,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 				r.needsRollout = true
 			}
 		case "registration-json":
-			platformOIDCCredentials := &corev1.Secret{}
-			var servicesNamespace string
-			servicesNamespace, err = ctrlCommon.GetServicesNamespace(context.Background(), &r.Client)
-			if err != nil {
-				reqLogger.Error(err, "Failed to get services namespace")
-				return
-			}
-			objectKey := types.NamespacedName{Name: "platform-oidc-credentials", Namespace: servicesNamespace}
-			err = r.Client.Get(context.Background(), objectKey, platformOIDCCredentials)
-			if err != nil {
-				reqLogger.Error(err, "Failed to get Secret for registration-json update")
-				return
-			}
-			latestWLPClientID := platformOIDCCredentials.Data["WLP_CLIENT_ID"]
-			latestWLPClientSecret := platformOIDCCredentials.Data["WLP_CLIENT_SECRET"]
-			newConfigMap = registrationJsonConfigMap(instance, string(latestWLPClientID[:]), string(latestWLPClientSecret[:]), icpConsoleURL, r.Scheme)
+			newConfigMap = registrationJsonConfigMap(instance, platformOIDCCredentialsSecret.Data["WLP_CLIENT_ID"], platformOIDCCredentialsSecret.Data["WLP_CLIENT_SECRET"], icpConsoleURL, r.Scheme)
 			if newConfigMap == nil {
 				err = fmt.Errorf("an error occurred during registration-json generation")
 				return err
@@ -691,7 +685,7 @@ func replaceOIDCClientRegistrationJob(cl client.Client, ctx context.Context, nam
 	return
 }
 
-func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID string, wlpClientSecret string, icpConsoleURL string, scheme *runtime.Scheme) *corev1.ConfigMap {
+func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpClientID []byte, wlpClientSecret []byte, icpConsoleURL string, scheme *runtime.Scheme) *corev1.ConfigMap {
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 
 	// Calculate the ICP Registration Console URI(s)
@@ -710,11 +704,17 @@ func registrationJsonConfigMap(instance *operatorv1alpha1.Authentication, wlpCli
 		ICPRegistrationConsoleURIs                  []string
 	}
 	vals := tmpRegistrationJsonVals{
-		wlpClientID,
-		wlpClientSecret,
+		string(wlpClientID),
+		string(wlpClientSecret),
 		icpConsoleURL,
 		icpRegistrationConsoleURIs,
 	}
+	reqLogger.Info("tmpRegistrationJsonVals", "wlpClientID", vals.WLPClientID, "wlpClientSecret", wlpClientSecret)
+	defer func() {
+		vals.WLPClientID = ""
+		vals.WLPClientSecret = ""
+		vals = tmpRegistrationJsonVals{}
+	}()
 	registrationJsonTpl := template.Must(template.New("registrationJson").Parse(registrationJson))
 	var registrationJsonBytes bytes.Buffer
 	if err := registrationJsonTpl.Execute(&registrationJsonBytes, vals); err != nil {

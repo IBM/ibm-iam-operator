@@ -38,6 +38,7 @@ import (
 
 	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/apis/oidc.security/v1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
+	"github.com/IBM/ibm-iam-operator/controllers/common"
 	controllercommon "github.com/IBM/ibm-iam-operator/controllers/common"
 	oidcsecuritycontrollers "github.com/IBM/ibm-iam-operator/controllers/oidc.security"
 	operatorcontrollers "github.com/IBM/ibm-iam-operator/controllers/operator"
@@ -156,10 +157,16 @@ func main() {
 	const clientControllerName = "controller_oidc_client"
 
 	clientReconciler := &oidcsecuritycontrollers.ClientReconciler{
-		Client:   mgr.GetClient(),
-		Reader:   mgr.GetAPIReader(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor(clientControllerName),
+		Client:        mgr.GetClient(),
+		Reader:        mgr.GetAPIReader(),
+		Scheme:        mgr.GetScheme(),
+		Recorder:      mgr.GetEventRecorderFor(clientControllerName),
+		ByteGenerator: &common.RandomByteGenerator{},
+	}
+	if os.Getenv(common.ForceRunModeEnv) == string(common.LocalRunMode) {
+		clientReconciler.RunMode = common.LocalRunMode
+	} else {
+		clientReconciler.RunMode = common.ClusterRunMode
 	}
 	if err = (clientReconciler).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Client")
@@ -176,6 +183,7 @@ func main() {
 		Reader:          mgr.GetAPIReader(),
 		DiscoveryClient: *dc,
 		Scheme:          mgr.GetScheme(),
+		ByteGenerator:   &common.RandomByteGenerator{},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Authentication")
 		os.Exit(1)

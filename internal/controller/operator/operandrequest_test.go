@@ -6,6 +6,7 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
 	testutil "github.com/IBM/ibm-iam-operator/test/utils"
@@ -69,7 +70,7 @@ var _ = Describe("OperandRequest handling", func() {
 			WithScheme(scheme)
 	})
 
-	Describe("addEmbeddedEDBIfNeeded", func() {
+	Describe("addEmbeddedDBIfNeeded", func() {
 		var operands *[]operatorv1alpha1.Operand
 		Context("When determining external or embedded EDB", func() {
 			BeforeEach(func() {
@@ -103,7 +104,7 @@ var _ = Describe("OperandRequest handling", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				By("seeing the value of IS_EMBEDDED field is empty")
-				err = r.addEmbeddedEDBIfNeeded(context.Background(), authCR, operands)
+				err = r.addEmbeddedDBIfNeeded(context.Background(), authCR, operands)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(len(*operands)).To(Equal(1))
 				Expect((*operands)[0]).ToNot(BeNil())
@@ -129,20 +130,65 @@ var _ = Describe("OperandRequest handling", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				By("seeing the value of IS_EMBEDDED field is true")
-				err = r.addEmbeddedEDBIfNeeded(context.Background(), authCR, operands)
+				err = r.addEmbeddedDBIfNeeded(context.Background(), authCR, operands)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(len(*operands)).To(Equal(1))
 				Expect((*operands)[0]).ToNot(BeNil())
 				Expect((*operands)[0].Name).To(Equal("common-service-postgresql"))
 			})
 
+			It("should add the embedded CNPG entry to the list of Operands when set on Authentication CR", func() {
+				By("having im-datastore-edb-cm ConfigMap in the same namespace as the Authentication")
+				cm := &corev1.ConfigMap{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "v1",
+						Kind:       "ConfigMap",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "im-datastore-edb-cm",
+						Namespace: "data-ns",
+					},
+					Data: map[string]string{
+						"IS_EMBEDDED": "true",
+					},
+				}
+				err := r.Create(context.Background(), cm)
+				Expect(err).ToNot(HaveOccurred())
+
+				By(`setting .spec.database.operandRequest to "cnpg-ibm"`)
+				authCR.Spec.Database = &operatorv1alpha1.DatabaseSpec{
+					OperandRequest: ptr.To("cnpg-ibm"),
+				}
+
+				By("seeing the value of IS_EMBEDDED field is true")
+				err = r.addEmbeddedDBIfNeeded(context.Background(), authCR, operands)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(len(*operands)).To(Equal(1))
+				Expect((*operands)[0]).ToNot(BeNil())
+				Expect((*operands)[0].Name).To(Equal("cnpg-ibm"))
+			})
+
 			It("should add the embedded EDB entry to the list of Operands", func() {
 				By("not having im-datastore-edb-cm ConfigMap in the same namespace as the Authentication")
-				err := r.addEmbeddedEDBIfNeeded(context.Background(), authCR, operands)
+				err := r.addEmbeddedDBIfNeeded(context.Background(), authCR, operands)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(len(*operands)).To(Equal(1))
 				Expect((*operands)[0]).ToNot(BeNil())
 				Expect((*operands)[0].Name).To(Equal("common-service-postgresql"))
+			})
+
+			It("should add the embedded CNPG entry to the list of Operands", func() {
+				By(`setting .spec.database.operandRequest to "cnpg-ibm"`)
+				authCR.Spec.Database = &operatorv1alpha1.DatabaseSpec{
+					OperandRequest: ptr.To("cnpg-ibm"),
+				}
+
+				By("not having im-datastore-edb-cm ConfigMap in the same namespace as the Authentication")
+				err := r.addEmbeddedDBIfNeeded(context.Background(), authCR, operands)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(len(*operands)).To(Equal(1))
+				Expect((*operands)[0]).ToNot(BeNil())
+				Expect((*operands)[0].Name).To(Equal("cnpg-ibm"))
 			})
 
 			It("should NOT add the embedded EDB entry to the list of Operands", func() {
@@ -164,7 +210,7 @@ var _ = Describe("OperandRequest handling", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				By("seeing the value of IS_EMBEDDED field is false")
-				err = r.addEmbeddedEDBIfNeeded(context.Background(), authCR, operands)
+				err = r.addEmbeddedDBIfNeeded(context.Background(), authCR, operands)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(len(*operands)).To(Equal(0))
 			})
@@ -181,7 +227,7 @@ var _ = Describe("OperandRequest handling", func() {
 					},
 				}
 				By("failing to get the ConfigMap for some reason")
-				err := rFailing.addEmbeddedEDBIfNeeded(context.Background(), authCR, operands)
+				err := rFailing.addEmbeddedDBIfNeeded(context.Background(), authCR, operands)
 				Expect(err).To(HaveOccurred())
 				Expect(len(*operands)).To(Equal(0))
 			})

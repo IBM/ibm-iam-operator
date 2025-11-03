@@ -49,6 +49,11 @@ type AuthenticationSpec struct {
 	Config                        ConfigSpec             `json:"config"`
 	EnableInstanaMetricCollection bool                   `json:"enableInstanaMetricCollection,omitempty"`
 	AutoScaleConfig               bool                   `json:"autoScaleConfig,omitempty"`
+	Database                      *DatabaseSpec          `json:"database,omitempty"`
+}
+
+type DatabaseSpec struct {
+	OperandRequest *string `json:"operandRequest,omitempty"`
 }
 
 type AuditServiceSpec struct {

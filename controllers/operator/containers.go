@@ -320,8 +320,8 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			{
 				Name:      "scim-admin-auth",
 				MountPath: "/auth/scim-admin-auth",
-      },
-      {
+			},
+			{
 				Name:      "liberty-serverdir-vol",
 				MountPath: "/opt/ibm/wlp/usr/servers/defaultServer",
 			},

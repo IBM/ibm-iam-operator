@@ -523,6 +523,53 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 					return
 				}
 			}
+		case "registration-script":
+			newConfigMap, err = registrationScriptConfigMap(instance, r.Scheme)
+			if err != nil {
+				err = fmt.Errorf("an error occurred during registration-script generation")
+				return err
+			}
+			reqLogger.Info("Calculated new register-client.sh")
+
+			var updatedScript, updatedOwnerRefs bool
+			existingScript := currentConfigMap.Data["register-client.sh"]
+			if existingScript != registerClientScript {
+				reqLogger.Info("Difference found in observed vs calculated register-client.sh")
+				currentConfigMap.Data["register-client.sh"] = registerClientScript
+				updatedScript = true
+			}
+			if !reflect.DeepEqual(newConfigMap.GetOwnerReferences(), currentConfigMap.GetOwnerReferences()) {
+				reqLogger.Info("Difference found in observed vs calculated OwnerReferences for registration-script cm")
+				currentConfigMap.OwnerReferences = newConfigMap.GetOwnerReferences()
+				updatedOwnerRefs = true
+			}
+			if updatedScript || updatedOwnerRefs {
+				reqLogger.Info("Updating registration-script ConfigMap")
+				if err = r.Client.Update(context.Background(), currentConfigMap); err != nil {
+					reqLogger.Error(err, "Failed to update ConfigMap", "Name", "registration-script", "Namespace", instance.Namespace)
+					return
+				}
+				reqLogger.Info("ConfigMap successfully updated")
+				if updatedScript {
+					reqLogger.Info("Deleting Job to re-run with updated ConfigMap", "Job.Name", "oidc-client-registration")
+					job := &batchv1.Job{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "oidc-client-registration",
+							Namespace: instance.Namespace,
+						},
+					}
+					if err = r.Client.Delete(context.TODO(), job); err != nil {
+						if k8sErrors.IsNotFound(err) {
+							reqLogger.Info("Job not found on cluster; continuing", "Job.Name", "oidc-client-registration")
+							return nil
+						}
+						reqLogger.Error(err, "Could not delete job", "Job.Name", "oidc-client-registration")
+						return
+					}
+					reqLogger.Info("Deleted Job", "Job.Name", "oidc-client-registration")
+					return
+				}
+			}
 		default:
 			reqLogger.Info("No ConfigMap update required")
 		}

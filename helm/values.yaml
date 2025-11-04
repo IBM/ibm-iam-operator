@@ -8,9 +8,10 @@ global:
   imagePullPrefix: icr.io
   imagePullSecret: ibm-entitlement-key
   imagePullPolicy: IfNotPresent
-  tetheredNamespaces:
-    - tenant1
-    - tenant2
+# Define tethered namespaces here, e.g.:
+# tetheredNamespaces:
+#   - tenant1
+#   - tenant2
 operator:
   imageTag: "4.15.0"
 operands:

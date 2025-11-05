@@ -133,12 +133,9 @@ func generateHPAObject(instance *operatorv1alpha1.Authentication, deploymentName
 
 		memRequest := container.Resources.Requests.Memory().Value()
 		memLimit := container.Resources.Limits.Memory().Value()
-		cpuRequest := container.Resources.Requests.Cpu().MilliValue()
-		cpuLimit := container.Resources.Limits.Cpu().MilliValue()
 
 		// Compute average utilization
 		avgUtilMem := calculateUtilization(memRequest, memLimit)
-		avgUtilCPU := calculateUtilization(cpuRequest, cpuLimit)
 
 		// Define HPA
 		*hpa = autoscalingv2.HorizontalPodAutoscaler{
@@ -171,16 +168,6 @@ func generateHPAObject(instance *operatorv1alpha1.Authentication, deploymentName
 							Target: autoscalingv2.MetricTarget{
 								Type:               autoscalingv2.UtilizationMetricType,
 								AverageUtilization: &avgUtilMem,
-							},
-						},
-					},
-					{
-						Type: autoscalingv2.ResourceMetricSourceType,
-						Resource: &autoscalingv2.ResourceMetricSource{
-							Name: "cpu",
-							Target: autoscalingv2.MetricTarget{
-								Type:               autoscalingv2.UtilizationMetricType,
-								AverageUtilization: &avgUtilCPU,
 							},
 						},
 					},

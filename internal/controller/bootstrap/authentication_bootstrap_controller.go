@@ -22,12 +22,16 @@ import (
 	"strconv"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
-	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
+	"github.com/IBM/ibm-iam-operator/internal/controller/common"
+	authctrl "github.com/IBM/ibm-iam-operator/internal/controller/operator"
 	"github.com/IBM/ibm-iam-operator/internal/version"
 	"github.com/opdev/subreconciler"
+	routev1 "github.com/openshift/api/route/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -42,6 +46,7 @@ import (
 // edge cases that are encountered during upgrades.
 type BootstrapReconciler struct {
 	client.Client
+	DiscoveryClient *discovery.DiscoveryClient
 }
 
 func (r *BootstrapReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
@@ -66,7 +71,7 @@ func (r *BootstrapReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	authCtrl := ctrl.NewControllerManagedBy(mgr)
 
 	bootstrapPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
-		return o.GetLabels()[ctrlcommon.ManagerVersionLabel] != version.Version
+		return o.GetLabels()[common.ManagerVersionLabel] != version.Version
 	})
 
 	authCtrl.Watches(&operatorv1alpha1.Authentication{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(bootstrapPred))
@@ -83,7 +88,7 @@ func (r *BootstrapReconciler) makeAuthenticationCorrections(ctx context.Context,
 	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
-	if authCR.Labels[ctrlcommon.ManagerVersionLabel] == version.Version {
+	if authCR.Labels[common.ManagerVersionLabel] == version.Version {
 		return subreconciler.ContinueReconciling()
 	}
 
@@ -96,7 +101,12 @@ func (r *BootstrapReconciler) makeAuthenticationCorrections(ctx context.Context,
 		return subreconciler.RequeueWithError(err)
 	}
 
-	authCR.Labels[ctrlcommon.ManagerVersionLabel] = version.Version
+	if err = r.bootstrapIngressCustomization(debugCtx, authCR); err != nil {
+		log.Error(err, "Failed to update ingress customization")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	authCR.Labels[common.ManagerVersionLabel] = version.Version
 
 	err = r.Update(debugCtx, authCR)
 	if err != nil {
@@ -106,6 +116,143 @@ func (r *BootstrapReconciler) makeAuthenticationCorrections(ctx context.Context,
 	log.Info("Performed bootstrap update to Authentication successfully")
 
 	return subreconciler.ContinueReconciling()
+}
+
+func (r *BootstrapReconciler) bootstrapIngressCustomization(ctx context.Context, authCR *operatorv1alpha1.Authentication) (err error) {
+	modified, err := r.setIngressFromCustomizationCM(ctx, authCR)
+	if modified || err != nil {
+		return
+	}
+	err = r.setIngressHostnameIfCustomized(ctx, authCR)
+	if err != nil {
+		return
+	}
+	return r.setIngressSecretIfCustomized(ctx, authCR)
+}
+
+func (r *BootstrapReconciler) setIngressFromCustomizationCM(ctx context.Context, authCR *operatorv1alpha1.Authentication) (modified bool, err error) {
+	cmName := "cs-onprem-tenant-config"
+	log := logf.FromContext(ctx, "ConfigMap.Name", cmName).V(1)
+	cm := &corev1.ConfigMap{}
+	if err = r.Get(ctx, types.NamespacedName{Name: cmName, Namespace: authCR.Namespace}, cm); k8sErrors.IsNotFound(err) {
+		log.Info("Did not find ConfigMap")
+		return false, nil
+	} else if err != nil {
+		return
+	}
+	log.Info("Found ConfigMap; setting hostname and secret using fields")
+	authCR.Spec.Config.Ingress = &operatorv1alpha1.IngressConfig{
+		Hostname: ptr.To(cm.Data["custom_hostname"]),
+		Secret:   ptr.To(cm.Data["custom_host_certificate_secret"]),
+	}
+	return true, nil
+}
+
+func setIngressIfNotSet(authCR *operatorv1alpha1.Authentication) {
+	if authCR.Spec.Config.Ingress != nil {
+		return
+	}
+	authCR.Spec.Config.Ingress = &operatorv1alpha1.IngressConfig{}
+}
+
+func (r *BootstrapReconciler) generateClusterInfo(ctx context.Context, authCR *operatorv1alpha1.Authentication, generated *corev1.ConfigMap) (err error) {
+	log := logf.FromContext(ctx).V(1)
+	var domainName string
+	if domainName, err = authctrl.GetCNCFDomain(ctx, r.Client, authCR); err != nil {
+		log.Info("Could not retrieve cluster configuration; requeueing", "reason", err.Error())
+		return
+	}
+
+	// if the env identified as CNCF
+	if domainName != "" {
+		log.Info("Env type is CNCF")
+		err = authctrl.GenerateCNCFClusterInfo(r.Client, r.DiscoveryClient, ctx, authCR, domainName, generated)
+	} else {
+		log.Info("Env Type is OCP")
+		err = authctrl.GenerateOCPClusterInfo(r.Client, r.DiscoveryClient, ctx, authCR, generated)
+	}
+
+	if err != nil {
+		log.Info("Failed to generate ibmcloud-cluster-info contents", "reason", err.Error())
+	}
+	return
+}
+
+func (r *BootstrapReconciler) setIngressHostnameIfCustomized(ctx context.Context, authCR *operatorv1alpha1.Authentication) (err error) {
+	log := logf.FromContext(ctx).V(1)
+	clusterInfo := &corev1.ConfigMap{}
+	if err = r.Get(ctx, types.NamespacedName{Name: common.IBMCloudClusterInfoCMName, Namespace: authCR.Namespace}, clusterInfo); k8sErrors.IsNotFound(err) {
+		log.Info("Did not find ConfigMap; assume no hostname customization")
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to detect hostname customization: %w", err)
+	}
+	generated := &corev1.ConfigMap{}
+
+	log.Info("Generate expected ibmcloud-cluster-info ConfigMap contents")
+	if err = r.generateClusterInfo(ctx, authCR, generated); err != nil {
+		return fmt.Errorf("failed to detect hostname customization: %w", err)
+	} else if clusterInfo.Data["cluster_address"] == generated.Data["cluster_address"] {
+		log.Info("cluster_address values are the same; hostname is not customized")
+		return
+	}
+	log.Info("cluster_address values are different; hostname is customized", "found", clusterInfo.Data["cluster_address"], "generated", generated.Data["cluster_address"])
+	setIngressIfNotSet(authCR)
+	authCR.Spec.Config.Ingress.Hostname = ptr.To(clusterInfo.Data["cluster_address"])
+	return
+}
+
+func hasTLSFields(s *corev1.Secret) (hasFields bool) {
+	return len(s.Data["tls.key"]) > 0 && len(s.Data["tls.crt"]) > 0 && len(s.Data["ca.crt"]) > 0
+}
+
+func (r *BootstrapReconciler) setIngressSecretIfCustomized(ctx context.Context, authCR *operatorv1alpha1.Authentication) (err error) {
+	log := logf.FromContext(ctx).V(1)
+	customTLSSecretName := "custom-tls-secret"
+	// First, check for custom-tls-secret
+	secret := &corev1.Secret{}
+	if err = r.Get(ctx, types.NamespacedName{Name: customTLSSecretName, Namespace: authCR.Namespace}, secret); err == nil && hasTLSFields(secret) {
+		setIngressIfNotSet(authCR)
+		authCR.Spec.Config.Ingress.Secret = ptr.To(customTLSSecretName)
+		return
+	} else if !k8sErrors.IsNotFound(err) {
+		return
+	}
+	// Then try to get cp-console
+	cpConsole := &routev1.Route{}
+	if err = r.Get(ctx, types.NamespacedName{Name: "cp-console", Namespace: authCR.Namespace}, cpConsole); k8sErrors.IsNotFound(err) {
+		err = nil
+		return
+	} else if err != nil {
+		return
+	}
+	// If any of the TLS fields are empty, assume that custom certs are improperly configured and skip bootstrapping
+	if cpConsole.Spec.TLS.Certificate == "" || cpConsole.Spec.TLS.Key == "" || cpConsole.Spec.TLS.CACertificate == "" {
+		log.Info("Incomplete TLS customization found on cp-console Route; assume no custom TLS")
+		return
+	}
+
+	secret = &corev1.Secret{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      customTLSSecretName,
+			Namespace: authCR.Namespace,
+		},
+		TypeMeta: v1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Secret",
+		},
+		Data: map[string][]byte{
+			"tls.key": []byte(cpConsole.Spec.TLS.Key),
+			"tls.crt": []byte(cpConsole.Spec.TLS.Certificate),
+			"ca.crt":  []byte(cpConsole.Spec.TLS.CACertificate),
+		},
+	}
+	if err = r.Create(ctx, secret); err != nil {
+		return
+	}
+	setIngressIfNotSet(authCR)
+	authCR.Spec.Config.Ingress.Secret = ptr.To(customTLSSecretName)
+	return
 }
 
 // writeConfigurationsToAuthenticationCR copies values from the

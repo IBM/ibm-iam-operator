@@ -173,8 +173,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	var dc *discovery.DiscoveryClient
+	dc, err = discovery.NewDiscoveryClientForConfig(mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "failed to get discovery client", "controller", "Authentication")
+		os.Exit(1)
+	}
+
 	if err = (&bootstrapcontrollers.BootstrapReconciler{
-		Client: mgr.GetClient(),
+		Client:          mgr.GetClient(),
+		DiscoveryClient: dc,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Authentication")
 		os.Exit(1)
@@ -201,13 +209,6 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Client")
 		os.Exit(1)
 	}
-	var dc *discovery.DiscoveryClient
-	dc, err = discovery.NewDiscoveryClientForConfig(mgr.GetConfig())
-	if err != nil {
-		setupLog.Error(err, "failed to get discovery client", "controller", "Authentication")
-		os.Exit(1)
-	}
-
 	if err = (&operatorcontrollers.AuthenticationReconciler{
 		Client: &controllercommon.FallbackClient{
 			Client: mgr.GetClient(),

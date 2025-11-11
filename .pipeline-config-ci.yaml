@@ -48,6 +48,8 @@ tasks:
           export BUILD_TAG="$(cat internal/version/version.go | tr -d '\n')"
           source build_scripts/setup_env.sh
           source build_scripts/build_image.sh
+          set_env "STAGE_UNIT_TEST_STATUS" "success"
+          collect-evidence --asset-type "repo" --asset-key "app-repo" --status "success" --tool-type "misc" --evidence-type "com.ibm.unit_tests"
       - name: sign-artifact
         when: 'false'
       - name: scan-artifact

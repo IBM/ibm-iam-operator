@@ -331,6 +331,8 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"LIBERTY_SAMESITE_COOKIE",
 			"SECRETS_STORE_AVAILABLE",
 		),
+		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("SESSION_TIMEOUT", "43200"),
+			"SESSION_TIMEOUT"),
 		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("OS_TOKEN_LENGTH", "45"),
 			"OS_TOKEN_LENGTH"),
 		updatesValuesWhen(observedKeyValueContains[*corev1.ConfigMap]("IDENTITY_MGMT_URL", "127.0.0.1"),

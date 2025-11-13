@@ -8,9 +8,9 @@ require (
 	github.com/opdev/subreconciler v0.0.0-20230302151718-c4c8b5ec17c5
 	github.com/openshift/api v0.0.0-20250919093554-588d5490d187
 	github.com/zach-klippenstein/goregen v0.0.0-20160303162051-795b5e3961ea
-	k8s.io/api v0.34.1
-	k8s.io/apimachinery v0.34.1
-	k8s.io/client-go v0.34.1
+	k8s.io/api v0.34.2
+	k8s.io/apimachinery v0.34.2
+	k8s.io/client-go v0.34.2
 	k8s.io/utils v0.0.0-20250820121507-0af2bda4dd1d
 	sigs.k8s.io/controller-runtime v0.22.1
 	sigs.k8s.io/secrets-store-csi-driver v1.5.3

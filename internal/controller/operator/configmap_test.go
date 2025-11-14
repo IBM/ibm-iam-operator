@@ -596,7 +596,7 @@ var _ = Describe("ConfigMap handling", func() {
 					"LOG_LEVEL_MW":                       "info",
 					"DEFAULT_LOGIN":                      "",
 					"IDTOKEN_LIFETIME":                   "12h",
-					"SESSION_TIMEOUT":                    "43200",
+					"SESSION_TIMEOUT":                    "43200s",
 					"OIDC_ISSUER_URL":                    authCR.Spec.Config.OIDCIssuerURL,
 					"PDP_REDIS_CACHE_DEFAULT_TTL":        "600",
 					"FIPS_ENABLED":                       strconv.FormatBool(authCR.Spec.Config.FIPSEnabled),

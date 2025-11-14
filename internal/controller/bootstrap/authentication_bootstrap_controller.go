@@ -92,6 +92,7 @@ func (r *BootstrapReconciler) makeAuthenticationCorrections(ctx context.Context,
 		return
 	}
 	if authCR.Labels[common.ManagerVersionLabel] == version.Version {
+		log.Info("Authentication already bootstrapped, so skipping corrections")
 		return subreconciler.ContinueReconciling()
 	}
 
@@ -109,6 +110,7 @@ func (r *BootstrapReconciler) makeAuthenticationCorrections(ctx context.Context,
 		return subreconciler.RequeueWithError(err)
 	}
 
+	log.Info("Updating Authentication with version label and bootstrapped values")
 	authCR.Labels[common.ManagerVersionLabel] = version.Version
 
 	err = r.Update(debugCtx, authCR)

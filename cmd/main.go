@@ -181,7 +181,10 @@ func main() {
 	}
 
 	if err = (&bootstrapcontrollers.BootstrapReconciler{
-		Client:          mgr.GetClient(),
+		Client: &controllercommon.FallbackClient{
+			Client: mgr.GetClient(),
+			Reader: mgr.GetAPIReader(),
+		},
 		DiscoveryClient: dc,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Authentication")

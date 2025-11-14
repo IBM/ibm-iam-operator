@@ -164,7 +164,7 @@ func (r *BootstrapReconciler) generateClusterInfo(ctx context.Context, authCR *o
 	log := logf.FromContext(ctx)
 	var domainName string
 	if domainName, err = authctrl.GetCNCFDomain(ctx, r.Client, authCR); err != nil {
-		log.Info("Could not retrieve cluster configuration; requeueing", "reason", err.Error())
+		log.Error(err, "Could not retrieve cluster configuration; requeueing")
 		return
 	}
 
@@ -178,7 +178,7 @@ func (r *BootstrapReconciler) generateClusterInfo(ctx context.Context, authCR *o
 	}
 
 	if err != nil {
-		log.Info("Failed to generate ibmcloud-cluster-info contents", "reason", err.Error())
+		log.Error(err, "Failed to generate ibmcloud-cluster-info contents")
 	}
 	return
 }

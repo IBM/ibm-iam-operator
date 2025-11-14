@@ -161,7 +161,7 @@ func setIngressIfNotSet(authCR *operatorv1alpha1.Authentication) {
 }
 
 func (r *BootstrapReconciler) generateClusterInfo(ctx context.Context, authCR *operatorv1alpha1.Authentication, generated *corev1.ConfigMap) (err error) {
-	log := logf.FromContext(ctx).V(1)
+	log := logf.FromContext(ctx)
 	var domainName string
 	if domainName, err = authctrl.GetCNCFDomain(ctx, r.Client, authCR); err != nil {
 		log.Info("Could not retrieve cluster configuration; requeueing", "reason", err.Error())
@@ -184,7 +184,7 @@ func (r *BootstrapReconciler) generateClusterInfo(ctx context.Context, authCR *o
 }
 
 func (r *BootstrapReconciler) setIngressHostnameIfCustomized(ctx context.Context, authCR *operatorv1alpha1.Authentication) (err error) {
-	log := logf.FromContext(ctx).V(1)
+	log := logf.FromContext(ctx)
 	clusterInfo := &corev1.ConfigMap{}
 	if err = r.Get(ctx, types.NamespacedName{Name: common.IBMCloudClusterInfoCMName, Namespace: authCR.Namespace}, clusterInfo); k8sErrors.IsNotFound(err) {
 		log.Info("Did not find ConfigMap; assume no hostname customization")
@@ -213,7 +213,7 @@ func (r *BootstrapReconciler) setIngressHostnameIfCustomized(ctx context.Context
 // so that the existing TLS configuration is preserved through an upgrade.
 func (r *BootstrapReconciler) setIngressSecretIfCustomized(ctx context.Context, authCR *operatorv1alpha1.Authentication) (err error) {
 	customTLSSecretName := "custom-tls-secret"
-	log := logf.FromContext(ctx, "Secret.Name", customTLSSecretName).V(1)
+	log := logf.FromContext(ctx, "Secret.Name", customTLSSecretName)
 	secret := &corev1.Secret{}
 	if err = r.Get(ctx, types.NamespacedName{Name: customTLSSecretName, Namespace: authCR.Namespace}, secret); err == nil {
 		if err = validateTLSSecret(secret); err != nil {
@@ -274,7 +274,7 @@ func (r *BootstrapReconciler) setIngressSecretIfCustomized(ctx context.Context, 
 // writeConfigurationsToAuthenticationCR copies values from the
 // platform-auth-idp ConfigMap to the Authentication CR.
 func (r *BootstrapReconciler) writeConfigurationsToAuthenticationCR(ctx context.Context, authCR *operatorv1alpha1.Authentication) (err error) {
-	log := logf.FromContext(ctx, "ConfigMap.Name", "platform-auth-idp").V(1)
+	log := logf.FromContext(ctx, "ConfigMap.Name", "platform-auth-idp")
 	platformAuthIDPCM := &corev1.ConfigMap{}
 	if err = r.Get(ctx, types.NamespacedName{Name: "platform-auth-idp", Namespace: authCR.Namespace}, platformAuthIDPCM); k8sErrors.IsNotFound(err) {
 		log.Info("ConfigMap not found")

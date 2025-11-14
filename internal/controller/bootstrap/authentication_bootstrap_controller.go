@@ -18,6 +18,9 @@ package bootstrap
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"strconv"
 
@@ -202,33 +205,44 @@ func (r *BootstrapReconciler) setIngressHostnameIfCustomized(ctx context.Context
 	return
 }
 
-func hasTLSFields(s *corev1.Secret) (hasFields bool) {
-	return len(s.Data["tls.key"]) > 0 && len(s.Data["tls.crt"]) > 0 && len(s.Data["ca.crt"]) > 0
-}
-
+// setIngressSecretIfCustomized sets the ingress secret for Authentication CR if
+// custom TLS is configured.  It checks for an existing custom TLS secret and,
+// if not found, creates one using the TLS configuration from the console Route
+// so that the existing TLS configuration is preserved through an upgrade.
 func (r *BootstrapReconciler) setIngressSecretIfCustomized(ctx context.Context, authCR *operatorv1alpha1.Authentication) (err error) {
-	log := logf.FromContext(ctx).V(1)
 	customTLSSecretName := "custom-tls-secret"
-	// First, check for custom-tls-secret
+	log := logf.FromContext(ctx, "Secret.Name", customTLSSecretName).V(1)
 	secret := &corev1.Secret{}
-	if err = r.Get(ctx, types.NamespacedName{Name: customTLSSecretName, Namespace: authCR.Namespace}, secret); err == nil && hasTLSFields(secret) {
+	if err = r.Get(ctx, types.NamespacedName{Name: customTLSSecretName, Namespace: authCR.Namespace}, secret); err == nil {
+		if err = validateTLSSecret(secret); err != nil {
+			log.Error(err, "Secret does not contain valid X509 TLS certificate values")
+			return fmt.Errorf("found Secret does not contain valid TLS certificate values: %w", err)
+		}
+		log.Info("Found Secret that contains valid TLS certificate chain and key")
 		setIngressIfNotSet(authCR)
 		authCR.Spec.Config.Ingress.Secret = ptr.To(customTLSSecretName)
 		return
 	} else if !k8sErrors.IsNotFound(err) {
+		log.Error(err, "Unexpected error occurred while trying to retrieve custom TLS certificate Secret")
 		return
 	}
-	// Then try to get cp-console
-	cpConsole := &routev1.Route{}
-	if err = r.Get(ctx, types.NamespacedName{Name: "cp-console", Namespace: authCR.Namespace}, cpConsole); k8sErrors.IsNotFound(err) {
+	consoleRoute := &routev1.Route{}
+	consoleName := "cp-console"
+	if authCR.Spec.Config.ZenFrontDoor {
+		consoleName = "cpd"
+	}
+	log.Info("Did not find Secret containing custom TLS; check the console Route for current TLS configuration", "Route.Name", consoleName)
+	if err = r.Get(ctx, types.NamespacedName{Name: consoleName, Namespace: authCR.Namespace}, consoleRoute); k8sErrors.IsNotFound(err) {
 		err = nil
+		log.Info("Did not find Route, so no TLS customization will be performed", "Route.Name", consoleName)
 		return
 	} else if err != nil {
+		log.Error(err, "Unexpected error occurred while trying to retrieve console Route", "Route.Name", consoleName)
 		return
 	}
 	// If any of the TLS fields are empty, assume that custom certs are improperly configured and skip bootstrapping
-	if cpConsole.Spec.TLS.Certificate == "" || cpConsole.Spec.TLS.Key == "" || cpConsole.Spec.TLS.CACertificate == "" {
-		log.Info("Incomplete TLS customization found on cp-console Route; assume no custom TLS")
+	if consoleRoute.Spec.TLS.Certificate == "" || consoleRoute.Spec.TLS.Key == "" || consoleRoute.Spec.TLS.CACertificate == "" {
+		log.Info("Incomplete TLS customization found on console Route, so no TLS customization will be performed", "Route.Name", consoleName)
 		return
 	}
 
@@ -242,9 +256,9 @@ func (r *BootstrapReconciler) setIngressSecretIfCustomized(ctx context.Context, 
 			Kind:       "Secret",
 		},
 		Data: map[string][]byte{
-			"tls.key": []byte(cpConsole.Spec.TLS.Key),
-			"tls.crt": []byte(cpConsole.Spec.TLS.Certificate),
-			"ca.crt":  []byte(cpConsole.Spec.TLS.CACertificate),
+			"tls.key": []byte(consoleRoute.Spec.TLS.Key),
+			"tls.crt": []byte(consoleRoute.Spec.TLS.Certificate),
+			"ca.crt":  []byte(consoleRoute.Spec.TLS.CACertificate),
 		},
 	}
 	if err = r.Create(ctx, secret); err != nil {
@@ -357,4 +371,74 @@ func (r *BootstrapReconciler) getLatestAuthentication(ctx context.Context, req c
 		return subreconciler.RequeueWithError(err)
 	}
 	return subreconciler.ContinueReconciling()
+}
+
+// validateTLSFiles checks if the provided TLS key, certificate chain, and CA certificate files are valid.
+func validateTLSSecret(secret *corev1.Secret) (err error) {
+	// Read certificate files
+	keyBytes := secret.Data["tls.key"]
+	certChainBytes := secret.Data["tls.crt"]
+	caCertBytes := secret.Data["ca.crt"]
+
+	_, err = tls.X509KeyPair(certChainBytes, keyBytes)
+	if err != nil {
+		return fmt.Errorf("failed to form X509 key pair using tls.key and tls.crt: %w", err)
+	}
+
+	block, _ := pem.Decode(caCertBytes)
+	if block == nil || block.Type != "CERTIFICATE" {
+		return fmt.Errorf("failed to decode PEM block containing CA certificate")
+	}
+	caCert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		panic(err)
+	}
+
+	caCertPool := x509.NewCertPool()
+	caCertPool.AddCert(caCert)
+
+	// Load certificate chain
+	var leafCert *x509.Certificate
+	intermediatePool := x509.NewCertPool()
+
+	for {
+		block, rest := pem.Decode(certChainBytes)
+		if block == nil {
+			break
+		}
+		if block.Type != "CERTIFICATE" {
+			certChainBytes = rest
+			continue
+		}
+
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return fmt.Errorf("failed to parse certificate chain: %w", err)
+		}
+
+		if leafCert == nil {
+			leafCert = cert // First certificate is the leaf
+		} else {
+			intermediatePool.AddCert(cert) // Subsequent certificates are intermediates
+		}
+		certChainBytes = rest
+	}
+
+	if leafCert == nil {
+		return fmt.Errorf("no leaf certificate found in chain")
+	}
+
+	// Verify options
+	verifyOptions := x509.VerifyOptions{
+		Roots:         caCertPool,
+		Intermediates: intermediatePool,
+	}
+
+	// Verify the leaf certificate against the CA
+	_, err = leafCert.Verify(verifyOptions)
+	if err != nil {
+		return fmt.Errorf("leaf certificate verification failed: %w", err)
+	}
+
+	return nil
 }

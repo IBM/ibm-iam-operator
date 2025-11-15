@@ -241,6 +241,21 @@ func (r *AuthenticationReconciler) handleAuthenticationFinalizer(ctx context.Con
 	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
+func (r *AuthenticationReconciler) ensureBootstrapIsComplete(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	log := logf.FromContext(ctx)
+	log.Info("Confirm bootstrap is complete")
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+	if authCR.Labels[common.ManagerVersionLabel] != version.Version {
+		log.Info("Bootstrap incomplete; requeueing")
+		return subreconciler.RequeueWithDelay(time.Second * 1)
+	}
+	log.Info("Bootstrap complete; continuing")
+	return subreconciler.ContinueReconciling()
+}
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
@@ -264,6 +279,7 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 	var subResult *ctrl.Result
 
 	fns := []subreconciler.FnWithRequest{
+		r.ensureBootstrapIsComplete,
 		r.handleAuthenticationFinalizer,
 		r.createSA,
 		r.createRole,

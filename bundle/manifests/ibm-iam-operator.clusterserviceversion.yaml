@@ -156,7 +156,7 @@ metadata:
     categories: Security
     certified: "false"
     containerImage: icr.io/cpopen/ibm-iam-operator:4.15.0
-    createdAt: "2025-11-12T13:40:44Z"
+    createdAt: "2025-11-18T03:35:30Z"
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage the lifecycle of IAM services. With this operator, you can simply deploy and upgrade the IAM services
     features.operators.openshift.io/disconnected: "true"
     features.operators.openshift.io/fips-compliant: "true"
@@ -613,15 +613,6 @@ spec:
                 - watch
             - apiGroups:
                 - postgresql.k8s.enterprisedb.io
-              resources:
-                - clusters
-                - clusters/status
-              verbs:
-                - get
-                - list
-                - watch
-            - apiGroups:
-                - postgresql.cnpg.ibm.com
               resources:
                 - clusters
                 - clusters/status

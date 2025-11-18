@@ -297,15 +297,6 @@ rules:
   - list
   - watch
 - apiGroups:
-  - postgresql.cnpg.ibm.com
-  resources:
-  - clusters
-  - clusters/status
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - secrets-store.csi.x-k8s.io
   resources:
   - secretproviderclasses

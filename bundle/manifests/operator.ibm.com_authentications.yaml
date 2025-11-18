@@ -284,12 +284,6 @@ spec:
                 - wlpClientSecret
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
-              database:
-                description: Database includes configuration details for IM's database
-                properties:
-                  operandRequest:
-                    type: string
-                x-kubernetes-preserve-unknown-fields: true
               enableInstanaMetricCollection:
                 type: boolean
               identityManager:

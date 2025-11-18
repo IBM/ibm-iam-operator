@@ -47,13 +47,6 @@ func (r *AuthenticationReconciler) addEmbeddedDBIfNeeded(ctx context.Context, au
 		return
 	}
 	name := "common-service-postgresql"
-	if authCR.Spec.Database != nil && authCR.Spec.Database.OperandRequest != nil && *authCR.Spec.Database.OperandRequest != "" {
-		if *authCR.Spec.Database.OperandRequest == "ibm-cnpg-postgres-operator" {
-			name = "common-service-cnpg"
-		} else {
-			name = *authCR.Spec.Database.OperandRequest
-		}
-	}
 	*operands = append(*operands, operatorv1alpha1.Operand{
 		Name: name,
 		Bindings: map[string]operatorv1alpha1.Bindable{
@@ -351,10 +344,6 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 	}
 
 	clusterAPIVersion := "postgresql.k8s.enterprisedb.io/v1"
-	if authCR.Spec.Database != nil && authCR.Spec.Database.OperandRequest != nil && *authCR.Spec.Database.OperandRequest == "ibm-cnpg-postgres-operator" {
-		clusterAPIVersion = "postgresql.cnpg.ibm.com/v1"
-	}
-
 	log = log.WithValues("Object.Name", "common-service-db", "Object.Kind", "Cluster", "Object.APIVersion", clusterAPIVersion)
 
 	u := &unstructured.Unstructured{

@@ -147,9 +147,37 @@ func (r *BootstrapReconciler) makeAuthenticationCorrections(ctx context.Context,
 	return subreconciler.ContinueReconciling()
 }
 
+func (r *BootstrapReconciler) deleteOnpremConfigMap(ctx context.Context, namespace string) (err error) {
+	cmName := "cs-onprem-tenant-config"
+	log := logf.FromContext(ctx, "ConfigMap.Name", cmName).V(1)
+	log.Info("ConfigMap no longer needed, so attempt to delete it")
+	log.Info("Attempting to get ConfigMap")
+	cm := &corev1.ConfigMap{}
+	if err = r.Get(ctx, types.NamespacedName{Name: cmName, Namespace: namespace}, cm); k8sErrors.IsNotFound(err) {
+		log.Info("ConfigMap not found, nothing to delete")
+		return nil
+	} else if err != nil {
+		log.Error(err, "An unexpected error occurred while trying to get the ConfigMap")
+		return
+	}
+	log.Info("Attempting to delete ConfigMap")
+	err = r.Delete(ctx, cm)
+	if k8sErrors.IsGone(err) || k8sErrors.IsNotFound(err) {
+		log.Info("ConfigMap not found, nothing to do")
+		return nil
+	} else if err != nil {
+		log.Error(err, "An unexpected error occurred while trying to delete the ConfigMap")
+	} else {
+		log.Info("Deleted ConfigMap")
+	}
+	return
+}
+
 func (r *BootstrapReconciler) bootstrapIngressCustomization(ctx context.Context, authCR *operatorv1alpha1.Authentication) (err error) {
 	modified, err := r.setIngressFromCustomizationCM(ctx, authCR)
-	if modified || err != nil {
+	if modified && err == nil {
+		return r.deleteOnpremConfigMap(ctx, authCR.Namespace)
+	} else if err != nil {
 		return
 	}
 	err = r.setIngressHostnameIfCustomized(ctx, authCR)

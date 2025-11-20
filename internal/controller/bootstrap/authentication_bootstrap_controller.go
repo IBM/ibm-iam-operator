@@ -149,7 +149,7 @@ func (r *BootstrapReconciler) makeAuthenticationCorrections(ctx context.Context,
 
 func (r *BootstrapReconciler) deleteOnpremConfigMap(ctx context.Context, namespace string) (err error) {
 	cmName := "cs-onprem-tenant-config"
-	log := logf.FromContext(ctx, "ConfigMap.Name", cmName).V(1)
+	log := logf.FromContext(ctx, "ConfigMap.Name", cmName)
 	log.Info("ConfigMap no longer needed, so attempt to delete it")
 	log.Info("Attempting to get ConfigMap")
 	cm := &corev1.ConfigMap{}
@@ -189,7 +189,7 @@ func (r *BootstrapReconciler) bootstrapIngressCustomization(ctx context.Context,
 
 func (r *BootstrapReconciler) setIngressFromCustomizationCM(ctx context.Context, authCR *operatorv1alpha1.Authentication) (modified bool, err error) {
 	cmName := "cs-onprem-tenant-config"
-	log := logf.FromContext(ctx, "ConfigMap.Name", cmName).V(1)
+	log := logf.FromContext(ctx, "ConfigMap.Name", cmName)
 	cm := &corev1.ConfigMap{}
 	if err = r.Get(ctx, types.NamespacedName{Name: cmName, Namespace: authCR.Namespace}, cm); k8sErrors.IsNotFound(err) {
 		log.Info("Did not find ConfigMap")

@@ -69,7 +69,7 @@ make bundle
 
 echo "Update chart versions"
 $LOCALBIN/yq -i '.appVersion = env(VERSION), .version = env(VERSION)' "${REPO_ROOT}/helm/Chart.yaml"
-$LOCALBIN/yq -i '.operator.imageTag = env(VERSION) | .operands.platformIdentityProvider.imageTag = env(VERSION) | .operands.platformAuthService.imageTag = env(VERSION) | .operands.platformIdentityManagement.imageTag = env(VERSION) | .operands.imInitContainer.imageTag = env(VERSION)' "${REPO_ROOT}/helm/values.yaml"
+$LOCALBIN/yq -i '.operator.imageTag = env(VERSION) | .operands.platformIdentityProvider.imageTag = env(VERSION) | .operands.platformAuthService.imageTag = env(VERSION) | .operands.platformIdentityManagement.imageTag = env(VERSION) | .operands.imInitContainer.imageTag = env(VERSION) | .operands.imDBMigrator.imageTag = env(VERSION)' "${REPO_ROOT}/helm/values.yaml"
 $LOCALBIN/yq -i '.appVersion = env(VERSION), .version = env(VERSION)' "${REPO_ROOT}/helm-cluster-scoped/Chart.yaml"
 sed s/$current_version/$VERSION/ $REPO_ROOT/helm/templates/10-deployment.yaml > $REPO_ROOT/helm/templates/10-deployment.yaml.new
 mv $REPO_ROOT/helm/templates/10-deployment.yaml.new $REPO_ROOT/helm/templates/10-deployment.yaml

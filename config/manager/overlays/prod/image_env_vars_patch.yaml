@@ -22,7 +22,7 @@
   path: /spec/template/spec/containers/0/env/-
   value:
     name: IM_DB_MIGRATOR_IMAGE
-    value: icr.io/cpopen/cpfs/ibm-im-db-migrator:1.0.0
+    value: icr.io/cpopen/cpfs/ibm-im-db-migrator:4.15.0
 - op: replace
   path: /spec/template/spec/containers/0/imagePullPolicy
   value: IfNotPresent

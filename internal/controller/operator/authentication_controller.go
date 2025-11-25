@@ -485,6 +485,9 @@ func (r *AuthenticationReconciler) hasAPIAccess(ctx context.Context, namespace s
 	reqLogger := logf.FromContext(ctx).V(1).WithValues("namespace", namespace, "group", group, "resource", resource, "verbs", verbs)
 	for _, verb := range verbs {
 		ssar := &authorizationv1.SelfSubjectAccessReview{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "ibm-iam-operator-access-check-",
+			},
 			Spec: authorizationv1.SelfSubjectAccessReviewSpec{
 				ResourceAttributes: &authorizationv1.ResourceAttributes{
 					Namespace: namespace,

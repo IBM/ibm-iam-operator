@@ -19,7 +19,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -75,18 +74,7 @@ var _ = Describe("ClusterRoleBinding handling", func() {
 			BeforeEach(func() {
 				cb = *fakeclient.NewClientBuilder().
 					WithScheme(scheme).
-					WithObjects(authCR).
-					WithInterceptorFuncs(interceptor.Funcs{
-						Create: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
-							// Intercept SelfSubjectAccessReview creation and set status to deny
-							if ssar, ok := obj.(*authorizationv1.SelfSubjectAccessReview); ok {
-								ssar.Status.Allowed = false
-								ssar.Status.Denied = true
-								ssar.Status.Reason = "insufficient permissions"
-							}
-							return client.Create(ctx, obj, opts...)
-						},
-					})
+					WithObjects(authCR)
 
 				cl = cb.Build()
 				var err error
@@ -119,17 +107,7 @@ var _ = Describe("ClusterRoleBinding handling", func() {
 			BeforeEach(func() {
 				cb = *fakeclient.NewClientBuilder().
 					WithScheme(scheme).
-					WithObjects(authCR).
-					WithInterceptorFuncs(interceptor.Funcs{
-						Create: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
-							// Intercept SelfSubjectAccessReview creation and allow it
-							if ssar, ok := obj.(*authorizationv1.SelfSubjectAccessReview); ok {
-								ssar.Status.Allowed = true
-								ssar.Status.Denied = false
-							}
-							return client.Create(ctx, obj, opts...)
-						},
-					})
+					WithObjects(authCR)
 
 				cl = cb.Build()
 				var err error
@@ -158,17 +136,7 @@ var _ = Describe("ClusterRoleBinding handling", func() {
 			BeforeEach(func() {
 				cb = *fakeclient.NewClientBuilder().
 					WithScheme(scheme).
-					WithObjects(authCR).
-					WithInterceptorFuncs(interceptor.Funcs{
-						Create: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
-							// Intercept SelfSubjectAccessReview creation and allow it
-							if ssar, ok := obj.(*authorizationv1.SelfSubjectAccessReview); ok {
-								ssar.Status.Allowed = true
-								ssar.Status.Denied = false
-							}
-							return client.Create(ctx, obj, opts...)
-						},
-					})
+					WithObjects(authCR)
 
 				cl = cb.Build()
 				// Use a discovery client that won't find OpenShift user API
@@ -201,17 +169,7 @@ var _ = Describe("ClusterRoleBinding handling", func() {
 		Context("when Authentication CR is not found", func() {
 			BeforeEach(func() {
 				cb = *fakeclient.NewClientBuilder().
-					WithScheme(scheme).
-					WithInterceptorFuncs(interceptor.Funcs{
-						Create: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
-							// Intercept SelfSubjectAccessReview creation and allow it
-							if ssar, ok := obj.(*authorizationv1.SelfSubjectAccessReview); ok {
-								ssar.Status.Allowed = true
-								ssar.Status.Denied = false
-							}
-							return client.Create(ctx, obj, opts...)
-						},
-					})
+					WithScheme(scheme)
 
 				cl = cb.Build()
 				var err error
@@ -264,17 +222,7 @@ var _ = Describe("ClusterRoleBinding handling", func() {
 
 				cb = *fakeclient.NewClientBuilder().
 					WithScheme(scheme).
-					WithObjects(authCR, existingCRB).
-					WithInterceptorFuncs(interceptor.Funcs{
-						Create: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
-							// Intercept SelfSubjectAccessReview creation and allow it
-							if ssar, ok := obj.(*authorizationv1.SelfSubjectAccessReview); ok {
-								ssar.Status.Allowed = true
-								ssar.Status.Denied = false
-							}
-							return client.Create(ctx, obj, opts...)
-						},
-					})
+					WithObjects(authCR, existingCRB)
 
 				cl = cb.Build()
 				var err error
@@ -308,17 +256,7 @@ var _ = Describe("ClusterRoleBinding handling", func() {
 			BeforeEach(func() {
 				cb = *fakeclient.NewClientBuilder().
 					WithScheme(scheme).
-					WithObjects(authCR).
-					WithInterceptorFuncs(interceptor.Funcs{
-						Create: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
-							// Intercept SelfSubjectAccessReview creation and allow it
-							if ssar, ok := obj.(*authorizationv1.SelfSubjectAccessReview); ok {
-								ssar.Status.Allowed = true
-								ssar.Status.Denied = false
-							}
-							return client.Create(ctx, obj, opts...)
-						},
-					})
+					WithObjects(authCR)
 
 				cl = cb.Build()
 				var err error
@@ -413,17 +351,7 @@ var _ = Describe("ClusterRoleBinding handling", func() {
 
 					cb := *fakeclient.NewClientBuilder().
 						WithScheme(scheme).
-						WithObjects(authCR).
-						WithInterceptorFuncs(interceptor.Funcs{
-							Create: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
-								// Intercept SelfSubjectAccessReview creation and allow it
-								if ssar, ok := obj.(*authorizationv1.SelfSubjectAccessReview); ok {
-									ssar.Status.Allowed = true
-									ssar.Status.Denied = false
-								}
-								return client.Create(ctx, obj, opts...)
-							},
-						})
+						WithObjects(authCR)
 
 					cl := cb.Build()
 					dc, err := discovery.NewDiscoveryClientForConfig(cfg)

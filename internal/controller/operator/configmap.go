@@ -42,7 +42,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -131,11 +130,11 @@ func getConfigMapDataSHA1Sum(cm *corev1.ConfigMap) (sha string, err error) {
 	return fmt.Sprintf("%x", dataSHA[:]), nil
 }
 
-// GetCNCFDomain returns the CNCF domain name set in the global ConfigMap, if
+// getCNCFDomain returns the CNCF domain name set in the global ConfigMap, if
 // present. Returns an error when the ConfigMap is not found and returns an
 // empty string whenever the ConfigMap is found but the CNCF domain name is not
 // set.
-func GetCNCFDomain(ctx context.Context, cl client.Client, authCR *operatorv1alpha1.Authentication) (domainName string, err error) {
+func getCNCFDomain(ctx context.Context, cl client.Client, authCR *operatorv1alpha1.Authentication) (domainName string, err error) {
 	logger := logf.FromContext(ctx)
 	cmName := common.GlobalConfigMapName
 	cmNs := authCR.Namespace
@@ -451,7 +450,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 		}
 
 		var isOSEnv bool
-		if domainName, err := GetCNCFDomain(ctx, s.GetClient(), authCR); err != nil {
+		if domainName, err := getCNCFDomain(ctx, s.GetClient(), authCR); err != nil {
 			reqLogger.Info("Could not retrieve cluster configuration; requeueing", "reason", err.Error())
 			return err
 		} else {
@@ -789,8 +788,8 @@ func getHostFromDummyRoute(ctx context.Context, cl client.Client, authCR *operat
 	return
 }
 
-// GetAppsDomain obtains the OCP appsDomain by attempting to create a dummy Route in the services namespace.
-func GetAppsDomain(cl client.Client, ctx context.Context, authCR *operatorv1alpha1.Authentication) (domain string, err error) {
+// getDomain obtains the OCP appsDomain by attempting to create a dummy Route in the services namespace.
+func (r *AuthenticationReconciler) getDomain(ctx context.Context, authCR *operatorv1alpha1.Authentication) (domain string, err error) {
 	reqLogger := logf.FromContext(ctx)
 
 	commonLabel := map[string]string{"app": "im"}
@@ -802,14 +801,14 @@ func GetAppsDomain(cl client.Client, ctx context.Context, authCR *operatorv1alph
 		client.MatchingLabels(routeLabels),
 	}
 
-	if err = cl.List(ctx, imRoutes, listOpts...); err != nil && !k8sErrors.IsNotFound(err) {
+	if err = r.List(ctx, imRoutes, listOpts...); err != nil && !k8sErrors.IsNotFound(err) {
 		reqLogger.Error(err, "Failed to list Routes")
 		return
 	}
 
 	var host string
 	if len(imRoutes.Items) == 0 {
-		if host, err = getHostFromDummyRoute(ctx, cl, authCR); err != nil {
+		if host, err = getHostFromDummyRoute(ctx, r.Client, authCR); err != nil {
 			reqLogger.Error(err, "Could not get host name from dummy Route")
 			return
 		}
@@ -848,7 +847,7 @@ func getClusterProxy(authCR *operatorv1alpha1.Authentication, domainName string)
 	return strings.Join([]string{"cp-proxy", domainName}, ".")
 }
 
-func GenerateCNCFClusterInfo(cl client.Client, dc *discovery.DiscoveryClient, ctx context.Context, authCR *operatorv1alpha1.Authentication, domainName string, generated *corev1.ConfigMap) (err error) {
+func (r *AuthenticationReconciler) generateCNCFClusterInfo(ctx context.Context, authCR *operatorv1alpha1.Authentication, domainName string, generated *corev1.ConfigMap) (err error) {
 	reqLogger := logf.FromContext(ctx)
 
 	rhttpPort, rhttpsPort, cname := getClusterInfoFromEnv()
@@ -858,8 +857,8 @@ func GenerateCNCFClusterInfo(cl client.Client, dc *discovery.DiscoveryClient, ct
 	clusterAddressAuth := clusterAddress
 	clusterEndpoint := "https://" + clusterAddress
 	proxyDomainName := getClusterProxy(authCR, domainName)
-	if ShouldUseCPDHost(authCR, dc) {
-		zenHost, err = GetZenHost(cl, ctx, authCR)
+	if shouldUseCPDHost(authCR, &r.DiscoveryClient) {
+		zenHost, err = r.getZenHost(ctx, authCR)
 		if err == nil {
 			clusterAddressAuth = zenHost
 			clusterAddress = zenHost
@@ -893,7 +892,7 @@ func GenerateCNCFClusterInfo(cl client.Client, dc *discovery.DiscoveryClient, ct
 	return
 }
 
-func GetK8sAPIHostAndPort() (host, port string) {
+func (r *AuthenticationReconciler) getAPIHostAndPort() (host, port string) {
 	cfg, err := config.GetConfig()
 	if err != nil {
 		return
@@ -904,12 +903,12 @@ func GetK8sAPIHostAndPort() (host, port string) {
 	return noProtocol[0:index], noProtocol[index+1:]
 }
 
-func GenerateOCPClusterInfo(cl client.Client, dc *discovery.DiscoveryClient, ctx context.Context, authCR *operatorv1alpha1.Authentication, generated *corev1.ConfigMap) (err error) {
+func (r *AuthenticationReconciler) generateOCPClusterInfo(ctx context.Context, authCR *operatorv1alpha1.Authentication, generated *corev1.ConfigMap) (err error) {
 	reqLogger := logf.FromContext(ctx)
 
 	rhttpPort, rhttpsPort, cname := getClusterInfoFromEnv()
 
-	domainName, err := GetAppsDomain(cl, ctx, authCR)
+	domainName, err := r.getDomain(ctx, authCR)
 	if err != nil {
 		return
 	}
@@ -920,8 +919,8 @@ func GenerateOCPClusterInfo(cl client.Client, dc *discovery.DiscoveryClient, ctx
 	clusterEndpoint := "https://" + clusterAddress
 	proxyDomainName := getClusterProxy(authCR, domainName)
 
-	if ShouldUseCPDHost(authCR, dc) {
-		zenHost, err = GetZenHost(cl, ctx, authCR)
+	if shouldUseCPDHost(authCR, &r.DiscoveryClient) {
+		zenHost, err = r.getZenHost(ctx, authCR)
 		if err == nil {
 			clusterAddressAuth = zenHost
 			clusterAddress = zenHost
@@ -935,7 +934,7 @@ func GenerateOCPClusterInfo(cl client.Client, dc *discovery.DiscoveryClient, ctx
 		}
 	}
 
-	apiHost, apiPort := GetK8sAPIHostAndPort()
+	apiHost, apiPort := r.getAPIHostAndPort()
 
 	*generated = corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1015,12 +1014,12 @@ func IsMissingKeyError(err error) bool {
 	return false
 }
 
-func GetZenHost(cl client.Client, ctx context.Context, authCR *operatorv1alpha1.Authentication) (zenHost string, err error) {
+func (r *AuthenticationReconciler) getZenHost(ctx context.Context, authCR *operatorv1alpha1.Authentication) (zenHost string, err error) {
 	reqLogger := logf.FromContext(ctx)
 	//Get the routehost from the ibmcloud-cluster-info configmap
 	productConfigMap := &corev1.ConfigMap{}
 	cmKey := types.NamespacedName{Name: ZenProductConfigmapName, Namespace: authCR.Namespace}
-	err = cl.Get(ctx, cmKey, productConfigMap)
+	err = r.Client.Get(ctx, cmKey, productConfigMap)
 	if k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Zen product configmap does not exist")
 		return
@@ -1044,7 +1043,7 @@ func GetZenHost(cl client.Client, ctx context.Context, authCR *operatorv1alpha1.
 func (r *AuthenticationReconciler) generateIBMCloudClusterInfoConfigMap(ctx context.Context, authCR *operatorv1alpha1.Authentication, generated *corev1.ConfigMap) (err error) {
 	reqLogger := logf.FromContext(ctx)
 	var domainName string
-	if domainName, err = GetCNCFDomain(ctx, r.Client, authCR); err != nil {
+	if domainName, err = getCNCFDomain(ctx, r.Client, authCR); err != nil {
 		reqLogger.Info("Could not retrieve cluster configuration; requeueing", "reason", err.Error())
 		return
 	}
@@ -1052,10 +1051,10 @@ func (r *AuthenticationReconciler) generateIBMCloudClusterInfoConfigMap(ctx cont
 	// if the env identified as CNCF
 	if domainName != "" {
 		reqLogger.Info("Env type is CNCF")
-		err = GenerateCNCFClusterInfo(r.Client, &r.DiscoveryClient, ctx, authCR, domainName, generated)
+		err = r.generateCNCFClusterInfo(ctx, authCR, domainName, generated)
 	} else {
 		reqLogger.Info("Env Type is OCP")
-		err = GenerateOCPClusterInfo(r.Client, &r.DiscoveryClient, ctx, authCR, generated)
+		err = r.generateOCPClusterInfo(ctx, authCR, generated)
 	}
 
 	if err != nil {

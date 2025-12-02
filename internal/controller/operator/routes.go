@@ -549,7 +549,7 @@ func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.A
 	}
 }
 
-func ShouldUseCPDHost(authCR *operatorv1alpha1.Authentication, dc *discovery.DiscoveryClient) bool {
+func shouldUseCPDHost(authCR *operatorv1alpha1.Authentication, dc *discovery.DiscoveryClient) bool {
 	return !authCR.HasCustomIngressHostname() && authCR.Spec.Config.ZenFrontDoor && common.ClusterHasZenExtensionGroupVersion(dc)
 }
 
@@ -682,7 +682,7 @@ func (r *AuthenticationReconciler) getClusterAddress(authCR *operatorv1alpha1.Au
 		clusterInfoConfigMap := &corev1.ConfigMap{}
 
 		clusterAddressFieldName := "cluster_address"
-		if ShouldUseCPDHost(authCR, &r.DiscoveryClient) {
+		if shouldUseCPDHost(authCR, &r.DiscoveryClient) {
 			clusterAddressFieldName = "cluster_address_auth"
 		}
 

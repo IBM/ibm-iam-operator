@@ -129,22 +129,9 @@ func (r *BootstrapReconciler) makeAuthenticationCorrections(ctx context.Context,
 		return subreconciler.RequeueWithError(err)
 	}
 
-	//call bootstrapIngressCustomization only if cluster is OCP
-	var domainName string
-	if domainName, err = authctrl.GetCNCFDomain(ctx, r.Client, authCR); err != nil {
-		log.Error(err, "Could not retrieve cluster configuration; requeueing")
+	if err = r.bootstrapIngressCustomization(debugCtx, authCR); err != nil {
+		log.Error(err, "Failed to update ingress customization")
 		return subreconciler.RequeueWithError(err)
-	}
-
-	// if the env identified as CNCF
-	if domainName != "" {
-		log.Info("Env type is CNCF, skipping bootstrapIngressCustomization")
-	} else {
-		log.Info("Env Type is OCP")
-		if err = r.bootstrapIngressCustomization(debugCtx, authCR); err != nil {
-			log.Error(err, "Failed to update ingress customization")
-			return subreconciler.RequeueWithError(err)
-		}
 	}
 
 	log.Info("Updating Authentication with version label and bootstrapped values")

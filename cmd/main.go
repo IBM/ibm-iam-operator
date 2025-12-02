@@ -107,8 +107,7 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	ctrlLog := zap.New(zap.UseFlagOptions(&opts))
-	ctrl.SetLogger(ctrlLog)
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	watchNamespace, err := controllercommon.GetWatchNamespace()
 	if err != nil {
@@ -174,20 +173,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	var dc *discovery.DiscoveryClient
-	dc, err = discovery.NewDiscoveryClientForConfig(mgr.GetConfig())
-	if err != nil {
-		setupLog.Error(err, "failed to get discovery client", "controller", "Authentication")
-		os.Exit(1)
-	}
-
 	if err = (&bootstrapcontrollers.BootstrapReconciler{
-		Client: &controllercommon.FallbackClient{
-			Client: mgr.GetClient(),
-			Reader: mgr.GetAPIReader(),
-		},
-		DiscoveryClient: dc,
-	}).SetupWithManager(mgr, ctrlLog); err != nil {
+		Client: mgr.GetClient(),
+	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Authentication")
 		os.Exit(1)
 	}
@@ -213,6 +201,13 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Client")
 		os.Exit(1)
 	}
+	var dc *discovery.DiscoveryClient
+	dc, err = discovery.NewDiscoveryClientForConfig(mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "failed to get discovery client", "controller", "Authentication")
+		os.Exit(1)
+	}
+
 	if err = (&operatorcontrollers.AuthenticationReconciler{
 		Client: &controllercommon.FallbackClient{
 			Client: mgr.GetClient(),

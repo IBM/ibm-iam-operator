@@ -105,28 +105,28 @@ var _ = Describe("ConfigMap handling", func() {
 			ctx = context.Background()
 		})
 		It("retrieves the domain name when configured for CNCF", func() {
-			dn, err := GetCNCFDomain(ctx, r.Client, authCR)
+			dn, err := getCNCFDomain(ctx, r.Client, authCR)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(dn).To(Equal("example.ibm.com"))
 		})
 		It("retrieves nothing when not configured for CNCF", func() {
 			globalConfigMap.Data["kubernetes_cluster_type"] = "other"
 			r.Update(ctx, globalConfigMap)
-			dn, err := GetCNCFDomain(ctx, r.Client, authCR)
+			dn, err := getCNCFDomain(ctx, r.Client, authCR)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(dn).To(Equal(""))
 		})
 		It("produces an error when ibm-cpp-config does not have domain_name set", func() {
 			delete(globalConfigMap.Data, "domain_name")
 			r.Update(ctx, globalConfigMap)
-			dn, err := GetCNCFDomain(ctx, r.Client, authCR)
+			dn, err := getCNCFDomain(ctx, r.Client, authCR)
 			Expect(err).To(HaveOccurred())
 			Expect(dn).To(Equal(""))
 			Expect(err.Error()).To(Equal("domain name not configured"))
 		})
 		It("produces an error when ibm-cpp-config isn't found", func() {
 			r.Delete(ctx, globalConfigMap)
-			dn, err := GetCNCFDomain(ctx, r.Client, authCR)
+			dn, err := getCNCFDomain(ctx, r.Client, authCR)
 			Expect(dn).To(Equal(""))
 			Expect(err).To(HaveOccurred())
 		})

@@ -375,6 +375,7 @@ func (r *AuthenticationReconciler) syncRouterCertSecret(ctx context.Context, req
 	currentRouterCertSecret := authCR.Spec.AuthService.RouterCertSecret
 
 	// Check if routerCertSecret needs to be updated
+	// testing for nil pointer dereference
 	if currentRouterCertSecret == customCertSecret {
 		log.V(1).Info("routerCertSecret is already synchronized",
 			"routerCertSecret", currentRouterCertSecret,

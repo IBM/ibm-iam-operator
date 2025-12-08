@@ -370,6 +370,7 @@ func (r *AuthenticationReconciler) syncRouterCertSecret(ctx context.Context, req
 		return subreconciler.ContinueReconciling()
 	}
 
+	// Get the custom ingress certificate secret
 	customCertSecret := *authCR.Spec.Config.Ingress.Secret
 	currentRouterCertSecret := authCR.Spec.AuthService.RouterCertSecret
 

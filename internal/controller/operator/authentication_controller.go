@@ -279,6 +279,7 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 		r.ensureMigrationJobRuns,
 		r.checkSAMLPresence,
 		r.handleCertificates,
+		r.syncRouterCertSecret,
 		r.handleServices,
 		r.handleOperandBindInfo,
 		r.handleSecrets,
@@ -419,6 +420,59 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			}
 		}), builder.WithPredicates(predicate.Or(globalCMPred, productCMPred)),
 	)
+
+	// Watch for changes to custom ingress certificate secrets
+	// This ensures routerCertSecret is synchronized when the custom certificate is updated
+	customIngressSecretPred := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			secret, ok := e.ObjectNew.(*corev1.Secret)
+			if !ok {
+				return false
+			}
+			// Get the Authentication CR to check if this secret is the custom ingress certificate
+			authCR, err := common.GetAuthentication(context.Background(), r.Client)
+			if err != nil || authCR == nil {
+				return false
+			}
+			// Only trigger reconciliation if this is the custom ingress certificate secret
+			if authCR.HasCustomIngressCertificate() && *authCR.Spec.Config.Ingress.Secret == secret.Name {
+				return true
+			}
+			return false
+		},
+		CreateFunc: func(e event.CreateEvent) bool {
+			secret, ok := e.Object.(*corev1.Secret)
+			if !ok {
+				return false
+			}
+			// Get the Authentication CR to check if this secret is the custom ingress certificate
+			authCR, err := common.GetAuthentication(context.Background(), r.Client)
+			if err != nil || authCR == nil {
+				return false
+			}
+			// Only trigger reconciliation if this is the custom ingress certificate secret
+			if authCR.HasCustomIngressCertificate() && *authCR.Spec.Config.Ingress.Secret == secret.Name {
+				return true
+			}
+			return false
+		},
+	}
+
+	authCtrl.Watches(&corev1.Secret{},
+		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
+			authCR, _ := common.GetAuthentication(ctx, r.Client)
+			if authCR == nil {
+				return
+			}
+			return []reconcile.Request{
+				{NamespacedName: types.NamespacedName{
+					Name:      authCR.Name,
+					Namespace: authCR.Namespace,
+				}},
+			}
+		}), builder.WithPredicates(customIngressSecretPred),
+	)
+
 	bootstrappedPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
 		return o.GetLabels()[common.ManagerVersionLabel] == version.Version
 	})

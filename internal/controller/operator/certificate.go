@@ -25,6 +25,7 @@ import (
 	certmgrv1 "github.com/IBM/ibm-iam-operator/internal/api/certmanager/v1"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
 	"github.com/opdev/subreconciler"
+	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -347,4 +348,88 @@ func (r *AuthenticationReconciler) generateCertificateObject(authCR *operatorv1a
 	err = controllerutil.SetControllerReference(authCR, certificate, r.Client.Scheme())
 
 	return
+}
+
+// syncRouterCertSecret synchronizes the routerCertSecret field in Authentication CR
+// with the custom ingress certificate secret when configured. This ensures that
+// SAML authentication uses the correct certificate after custom endpoint certificate
+// updates or upgrades from CPFS 3.x to 4.x.
+func (r *AuthenticationReconciler) syncRouterCertSecret(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	log := logf.FromContext(ctx)
+	authCR := &operatorv1alpha1.Authentication{}
+
+	log.Info("Synchronizing routerCertSecret with custom ingress certificate")
+
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+
+	// Check if custom ingress certificate is configured
+	if !authCR.HasCustomIngressCertificate() {
+		log.V(1).Info("No custom ingress certificate configured; skipping routerCertSecret sync")
+		return subreconciler.ContinueReconciling()
+	}
+
+	customCertSecret := *authCR.Spec.Config.Ingress.Secret
+	currentRouterCertSecret := authCR.Spec.AuthService.RouterCertSecret
+
+	// Check if routerCertSecret needs to be updated
+	if currentRouterCertSecret == customCertSecret {
+		log.V(1).Info("routerCertSecret is already synchronized",
+			"routerCertSecret", currentRouterCertSecret,
+			"customCertSecret", customCertSecret)
+		return subreconciler.ContinueReconciling()
+	}
+
+	// Verify that the custom certificate secret exists before updating
+	secret := &corev1.Secret{}
+	secretKey := types.NamespacedName{
+		Name:      customCertSecret,
+		Namespace: authCR.Namespace,
+	}
+
+	if err = r.Get(ctx, secretKey, secret); k8sErrors.IsNotFound(err) {
+		log.Info("Custom certificate secret not found; will retry",
+			"secretName", customCertSecret,
+			"namespace", authCR.Namespace)
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	} else if err != nil {
+		log.Error(err, "Failed to get custom certificate secret",
+			"secretName", customCertSecret,
+			"namespace", authCR.Namespace)
+		return subreconciler.RequeueWithError(err)
+	}
+
+	// Validate that the secret contains required certificate fields
+	if _, hasCert := secret.Data["tls.crt"]; !hasCert {
+		log.Info("Custom certificate secret missing tls.crt field",
+			"secretName", customCertSecret)
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	}
+	if _, hasKey := secret.Data["tls.key"]; !hasKey {
+		log.Info("Custom certificate secret missing tls.key field",
+			"secretName", customCertSecret)
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	}
+
+	log.Info("Updating routerCertSecret to match custom ingress certificate",
+		"oldValue", currentRouterCertSecret,
+		"newValue", customCertSecret)
+
+	// Update the Authentication CR with the new routerCertSecret
+	authCR.Spec.AuthService.RouterCertSecret = customCertSecret
+
+	if err = r.Update(ctx, authCR); err != nil {
+		log.Error(err, "Failed to update Authentication CR with new routerCertSecret")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	log.Info("Successfully synchronized routerCertSecret",
+		"routerCertSecret", customCertSecret)
+
+	// Signal that deployments need to be rolled out to pick up the new certificate
+	r.needsRollout = true
+
+	// Requeue to ensure the change is propagated
+	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }

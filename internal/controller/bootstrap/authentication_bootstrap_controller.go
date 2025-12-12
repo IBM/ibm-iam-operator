@@ -150,15 +150,29 @@ func (r *BootstrapReconciler) makeAuthenticationCorrections(ctx context.Context,
 }
 
 func (r *BootstrapReconciler) bootstrapIngressCustomization(ctx context.Context, authCR *operatorv1alpha1.Authentication) (err error) {
-	_, err = r.setIngressFromCustomizationCM(ctx, authCR)
-	if err != nil {
+	log := logf.FromContext(ctx)
+	cmName := "cs-onprem-tenant-config"
+	var modified bool
+	log.Info("Attempt to bootstrap ingress configuration into Authentication CR from ConfigMap", "ConfigMap.Name", cmName)
+	modified, err = r.setIngressFromCustomizationCM(ctx, authCR)
+	if modified {
+		log.Info("Bootstrapping ingress configuration into Authentication CR from ConfigMap succeeded", "ConfigMap.Name", cmName)
+		return
+	} else if err != nil && !k8sErrors.IsNotFound(err) {
+		log.Error(err, "Bootstrapping ingress configuration into Authentication CR from ConfigMap failed", "ConfigMap.Name", cmName)
 		return
 	}
-	err = r.setIngressHostnameIfCustomized(ctx, authCR)
-	if err != nil {
+	log.Info("ConfigMap for bootstrapping ingress configuration not found; attempting to bootstrap ingress configuration into Authentication CR from other observed objects instead")
+	if err = r.setIngressHostnameIfCustomized(ctx, authCR); err != nil {
+		log.Error(err, "Bootstrapping ingress hostname into Authentication CR from other observed objects failed")
 		return
 	}
-	return r.setIngressSecretIfCustomized(ctx, authCR)
+	if err = r.setIngressSecretIfCustomized(ctx, authCR); err != nil {
+		log.Error(err, "Bootstrapping ingress certificates into Authentication CR from other observed objects failed")
+		return
+	}
+	log.Info("Bootstrapping ingress configuration into Authentication CR from other observed objects succeeded")
+	return
 }
 
 func (r *BootstrapReconciler) setIngressFromCustomizationCM(ctx context.Context, authCR *operatorv1alpha1.Authentication) (modified bool, err error) {
@@ -166,10 +180,7 @@ func (r *BootstrapReconciler) setIngressFromCustomizationCM(ctx context.Context,
 	log := logf.FromContext(ctx, "ConfigMap.Name", cmName)
 
 	cm := &corev1.ConfigMap{}
-	if err = r.Get(ctx, types.NamespacedName{Name: cmName, Namespace: authCR.Namespace}, cm); k8sErrors.IsNotFound(err) {
-		log.Info("Did not find ConfigMap")
-		return false, nil
-	} else if err != nil {
+	if err = r.Get(ctx, types.NamespacedName{Name: cmName, Namespace: authCR.Namespace}, cm); err != nil {
 		return
 	}
 

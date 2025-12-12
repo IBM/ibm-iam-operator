@@ -175,7 +175,7 @@ func (r *BootstrapReconciler) bootstrapIngressCustomization(ctx context.Context,
 	return
 }
 
-func (r *BootstrapReconciler) setIngressFromCustomizationCM(ctx context.Context, authCR *operatorv1alpha1.Authentication) (modified bool, err error) {
+func (r *BootstrapReconciler) setIngressFromCustomizationCM(ctx context.Context, authCR *operatorv1alpha1.Authentication) (configured bool, err error) {
 	cmName := "cs-onprem-tenant-config"
 	log := logf.FromContext(ctx, "ConfigMap.Name", cmName)
 
@@ -187,7 +187,7 @@ func (r *BootstrapReconciler) setIngressFromCustomizationCM(ctx context.Context,
 	// Check if we've already processed this ConfigMap
 	if cm.Annotations != nil && cm.Annotations[OnpremConfigMapProcessedAnnotation] == "true" {
 		log.Info("ConfigMap already processed in a previous reconciliation; skipping")
-		return false, nil
+		return true, nil
 	}
 
 	log.Info("Found ConfigMap; setting hostname and secret using fields")

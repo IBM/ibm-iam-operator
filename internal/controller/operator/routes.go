@@ -81,6 +81,12 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Re
 		return
 	}
 
+	// Check if Routes should be removed based on .spec.config.ingress.gvk setting
+	if authCR.ShouldRemoveRoutes() {
+		log.Info("Routes management disabled via .spec.config.ingress.gvk=none; ensuring all Routes are removed")
+		return r.removeAllManagedRoutes(handleRouteCtx, authCR)
+	}
+
 	return r.reconcileAllRoutes(handleRouteCtx, authCR)
 }
 
@@ -329,6 +335,41 @@ func (r *AuthenticationReconciler) removeExtraRoutes(authCR *operatorv1alpha1.Au
 
 		return
 	}
+}
+
+// removeAllManagedRoutes removes all Routes managed by this operator when .spec.config.ingress.gvk is set to "none"
+func (r *AuthenticationReconciler) removeAllManagedRoutes(ctx context.Context, authCR *operatorv1alpha1.Authentication) (result *ctrl.Result, err error) {
+	log := logf.FromContext(ctx)
+	log.Info("Removing all managed Routes as .spec.config.ingress.gvk is set to 'none'")
+
+	routesList := &routev1.RouteList{}
+	err = r.List(ctx, routesList, client.InNamespace(authCR.Namespace), client.MatchingLabels{"app": "im"})
+	if err != nil {
+		log.Error(err, "Failed to list Routes")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	changed := false
+	for _, item := range routesList.Items {
+		log.Info("Removing Route", "Name", item.Name)
+		if err = r.Delete(ctx, &item); k8sErrors.IsNotFound(err) {
+			log.Info("Route was not found; continuing", "Name", item.Name)
+			err = nil
+		} else if err != nil {
+			log.Error(err, "Failed to delete Route", "Name", item.Name)
+			return subreconciler.RequeueWithDelay(defaultLowerWait)
+		}
+		log.Info("Successfully deleted Route", "Name", item.Name)
+		changed = true
+	}
+
+	if changed {
+		log.Info("Deleted all managed Routes; requeueing")
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	}
+
+	log.Info("All managed Routes have been removed")
+	return subreconciler.ContinueReconciling()
 }
 
 func (r *AuthenticationReconciler) getCustomTLS(authCR *operatorv1alpha1.Authentication, secret *corev1.Secret) common.SecondaryReconcilerFn {

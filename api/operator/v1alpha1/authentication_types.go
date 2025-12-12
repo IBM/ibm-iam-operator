@@ -118,6 +118,12 @@ type ClientRegistrationSpec struct {
 type IngressConfig struct {
 	Hostname *string `json:"hostname,omitempty"`
 	Secret   *string `json:"secret,omitempty"`
+	// GVK specifies which ingress resource type to use. Valid values: "none", "openshift.io/v1/route"
+	// When set to "openshift.io/v1/route", Routes are created when OpenShift is detected.
+	// When set to "none", all Routes are removed.
+	// When unspecified, defaults to "openshift.io/v1/route" behavior.
+	// +kubebuilder:validation:Enum=none;openshift.io/v1/route
+	GVK *string `json:"gvk,omitempty"`
 }
 
 type ConfigSpec struct {
@@ -352,6 +358,23 @@ func (a *Authentication) HasCustomIngressCertificate() bool {
 
 func (a *Authentication) HasCustomIngress() bool {
 	return a.HasCustomIngressHostname() || a.HasCustomIngressCertificate()
+}
+
+// ShouldManageRoutes returns true if Routes should be created/managed.
+// Returns false when .spec.config.ingress.gvk is set to "none".
+// Returns true when .spec.config.ingress.gvk is set to "openshift.io/v1/route" or unspecified (default).
+func (a *Authentication) ShouldManageRoutes() bool {
+	if a.Spec.Config.Ingress != nil && a.Spec.Config.Ingress.GVK != nil {
+		return *a.Spec.Config.Ingress.GVK != "none"
+	}
+	// Default behavior: manage routes (equivalent to "openshift.io/v1/route")
+	return true
+}
+
+// ShouldRemoveRoutes returns true if all Routes should be removed from the cluster.
+// Returns true when .spec.config.ingress.gvk is set to "none".
+func (a *Authentication) ShouldRemoveRoutes() bool {
+	return !a.ShouldManageRoutes()
 }
 
 func (a *Authentication) GetDBSchemaVersion() string {

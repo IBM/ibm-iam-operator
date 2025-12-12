@@ -250,6 +250,8 @@ spec:
                     type: boolean
                   ingress:
                     properties:
+                      gvk:
+                        type: string
                       hostname:
                         type: string
                       secret:

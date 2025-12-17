@@ -619,7 +619,6 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"IS_OPENSHIFT_ENV":                   strconv.FormatBool(isOSEnv),
 				"LIBERTY_SAMESITE_COOKIE":            libertySSCookie,
 				"OAUTH_21_ENABLED":                   strconv.FormatBool(oauth21Enabled),
-				"ENABLE_IMPERSONATION":               strconv.FormatBool(authCR.Spec.Config.EnableImpersonation),
 			},
 		}
 

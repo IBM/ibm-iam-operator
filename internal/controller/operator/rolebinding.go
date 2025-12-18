@@ -29,7 +29,7 @@ import (
 )
 
 func (r *AuthenticationReconciler) createRoleBinding(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	log := logf.FromContext(ctx, "RoleBinding.Name", "ibm-iam-operand-restricted")
+	log := logf.FromContext(ctx)
 	debugLog := log.V(1)
 	debugCtx := logf.IntoContext(ctx, debugLog)
 
@@ -38,38 +38,57 @@ func (r *AuthenticationReconciler) createRoleBinding(ctx context.Context, req ct
 	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
-	// Define a new RoleBinding
-	operandRB := r.iamOperandRB(authCR)
-	debugLog.Info("Creating RoleBinding")
-	err = r.Client.Create(ctx, operandRB)
-	if k8sErrors.IsAlreadyExists(err) {
-		log.Info("RoleBinding is already present")
-		return subreconciler.ContinueReconciling()
-	} else if err != nil {
-		log.Error(err, "Failed to create RoleBinding")
-		return subreconciler.RequeueWithError(err)
+
+	// Define role names to be used to create rolebinding
+	roleNames := []string{
+		"platform-identity-provider",
+		"platform-identity-management",
+	}
+	// Track if any rolebinding was created
+	anyCreated := false
+
+	// Create all rolebindings in a loop
+	for _, roleName := range roleNames {
+		operandRB := r.iamOperandRB(authCR, roleName)
+		err = r.Client.Create(ctx, operandRB)
+		if k8sErrors.IsAlreadyExists(err) {
+			log.Info("RoleBinding is already present", "roleBindingName", roleName)
+			continue
+		} else if err != nil {
+			log.Error(err, "Failed to create RoleBinding", "roleBindingName", roleName)
+			return subreconciler.RequeueWithError(err)
+		}
+		log.Info("Rolebinding created successfully", "roleBindingName", roleName)
+		anyCreated = true
+	}
+	// If any rolebinding was created, requeue to ensure all are ready
+	if anyCreated {
+		log.Info("Rolebindings created successfully")
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
 
-	log.Info("Created RoleBinding successfully")
-	return subreconciler.RequeueWithDelay(defaultLowerWait)
+	log.Info("All Rolebindings already exist")
+	return subreconciler.ContinueReconciling()
+
 }
 
-func (r *AuthenticationReconciler) iamOperandRB(instance *operatorv1alpha1.Authentication) *rbacv1.RoleBinding {
+func (r *AuthenticationReconciler) iamOperandRB(instance *operatorv1alpha1.Authentication, rolename string) *rbacv1.RoleBinding {
+
 	operandRB := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ibm-iam-operand-restricted",
+			Name:      rolename,
 			Namespace: instance.Namespace,
 			Labels:    map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/managed-by": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"},
 		},
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
 			Kind:     "Role",
-			Name:     "ibm-iam-operand-restricted",
+			Name:     rolename,
 		},
 		Subjects: []rbacv1.Subject{
 			{
 				Kind:      "ServiceAccount",
-				Name:      "ibm-iam-operand-restricted",
+				Name:      rolename,
 				Namespace: instance.Namespace,
 			},
 		},

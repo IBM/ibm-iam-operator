@@ -29,7 +29,7 @@ import (
 )
 
 func (r *AuthenticationReconciler) createRole(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	log := logf.FromContext(ctx, "Role.Name", "ibm-iam-operand-restricted")
+	log := logf.FromContext(ctx)
 	debugLog := log.V(1)
 	debugCtx := logf.IntoContext(ctx, debugLog)
 
@@ -39,43 +39,90 @@ func (r *AuthenticationReconciler) createRole(ctx context.Context, req ctrl.Requ
 	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
-	// Define a new Role
-	operandRole := r.iamOperandRole(authCR)
-	err = r.Client.Create(debugCtx, operandRole)
-	if k8sErrors.IsAlreadyExists(err) {
-		log.Info("Role is already present")
-		return subreconciler.ContinueReconciling()
-	} else if err != nil {
-		log.Error(err, "Failed to create Role")
-		return subreconciler.RequeueWithError(err)
+	// Define role names to create
+	roleNames := []string{
+		"platform-identity-provider",
+		"platform-identity-management",
 	}
-	log.Info("Role created successfully")
-	// Role created successfully - return and requeue
-	return subreconciler.RequeueWithDelay(defaultLowerWait)
+	// Track if any role was created
+	anyCreated := false
+	// Create all roles in a loop
+	for _, roleName := range roleNames {
+		operandRole := r.iamOperandRole(authCR, roleName)
+		err = r.Client.Create(debugCtx, operandRole)
+		if k8sErrors.IsAlreadyExists(err) {
+			log.Info("Role is already present", "roleName", roleName)
+			continue
+		} else if err != nil {
+			log.Error(err, "Failed to create Role", "roleName", roleName)
+			return subreconciler.RequeueWithError(err)
+		}
+		log.Info("Role created successfully", "roleName", roleName)
+		anyCreated = true
+	}
+	// If any role was created, requeue to ensure all are ready
+	if anyCreated {
+		log.Info("Roles created successfully")
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	}
+
+	log.Info("All Roles already exist")
+	return subreconciler.ContinueReconciling()
+
 }
 
-func (r *AuthenticationReconciler) iamOperandRole(instance *operatorv1alpha1.Authentication) *rbacv1.Role {
+func (r *AuthenticationReconciler) iamOperandRole(instance *operatorv1alpha1.Authentication, rolename string) *rbacv1.Role {
 
-	// reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	operandRole := &rbacv1.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ibm-iam-operand-restricted",
-			Labels:    map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/managed-by": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"},
-			Namespace: instance.Namespace,
-		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{"oidc.security.ibm.com"},
-				Resources: []string{"clients", "clients/finalizers", "clients/status"},
-				Verbs:     []string{"create", "delete", "watch", "get", "list", "patch", "update"},
+	var operandRole *rbacv1.Role
+
+	switch rolename {
+	case "platform-identity-provider":
+		operandRole = &rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      rolename,
+				Labels:    map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/managed-by": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"},
+				Namespace: instance.Namespace,
 			},
-			{
-				APIGroups: []string{""},
-				Resources: []string{"secrets", "services", "endpoints"},
-				Verbs:     []string{"create", "delete", "watch", "get", "list", "patch", "update"},
+			Rules: []rbacv1.PolicyRule{
+				{
+					APIGroups: []string{""},
+					Resources: []string{"endpoints"},
+					Verbs:     []string{"get"},
+				},
+				{
+					APIGroups: []string{""},
+					Resources: []string{"secrets"},
+					Verbs:     []string{"get", "patch"},
+				},
+				{
+					APIGroups: []string{"oidc.security.ibm.com"},
+					Resources: []string{"clients"},
+					Verbs:     []string{"create", "update", "get", "delete"},
+				},
 			},
-		},
+		}
+
+	case "platform-identity-management":
+		operandRole = &rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      rolename,
+				Labels:    map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/managed-by": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"},
+				Namespace: instance.Namespace,
+			},
+			Rules: []rbacv1.PolicyRule{
+				{
+					APIGroups: []string{""},
+					Resources: []string{"endpoints"},
+					Verbs:     []string{"get"},
+				},
+				{
+					APIGroups: []string{""},
+					Resources: []string{"secrets"},
+					Verbs:     []string{"get", "patch"},
+				},
+			},
+		}
 	}
-	return operandRole
 
+	return operandRole
 }

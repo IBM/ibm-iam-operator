@@ -119,7 +119,8 @@ func (r *AuthenticationReconciler) getSecretSubreconcilers(ctx context.Context, 
 		ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.Secret]().
 			WithName("platform-auth-ldaps-ca-cert").
 			WithGenerateFns(generateSecretObject(map[string][]byte{"certificate": []byte("")})).
-			WithModifyFns(ensureSecretLabels),
+			WithModifyFns(ensureSecretLabels, ensureChecksumAnnotation).
+			WithOnWriteFns(signalNeedRolloutFn[*corev1.Secret](r)),
 		ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.Secret]().
 			WithName("im-cert-auth-certificates").
 			WithGenerateFns(generateSecretObject(map[string][]byte{"data": []byte("")})).

@@ -40,6 +40,13 @@ spec:
         memory: 128Mi
         ephemeral-storage: 158Mi
   config:
+    # ingress:
+    #   # Optional: Specify which ingress resource type to use
+    #   # Valid values: "none", "openshift.io/v1/route"
+    #   # - "openshift.io/v1/route": Creates OpenShift Routes (default behavior when unspecified)
+    #   # - "none": Ensures all OpenShift Routes are removed from the cluster
+    #   # When unspecified, defaults to "openshift.io/v1/route" behavior
+    #   gvk: openshift.io/v1/route
     authUniqueHosts: internal-ip1 internal-ip2 mycluster.icp
     clusterCADomain: mycluster.icp
     clusterExternalAddress: 10.0.0.1

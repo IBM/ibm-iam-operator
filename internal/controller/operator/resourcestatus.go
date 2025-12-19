@@ -385,9 +385,16 @@ func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, 
 		f: getAllRouteStatus,
 	}
 
+	// Only check Route status if:
+	// 1. Cluster has Route API available, AND
+	// 2. .spec.config.ingress.gvk is not set to "none"
 	if ctrlcommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient) {
-		reqLogger.Info("Is running on OpenShift; will check Route status")
-		statusRetrievals = append(statusRetrievals, routeStatusRetrieval)
+		if authentication.ShouldRemoveRoutes() {
+			reqLogger.Info("Routes are disabled via .spec.config.ingress.gvk=none; skipping Route status check")
+		} else {
+			reqLogger.Info("Is running on OpenShift; will check Route status")
+			statusRetrievals = append(statusRetrievals, routeStatusRetrieval)
+		}
 	} else {
 		reqLogger.Info("Routes are not available; assuming ingress will be configured manually")
 	}

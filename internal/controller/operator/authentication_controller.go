@@ -295,6 +295,7 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 		r.ensureMigrationJobRuns,
 		r.checkSAMLPresence,
 		r.handleCertificates,
+		r.syncRouterCertSecret,
 		r.handleServices,
 		r.handleOperandBindInfo,
 		r.handleSecrets,

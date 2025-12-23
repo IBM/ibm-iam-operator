@@ -239,6 +239,7 @@ spec:
                 - clusterrolebindings
               verbs:
                 - create
+                - delete
             - apiGroups:
                 - user.openshift.io
               resources:
@@ -572,6 +573,7 @@ spec:
                 - patch
                 - update
                 - watch
+                - delete
             - apiGroups:
                 - rbac.authorization.k8s.io
               resources:
@@ -579,6 +581,7 @@ spec:
                 - rolebindings
               verbs:
                 - create
+                - delete
             - apiGroups:
                 - zen.cpd.ibm.com
               resources:

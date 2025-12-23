@@ -53,28 +53,71 @@ func (r *AuthenticationReconciler) handleClusterRoles(ctx context.Context, req c
 	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
-
-	operandClusterRole := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "ibm-iam-operand-restricted",
-			Labels: map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/managed-by": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"},
-		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{"user.openshift.io"},
-				Resources: []string{"users", "groups", "identities"},
-				Verbs:     []string{"get", "list"},
-			},
-		},
+	// Define role names to create
+	clusterRoleNames := []string{
+		"platform-identity-provider",
+		"platform-identity-management",
 	}
-	log = log.WithValues("ClusterRole.Name", operandClusterRole.Name)
-	if err := r.Create(debugCtx, operandClusterRole); k8sErrors.IsAlreadyExists(err) {
-		log.Info("ClusterRole already exists; continuing")
-		return subreconciler.ContinueReconciling()
-	} else if err != nil {
-		log.Info("Encountered an unexpected error while trying to create ClusterRole", "error", err.Error())
+	// Track if any clusterrole was created
+	anyCreated := false
+	// Create all roles in a loop
+	for _, clusterRoleName := range clusterRoleNames {
+		operandClusterRole := r.iamOperandClusterRole(authCR, clusterRoleName)
+		err = r.Client.Create(debugCtx, operandClusterRole)
+		if k8sErrors.IsAlreadyExists(err) {
+			log.Info("ClusterRole already exists; continuing")
+			continue
+		} else if err != nil {
+			log.Info("Encountered an unexpected error while trying to create ClusterRole", "error", err.Error())
+			return subreconciler.RequeueWithError(err)
+		}
+		log.Info("ClusterRole created successfully", "ClusterRole", clusterRoleName)
+		anyCreated = true
+	}
+	if anyCreated {
+		log.Info("ClusterRoles created successfully")
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
-	log.Info("ClusterRole created successfully")
-	return subreconciler.RequeueWithDelay(defaultLowerWait)
+
+	log.Info("All ClusterRoles already exist")
+	return subreconciler.ContinueReconciling()
+}
+
+func (r *AuthenticationReconciler) iamOperandClusterRole(instance *operatorv1alpha1.Authentication, rolename string) *rbacv1.ClusterRole {
+
+	var operandRole *rbacv1.ClusterRole
+
+	switch rolename {
+	case "platform-identity-provider":
+		operandRole = &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   rolename,
+				Labels: map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/managed-by": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"},
+			},
+			Rules: []rbacv1.PolicyRule{
+				{
+					APIGroups: []string{"user.openshift.io"},
+					Resources: []string{"users", "groups"},
+					Verbs:     []string{"get", "list"},
+				},
+			},
+		}
+
+	case "platform-identity-management":
+		operandRole = &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   rolename,
+				Labels: map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/managed-by": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"},
+			},
+			Rules: []rbacv1.PolicyRule{
+				{
+					APIGroups: []string{"user.openshift.io"},
+					Resources: []string{"users", "groups"},
+					Verbs:     []string{"get", "list"},
+				},
+			},
+		}
+	}
+
+	return operandRole
 }

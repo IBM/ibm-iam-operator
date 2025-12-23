@@ -242,6 +242,21 @@ func (r *AuthenticationReconciler) handleAuthenticationFinalizer(ctx context.Con
 	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
+func (r *AuthenticationReconciler) ensureBootstrapIsComplete(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	log := logf.FromContext(ctx)
+	log.Info("Confirm bootstrap is complete")
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+	if authCR.Labels[common.ManagerVersionLabel] != version.Version {
+		log.Info("Bootstrap incomplete; requeueing")
+		return subreconciler.RequeueWithDelay(time.Second * 1)
+	}
+	log.Info("Bootstrap complete; continuing")
+	return subreconciler.ContinueReconciling()
+}
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
@@ -265,6 +280,7 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 	var subResult *ctrl.Result
 
 	fns := []subreconciler.FnWithRequest{
+		r.ensureBootstrapIsComplete,
 		r.handleAuthenticationFinalizer,
 		r.createSA,
 		r.createRole,
@@ -319,7 +335,6 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
-
 	authCtrl := ctrl.NewControllerManagedBy(mgr).
 		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&corev1.Secret{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
@@ -407,6 +422,45 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return o.GetName() == common.GlobalConfigMapName
 	})
 
+	bootstrapLabelSelector := metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      common.ManagerVersionLabel,
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{version.Version},
+			},
+		},
+	}
+	bootstrappedPred, err := predicate.LabelSelectorPredicate(bootstrapLabelSelector)
+	if err != nil {
+		return err
+	}
+
+	//bootstrappedPred := predicate.Funcs{
+	//	UpdateFunc: func(e event.UpdateEvent) bool {
+	//		predLog.Info("Update event", "Label.Version", e.ObjectNew.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.ObjectNew.GetLabels()[common.ManagerVersionLabel] == version.Version)
+	//		return e.ObjectNew.GetLabels()[common.ManagerVersionLabel] == version.Version
+	//	},
+
+	//	// Allow create events
+	//	CreateFunc: func(e event.CreateEvent) bool {
+	//		predLog.Info("Create event", "Label.Version", e.Object.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version)
+	//		return e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version
+	//	},
+
+	//	// Allow delete events
+	//	DeleteFunc: func(e event.DeleteEvent) bool {
+	//		predLog.Info("Delete event", "Label.Version", e.Object.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version)
+	//		return e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version
+	//	},
+
+	//	// Allow generic events (e.g., external triggers)
+	//	GenericFunc: func(e event.GenericEvent) bool {
+	//		predLog.Info("Generic event", "Label.Version", e.Object.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version)
+	//		return e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version
+	//	},
+	//}
+
 	authCtrl.Watches(&corev1.ConfigMap{},
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
 			authCR, _ := common.GetAuthentication(ctx, r.Client)
@@ -421,9 +475,6 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			}
 		}), builder.WithPredicates(predicate.Or(globalCMPred, productCMPred)),
 	)
-	bootstrappedPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
-		return o.GetLabels()[common.ManagerVersionLabel] == version.Version
-	})
 
 	authCtrl.Watches(&operatorv1alpha1.Authentication{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(bootstrappedPred))
 	return authCtrl.Named("controller_authentication").

@@ -25,7 +25,6 @@ import (
 	certmgrv1 "github.com/IBM/ibm-iam-operator/internal/api/certmanager/v1"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
 	"github.com/opdev/subreconciler"
-	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

@@ -120,7 +120,6 @@ func generateCertificateFieldsList(authCR *operatorv1alpha1.Authentication) []*r
 	return certList
 }
 
-// shouldUseCustomIngressCertForSAML returns true when routerCertSecret is default and a custom ingress certificate is configured.
 func shouldUseCustomIngressCertForSAML(authCR *operatorv1alpha1.Authentication) bool {
 	const defaultSAMLCertSecret = "saml-auth-secret"
 	return authCR.GetSAMLCertificateSecretName() != defaultSAMLCertSecret

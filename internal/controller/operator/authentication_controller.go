@@ -475,14 +475,13 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	)
 
 	// Watch for changes to customer-supplied Secrets that are part of IM
-	// Customers must label their Secrets with "app.kubernetes.io/part-of": "im"
 	imManagedSecretPred := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			secret, ok := e.ObjectNew.(*corev1.Secret)
 			if !ok {
 				return false
 			}
-			// Check if secret has the IM part-of label
+
 			if labels := secret.GetLabels(); labels != nil {
 				if val, exists := labels["app.kubernetes.io/part-of"]; exists && val == "im" {
 					return true
@@ -495,7 +494,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			if !ok {
 				return false
 			}
-			// Check if secret has the IM part-of label
+
 			if labels := secret.GetLabels(); labels != nil {
 				if val, exists := labels["app.kubernetes.io/part-of"]; exists && val == "im" {
 					return true
@@ -508,7 +507,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			if !ok {
 				return false
 			}
-			// Trigger reconciliation if a labeled IM secret is deleted
+
 			if labels := secret.GetLabels(); labels != nil {
 				if val, exists := labels["app.kubernetes.io/part-of"]; exists && val == "im" {
 					return true
@@ -521,7 +520,6 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Add the watch for customer-supplied Secrets
 	authCtrl.Watches(&corev1.Secret{},
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
-			// When a labeled secret changes, reconcile the Authentication CR
 			authCR, _ := common.GetAuthentication(ctx, r.Client)
 			if authCR == nil {
 				return

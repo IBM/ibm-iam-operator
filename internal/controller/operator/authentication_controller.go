@@ -475,9 +475,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	)
 
 	// Watch for changes to customer-supplied Secrets that are part of IM
-	// This includes custom ingress certificates and any other customer-managed Secrets
 	// Customers must label their Secrets with "app.kubernetes.io/part-of": "im"
-	// This enables automatic reconciliation when certificates are updated
 	imManagedSecretPred := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			secret, ok := e.ObjectNew.(*corev1.Secret)
@@ -485,7 +483,6 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return false
 			}
 			// Check if secret has the IM part-of label
-			// This is efficient - no API calls needed
 			if labels := secret.GetLabels(); labels != nil {
 				if val, exists := labels["app.kubernetes.io/part-of"]; exists && val == "im" {
 					return true

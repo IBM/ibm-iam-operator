@@ -905,22 +905,22 @@ func hasDataField(fields metav1.ManagedFieldsEntry) bool {
 
 // getSAMLCertificateSecretName determines which certificate secret to use for SAML SP
 //
-// Note: The Authentication CR field is named "routerCertSecret" for historical reasons,
-// but it's actually used for SAML Service Provider certificate configuration.
-// In this code, we refer to it as "samlCertSecret" for clarity.
+// Note: The Authentication CR field is named "routerCertSecret" (historical),
+// but it configures the SAML Service Provider certificate.
+// Referred to as "samlCertSecret" here for clarity.
 //
 // Decision logic:
-// 1. If routerCertSecret is default ("saml-auth-secret") AND custom ingress cert exists:
-//    → Use the custom ingress certificate (reproduces pre-4.x behavior)
-// 2. If routerCertSecret is set to a custom value:
-//    → Use that custom value (respects user's explicit choice)
-// 3. Otherwise:
-//    → Use the default "saml-auth-secret"
+//  1. If routerCertSecret is default ("saml-auth-secret") AND custom ingress cert exists:
+//     → Use the custom ingress certificate (reproduces pre-4.x behavior)
+//  2. If routerCertSecret is set to a custom value:
+//     → Use that custom value (respects user's explicit choice)
+//  3. Otherwise:
+//     → Use the default "saml-auth-secret"
 func getSAMLCertificateSecretName(authCR *operatorv1alpha1.Authentication) string {
 	const defaultSAMLCertSecret = "saml-auth-secret"
 
 	// Get the routerCertSecret value (legacy field name, actually for SAML cert)
-	// We call it samlCertSecret in code for clarity
+	// Using samlCertSecret in code for clarity
 	samlCertSecret := authCR.Spec.AuthService.RouterCertSecret
 	if samlCertSecret == "" {
 		samlCertSecret = defaultSAMLCertSecret
@@ -1046,9 +1046,9 @@ func buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName,
 				},
 			},
 		},
-		// Volume for SAML Service Provider certificate
-		// Note: Volume name is "saml-cert" but the CR field is "routerCertSecret" (legacy naming)
-		// The getSAMLCertificateSecretName helper determines which certificate to use
+		// Volume for SAML SP certificate.
+		// Note: CR field is "routerCertSecret" (legacy); volume name is "saml-cert".
+		// getSAMLCertificateSecretName selects the certificate.
 		{
 			Name: "saml-cert",
 			VolumeSource: corev1.VolumeSource{

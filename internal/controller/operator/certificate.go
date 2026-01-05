@@ -51,6 +51,7 @@ func (r *AuthenticationReconciler) handleCertificates(ctx context.Context, req c
 	certificateFieldsList := generateCertificateFieldsList(authCR)
 	certificateSubreconcilers := []subreconciler.Fn{
 		r.removeV1Alpha1Certs(authCR, certificateFieldsList),
+		r.cleanupDefaultSAMLCertificate(authCR),
 		r.createV1CertificatesIfNotPresent(authCR, certificateFieldsList),
 		r.addLabelIfMissing(certificateFieldsList),
 	}
@@ -72,7 +73,7 @@ type reconcileCertificateFields struct {
 }
 
 func generateCertificateFieldsList(authCR *operatorv1alpha1.Authentication) []*reconcileCertificateFields {
-	return []*reconcileCertificateFields{
+	certList := []*reconcileCertificateFields{
 		{
 			NamespacedName: types.NamespacedName{
 				Name:      "platform-auth-cert",
@@ -101,7 +102,13 @@ func generateCertificateFieldsList(authCR *operatorv1alpha1.Authentication) []*r
 			CommonName: "platform-identity-management",
 			DNSNames:   []string{fmt.Sprintf("platform-identity-management.%s.svc", authCR.Namespace)},
 		},
-		{
+	}
+
+	// Only create saml-auth-cert if using default configuration (no custom ingress certificate)
+	// When custom ingress certificate is configured, deployments will use that certificate directly
+	// via the getSAMLCertificateSecretName() helper function in deployment.go
+	if !shouldUseCustomIngressCertForSAML(authCR) {
+		certList = append(certList, &reconcileCertificateFields{
 			NamespacedName: types.NamespacedName{
 				Name:      "saml-auth-cert",
 				Namespace: authCR.Namespace,
@@ -109,8 +116,26 @@ func generateCertificateFieldsList(authCR *operatorv1alpha1.Authentication) []*r
 			SecretName: "saml-auth-secret",
 			CommonName: "saml-auth",
 			DNSNames:   []string{},
-		},
+		})
 	}
+
+	return certList
+}
+
+// shouldUseCustomIngressCertForSAML determines if custom ingress certificate should be used for SAML
+// Returns true when:
+// 1. routerCertSecret is default "saml-auth-secret" (or empty)
+// 2. AND custom ingress certificate is configured
+func shouldUseCustomIngressCertForSAML(authCR *operatorv1alpha1.Authentication) bool {
+	routerCertSecret := authCR.Spec.AuthService.RouterCertSecret
+	
+	// If routerCertSecret is explicitly set to something other than default, respect that choice
+	if routerCertSecret != "" && routerCertSecret != "saml-auth-secret" {
+		return false
+	}
+	
+	// Check if custom ingress certificate is configured
+	return authCR.HasCustomIngressCertificate()
 }
 
 // removeV1Alpha1Certs removes v1alpha1 Certificates for IM so that they can be replaced with cert-manager.io/v1 Certificates.
@@ -181,6 +206,47 @@ func (r *AuthenticationReconciler) removeV1Alpha1Cert(_ *operatorv1alpha1.Authen
 			return subreconciler.RequeueWithError(err)
 		}
 		log.Info("Successfully deleted")
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	}
+}
+
+// cleanupDefaultSAMLCertificate removes the default saml-auth-cert Certificate when custom ingress
+// certificate is configured. This ensures that the operator doesn't create unnecessary Certificate
+// resources when the deployment will use the custom ingress certificate instead.
+func (r *AuthenticationReconciler) cleanupDefaultSAMLCertificate(authCR *operatorv1alpha1.Authentication) (fn subreconciler.Fn) {
+	return func(ctx context.Context) (result *ctrl.Result, err error) {
+		log := logf.FromContext(ctx)
+		
+		// Only cleanup if we should use custom ingress cert for SAML
+		if !shouldUseCustomIngressCertForSAML(authCR) {
+			log.V(1).Info("Not using custom ingress certificate for SAML; skipping cleanup")
+			return subreconciler.ContinueReconciling()
+		}
+		
+		log.Info("Custom ingress certificate configured for SAML; checking for default saml-auth-cert to cleanup")
+		
+		samlCertName := types.NamespacedName{
+			Name:      "saml-auth-cert",
+			Namespace: authCR.Namespace,
+		}
+		
+		cert := &certmgrv1.Certificate{}
+		err = r.Get(ctx, samlCertName, cert)
+		if k8sErrors.IsNotFound(err) {
+			log.V(1).Info("Default saml-auth-cert does not exist; nothing to cleanup")
+			return subreconciler.ContinueReconciling()
+		} else if err != nil {
+			log.Error(err, "Failed to get saml-auth-cert Certificate")
+			return subreconciler.RequeueWithError(err)
+		}
+		
+		log.Info("Deleting default saml-auth-cert Certificate as custom ingress certificate will be used")
+		if err = r.Delete(ctx, cert); err != nil {
+			log.Error(err, "Failed to delete saml-auth-cert Certificate")
+			return subreconciler.RequeueWithError(err)
+		}
+		
+		log.Info("Successfully deleted default saml-auth-cert Certificate")
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
 }

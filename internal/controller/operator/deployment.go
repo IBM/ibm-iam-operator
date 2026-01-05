@@ -237,7 +237,6 @@ func generatePlatformAuthService(imagePullSecret, ldapSPCName, edbSPCName string
 		}
 		replicas := authCR.Spec.Replicas
 		ldapCACert := authCR.Spec.AuthService.LdapsCACert
-		routerCertSecret := authCR.Spec.AuthService.RouterCertSecret
 		ldapSPCExists := ldapSPCName != ""
 
 		deployLabels := common.MergeMaps(nil,
@@ -383,7 +382,7 @@ func generatePlatformAuthService(imagePullSecret, ldapSPCName, edbSPCName string
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, "", ldapSPCName, edbSPCName),
+						Volumes:        buildIdpVolumes(ldapCACert, getSAMLCertificateSecretName(authCR), "", ldapSPCName, edbSPCName),
 						Containers:     buildContainers(authCR, authServiceImage, ldapSPCExists),
 						InitContainers: buildInitContainers(initContainerImage),
 					},
@@ -415,7 +414,6 @@ func generatePlatformIdentityManagement(imagePullSecret, auditSecretName, ldapSP
 		}
 		replicas := authCR.Spec.Replicas
 		ldapCACert := authCR.Spec.AuthService.LdapsCACert
-		routerCertSecret := authCR.Spec.AuthService.RouterCertSecret
 		ldapSPCExists := ldapSPCName != ""
 
 		deployLabels := common.MergeMaps(nil,
@@ -560,7 +558,7 @@ func generatePlatformIdentityManagement(imagePullSecret, auditSecretName, ldapSP
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName, edbSPCName),
+						Volumes:        buildIdpVolumes(ldapCACert, getSAMLCertificateSecretName(authCR), auditSecretName, ldapSPCName, edbSPCName),
 						Containers:     buildManagerContainers(authCR, identityManagerImage, ldapSPCExists),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
@@ -590,7 +588,6 @@ func generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn, auditSe
 		}
 		replicas := authCR.Spec.Replicas
 		ldapCACert := authCR.Spec.AuthService.LdapsCACert
-		routerCertSecret := authCR.Spec.AuthService.RouterCertSecret
 		ldapSPCExists := ldapSPCName != ""
 
 		deployLabels := common.MergeMaps(nil,
@@ -736,7 +733,7 @@ func generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn, auditSe
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName, edbSPCName),
+						Volumes:        buildIdpVolumes(ldapCACert, getSAMLCertificateSecretName(authCR), auditSecretName, ldapSPCName, edbSPCName),
 						Containers:     buildProviderContainers(authCR, identityProviderImage, saasServiceIdCrn, ldapSPCExists),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
@@ -906,6 +903,41 @@ func hasDataField(fields metav1.ManagedFieldsEntry) bool {
 	return false
 }
 
+// getSAMLCertificateSecretName determines which certificate secret to use for SAML SP
+//
+// Note: The Authentication CR field is named "routerCertSecret" for historical reasons,
+// but it's actually used for SAML Service Provider certificate configuration.
+// In this code, we refer to it as "samlCertSecret" for clarity.
+//
+// Decision logic:
+// 1. If routerCertSecret is default ("saml-auth-secret") AND custom ingress cert exists:
+//    → Use the custom ingress certificate (reproduces pre-4.x behavior)
+// 2. If routerCertSecret is set to a custom value:
+//    → Use that custom value (respects user's explicit choice)
+// 3. Otherwise:
+//    → Use the default "saml-auth-secret"
+func getSAMLCertificateSecretName(authCR *operatorv1alpha1.Authentication) string {
+	const defaultSAMLCertSecret = "saml-auth-secret"
+
+	// Get the routerCertSecret value (legacy field name, actually for SAML cert)
+	// We call it samlCertSecret in code for clarity
+	samlCertSecret := authCR.Spec.AuthService.RouterCertSecret
+	if samlCertSecret == "" {
+		samlCertSecret = defaultSAMLCertSecret
+	}
+
+	// If custom ingress certificate is configured AND samlCertSecret is still default,
+	// automatically use the custom ingress certificate (reproduces pre-4.x behavior)
+	if authCR.HasCustomIngressCertificate() && samlCertSecret == defaultSAMLCertSecret {
+		customIngressSecret := *authCR.Spec.Config.Ingress.Secret
+		return customIngressSecret
+	}
+
+	// Otherwise, use whatever samlCertSecret is set to
+	// This respects explicit user configuration
+	return samlCertSecret
+}
+
 func buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName, edbSPCName string) []corev1.Volume {
 	volumes := []corev1.Volume{
 		{
@@ -1014,6 +1046,9 @@ func buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName,
 				},
 			},
 		},
+		// Volume for SAML Service Provider certificate
+		// Note: Volume name is "saml-cert" but the CR field is "routerCertSecret" (legacy naming)
+		// The getSAMLCertificateSecretName helper determines which certificate to use
 		{
 			Name: "saml-cert",
 			VolumeSource: corev1.VolumeSource{

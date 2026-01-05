@@ -764,6 +764,12 @@ var _ = Describe("ConfigMap handling", func() {
 						"LDAP_CTX_POOL_PREFERREDSIZE",
 					},
 				},
+				{
+					"LIBERTY_AUTH_CACHE_TIMEOUT",
+					[]string{
+						"LIBERTY_AUTH_CACHE_TIMEOUT",
+					},
+				},
 			}
 
 			setDummyData := func(pkey string, keys []string, o *corev1.ConfigMap) {

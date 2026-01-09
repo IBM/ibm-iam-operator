@@ -71,14 +71,15 @@ var mgmtSA string = "platform-identity-management"
 var cpu50 = resource.NewMilliQuantity(50, resource.DecimalSI)            // 50m
 var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
 var cpu1000 = resource.NewMilliQuantity(1000, resource.DecimalSI)        // 1000m
+var memory100 = resource.NewQuantity(100*1024*1024, resource.BinarySI)   // 100Mi
 var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI)   // 128Mi
 var memory150 = resource.NewQuantity(150*1024*1024, resource.BinarySI)   // 150Mi
 var memory178 = resource.NewQuantity(178*1024*1024, resource.BinarySI)   // 178Mi
 var memory300 = resource.NewQuantity(300*1024*1024, resource.BinarySI)   // 300Mi
 var memory350 = resource.NewQuantity(350*1024*1024, resource.BinarySI)   // 350Mi
 var memory400 = resource.NewQuantity(400*1024*1024, resource.BinarySI)   // 400Mi
-var memory550 = resource.NewQuantity(550*1024*1024, resource.BinarySI)   // 550Mi
-var memory650 = resource.NewQuantity(650*1024*1024, resource.BinarySI)   // 650Mi
+var memory620 = resource.NewQuantity(620*1024*1024, resource.BinarySI)   // 620Mi
+var memory750 = resource.NewQuantity(750*1024*1024, resource.BinarySI)   // 750Mi
 var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024Mi
 
 // opreqWait is used for the resources that interact with and originate from OperandRequests

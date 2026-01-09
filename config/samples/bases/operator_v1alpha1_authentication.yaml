@@ -21,7 +21,7 @@ spec:
       limits:
         cpu: 1000m
         memory: 1Gi
-        ephemeral-storage: 650Mi
+        ephemeral-storage: 750Mi
       requests:
         cpu: 100m
         memory: 350Mi
@@ -95,7 +95,7 @@ spec:
       limits:
         cpu: 1000m
         memory: 1Gi
-        ephemeral-storage: 550Mi
+        ephemeral-storage: 620Mi
       requests:
         cpu: 50m
         memory: 150Mi
@@ -108,7 +108,7 @@ spec:
       limits:
         cpu: 1000m
         memory: 1Gi
-        ephemeral-storage: 550Mi
+        ephemeral-storage: 620Mi
       requests:
         cpu: 50m
         memory: 150Mi

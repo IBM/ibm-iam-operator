@@ -385,7 +385,7 @@ func generatePlatformAuthService(imagePullSecret, samlCertSecret, ldapSPCName, e
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, samlCertSecret, "", ldapSPCName, edbSPCName),
+						Volumes:        buildAuthSvcVolumes(ldapCACert, routerCertSecret, "", ldapSPCName, edbSPCName),
 						Containers:     buildContainers(authCR, authServiceImage, ldapSPCExists),
 						InitContainers: buildInitContainers(initContainerImage),
 					},
@@ -561,7 +561,7 @@ func generatePlatformIdentityManagement(imagePullSecret, samlCertSecret, auditSe
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, samlCertSecret, auditSecretName, ldapSPCName, edbSPCName),
+						Volumes:        buildMgmtVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName, edbSPCName),
 						Containers:     buildManagerContainers(authCR, identityManagerImage, ldapSPCExists),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
@@ -736,7 +736,7 @@ func generatePlatformIdentityProvider(imagePullSecret, samlCertSecret, saasServi
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, samlCertSecret, auditSecretName, ldapSPCName, edbSPCName),
+						Volumes:        buildProviderVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName, edbSPCName),
 						Containers:     buildProviderContainers(authCR, identityProviderImage, saasServiceIdCrn, ldapSPCExists),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
@@ -906,27 +906,8 @@ func hasDataField(fields metav1.ManagedFieldsEntry) bool {
 	return false
 }
 
-func buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName, edbSPCName string) []corev1.Volume {
+func buildAuthSvcVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName, edbSPCName string) []corev1.Volume {
 	volumes := []corev1.Volume{
-		{
-			Name: "platform-identity-management",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: "platform-identity-management",
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "tls.key",
-							Path: "tls.key",
-						},
-						{
-							Key:  "tls.crt",
-							Path: "tls.crt",
-						},
-					},
-					DefaultMode: &partialAccess,
-				},
-			},
-		},
 		{
 			Name: "auth-key",
 			VolumeSource: corev1.VolumeSource{
@@ -940,29 +921,6 @@ func buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName,
 						{
 							Key:  "tls.crt",
 							Path: "platformauth.crt",
-						},
-					},
-					DefaultMode: &partialAccess,
-				},
-			},
-		},
-		{
-			Name: "identity-provider-cert",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: "identity-provider-secret",
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "ca.crt",
-							Path: "ca.crt",
-						},
-						{
-							Key:  "tls.key",
-							Path: "tls.key",
-						},
-						{
-							Key:  "tls.crt",
-							Path: "tls.crt",
 						},
 					},
 					DefaultMode: &partialAccess,
@@ -1034,25 +992,6 @@ func buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName,
 			},
 		},
 		{
-			Name: "cluster-ca",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: "cs-ca-certificate-secret",
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "tls.key",
-							Path: "ca.key",
-						},
-						{
-							Key:  "tls.crt",
-							Path: "ca.crt",
-						},
-					},
-					DefaultMode: &partialAccess,
-				},
-			},
-		},
-		{
 			Name: "pgsql-client-cred",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
@@ -1102,6 +1041,165 @@ func buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName,
 			},
 		},
 		{
+			Name: "liberty-serverdir-vol",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					SizeLimit: memory150,
+				},
+			},
+		},
+		{
+			Name: "liberty-outputdir-vol",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					SizeLimit: memory178,
+				},
+			},
+		},
+		{
+			Name: "liberty-logs-vol",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					SizeLimit: memory100,
+				},
+			},
+		},
+		{
+			Name: "tmp-vol",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					SizeLimit: memory100,
+				},
+			},
+		},
+		{
+			Name: "auth-service-data-vol",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					SizeLimit: memory128,
+				},
+			},
+		},
+	}
+	if auditSecretName != "" {
+		auditVolume := corev1.Volume{
+			Name: IMAuditTLSVolume,
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: auditSecretName,
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "tls.crt",
+							Path: "tls.crt",
+						},
+						{
+							Key:  "tls.key",
+							Path: "tls.key",
+						},
+						{
+							Key:  "ca.crt",
+							Path: "ca.crt",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		}
+		volumes = append(volumes, auditVolume)
+	}
+	if ldapSPCName != "" {
+		volumes = ensureVolumePresent(volumes, corev1.Volume{
+			Name: common.IMLdapBindPwdVolume,
+			VolumeSource: corev1.VolumeSource{
+				CSI: &corev1.CSIVolumeSource{
+					Driver:   "secrets-store.csi.k8s.io",
+					ReadOnly: ptr.To(true),
+					VolumeAttributes: map[string]string{
+						"secretProviderClass": ldapSPCName,
+					},
+				},
+			},
+		})
+	}
+	if edbSPCName != "" {
+		volumes = ensureVolumePresent(volumes, corev1.Volume{
+			Name: "pgsql-certs",
+			VolumeSource: corev1.VolumeSource{
+				CSI: &corev1.CSIVolumeSource{
+					Driver:   "secrets-store.csi.k8s.io",
+					ReadOnly: ptr.To(true),
+					VolumeAttributes: map[string]string{
+						"secretProviderClass": edbSPCName,
+					},
+				},
+			},
+		})
+	} else {
+		volumes = ensureVolumePresent(volumes, corev1.Volume{
+			Name: "pgsql-certs",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  common.DatastoreEDBSecretName,
+					DefaultMode: &partialAccess,
+				},
+			},
+		})
+	}
+	return volumes
+}
+
+func buildMgmtVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName, edbSPCName string) []corev1.Volume {
+	volumes := []corev1.Volume{
+		{
+			Name: "platform-identity-management",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-identity-management",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "tls.key",
+							Path: "tls.key",
+						},
+						{
+							Key:  "tls.crt",
+							Path: "tls.crt",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		},
+		{
+			Name: "cluster-ca",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "cs-ca-certificate-secret",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "tls.key",
+							Path: "ca.key",
+						},
+						{
+							Key:  "tls.crt",
+							Path: "ca.crt",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		},
+		{
+			Name: "pgsql-client-cred",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: common.DatastoreEDBCMName,
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		},
+		{
 			Name: "scim-ldap-attributes-mapping",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
@@ -1119,39 +1217,169 @@ func buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName,
 			},
 		},
 		{
-			Name: "liberty-serverdir-vol",
+			Name: "tmp-vol",
 			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					SizeLimit: memory100,
+				},
+			},
+		},
+	}
+	if auditSecretName != "" {
+		auditVolume := corev1.Volume{
+			Name: IMAuditTLSVolume,
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: auditSecretName,
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "tls.crt",
+							Path: "tls.crt",
+						},
+						{
+							Key:  "tls.key",
+							Path: "tls.key",
+						},
+						{
+							Key:  "ca.crt",
+							Path: "ca.crt",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		}
+		volumes = append(volumes, auditVolume)
+	}
+	if ldapSPCName != "" {
+		volumes = ensureVolumePresent(volumes, corev1.Volume{
+			Name: common.IMLdapBindPwdVolume,
+			VolumeSource: corev1.VolumeSource{
+				CSI: &corev1.CSIVolumeSource{
+					Driver:   "secrets-store.csi.k8s.io",
+					ReadOnly: ptr.To(true),
+					VolumeAttributes: map[string]string{
+						"secretProviderClass": ldapSPCName,
+					},
+				},
+			},
+		})
+	}
+	if edbSPCName != "" {
+		volumes = ensureVolumePresent(volumes, corev1.Volume{
+			Name: "pgsql-certs",
+			VolumeSource: corev1.VolumeSource{
+				CSI: &corev1.CSIVolumeSource{
+					Driver:   "secrets-store.csi.k8s.io",
+					ReadOnly: ptr.To(true),
+					VolumeAttributes: map[string]string{
+						"secretProviderClass": edbSPCName,
+					},
+				},
+			},
+		})
+	} else {
+		volumes = ensureVolumePresent(volumes, corev1.Volume{
+			Name: "pgsql-certs",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  common.DatastoreEDBSecretName,
+					DefaultMode: &partialAccess,
+				},
+			},
+		})
+	}
+	return volumes
+}
+
+func buildProviderVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName, edbSPCName string) []corev1.Volume {
+	volumes := []corev1.Volume{
+		{
+			Name: "auth-key",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-auth-secret",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "tls.key",
+							Path: "platformauth-key.crt",
+						},
+						{
+							Key:  "tls.crt",
+							Path: "platformauth.crt",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
 			},
 		},
 		{
-			Name: "liberty-outputdir-vol",
+			Name: "identity-provider-cert",
 			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "identity-provider-secret",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "ca.crt",
+							Path: "ca.crt",
+						},
+						{
+							Key:  "tls.key",
+							Path: "tls.key",
+						},
+						{
+							Key:  "tls.crt",
+							Path: "tls.crt",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
 			},
 		},
 		{
-			Name: "liberty-logs-vol",
+			Name: "saml-cert",
 			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: routerCertSecret,
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "tls.crt",
+							Path: "saml-auth.crt",
+						},
+						{
+							Key:  "tls.key",
+							Path: "saml-auth.key",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		},
+		{
+			Name: "pgsql-client-cred",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: common.DatastoreEDBCMName,
+					},
+					DefaultMode: &partialAccess,
+				},
 			},
 		},
 		{
 			Name: "tmp-vol",
 			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		},
-		{
-			Name: "auth-service-data-vol",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					SizeLimit: memory100,
+				},
 			},
 		},
 		{
 			Name: "provider-data-vol",
 			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					SizeLimit: memory178,
+				},
 			},
 		},
 	}

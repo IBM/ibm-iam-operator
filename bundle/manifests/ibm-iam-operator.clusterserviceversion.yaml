@@ -29,7 +29,7 @@ metadata:
               "resources": {
                 "limits": {
                   "cpu": "1000m",
-                  "ephemeral-storage": "650Mi",
+                  "ephemeral-storage": "750Mi",
                   "memory": "1Gi"
                 },
                 "requests": {
@@ -104,7 +104,7 @@ metadata:
               "resources": {
                 "limits": {
                   "cpu": "1000m",
-                  "ephemeral-storage": "550Mi",
+                  "ephemeral-storage": "620Mi",
                   "memory": "1Gi"
                 },
                 "requests": {
@@ -121,7 +121,7 @@ metadata:
               "resources": {
                 "limits": {
                   "cpu": "1000m",
-                  "ephemeral-storage": "550Mi",
+                  "ephemeral-storage": "620Mi",
                   "memory": "1Gi"
                 },
                 "requests": {

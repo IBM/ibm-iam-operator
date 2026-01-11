@@ -65,8 +65,9 @@ var authServicePort int32 = 9443
 var authHealthCheckPort int32 = 9080
 var identityProviderPort int32 = 4300
 var identityManagerPort int32 = 4500
-var serviceAccountName string = "ibm-iam-operand-restricted"
-
+var imOperandSA string = "ibm-im-operand"
+var providerSA string = "platform-identity-provider"
+var mgmtSA string = "platform-identity-management"
 var cpu50 = resource.NewMilliQuantity(50, resource.DecimalSI)            // 50m
 var cpu100 = resource.NewMilliQuantity(100, resource.DecimalSI)          // 100m
 var cpu1000 = resource.NewMilliQuantity(1000, resource.DecimalSI)        // 1000m
@@ -309,6 +310,7 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 		r.handleHPAs,
 		r.syncClientHostnames,
 		r.handleMongoDBCleanup,
+		r.cleanupOldRBAC,
 	}
 
 	for _, fn := range fns {

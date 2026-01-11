@@ -461,7 +461,7 @@ func generateJobObject(s common.SecondaryReconciler, ctx context.Context, job *b
 							},
 						},
 					},
-					ServiceAccountName: serviceAccountName,
+					ServiceAccountName: imOperandSA,
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
 					Tolerations: []corev1.Toleration{
 						{
@@ -726,7 +726,7 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 							},
 						},
 					},
-					ServiceAccountName: serviceAccountName,
+					ServiceAccountName: imOperandSA,
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
 					Tolerations: []corev1.Toleration{
 						{

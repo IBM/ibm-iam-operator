@@ -468,7 +468,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		},
 		{
 			Name:  "roksClientId",
-			Value: "system:serviceaccount:" + instance.Namespace + ":ibm-iam-operand-restricted",
+			Value: "system:serviceaccount:" + instance.Namespace + ":" + providerSA,
 		},
 		{
 			Name: "roksClientSecret",
@@ -773,7 +773,7 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		},
 		{
 			Name:  "roksClientId",
-			Value: "system:serviceaccount:" + instance.Namespace + ":ibm-iam-operand-restricted",
+			Value: "system:serviceaccount:" + instance.Namespace + ":" + providerSA,
 		},
 		{
 			Name: "roksClientSecret",

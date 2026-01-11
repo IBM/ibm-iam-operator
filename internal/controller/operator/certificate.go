@@ -121,8 +121,10 @@ func generateCertificateFieldsList(authCR *operatorv1alpha1.Authentication) []*r
 }
 
 func shouldUseCustomIngressCertForSAML(authCR *operatorv1alpha1.Authentication) bool {
-	const defaultSAMLCertSecret = "saml-auth-secret"
-	return authCR.GetSAMLCertificateSecretName() != defaultSAMLCertSecret
+	if !authCR.HasCustomIngressCertificate() {
+		return false
+	}
+	return authCR.GetSAMLCertificateSecretName() == *authCR.Spec.Config.Ingress.Secret
 }
 
 // removeV1Alpha1Certs removes v1alpha1 Certificates for IM so that they can be replaced with cert-manager.io/v1 Certificates.
@@ -208,27 +210,19 @@ func (r *AuthenticationReconciler) cleanupDefaultSAMLCertificate(authCR *operato
 			return subreconciler.ContinueReconciling()
 		}
 
-		log.Info("Custom ingress certificate configured for SAML; checking for default saml-auth-cert to cleanup")
+		log.Info("Custom ingress certificate configured for SAML; attempting to delete default saml-auth-cert")
 
-		samlCertName := types.NamespacedName{
-			Name:      "saml-auth-cert",
-			Namespace: authCR.Namespace,
+		cert := &certmgrv1.Certificate{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "saml-auth-cert",
+				Namespace: authCR.Namespace,
+			},
 		}
 
-		cert := &certmgrv1.Certificate{}
-		err = r.Get(ctx, samlCertName, cert)
-		if k8sErrors.IsNotFound(err) {
-			log.V(1).Info("Default saml-auth-cert does not exist; nothing to cleanup")
-			return subreconciler.ContinueReconciling()
-		} else if err != nil {
-			log.Error(err, "Failed to get saml-auth-cert Certificate")
-			return subreconciler.RequeueWithError(err)
-		}
-
-		log.Info("Deleting default saml-auth-cert Certificate as custom ingress certificate will be used")
+		// Optimized: Delete directly without Get (saves one API call when cert exists)
 		if err = r.Delete(ctx, cert); err != nil {
 			if k8sErrors.IsNotFound(err) {
-				log.V(1).Info("Certificate already deleted; continuing")
+				log.V(1).Info("Default saml-auth-cert does not exist; nothing to cleanup")
 				return subreconciler.ContinueReconciling()
 			}
 			log.Error(err, "Failed to delete saml-auth-cert Certificate")

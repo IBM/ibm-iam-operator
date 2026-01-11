@@ -354,6 +354,22 @@ func (a *Authentication) HasCustomIngress() bool {
 	return a.HasCustomIngressHostname() || a.HasCustomIngressCertificate()
 }
 
+// GetSAMLCertificateSecretName returns the certificate secret name for SAML SP, using custom ingress cert if configured and routerCertSecret is default.
+func (a *Authentication) GetSAMLCertificateSecretName() string {
+	const defaultSAMLCertSecret = "saml-auth-secret"
+
+	samlCertSecret := a.Spec.AuthService.RouterCertSecret
+	if samlCertSecret == "" {
+		samlCertSecret = defaultSAMLCertSecret
+	}
+
+	if a.HasCustomIngressCertificate() && samlCertSecret == defaultSAMLCertSecret {
+		return *a.Spec.Config.Ingress.Secret
+	}
+
+	return samlCertSecret
+}
+
 func (a *Authentication) GetDBSchemaVersion() string {
 	annotations := a.GetAnnotations()
 	if version, ok := annotations[AnnotationAuthDBSchemaVersion]; ok {

@@ -237,7 +237,6 @@ func generatePlatformAuthService(imagePullSecret, ldapSPCName, edbSPCName string
 		}
 		replicas := authCR.Spec.Replicas
 		ldapCACert := authCR.Spec.AuthService.LdapsCACert
-		routerCertSecret := authCR.Spec.AuthService.RouterCertSecret
 		ldapSPCExists := ldapSPCName != ""
 
 		deployLabels := common.MergeMaps(nil,
@@ -383,7 +382,7 @@ func generatePlatformAuthService(imagePullSecret, ldapSPCName, edbSPCName string
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, "", ldapSPCName, edbSPCName),
+						Volumes:        buildIdpVolumes(ldapCACert, authCR.GetSAMLCertificateSecretName(), "", ldapSPCName, edbSPCName),
 						Containers:     buildContainers(authCR, authServiceImage, ldapSPCExists),
 						InitContainers: buildInitContainers(initContainerImage),
 					},
@@ -415,7 +414,6 @@ func generatePlatformIdentityManagement(imagePullSecret, auditSecretName, ldapSP
 		}
 		replicas := authCR.Spec.Replicas
 		ldapCACert := authCR.Spec.AuthService.LdapsCACert
-		routerCertSecret := authCR.Spec.AuthService.RouterCertSecret
 		ldapSPCExists := ldapSPCName != ""
 
 		deployLabels := common.MergeMaps(nil,
@@ -560,7 +558,7 @@ func generatePlatformIdentityManagement(imagePullSecret, auditSecretName, ldapSP
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName, edbSPCName),
+						Volumes:        buildIdpVolumes(ldapCACert, authCR.GetSAMLCertificateSecretName(), auditSecretName, ldapSPCName, edbSPCName),
 						Containers:     buildManagerContainers(authCR, identityManagerImage, ldapSPCExists),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
@@ -590,7 +588,6 @@ func generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn, auditSe
 		}
 		replicas := authCR.Spec.Replicas
 		ldapCACert := authCR.Spec.AuthService.LdapsCACert
-		routerCertSecret := authCR.Spec.AuthService.RouterCertSecret
 		ldapSPCExists := ldapSPCName != ""
 
 		deployLabels := common.MergeMaps(nil,
@@ -736,7 +733,7 @@ func generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn, auditSe
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName, edbSPCName),
+						Volumes:        buildIdpVolumes(ldapCACert, authCR.GetSAMLCertificateSecretName(), auditSecretName, ldapSPCName, edbSPCName),
 						Containers:     buildProviderContainers(authCR, identityProviderImage, saasServiceIdCrn, ldapSPCExists),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},

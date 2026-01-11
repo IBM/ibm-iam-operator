@@ -474,6 +474,65 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}), builder.WithPredicates(predicate.Or(globalCMPred, productCMPred)),
 	)
 
+	// Watch for changes to customer-supplied Secrets that are part of IM
+	imManagedSecretPred := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			secret, ok := e.ObjectNew.(*corev1.Secret)
+			if !ok {
+				return false
+			}
+
+			if labels := secret.GetLabels(); labels != nil {
+				if val, exists := labels["app.kubernetes.io/part-of"]; exists && val == "im" {
+					return true
+				}
+			}
+			return false
+		},
+		CreateFunc: func(e event.CreateEvent) bool {
+			secret, ok := e.Object.(*corev1.Secret)
+			if !ok {
+				return false
+			}
+
+			if labels := secret.GetLabels(); labels != nil {
+				if val, exists := labels["app.kubernetes.io/part-of"]; exists && val == "im" {
+					return true
+				}
+			}
+			return false
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			secret, ok := e.Object.(*corev1.Secret)
+			if !ok {
+				return false
+			}
+
+			if labels := secret.GetLabels(); labels != nil {
+				if val, exists := labels["app.kubernetes.io/part-of"]; exists && val == "im" {
+					return true
+				}
+			}
+			return false
+		},
+	}
+
+	// Add the watch for customer-supplied Secrets
+	authCtrl.Watches(&corev1.Secret{},
+		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
+			authCR, _ := common.GetAuthentication(ctx, r.Client)
+			if authCR == nil {
+				return
+			}
+			return []reconcile.Request{
+				{NamespacedName: types.NamespacedName{
+					Name:      authCR.Name,
+					Namespace: authCR.Namespace,
+				}},
+			}
+		}), builder.WithPredicates(imManagedSecretPred),
+	)
+
 	authCtrl.Watches(&operatorv1alpha1.Authentication{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(bootstrappedPred))
 	return authCtrl.Named("controller_authentication").
 		Complete(r)

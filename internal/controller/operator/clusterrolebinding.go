@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
+	"github.com/IBM/ibm-iam-operator/internal/controller/common"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
 	"github.com/opdev/subreconciler"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -93,12 +94,8 @@ func (r *AuthenticationReconciler) iamOperandCRB(instance *operatorv1alpha1.Auth
 
 	operandCRB := &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				"app.kubernetes.io/instance":   "ibm-iam-operator",
-				"app.kubernetes.io/managed-by": "ibm-iam-operator",
-				"app.kubernetes.io/name":       "ibm-iam-operator",
-			},
+			Name:   name,
+			Labels: common.MergeMaps(nil, map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"}, common.GetCommonLabels()),
 		},
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,

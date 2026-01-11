@@ -20,6 +20,7 @@ import (
 	"context"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
+	"github.com/IBM/ibm-iam-operator/internal/controller/common"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
 	"github.com/opdev/subreconciler"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -92,7 +93,7 @@ func (r *AuthenticationReconciler) iamOperandClusterRole(instance *operatorv1alp
 		operandRole = &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   rolename,
-				Labels: map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/managed-by": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"},
+				Labels: common.MergeMaps(nil, map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"}, common.GetCommonLabels()),
 			},
 			Rules: []rbacv1.PolicyRule{
 				{
@@ -107,7 +108,7 @@ func (r *AuthenticationReconciler) iamOperandClusterRole(instance *operatorv1alp
 		operandRole = &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   rolename,
-				Labels: map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/managed-by": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"},
+				Labels: common.MergeMaps(nil, map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"}, common.GetCommonLabels()),
 			},
 			Rules: []rbacv1.PolicyRule{
 				{

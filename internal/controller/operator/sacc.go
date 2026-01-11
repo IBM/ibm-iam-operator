@@ -20,6 +20,7 @@ import (
 	"context"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
+	"github.com/IBM/ibm-iam-operator/internal/controller/common"
 	"github.com/opdev/subreconciler"
 
 	corev1 "k8s.io/api/core/v1"
@@ -35,9 +36,9 @@ import (
 func (r *AuthenticationReconciler) createSA(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	// Define the ServiceAccount names to create
 	serviceAccountNames := []string{
-		"platform-auth-service",
-		"platform-identity-provider",
-		"platform-identity-management",
+		imOperandSA,
+		providerSA,
+		mgmtSA,
 	}
 	log := logf.FromContext(ctx)
 	debugLog := log.V(1)
@@ -96,9 +97,9 @@ func (r *AuthenticationReconciler) createSA(ctx context.Context, req ctrl.Reques
 func (r *AuthenticationReconciler) handleServiceAccount(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	// Define the ServiceAccount names to update
 	serviceAccountNames := []string{
-		"platform-auth-service",
-		"platform-identity-provider",
-		"platform-identity-management",
+		imOperandSA,
+		providerSA,
+		mgmtSA,
 	}
 	log := logf.FromContext(ctx)
 	debugLog := log.V(1)
@@ -151,18 +152,26 @@ func (r *AuthenticationReconciler) handleServiceAccount(ctx context.Context, req
 
 func generateSAObject(ctx context.Context, instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, operandSAName string) *corev1.ServiceAccount {
 	log := logf.FromContext(ctx)
-	metaLabels := map[string]string{
-		"app.kubernetes.io/instance":   "ibm-iam-operator",
-		"app.kubernetes.io/managed-by": "ibm-iam-operator",
-		"app.kubernetes.io/name":       "ibm-iam-operator",
-	}
 
-	operandSA := &corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      operandSAName,
-			Labels:    metaLabels,
-			Namespace: instance.Namespace,
-		},
+	metaLabels := common.MergeMaps(nil, map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"}, common.GetCommonLabels())
+	var operandSA *corev1.ServiceAccount
+	if operandSAName == imOperandSA {
+		operandSA = &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      operandSAName,
+				Labels:    metaLabels,
+				Namespace: instance.Namespace,
+			},
+			AutomountServiceAccountToken: &falseVar,
+		}
+	} else {
+		operandSA = &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      operandSAName,
+				Labels:    metaLabels,
+				Namespace: instance.Namespace,
+			},
+		}
 	}
 
 	// Set Authentication instance as the owner and controller of the operand serviceaccount

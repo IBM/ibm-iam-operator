@@ -291,7 +291,7 @@ func generatePlatformAuthService(imagePullSecret, ldapSPCName, edbSPCName string
 					},
 					Spec: corev1.PodSpec{
 						TerminationGracePeriodSeconds: &seconds60,
-						ServiceAccountName:            authserviceSA,
+						ServiceAccountName:            imOperandSA,
 						HostIPC:                       falseVar,
 						HostPID:                       falseVar,
 						SecurityContext: &corev1.PodSecurityContext{

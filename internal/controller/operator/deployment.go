@@ -1044,7 +1044,7 @@ func buildAuthSvcVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCN
 			Name: "liberty-serverdir-vol",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
-					SizeLimit: memory150,
+					SizeLimit: memory100,
 				},
 			},
 		},
@@ -1052,7 +1052,7 @@ func buildAuthSvcVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCN
 			Name: "liberty-outputdir-vol",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
-					SizeLimit: memory178,
+					SizeLimit: memory150,
 				},
 			},
 		},
@@ -1060,7 +1060,7 @@ func buildAuthSvcVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCN
 			Name: "liberty-logs-vol",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
-					SizeLimit: memory100,
+					SizeLimit: memory250,
 				},
 			},
 		},
@@ -1076,7 +1076,7 @@ func buildAuthSvcVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCN
 			Name: "auth-service-data-vol",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
-					SizeLimit: memory128,
+					SizeLimit: memory100,
 				},
 			},
 		},

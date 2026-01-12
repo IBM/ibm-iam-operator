@@ -75,6 +75,7 @@ var memory100 = resource.NewQuantity(100*1024*1024, resource.BinarySI)   // 100M
 var memory128 = resource.NewQuantity(128*1024*1024, resource.BinarySI)   // 128Mi
 var memory150 = resource.NewQuantity(150*1024*1024, resource.BinarySI)   // 150Mi
 var memory178 = resource.NewQuantity(178*1024*1024, resource.BinarySI)   // 178Mi
+var memory250 = resource.NewQuantity(250*1024*1024, resource.BinarySI)   // 250Mi
 var memory300 = resource.NewQuantity(300*1024*1024, resource.BinarySI)   // 300Mi
 var memory350 = resource.NewQuantity(350*1024*1024, resource.BinarySI)   // 350Mi
 var memory400 = resource.NewQuantity(400*1024*1024, resource.BinarySI)   // 400Mi

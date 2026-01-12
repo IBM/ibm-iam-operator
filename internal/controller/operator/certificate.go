@@ -219,12 +219,10 @@ func (r *AuthenticationReconciler) cleanupDefaultSAMLCertificate(authCR *operato
 			},
 		}
 
-		// Optimized: Delete directly without Get (saves one API call when cert exists)
-		if err = r.Delete(ctx, cert); err != nil {
-			if k8sErrors.IsNotFound(err) {
-				log.V(1).Info("Default saml-auth-cert does not exist; nothing to cleanup")
-				return subreconciler.ContinueReconciling()
-			}
+		if err = r.Delete(ctx, cert); k8sErrors.IsNotFound(err) {
+			log.V(1).Info("Default saml-auth-cert does not exist; nothing to cleanup")
+			return subreconciler.ContinueReconciling()
+		} else if err != nil {
 			log.Error(err, "Failed to delete saml-auth-cert Certificate")
 			return subreconciler.RequeueWithError(err)
 		}

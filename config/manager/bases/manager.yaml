@@ -98,12 +98,12 @@ spec:
           resources:
             limits:
               cpu: 25m
-              ephemeral-storage: 356Mi
+              ephemeral-storage: 100Mi
               memory: 320Mi
             requests:
               cpu: 20m
               memory: 80Mi
-              ephemeral-storage: 256Mi
+              ephemeral-storage: 50Mi
           securityContext:
             seccompProfile:
               type: RuntimeDefault

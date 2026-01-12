@@ -59,7 +59,7 @@ func buildInitContainers(initImage string) []corev1.Container {
 				Requests: map[corev1.ResourceName]resource.Quantity{
 					corev1.ResourceCPU:              *cpu100,
 					corev1.ResourceMemory:           *memory128,
-					corev1.ResourceEphemeralStorage: *memory178,
+					corev1.ResourceEphemeralStorage: *memory100,
 				},
 			},
 		},
@@ -99,7 +99,7 @@ func buildInitForMngrAndProvider(initImage string) []corev1.Container {
 				Requests: map[corev1.ResourceName]resource.Quantity{
 					corev1.ResourceCPU:              *cpu100,
 					corev1.ResourceMemory:           *memory128,
-					corev1.ResourceEphemeralStorage: *memory178,
+					corev1.ResourceEphemeralStorage: *memory100,
 				},
 			},
 		},
@@ -138,12 +138,12 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			Limits: map[corev1.ResourceName]resource.Quantity{
 				corev1.ResourceCPU:              *cpu1000,
 				corev1.ResourceMemory:           *memory1024,
-				corev1.ResourceEphemeralStorage: *memory750,
+				corev1.ResourceEphemeralStorage: *memory400,
 			},
 			Requests: map[corev1.ResourceName]resource.Quantity{
 				corev1.ResourceCPU:              *cpu100,
 				corev1.ResourceMemory:           *memory350,
-				corev1.ResourceEphemeralStorage: *memory400,
+				corev1.ResourceEphemeralStorage: *memory300,
 			},
 		}
 	}
@@ -348,12 +348,12 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			Limits: map[corev1.ResourceName]resource.Quantity{
 				corev1.ResourceCPU:              *cpu1000,
 				corev1.ResourceMemory:           *memory1024,
-				corev1.ResourceEphemeralStorage: *memory620,
+				corev1.ResourceEphemeralStorage: *memory200,
 			},
 			Requests: map[corev1.ResourceName]resource.Quantity{
 				corev1.ResourceCPU:              *cpu50,
 				corev1.ResourceMemory:           *memory150,
-				corev1.ResourceEphemeralStorage: *memory300,
+				corev1.ResourceEphemeralStorage: *memory100,
 			},
 		}
 	}
@@ -666,12 +666,12 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			Limits: map[corev1.ResourceName]resource.Quantity{
 				corev1.ResourceCPU:              *cpu1000,
 				corev1.ResourceMemory:           *memory1024,
-				corev1.ResourceEphemeralStorage: *memory620,
+				corev1.ResourceEphemeralStorage: *memory150,
 			},
 			Requests: map[corev1.ResourceName]resource.Quantity{
 				corev1.ResourceCPU:              *cpu50,
 				corev1.ResourceMemory:           *memory150,
-				corev1.ResourceEphemeralStorage: *memory300,
+				corev1.ResourceEphemeralStorage: *memory50,
 			},
 		}
 	}

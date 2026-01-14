@@ -21,7 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -283,6 +283,11 @@ func (in *ConfigSpec) DeepCopyInto(out *ConfigSpec) {
 	if in.UseSecretsStoreCSI != nil {
 		in, out := &in.UseSecretsStoreCSI, &out.UseSecretsStoreCSI
 		*out = new(bool)
+		**out = **in
+	}
+	if in.LibertyAuthCacheTimeout != nil {
+		in, out := &in.LibertyAuthCacheTimeout, &out.LibertyAuthCacheTimeout
+		*out = new(string)
 		**out = **in
 	}
 }

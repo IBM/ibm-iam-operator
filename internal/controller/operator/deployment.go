@@ -118,19 +118,22 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 		}
 	}
 
+	// Get SAML certificate secret name with IM label check
+	samlCertSecret := r.GetSAMLCertificateSecretNameWithLabelCheck(debugCtx, authCR)
+
 	imagePullSecret := os.Getenv("IMAGE_PULL_SECRET")
 	builders := []*common.SecondaryReconcilerBuilder[*appsv1.Deployment]{
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-auth-service").
-			WithGenerateFns(generatePlatformAuthService(imagePullSecret, ldapSPC.Name, edbSPC.Name)).
+			WithGenerateFns(generatePlatformAuthService(imagePullSecret, samlCertSecret, ldapSPC.Name, edbSPC.Name)).
 			WithModifyFns(modifyDeployment(r.needsRollout)),
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-identity-management").
-			WithGenerateFns(generatePlatformIdentityManagement(imagePullSecret, auditSecretName, ldapSPC.Name, edbSPC.Name)).
+			WithGenerateFns(generatePlatformIdentityManagement(imagePullSecret, samlCertSecret, auditSecretName, ldapSPC.Name, edbSPC.Name)).
 			WithModifyFns(modifyDeployment(r.needsRollout)),
 		common.NewSecondaryReconcilerBuilder[*appsv1.Deployment]().
 			WithName("platform-identity-provider").
-			WithGenerateFns(generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn, auditSecretName, ldapSPC.Name, edbSPC.Name)).
+			WithGenerateFns(generatePlatformIdentityProvider(imagePullSecret, samlCertSecret, saasServiceIdCrn, auditSecretName, ldapSPC.Name, edbSPC.Name)).
 			WithModifyFns(modifyDeployment(r.needsRollout)),
 	}
 
@@ -226,7 +229,7 @@ func (r *AuthenticationReconciler) getAuditSecretNameIfExists(ctx context.Contex
 	return *authCR.Spec.Config.AuditSecret, nil
 }
 
-func generatePlatformAuthService(imagePullSecret, ldapSPCName, edbSPCName string) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformAuthService(imagePullSecret, samlCertSecret, ldapSPCName, edbSPCName string) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		authServiceImage := common.GetImageRef("ICP_PLATFORM_AUTH_IMAGE")
@@ -382,7 +385,7 @@ func generatePlatformAuthService(imagePullSecret, ldapSPCName, edbSPCName string
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, authCR.GetSAMLCertificateSecretName(), "", ldapSPCName, edbSPCName),
+						Volumes:        buildIdpVolumes(ldapCACert, samlCertSecret, "", ldapSPCName, edbSPCName),
 						Containers:     buildContainers(authCR, authServiceImage, ldapSPCExists),
 						InitContainers: buildInitContainers(initContainerImage),
 					},
@@ -403,7 +406,7 @@ func generatePlatformAuthService(imagePullSecret, ldapSPCName, edbSPCName string
 	}
 }
 
-func generatePlatformIdentityManagement(imagePullSecret, auditSecretName, ldapSPCName, edbSPCName string) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformIdentityManagement(imagePullSecret, samlCertSecret, auditSecretName, ldapSPCName, edbSPCName string) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		identityManagerImage := common.GetImageRef("ICP_IDENTITY_MANAGER_IMAGE")
@@ -558,7 +561,7 @@ func generatePlatformIdentityManagement(imagePullSecret, auditSecretName, ldapSP
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, authCR.GetSAMLCertificateSecretName(), auditSecretName, ldapSPCName, edbSPCName),
+						Volumes:        buildIdpVolumes(ldapCACert, samlCertSecret, auditSecretName, ldapSPCName, edbSPCName),
 						Containers:     buildManagerContainers(authCR, identityManagerImage, ldapSPCExists),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
@@ -577,7 +580,7 @@ func generatePlatformIdentityManagement(imagePullSecret, auditSecretName, ldapSP
 	}
 }
 
-func generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn, auditSecretName, ldapSPCName, edbSPCName string) common.GenerateFn[*appsv1.Deployment] {
+func generatePlatformIdentityProvider(imagePullSecret, samlCertSecret, saasServiceIdCrn, auditSecretName, ldapSPCName, edbSPCName string) common.GenerateFn[*appsv1.Deployment] {
 	return func(s common.SecondaryReconciler, ctx context.Context, deploy *appsv1.Deployment) (err error) {
 		reqLogger := logf.FromContext(ctx)
 		identityProviderImage := common.GetImageRef("ICP_IDENTITY_PROVIDER_IMAGE")
@@ -733,7 +736,7 @@ func generatePlatformIdentityProvider(imagePullSecret, saasServiceIdCrn, auditSe
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildIdpVolumes(ldapCACert, authCR.GetSAMLCertificateSecretName(), auditSecretName, ldapSPCName, edbSPCName),
+						Volumes:        buildIdpVolumes(ldapCACert, samlCertSecret, auditSecretName, ldapSPCName, edbSPCName),
 						Containers:     buildProviderContainers(authCR, identityProviderImage, saasServiceIdCrn, ldapSPCExists),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},

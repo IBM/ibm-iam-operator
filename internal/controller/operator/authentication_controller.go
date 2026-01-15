@@ -477,17 +477,27 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Watch for changes to customer-supplied Secrets that are part of IM
 	imManagedSecretPred := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			secret, ok := e.ObjectNew.(*corev1.Secret)
-			if !ok {
+			oldSecret, oldOk := e.ObjectOld.(*corev1.Secret)
+			newSecret, newOk := e.ObjectNew.(*corev1.Secret)
+			if !oldOk || !newOk {
 				return false
 			}
 
-			if labels := secret.GetLabels(); labels != nil {
+			newHasLabel := false
+			if labels := newSecret.GetLabels(); labels != nil {
 				if val, exists := labels["app.kubernetes.io/part-of"]; exists && val == "im" {
-					return true
+					newHasLabel = true
 				}
 			}
-			return false
+
+			oldHasLabel := false
+			if labels := oldSecret.GetLabels(); labels != nil {
+				if val, exists := labels["app.kubernetes.io/part-of"]; exists && val == "im" {
+					oldHasLabel = true
+				}
+			}
+
+			return oldHasLabel || newHasLabel
 		},
 		CreateFunc: func(e event.CreateEvent) bool {
 			secret, ok := e.Object.(*corev1.Secret)

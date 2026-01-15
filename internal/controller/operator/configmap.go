@@ -331,6 +331,7 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"ACCOUNT_IAM_URL",
 			"LIBERTY_SAMESITE_COOKIE",
 			"SECRETS_STORE_AVAILABLE",
+			"LIBERTY_AUTH_CACHE_TIMEOUT",
 		),
 		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("SESSION_TIMEOUT", "43200"),
 			"SESSION_TIMEOUT"),
@@ -524,7 +525,10 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 		if authCR.Spec.Config.LibertySSCookie != nil && strings.EqualFold(*authCR.Spec.Config.LibertySSCookie, "none") {
 			libertySSCookie = *authCR.Spec.Config.LibertySSCookie
 		}
-
+		var libertyAuthCacheTimeout string
+		if authCR.Spec.Config.LibertyAuthCacheTimeout != nil {
+			libertyAuthCacheTimeout = *authCR.Spec.Config.LibertyAuthCacheTimeout
+		}
 		*generated = corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      s.GetName(),
@@ -619,6 +623,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"IS_OPENSHIFT_ENV":                   strconv.FormatBool(isOSEnv),
 				"LIBERTY_SAMESITE_COOKIE":            libertySSCookie,
 				"OAUTH_21_ENABLED":                   strconv.FormatBool(oauth21Enabled),
+				"LIBERTY_AUTH_CACHE_TIMEOUT":         libertyAuthCacheTimeout,
 			},
 		}
 

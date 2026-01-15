@@ -764,6 +764,12 @@ var _ = Describe("ConfigMap handling", func() {
 						"LDAP_CTX_POOL_PREFERREDSIZE",
 					},
 				},
+				{
+					"LIBERTY_AUTH_CACHE_TIMEOUT",
+					[]string{
+						"LIBERTY_AUTH_CACHE_TIMEOUT",
+					},
+				},
 			}
 
 			setDummyData := func(pkey string, keys []string, o *corev1.ConfigMap) {
@@ -1072,22 +1078,23 @@ var _ = Describe("ConfigMap handling", func() {
 				},
 				Spec: operatorv1alpha1.AuthenticationSpec{
 					Config: operatorv1alpha1.ConfigSpec{
-						ClusterName:           "mycluster",
-						ClusterCADomain:       "domain.example.com",
-						DefaultAdminUser:      "myadmin",
-						ZenFrontDoor:          true,
-						PreferredLogin:        "ldap",
-						ProviderIssuerURL:     "example.com",
-						ROKSURL:               "",
-						ROKSEnabled:           false,
-						FIPSEnabled:           true,
-						NONCEEnabled:          true,
-						OIDCIssuerURL:         "oidc.example.com",
-						SaasClientRedirectUrl: "saasclient.example.com",
-						ClaimsMap:             "someclaims",
-						ScopeClaim:            "scopeclaimexample",
-						IsOpenshiftEnv:        false,
-						OAuth21Enabled:        ptr.To(false),
+						ClusterName:             "mycluster",
+						ClusterCADomain:         "domain.example.com",
+						DefaultAdminUser:        "myadmin",
+						ZenFrontDoor:            true,
+						PreferredLogin:          "ldap",
+						ProviderIssuerURL:       "example.com",
+						ROKSURL:                 "",
+						ROKSEnabled:             false,
+						FIPSEnabled:             true,
+						NONCEEnabled:            true,
+						OIDCIssuerURL:           "oidc.example.com",
+						SaasClientRedirectUrl:   "saasclient.example.com",
+						ClaimsMap:               "someclaims",
+						ScopeClaim:              "scopeclaimexample",
+						IsOpenshiftEnv:          false,
+						OAuth21Enabled:          ptr.To(false),
+						LibertyAuthCacheTimeout: ptr.To("10m"),
 					},
 				},
 			}

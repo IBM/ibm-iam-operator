@@ -381,6 +381,11 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 				currentConfigMap.Data["LIBERTY_SAMESITE_COOKIE"] = newConfigMap.Data["LIBERTY_SAMESITE_COOKIE"]
 				cmUpdateRequired = true
 			}
+			if curVal, keyExists := currentConfigMap.Data["LDAP_ALLOWLIST_ENABLED"]; !keyExists || curVal != newConfigMap.Data["LDAP_ALLOWLIST_ENABLED"] {
+				reqLogger.Info("Updating an existing Configmap to update LDAP allowlist setting", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["LDAP_ALLOWLIST_ENABLED"] = newConfigMap.Data["LDAP_ALLOWLIST_ENABLED"]
+				cmUpdateRequired = true
+			}
 			// Indicates an upgrade from a previous
 			if _, keyExists := currentConfigMap.Data["MASTER_PATH"]; !keyExists {
 				req := ctrl.Request{NamespacedName: types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}}
@@ -707,6 +712,7 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 			"SCIM_AUTH_CACHE_TTL_VALUE":          "60",
 			"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
 			"LIBERTY_SAMESITE_COOKIE":            "",
+			"LDAP_ALLOWLIST_ENABLED":             strconv.FormatBool(instance.IsLDAPAllowlistEnabled()),
 		},
 	}
 

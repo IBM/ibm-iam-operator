@@ -475,9 +475,14 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	)
 
 	// Watch for changes to customer-supplied Secrets with IM label
+	// Pattern matches the SecretProviderClass watch above
 	imSecretLabelSelector := metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"app.kubernetes.io/part-of": "im",
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "app.kubernetes.io/part-of",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"im"},
+			},
 		},
 	}
 	imSecretPred, err := predicate.LabelSelectorPredicate(imSecretLabelSelector)
@@ -489,7 +494,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
 			authCR, _ := common.GetAuthentication(ctx, r.Client)
 			if authCR == nil {
-				return nil
+				return
 			}
 			return []reconcile.Request{
 				{NamespacedName: types.NamespacedName{

@@ -482,14 +482,20 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Filter in the mapper function instead of predicate to ensure watch is established
 	authCtrl.Watches(&corev1.Secret{},
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
+			predLog.Info("Mapper function called for secret", "name", o.GetName(), "namespace", o.GetNamespace())
+
 			secret, ok := o.(*corev1.Secret)
 			if !ok {
+				predLog.Info("Type assertion failed, not a secret")
 				return nil
 			}
 
 			// Only process secrets with the IM label
 			labels := secret.GetLabels()
-			if labels == nil || labels["app.kubernetes.io/part-of"] != "im" {
+			hasIMLabel := labels != nil && labels["app.kubernetes.io/part-of"] == "im"
+			predLog.Info("Checking secret for IM label", "secret", secret.GetName(), "hasIMLabel", hasIMLabel, "labels", labels)
+
+			if !hasIMLabel {
 				return nil
 			}
 
@@ -497,9 +503,11 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 			authCR, _ := common.GetAuthentication(ctx, r.Client)
 			if authCR == nil {
+				predLog.Info("No Authentication CR found")
 				return nil
 			}
 
+			predLog.Info("Enqueuing reconciliation request", "authCR", authCR.Name, "namespace", authCR.Namespace)
 			return []reconcile.Request{
 				{NamespacedName: types.NamespacedName{
 					Name:      authCR.Name,

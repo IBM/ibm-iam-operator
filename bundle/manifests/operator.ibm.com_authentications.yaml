@@ -202,6 +202,8 @@ spec:
                     type: string
                   isOpenshiftEnv:
                     type: boolean
+                  libertyAuthCacheTimeout:
+                    type: string
                   nonceEnabled:
                     type: boolean
                   oidcIssuerURL:

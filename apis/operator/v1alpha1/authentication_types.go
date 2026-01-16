@@ -146,6 +146,7 @@ type ConfigSpec struct {
 	ScopeClaim                  string `json:"scopeClaim,omitempty"`
 	OIDCIssuerURL               string `json:"oidcIssuerURL"`
 	AttrMappingFromConfig       bool   `json:"attrMappingFromConfig,omitempty"`
+	LibertyAuthCacheTimeout     string `json:"libertyAuthCacheTimeout,omitempty"`
 }
 
 type ManagedResourceStatus struct {

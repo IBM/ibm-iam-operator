@@ -707,6 +707,7 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 			"SCIM_AUTH_CACHE_TTL_VALUE":          "60",
 			"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
 			"LIBERTY_SAMESITE_COOKIE":            "",
+			"LIBERTY_AUTH_CACHE_TIMEOUT":         instance.Spec.Config.LibertyAuthCacheTimeout,
 		},
 	}
 

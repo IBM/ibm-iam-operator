@@ -148,11 +148,17 @@ func (r *AuthenticationReconciler) GetSAMLCertificateSecretNameWithLabelCheck(ct
 	log := logf.FromContext(ctx)
 	const defaultSAMLCertSecret = "saml-auth-secret"
 
+	log.Info("Checking SAML certificate secret with label validation")
+
 	// Check routerCertSecret if explicitly set
 	routerCertSecret := authCR.Spec.AuthService.RouterCertSecret
+	log.Info("RouterCertSecret value", "secret", routerCertSecret, "isEmpty", routerCertSecret == "", "isDefault", routerCertSecret == defaultSAMLCertSecret)
+
 	if routerCertSecret != "" && routerCertSecret != defaultSAMLCertSecret {
-		if r.hasIMLabel(ctx, routerCertSecret, authCR.Namespace) {
-			log.V(1).Info("Using routerCertSecret with IM label", "secret", routerCertSecret)
+		hasLabel := r.hasIMLabel(ctx, routerCertSecret, authCR.Namespace)
+		log.Info("Checking routerCertSecret for IM label", "secret", routerCertSecret, "hasLabel", hasLabel)
+		if hasLabel {
+			log.Info("Using routerCertSecret with IM label", "secret", routerCertSecret)
 			return routerCertSecret
 		}
 		log.Info("RouterCertSecret configured but missing 'app.kubernetes.io/part-of=im' label; falling back to default", "secret", routerCertSecret)
@@ -162,14 +168,22 @@ func (r *AuthenticationReconciler) GetSAMLCertificateSecretNameWithLabelCheck(ct
 	// Check custom ingress certificate if routerCertSecret is not set or is default
 	if authCR.HasCustomIngressCertificate() {
 		ingressSecret := *authCR.Spec.Config.Ingress.Secret
-		if r.hasIMLabel(ctx, ingressSecret, authCR.Namespace) {
-			log.V(1).Info("Using custom ingress certificate secret with IM label", "secret", ingressSecret)
+		log.Info("Checking custom ingress secret", "secret", ingressSecret)
+
+		hasLabel := r.hasIMLabel(ctx, ingressSecret, authCR.Namespace)
+		log.Info("Custom ingress secret label check", "secret", ingressSecret, "hasLabel", hasLabel)
+
+		if hasLabel {
+			log.Info("Using custom ingress certificate secret with IM label", "secret", ingressSecret)
 			return ingressSecret
 		}
 		log.Info("Custom ingress secret configured but missing 'app.kubernetes.io/part-of=im' label; using default", "secret", ingressSecret)
+	} else {
+		log.Info("No custom ingress certificate configured")
 	}
 
 	// default
+	log.Info("Using default SAML certificate", "secret", defaultSAMLCertSecret)
 	return defaultSAMLCertSecret
 }
 

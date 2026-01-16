@@ -474,30 +474,30 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}), builder.WithPredicates(predicate.Or(globalCMPred, productCMPred)),
 	)
 
-	// Watch for changes to customer-supplied Secrets that are part of IM
+	// Watch for changes to customer-supplied Secrets that could be used for SAML certificates
+	// This watches secrets in the Authentication CR's namespace and checks if they're relevant
 	imManagedSecretPred := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			oldSecret, oldOk := e.ObjectOld.(*corev1.Secret)
 			newSecret, newOk := e.ObjectNew.(*corev1.Secret)
+			oldSecret, oldOk := e.ObjectOld.(*corev1.Secret)
 			if !oldOk || !newOk {
 				return false
 			}
 
-			newHasLabel := false
-			if labels := newSecret.GetLabels(); labels != nil {
-				if val, exists := labels["app.kubernetes.io/part-of"]; exists && val == "im" {
-					newHasLabel = true
-				}
+			// Quick check: did the IM label change or is the secret labeled?
+			newLabels := newSecret.GetLabels()
+			oldLabels := oldSecret.GetLabels()
+
+			newHasLabel := newLabels != nil && newLabels["app.kubernetes.io/part-of"] == "im"
+			oldHasLabel := oldLabels != nil && oldLabels["app.kubernetes.io/part-of"] == "im"
+
+			// If neither old nor new has the label, ignore this update
+			if !newHasLabel && !oldHasLabel {
+				return false
 			}
 
-			oldHasLabel := false
-			if labels := oldSecret.GetLabels(); labels != nil {
-				if val, exists := labels["app.kubernetes.io/part-of"]; exists && val == "im" {
-					oldHasLabel = true
-				}
-			}
-
-			return oldHasLabel || newHasLabel
+			// Label was added, removed, or secret with label was updated
+			return oldHasLabel != newHasLabel || newHasLabel
 		},
 		CreateFunc: func(e event.CreateEvent) bool {
 			secret, ok := e.Object.(*corev1.Secret)
@@ -505,12 +505,9 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return false
 			}
 
-			if labels := secret.GetLabels(); labels != nil {
-				if val, exists := labels["app.kubernetes.io/part-of"]; exists && val == "im" {
-					return true
-				}
-			}
-			return false
+			// Only trigger if the secret has the IM label
+			labels := secret.GetLabels()
+			return labels != nil && labels["app.kubernetes.io/part-of"] == "im"
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			secret, ok := e.Object.(*corev1.Secret)
@@ -518,12 +515,9 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return false
 			}
 
-			if labels := secret.GetLabels(); labels != nil {
-				if val, exists := labels["app.kubernetes.io/part-of"]; exists && val == "im" {
-					return true
-				}
-			}
-			return false
+			// Only trigger if the secret had the IM label
+			labels := secret.GetLabels()
+			return labels != nil && labels["app.kubernetes.io/part-of"] == "im"
 		},
 	}
 

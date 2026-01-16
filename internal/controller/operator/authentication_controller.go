@@ -475,76 +475,38 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	)
 
 	// Watch for changes to customer-supplied Secrets that could be used for SAML certificates
-	// This watches secrets in the Authentication CR's namespace and checks if they're relevant
-	predLog := logf.Log.WithName("predicate").WithName("imManagedSecret")
-	imManagedSecretPred := predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			newSecret, newOk := e.ObjectNew.(*corev1.Secret)
-			oldSecret, oldOk := e.ObjectOld.(*corev1.Secret)
-			if !oldOk || !newOk {
-				predLog.Info("Update event: type assertion failed", "oldOk", oldOk, "newOk", newOk)
-				return false
-			}
-
-			secretName := newSecret.GetName()
-			predLog.Info("Update event received", "secret", secretName, "namespace", newSecret.GetNamespace())
-
-			// Quick check: did the IM label change or is the secret labeled?
-			newLabels := newSecret.GetLabels()
-			oldLabels := oldSecret.GetLabels()
-
-			newHasLabel := newLabels != nil && newLabels["app.kubernetes.io/part-of"] == "im"
-			oldHasLabel := oldLabels != nil && oldLabels["app.kubernetes.io/part-of"] == "im"
-
-			predLog.Info("Label check", "secret", secretName, "oldHasLabel", oldHasLabel, "newHasLabel", newHasLabel)
-
-			// If neither old nor new has the label, ignore this update
-			if !newHasLabel && !oldHasLabel {
-				predLog.Info("Neither old nor new has label, ignoring", "secret", secretName)
-				return false
-			}
-
-			// Label was added, removed, or secret with label was updated
-			shouldTrigger := oldHasLabel != newHasLabel || newHasLabel
-			predLog.Info("Predicate result", "secret", secretName, "shouldTrigger", shouldTrigger)
-			return shouldTrigger
-		},
-		CreateFunc: func(e event.CreateEvent) bool {
-			secret, ok := e.Object.(*corev1.Secret)
-			if !ok {
-				return false
-			}
-
-			// Only trigger if the secret has the IM label
-			labels := secret.GetLabels()
-			return labels != nil && labels["app.kubernetes.io/part-of"] == "im"
-		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			secret, ok := e.Object.(*corev1.Secret)
-			if !ok {
-				return false
-			}
-
-			// Only trigger if the secret had the IM label
-			labels := secret.GetLabels()
-			return labels != nil && labels["app.kubernetes.io/part-of"] == "im"
-		},
-	}
+	// Use mapper function for filtering instead of predicates to ensure watch is established
+	predLog := logf.Log.WithName("mapper").WithName("imManagedSecret")
 
 	// Add the watch for customer-supplied Secrets
+	// Filter in the mapper function instead of predicate to ensure watch is established
 	authCtrl.Watches(&corev1.Secret{},
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
+			secret, ok := o.(*corev1.Secret)
+			if !ok {
+				return nil
+			}
+
+			// Only process secrets with the IM label
+			labels := secret.GetLabels()
+			if labels == nil || labels["app.kubernetes.io/part-of"] != "im" {
+				return nil
+			}
+
+			predLog.Info("IM-labeled secret detected, triggering reconciliation", "secret", secret.GetName(), "namespace", secret.GetNamespace())
+
 			authCR, _ := common.GetAuthentication(ctx, r.Client)
 			if authCR == nil {
-				return
+				return nil
 			}
+
 			return []reconcile.Request{
 				{NamespacedName: types.NamespacedName{
 					Name:      authCR.Name,
 					Namespace: authCR.Namespace,
 				}},
 			}
-		}), builder.WithPredicates(imManagedSecretPred),
+		}),
 	)
 
 	authCtrl.Watches(&operatorv1alpha1.Authentication{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(bootstrappedPred))

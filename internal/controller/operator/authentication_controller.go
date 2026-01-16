@@ -476,13 +476,18 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	// Watch for changes to customer-supplied Secrets that could be used for SAML certificates
 	// This watches secrets in the Authentication CR's namespace and checks if they're relevant
+	predLog := logf.Log.WithName("predicate").WithName("imManagedSecret")
 	imManagedSecretPred := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			newSecret, newOk := e.ObjectNew.(*corev1.Secret)
 			oldSecret, oldOk := e.ObjectOld.(*corev1.Secret)
 			if !oldOk || !newOk {
+				predLog.Info("Update event: type assertion failed", "oldOk", oldOk, "newOk", newOk)
 				return false
 			}
+
+			secretName := newSecret.GetName()
+			predLog.Info("Update event received", "secret", secretName, "namespace", newSecret.GetNamespace())
 
 			// Quick check: did the IM label change or is the secret labeled?
 			newLabels := newSecret.GetLabels()
@@ -491,13 +496,18 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			newHasLabel := newLabels != nil && newLabels["app.kubernetes.io/part-of"] == "im"
 			oldHasLabel := oldLabels != nil && oldLabels["app.kubernetes.io/part-of"] == "im"
 
+			predLog.Info("Label check", "secret", secretName, "oldHasLabel", oldHasLabel, "newHasLabel", newHasLabel)
+
 			// If neither old nor new has the label, ignore this update
 			if !newHasLabel && !oldHasLabel {
+				predLog.Info("Neither old nor new has label, ignoring", "secret", secretName)
 				return false
 			}
 
 			// Label was added, removed, or secret with label was updated
-			return oldHasLabel != newHasLabel || newHasLabel
+			shouldTrigger := oldHasLabel != newHasLabel || newHasLabel
+			predLog.Info("Predicate result", "secret", secretName, "shouldTrigger", shouldTrigger)
+			return shouldTrigger
 		},
 		CreateFunc: func(e event.CreateEvent) bool {
 			secret, ok := e.Object.(*corev1.Secret)

@@ -474,47 +474,30 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}), builder.WithPredicates(predicate.Or(globalCMPred, productCMPred)),
 	)
 
-	// Watch for changes to customer-supplied Secrets that could be used for SAML certificates
-	// Use mapper function for filtering instead of predicates to ensure watch is established
-	predLog := logf.Log.WithName("mapper").WithName("imManagedSecret")
+	// Watch for changes to customer-supplied Secrets with IM label
+	imSecretLabelSelector := metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"app.kubernetes.io/part-of": "im",
+		},
+	}
+	imSecretPred, err := predicate.LabelSelectorPredicate(imSecretLabelSelector)
+	if err != nil {
+		return err
+	}
 
-	// Add the watch for customer-supplied Secrets
-	// Filter in the mapper function instead of predicate to ensure watch is established
 	authCtrl.Watches(&corev1.Secret{},
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
-			predLog.Info("Mapper function called for secret", "name", o.GetName(), "namespace", o.GetNamespace())
-
-			secret, ok := o.(*corev1.Secret)
-			if !ok {
-				predLog.Info("Type assertion failed, not a secret")
-				return nil
-			}
-
-			// Only process secrets with the IM label
-			labels := secret.GetLabels()
-			hasIMLabel := labels != nil && labels["app.kubernetes.io/part-of"] == "im"
-			predLog.Info("Checking secret for IM label", "secret", secret.GetName(), "hasIMLabel", hasIMLabel, "labels", labels)
-
-			if !hasIMLabel {
-				return nil
-			}
-
-			predLog.Info("IM-labeled secret detected, triggering reconciliation", "secret", secret.GetName(), "namespace", secret.GetNamespace())
-
 			authCR, _ := common.GetAuthentication(ctx, r.Client)
 			if authCR == nil {
-				predLog.Info("No Authentication CR found")
 				return nil
 			}
-
-			predLog.Info("Enqueuing reconciliation request", "authCR", authCR.Name, "namespace", authCR.Namespace)
 			return []reconcile.Request{
 				{NamespacedName: types.NamespacedName{
 					Name:      authCR.Name,
 					Namespace: authCR.Namespace,
 				}},
 			}
-		}),
+		}), builder.WithPredicates(imSecretPred),
 	)
 
 	authCtrl.Watches(&operatorv1alpha1.Authentication{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(bootstrappedPred))

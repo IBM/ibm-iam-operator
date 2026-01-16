@@ -49,7 +49,7 @@ func (r *AuthenticationReconciler) handleCertificates(ctx context.Context, req c
 		return
 	}
 
-	certificateFieldsList := generateCertificateFieldsList(authCR)
+	certificateFieldsList := r.generateCertificateFieldsList(debugCtx, authCR)
 	certificateSubreconcilers := []subreconciler.Fn{
 		r.removeV1Alpha1Certs(authCR, certificateFieldsList),
 		r.cleanupDefaultSAMLCertificate(authCR),
@@ -73,7 +73,7 @@ type reconcileCertificateFields struct {
 	IPAddresses []string
 }
 
-func generateCertificateFieldsList(authCR *operatorv1alpha1.Authentication) []*reconcileCertificateFields {
+func (r *AuthenticationReconciler) generateCertificateFieldsList(ctx context.Context, authCR *operatorv1alpha1.Authentication) []*reconcileCertificateFields {
 	certList := []*reconcileCertificateFields{
 		{
 			NamespacedName: types.NamespacedName{
@@ -105,24 +105,30 @@ func generateCertificateFieldsList(authCR *operatorv1alpha1.Authentication) []*r
 		},
 	}
 
-	certList = append(certList, &reconcileCertificateFields{
-		NamespacedName: types.NamespacedName{
-			Name:      "saml-auth-cert",
-			Namespace: authCR.Namespace,
-		},
-		SecretName: "saml-auth-secret",
-		CommonName: "saml-auth",
-		DNSNames:   []string{},
-	})
+	// Only create saml-auth-cert if NOT using custom ingress certificate for SAML
+	// When custom cert with IM label is used, we don't need the default certificate
+	if !r.shouldUseCustomIngressCertForSAML(ctx, authCR) {
+		certList = append(certList, &reconcileCertificateFields{
+			NamespacedName: types.NamespacedName{
+				Name:      "saml-auth-cert",
+				Namespace: authCR.Namespace,
+			},
+			SecretName: "saml-auth-secret",
+			CommonName: "saml-auth",
+			DNSNames:   []string{},
+		})
+	}
 
 	return certList
 }
 
-func shouldUseCustomIngressCertForSAML(authCR *operatorv1alpha1.Authentication) bool {
+func (r *AuthenticationReconciler) shouldUseCustomIngressCertForSAML(ctx context.Context, authCR *operatorv1alpha1.Authentication) bool {
 	if !authCR.HasCustomIngressCertificate() {
 		return false
 	}
-	return authCR.GetSAMLCertificateSecretName() == *authCR.Spec.Config.Ingress.Secret
+	ingressSecret := *authCR.Spec.Config.Ingress.Secret
+	// Only use custom cert if it has the IM label
+	return r.hasIMLabel(ctx, ingressSecret, authCR.Namespace)
 }
 
 func (r *AuthenticationReconciler) hasIMLabel(ctx context.Context, secretName, namespace string) bool {
@@ -264,14 +270,8 @@ func (r *AuthenticationReconciler) cleanupDefaultSAMLCertificate(authCR *operato
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		log := logf.FromContext(ctx)
 
-		if !shouldUseCustomIngressCertForSAML(authCR) {
+		if !r.shouldUseCustomIngressCertForSAML(ctx, authCR) {
 			log.V(1).Info("Not using custom ingress certificate for SAML; skipping cleanup")
-			return subreconciler.ContinueReconciling()
-		}
-
-		secretName := *authCR.Spec.Config.Ingress.Secret
-		if !r.hasIMLabel(ctx, secretName, authCR.Namespace) {
-			log.Info("Custom ingress certificate configured but secret missing 'app.kubernetes.io/part-of=im' label; skipping cleanup", "secret", secretName)
 			return subreconciler.ContinueReconciling()
 		}
 

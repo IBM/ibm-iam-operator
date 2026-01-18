@@ -496,10 +496,14 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Combined Secret watch: handles both owned secrets and IM-labeled secrets
 	authCtrl.Watches(&corev1.Secret{},
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
+			log := logf.FromContext(ctx).WithName("secret_watch_handler")
 			secret := o.(*corev1.Secret)
+
+			log.Info("Secret watch triggered", "Secret.Name", secret.Name, "Secret.Namespace", secret.Namespace, "Labels", secret.Labels)
 
 			// Check if this is an owned secret
 			if ownerRef := metav1.GetControllerOf(secret); ownerRef != nil && ownerRef.Kind == "Authentication" {
+				log.Info("Secret is owned by Authentication CR", "Owner.Name", ownerRef.Name, "Owner.Namespace", secret.Namespace)
 				return []reconcile.Request{
 					{NamespacedName: types.NamespacedName{
 						Name:      ownerRef.Name,
@@ -508,9 +512,15 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				}
 			}
 
-			// Otherwise, it's an IM-labeled secret
-			authCR, _ := common.GetAuthentication(ctx, r.Client)
+			// Otherwise, it's an IM-labeled secret - look for Authentication CR in the same namespace
+			log.Info("Checking for IM-labeled secret", "Secret.Name", secret.Name, "Secret.Namespace", secret.Namespace)
+			authCR, err := common.GetAuthentication(ctx, r.Client, secret.Namespace)
+			if err != nil {
+				log.Error(err, "Failed to get Authentication CR", "Secret.Namespace", secret.Namespace)
+				return nil
+			}
 			if authCR != nil {
+				log.Info("Found Authentication CR for IM-labeled secret", "Auth.Name", authCR.Name, "Auth.Namespace", authCR.Namespace)
 				return []reconcile.Request{
 					{NamespacedName: types.NamespacedName{
 						Name:      authCR.Name,
@@ -519,6 +529,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				}
 			}
 
+			log.Info("No Authentication CR found for secret", "Secret.Name", secret.Name, "Secret.Namespace", secret.Namespace)
 			return nil
 		}), builder.WithPredicates(predicate.Or(ownedSecretPred, imManagedSecretPred)),
 	)

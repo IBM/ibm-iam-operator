@@ -335,6 +335,7 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	authCtrl := ctrl.NewControllerManagedBy(mgr).
 		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
+		Watches(&corev1.Secret{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&certmgr.Certificate{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&batchv1.Job{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&corev1.Service{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
@@ -474,82 +475,33 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	)
 
 	// Watch for changes to Secrets (both owned and customer-supplied with IM label)
-	// Optimized predicate: filters at watch level before handler is called
-	checkSecret := func(o client.Object) bool {
-		secret, ok := o.(*corev1.Secret)
-		if !ok {
-			return false
-		}
-
-		// Check if owned by Authentication CR (fast check)
-		if ownerRef := metav1.GetControllerOf(secret); ownerRef != nil && ownerRef.Kind == "Authentication" {
-			return true
-		}
-
-		// Check if has IM label (only if not owned)
-		if labels := secret.GetLabels(); labels != nil {
-			if val, exists := labels["app.kubernetes.io/part-of"]; exists && val == "im" {
-				return true
-			}
-		}
-
-		return false
-	}
-
-	combinedSecretPred := predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
-			return checkSecret(e.Object)
-		},
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			return checkSecret(e.ObjectNew)
-		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			return checkSecret(e.Object)
-		},
-		GenericFunc: func(e event.GenericEvent) bool {
-			return checkSecret(e.Object)
+	// Watch for changes to customer-supplied Secrets that are part of IM
+	secretLabelSelector := metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "app.kubernetes.io/part-of",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"im"},
+			},
 		},
 	}
-
-	// Combined Secret watch: handles both owned secrets and IM-labeled secrets
+	secretLabelPredicate, err := predicate.LabelSelectorPredicate(secretLabelSelector)
+	if err != nil {
+		return err
+	}
 	authCtrl.Watches(&corev1.Secret{},
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
-			log := logf.FromContext(ctx).WithName("secret_watch_handler")
-			secret := o.(*corev1.Secret)
-
-			log.Info("Secret watch triggered", "Secret.Name", secret.Name, "Secret.Namespace", secret.Namespace, "Labels", secret.Labels)
-
-			// Check if this is an owned secret
-			if ownerRef := metav1.GetControllerOf(secret); ownerRef != nil && ownerRef.Kind == "Authentication" {
-				log.Info("Secret is owned by Authentication CR", "Owner.Name", ownerRef.Name, "Owner.Namespace", secret.Namespace)
-				return []reconcile.Request{
-					{NamespacedName: types.NamespacedName{
-						Name:      ownerRef.Name,
-						Namespace: secret.Namespace,
-					}},
-				}
+			authCR, _ := common.GetAuthentication(ctx, r.Client)
+			if authCR == nil {
+				return
 			}
-
-			// Otherwise, it's an IM-labeled secret - look for Authentication CR in the same namespace
-			log.Info("Checking for IM-labeled secret", "Secret.Name", secret.Name, "Secret.Namespace", secret.Namespace)
-			authCR, err := common.GetAuthentication(ctx, r.Client, secret.Namespace)
-			if err != nil {
-				log.Error(err, "Failed to get Authentication CR", "Secret.Namespace", secret.Namespace)
-				return nil
+			return []reconcile.Request{
+				{NamespacedName: types.NamespacedName{
+					Name:      authCR.Name,
+					Namespace: authCR.Namespace,
+				}},
 			}
-			if authCR != nil {
-				log.Info("Found Authentication CR for IM-labeled secret", "Auth.Name", authCR.Name, "Auth.Namespace", authCR.Namespace)
-				return []reconcile.Request{
-					{NamespacedName: types.NamespacedName{
-						Name:      authCR.Name,
-						Namespace: authCR.Namespace,
-					}},
-				}
-			}
-
-			log.Info("No Authentication CR found for secret", "Secret.Name", secret.Name, "Secret.Namespace", secret.Namespace)
-			return nil
-		}), builder.WithPredicates(combinedSecretPred),
+		}), builder.WithPredicates(secretLabelPredicate),
 	)
 
 	authCtrl.Watches(&operatorv1alpha1.Authentication{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(bootstrappedPred))

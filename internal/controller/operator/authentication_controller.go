@@ -475,46 +475,18 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	)
 
 	// Watch for changes to customer-supplied Secrets that are part of IM
-	imManagedSecretPred := predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			secret, ok := e.ObjectNew.(*corev1.Secret)
-			if !ok {
-				return false
-			}
-
-			if labels := secret.GetLabels(); labels != nil {
-				if val, exists := labels["app.kubernetes.io/part-of"]; exists && val == "im" {
-					return true
-				}
-			}
-			return false
+	imManagedSecretLabelSelector := metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "app.kubernetes.io/part-of",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"im"},
+			},
 		},
-		CreateFunc: func(e event.CreateEvent) bool {
-			secret, ok := e.Object.(*corev1.Secret)
-			if !ok {
-				return false
-			}
-
-			if labels := secret.GetLabels(); labels != nil {
-				if val, exists := labels["app.kubernetes.io/part-of"]; exists && val == "im" {
-					return true
-				}
-			}
-			return false
-		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			secret, ok := e.Object.(*corev1.Secret)
-			if !ok {
-				return false
-			}
-
-			if labels := secret.GetLabels(); labels != nil {
-				if val, exists := labels["app.kubernetes.io/part-of"]; exists && val == "im" {
-					return true
-				}
-			}
-			return false
-		},
+	}
+	imManagedSecretPred, err := predicate.LabelSelectorPredicate(imManagedSecretLabelSelector)
+	if err != nil {
+		return err
 	}
 
 	// Add the watch for customer-supplied Secrets

@@ -474,23 +474,26 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	)
 
 	// Watch for changes to Secrets (both owned and customer-supplied with IM label)
-	imManagedSecretLabelSelector := metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{
-			{
-				Key:      "app.kubernetes.io/part-of",
-				Operator: metav1.LabelSelectorOpIn,
-				Values:   []string{"im"},
-			},
-		},
-	}
-	imManagedSecretPred, err := predicate.LabelSelectorPredicate(imManagedSecretLabelSelector)
-	if err != nil {
-		return err
-	}
+	// Optimized predicate: filters at watch level before handler is called
+	combinedSecretPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
+		secret, ok := o.(*corev1.Secret)
+		if !ok {
+			return false
+		}
 
-	// Predicate for owned secrets
-	ownedSecretPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
-		return metav1.GetControllerOf(o) != nil && metav1.GetControllerOf(o).Kind == "Authentication"
+		// Check if owned by Authentication CR (fast check)
+		if ownerRef := metav1.GetControllerOf(secret); ownerRef != nil && ownerRef.Kind == "Authentication" {
+			return true
+		}
+
+		// Check if has IM label (only if not owned)
+		if labels := secret.GetLabels(); labels != nil {
+			if val, exists := labels["app.kubernetes.io/part-of"]; exists && val == "im" {
+				return true
+			}
+		}
+
+		return false
 	})
 
 	// Combined Secret watch: handles both owned secrets and IM-labeled secrets
@@ -531,7 +534,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 			log.Info("No Authentication CR found for secret", "Secret.Name", secret.Name, "Secret.Namespace", secret.Namespace)
 			return nil
-		}), builder.WithPredicates(predicate.Or(ownedSecretPred, imManagedSecretPred)),
+		}), builder.WithPredicates(combinedSecretPred),
 	)
 
 	authCtrl.Watches(&operatorv1alpha1.Authentication{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(bootstrappedPred))

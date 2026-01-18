@@ -475,19 +475,26 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	)
 
 	// Watch for changes to customer-supplied Secrets with IM label
-	// Use a simple predicate that filters by secret name to avoid caching all secrets
-	imSecretPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
-		// Only watch secrets in ibm-common-services namespace
-		if o.GetNamespace() != "ibm-common-services" {
-			return false
-		}
-		// Check if secret has IM label
-		labels := o.GetLabels()
-		return labels != nil && labels["app.kubernetes.io/part-of"] == "im"
-	})
+	imSecretLabelSelector := metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "app.kubernetes.io/part-of",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"im"},
+			},
+		},
+	}
+	imSecretPred, err := predicate.LabelSelectorPredicate(imSecretLabelSelector)
+	if err != nil {
+		return err
+	}
 
 	authCtrl.Watches(&corev1.Secret{},
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
+			// Only watch secrets in ibm-common-services namespace
+			if o.GetNamespace() != "ibm-common-services" {
+				return
+			}
 			authCR, _ := common.GetAuthentication(ctx, r.Client)
 			if authCR == nil {
 				return

@@ -264,6 +264,10 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 			reqLogger.Error(err, "Failed to get ConfigMap", "ConfigMap.Namespace", instance.Namespace, "ConfigMap.Name", configMap)
 			return
 		}
+		if *needToRequeue {
+			return
+		}
+		// If no err and did not need to requeue for any creation activity, check for updates
 		switch configMapList[index] {
 		case "platform-auth-idp":
 			cmUpdateRequired := false

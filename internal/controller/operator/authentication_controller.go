@@ -475,7 +475,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	// Watch for changes to Secrets (both owned and customer-supplied with IM label)
 	// Optimized predicate: filters at watch level before handler is called
-	combinedSecretPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
+	checkSecret := func(o client.Object) bool {
 		secret, ok := o.(*corev1.Secret)
 		if !ok {
 			return false
@@ -494,7 +494,22 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}
 
 		return false
-	})
+	}
+
+	combinedSecretPred := predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return checkSecret(e.Object)
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return checkSecret(e.ObjectNew)
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return checkSecret(e.Object)
+		},
+		GenericFunc: func(e event.GenericEvent) bool {
+			return checkSecret(e.Object)
+		},
+	}
 
 	// Combined Secret watch: handles both owned secrets and IM-labeled secrets
 	authCtrl.Watches(&corev1.Secret{},

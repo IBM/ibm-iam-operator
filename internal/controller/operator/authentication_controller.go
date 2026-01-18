@@ -474,49 +474,36 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}), builder.WithPredicates(predicate.Or(globalCMPred, productCMPred)),
 	)
 
-	// Watch for changes to Secrets (both owned and customer-supplied with IM label)
-	// Watch for changes to customer-supplied Secrets that are part of IM
-	// Custom predicate to handle label addition AND removal
 	imSecretPredicate := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
-			secret, ok := e.Object.(*corev1.Secret)
-			if !ok {
-				return false
-			}
+			secret := e.Object.(*corev1.Secret)
 			if labels := secret.GetLabels(); labels != nil {
-				return labels["app.kubernetes.io/part-of"] == "im"
+				return labels[IMPartOfLabel] == IMPartOfValue
 			}
 			return false
 		},
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			oldSecret, okOld := e.ObjectOld.(*corev1.Secret)
-			newSecret, okNew := e.ObjectNew.(*corev1.Secret)
-			if !okOld || !okNew {
-				return false
-			}
 
-			// Check if old object had the label
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldSecret := e.ObjectOld.(*corev1.Secret)
+			newSecret := e.ObjectNew.(*corev1.Secret)
+
 			oldHasLabel := false
 			if oldLabels := oldSecret.GetLabels(); oldLabels != nil {
-				oldHasLabel = oldLabels["app.kubernetes.io/part-of"] == "im"
+				oldHasLabel = oldLabels[IMPartOfLabel] == IMPartOfValue
 			}
 
-			// Check if new object has the label
 			newHasLabel := false
 			if newLabels := newSecret.GetLabels(); newLabels != nil {
-				newHasLabel = newLabels["app.kubernetes.io/part-of"] == "im"
+				newHasLabel = newLabels[IMPartOfLabel] == IMPartOfValue
 			}
 
-			// Trigger if either old OR new has the label (covers both addition and removal)
 			return oldHasLabel || newHasLabel
 		},
+
 		DeleteFunc: func(e event.DeleteEvent) bool {
-			secret, ok := e.Object.(*corev1.Secret)
-			if !ok {
-				return false
-			}
+			secret := e.Object.(*corev1.Secret)
 			if labels := secret.GetLabels(); labels != nil {
-				return labels["app.kubernetes.io/part-of"] == "im"
+				return labels[IMPartOfLabel] == IMPartOfValue
 			}
 			return false
 		},

@@ -25,6 +25,7 @@ import (
 	certmgrv1 "github.com/IBM/ibm-iam-operator/internal/api/certmanager/v1"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
 	"github.com/opdev/subreconciler"
+	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -41,14 +42,12 @@ const Certv1alpha1APIVersion = "certmanager.k8s.io/v1alpha1"
 func (r *AuthenticationReconciler) handleCertificates(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	authCR := &operatorv1alpha1.Authentication{}
 	log := logf.FromContext(ctx)
-	debugLog := log.V(1)
-	debugCtx := logf.IntoContext(ctx, debugLog)
 	log.Info("Ensure all Certificates are present and the correct GVK")
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 
-	certificateFieldsList := generateCertificateFieldsList(authCR)
+	certificateFieldsList := r.generateCertificateFieldsList(ctx, authCR)
 	certificateSubreconcilers := []subreconciler.Fn{
 		r.removeV1Alpha1Certs(authCR, certificateFieldsList),
 		r.cleanupDefaultSAMLCertificate(authCR),
@@ -56,7 +55,7 @@ func (r *AuthenticationReconciler) handleCertificates(ctx context.Context, req c
 		r.addLabelIfMissing(certificateFieldsList),
 	}
 	for _, fn := range certificateSubreconcilers {
-		if result, err = fn(debugCtx); subreconciler.ShouldHaltOrRequeue(result, err) {
+		if result, err = fn(ctx); subreconciler.ShouldHaltOrRequeue(result, err) {
 			return
 		}
 	}
@@ -72,7 +71,7 @@ type reconcileCertificateFields struct {
 	IPAddresses []string
 }
 
-func generateCertificateFieldsList(authCR *operatorv1alpha1.Authentication) []*reconcileCertificateFields {
+func (r *AuthenticationReconciler) generateCertificateFieldsList(ctx context.Context, authCR *operatorv1alpha1.Authentication) []*reconcileCertificateFields {
 	certList := []*reconcileCertificateFields{
 		{
 			NamespacedName: types.NamespacedName{
@@ -104,8 +103,7 @@ func generateCertificateFieldsList(authCR *operatorv1alpha1.Authentication) []*r
 		},
 	}
 
-	// Create saml-auth-cert only when no custom ingress certificate is configured; otherwise deployments use the custom cert.
-	if !shouldUseCustomIngressCertForSAML(authCR) {
+	if !r.shouldUseCustomIngressCertForSAML(ctx, authCR) {
 		certList = append(certList, &reconcileCertificateFields{
 			NamespacedName: types.NamespacedName{
 				Name:      "saml-auth-cert",
@@ -120,11 +118,58 @@ func generateCertificateFieldsList(authCR *operatorv1alpha1.Authentication) []*r
 	return certList
 }
 
-func shouldUseCustomIngressCertForSAML(authCR *operatorv1alpha1.Authentication) bool {
+func (r *AuthenticationReconciler) shouldUseCustomIngressCertForSAML(ctx context.Context, authCR *operatorv1alpha1.Authentication) bool {
 	if !authCR.HasCustomIngressCertificate() {
 		return false
 	}
-	return authCR.GetSAMLCertificateSecretName() == *authCR.Spec.Config.Ingress.Secret
+	ingressSecret := *authCR.Spec.Config.Ingress.Secret
+	return r.hasIMLabel(ctx, ingressSecret, authCR.Namespace)
+}
+
+func (r *AuthenticationReconciler) hasIMLabel(ctx context.Context, secretName, namespace string) bool {
+	secret := &corev1.Secret{}
+	err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: namespace}, secret)
+	if err != nil {
+		return false
+	}
+
+	if labels := secret.GetLabels(); labels != nil {
+		if val, exists := labels[IMPartOfLabel]; exists && val == IMPartOfValue {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (r *AuthenticationReconciler) GetSAMLCertificateSecretNameWithLabelCheck(ctx context.Context, authCR *operatorv1alpha1.Authentication) string {
+	log := logf.FromContext(ctx)
+	const defaultSAMLCertSecret = "saml-auth-secret"
+
+	// Check routerCertSecret if explicitly set
+	routerCertSecret := authCR.Spec.AuthService.RouterCertSecret
+	if routerCertSecret != "" && routerCertSecret != defaultSAMLCertSecret {
+		if r.hasIMLabel(ctx, routerCertSecret, authCR.Namespace) {
+			log.Info("Using routerCertSecret with IM label", "secret", routerCertSecret)
+			return routerCertSecret
+		}
+		log.Info("RouterCertSecret configured but missing IM label; falling back to default", "secret", routerCertSecret)
+		return defaultSAMLCertSecret
+	}
+
+	// Check custom ingress certificate if routerCertSecret is not set or is default
+	if authCR.HasCustomIngressCertificate() {
+		ingressSecret := *authCR.Spec.Config.Ingress.Secret
+		if r.hasIMLabel(ctx, ingressSecret, authCR.Namespace) {
+			log.Info("Using custom ingress certificate secret with IM label", "secret", ingressSecret)
+			return ingressSecret
+		}
+		log.Info("Custom ingress secret configured but missing IM label; using default", "secret", ingressSecret)
+	}
+
+	// Use default SAML certificate
+	log.Info("Using default SAML certificate", "secret", defaultSAMLCertSecret)
+	return defaultSAMLCertSecret
 }
 
 // removeV1Alpha1Certs removes v1alpha1 Certificates for IM so that they can be replaced with cert-manager.io/v1 Certificates.
@@ -204,13 +249,11 @@ func (r *AuthenticationReconciler) cleanupDefaultSAMLCertificate(authCR *operato
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		log := logf.FromContext(ctx)
 
-		// Only cleanup if we should use custom ingress cert for SAML
-		if !shouldUseCustomIngressCertForSAML(authCR) {
-			log.V(1).Info("Not using custom ingress certificate for SAML; skipping cleanup")
+		if !r.shouldUseCustomIngressCertForSAML(ctx, authCR) {
 			return subreconciler.ContinueReconciling()
 		}
 
-		log.Info("Custom ingress certificate configured for SAML; attempting to delete default saml-auth-cert")
+		log.Info("Deleting default saml-auth-cert as custom certificate with IM label is configured")
 
 		cert := &certmgrv1.Certificate{
 			ObjectMeta: metav1.ObjectMeta{
@@ -220,7 +263,6 @@ func (r *AuthenticationReconciler) cleanupDefaultSAMLCertificate(authCR *operato
 		}
 
 		if err = r.Delete(ctx, cert); k8sErrors.IsNotFound(err) {
-			log.V(1).Info("Default saml-auth-cert does not exist; nothing to cleanup")
 			return subreconciler.ContinueReconciling()
 		} else if err != nil {
 			log.Error(err, "Failed to delete saml-auth-cert Certificate")

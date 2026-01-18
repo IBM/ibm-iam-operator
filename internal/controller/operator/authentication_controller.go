@@ -476,19 +476,52 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	// Watch for changes to Secrets (both owned and customer-supplied with IM label)
 	// Watch for changes to customer-supplied Secrets that are part of IM
-	secretLabelSelector := metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{
-			{
-				Key:      "app.kubernetes.io/part-of",
-				Operator: metav1.LabelSelectorOpIn,
-				Values:   []string{"im"},
-			},
+	// Custom predicate to handle label addition AND removal
+	imSecretPredicate := predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			secret, ok := e.Object.(*corev1.Secret)
+			if !ok {
+				return false
+			}
+			if labels := secret.GetLabels(); labels != nil {
+				return labels["app.kubernetes.io/part-of"] == "im"
+			}
+			return false
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldSecret, okOld := e.ObjectOld.(*corev1.Secret)
+			newSecret, okNew := e.ObjectNew.(*corev1.Secret)
+			if !okOld || !okNew {
+				return false
+			}
+
+			// Check if old object had the label
+			oldHasLabel := false
+			if oldLabels := oldSecret.GetLabels(); oldLabels != nil {
+				oldHasLabel = oldLabels["app.kubernetes.io/part-of"] == "im"
+			}
+
+			// Check if new object has the label
+			newHasLabel := false
+			if newLabels := newSecret.GetLabels(); newLabels != nil {
+				newHasLabel = newLabels["app.kubernetes.io/part-of"] == "im"
+			}
+
+			// Trigger if either old OR new has the label (covers both addition and removal)
+			return oldHasLabel || newHasLabel
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			secret, ok := e.Object.(*corev1.Secret)
+			if !ok {
+				return false
+			}
+			if labels := secret.GetLabels(); labels != nil {
+				return labels["app.kubernetes.io/part-of"] == "im"
+			}
+			return false
 		},
 	}
-	secretLabelPredicate, err := predicate.LabelSelectorPredicate(secretLabelSelector)
-	if err != nil {
-		return err
-	}
+
 	authCtrl.Watches(&corev1.Secret{},
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
 			authCR, _ := common.GetAuthentication(ctx, r.Client)
@@ -501,7 +534,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					Namespace: authCR.Namespace,
 				}},
 			}
-		}), builder.WithPredicates(secretLabelPredicate),
+		}), builder.WithPredicates(imSecretPredicate),
 	)
 
 	authCtrl.Watches(&operatorv1alpha1.Authentication{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(bootstrappedPred))

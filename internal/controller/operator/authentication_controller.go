@@ -335,7 +335,6 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	authCtrl := ctrl.NewControllerManagedBy(mgr).
 		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
-		Watches(&corev1.Secret{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&certmgr.Certificate{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&batchv1.Job{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&corev1.Service{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
@@ -474,7 +473,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}), builder.WithPredicates(predicate.Or(globalCMPred, productCMPred)),
 	)
 
-	// Watch for changes to customer-supplied Secrets that are part of IM
+	// Watch for changes to Secrets (both owned and customer-supplied with IM label)
 	imManagedSecretLabelSelector := metav1.LabelSelector{
 		MatchExpressions: []metav1.LabelSelectorRequirement{
 			{
@@ -489,20 +488,39 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
-	// Add the watch for customer-supplied Secrets
+	// Predicate for owned secrets
+	ownedSecretPred := predicate.NewPredicateFuncs(func(o client.Object) bool {
+		return metav1.GetControllerOf(o) != nil && metav1.GetControllerOf(o).Kind == "Authentication"
+	})
+
+	// Combined Secret watch: handles both owned secrets and IM-labeled secrets
 	authCtrl.Watches(&corev1.Secret{},
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
+			secret := o.(*corev1.Secret)
+
+			// Check if this is an owned secret
+			if ownerRef := metav1.GetControllerOf(secret); ownerRef != nil && ownerRef.Kind == "Authentication" {
+				return []reconcile.Request{
+					{NamespacedName: types.NamespacedName{
+						Name:      ownerRef.Name,
+						Namespace: secret.Namespace,
+					}},
+				}
+			}
+
+			// Otherwise, it's an IM-labeled secret
 			authCR, _ := common.GetAuthentication(ctx, r.Client)
-			if authCR == nil {
-				return
+			if authCR != nil {
+				return []reconcile.Request{
+					{NamespacedName: types.NamespacedName{
+						Name:      authCR.Name,
+						Namespace: authCR.Namespace,
+					}},
+				}
 			}
-			return []reconcile.Request{
-				{NamespacedName: types.NamespacedName{
-					Name:      authCR.Name,
-					Namespace: authCR.Namespace,
-				}},
-			}
-		}), builder.WithPredicates(imManagedSecretPred),
+
+			return nil
+		}), builder.WithPredicates(predicate.Or(ownedSecretPred, imManagedSecretPred)),
 	)
 
 	authCtrl.Watches(&operatorv1alpha1.Authentication{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(bootstrappedPred))

@@ -354,9 +354,6 @@ func (a *Authentication) HasCustomIngress() bool {
 	return a.HasCustomIngressHostname() || a.HasCustomIngressCertificate()
 }
 
-// GetSAMLCertificateSecretName is deprecated. Use GetSAMLCertificateSecretNameWithLabelCheck in certificate.go instead.
-// This function has been removed as it doesn't support label-based certificate selection.
-
 func (a *Authentication) GetDBSchemaVersion() string {
 	annotations := a.GetAnnotations()
 	if version, ok := annotations[AnnotationAuthDBSchemaVersion]; ok {

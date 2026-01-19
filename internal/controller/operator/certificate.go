@@ -146,7 +146,6 @@ func (r *AuthenticationReconciler) GetSAMLCertificateSecretNameWithLabelCheck(ct
 	log := logf.FromContext(ctx)
 	const defaultSAMLCertSecret = "saml-auth-secret"
 
-	// Check routerCertSecret if explicitly set
 	routerCertSecret := authCR.Spec.AuthService.RouterCertSecret
 	if routerCertSecret != "" && routerCertSecret != defaultSAMLCertSecret {
 		if r.hasIMLabel(ctx, routerCertSecret, authCR.Namespace) {
@@ -157,7 +156,6 @@ func (r *AuthenticationReconciler) GetSAMLCertificateSecretNameWithLabelCheck(ct
 		return defaultSAMLCertSecret
 	}
 
-	// Check custom ingress certificate if routerCertSecret is not set or is default
 	if authCR.HasCustomIngressCertificate() {
 		ingressSecret := *authCR.Spec.Config.Ingress.Secret
 		if r.hasIMLabel(ctx, ingressSecret, authCR.Namespace) {
@@ -167,7 +165,6 @@ func (r *AuthenticationReconciler) GetSAMLCertificateSecretNameWithLabelCheck(ct
 		log.Info("Custom ingress secret configured but missing IM label; using default", "secret", ingressSecret)
 	}
 
-	// Use default SAML certificate
 	log.Info("Using default SAML certificate", "secret", defaultSAMLCertSecret)
 	return defaultSAMLCertSecret
 }

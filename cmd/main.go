@@ -25,12 +25,14 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	sscsidriverv1 "sigs.k8s.io/secrets-store-csi-driver/apis/v1"
@@ -145,12 +147,26 @@ func main() {
 		cacheOptions := cache.Options{
 			DefaultNamespaces:    defaultNamespaces,
 			DefaultLabelSelector: labels.Everything(),
+			ByObject: map[client.Object]cache.ByObject{
+				&corev1.Secret{}: {
+					Label: labels.SelectorFromSet(map[string]string{
+						"app.kubernetes.io/part-of": "im",
+					}),
+				},
+			},
 		}
 
 		mgrOptions.Cache = cacheOptions
 	} else {
 		cacheOptions := cache.Options{
 			DefaultLabelSelector: labels.Everything(),
+			ByObject: map[client.Object]cache.ByObject{
+				&corev1.Secret{}: {
+					Label: labels.SelectorFromSet(map[string]string{
+						"app.kubernetes.io/part-of": "im",
+					}),
+				},
+			},
 		}
 
 		mgrOptions.Cache = cacheOptions

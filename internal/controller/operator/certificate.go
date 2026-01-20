@@ -42,6 +42,8 @@ const Certv1alpha1APIVersion = "certmanager.k8s.io/v1alpha1"
 func (r *AuthenticationReconciler) handleCertificates(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	authCR := &operatorv1alpha1.Authentication{}
 	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
 	log.Info("Ensure all Certificates are present and the correct GVK")
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
@@ -55,7 +57,7 @@ func (r *AuthenticationReconciler) handleCertificates(ctx context.Context, req c
 		r.addLabelIfMissing(certificateFieldsList),
 	}
 	for _, fn := range certificateSubreconcilers {
-		if result, err = fn(ctx); subreconciler.ShouldHaltOrRequeue(result, err) {
+		if result, err = fn(debugCtx); subreconciler.ShouldHaltOrRequeue(result, err) {
 			return
 		}
 	}
@@ -122,8 +124,11 @@ func (r *AuthenticationReconciler) shouldUseCustomIngressCertForSAML(ctx context
 	if !authCR.HasCustomIngressCertificate() {
 		return false
 	}
+
 	ingressSecret := *authCR.Spec.Config.Ingress.Secret
-	return r.hasIMLabel(ctx, ingressSecret, authCR.Namespace)
+	selectedSecret := r.GetSAMLCertificateSecretNameWithLabelCheck(ctx, authCR)
+
+	return selectedSecret == ingressSecret
 }
 
 func (r *AuthenticationReconciler) hasIMLabel(ctx context.Context, secretName, namespace string) bool {

@@ -2,7 +2,7 @@ export BUILD_LOCALLY=0
 
 echo "***************** Install go *****************"
 
-GO_VERSION="1.24.5"
+GO_VERSION="1.25.6"
 curl -sLO "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz"
 sudo rm -rf /usr/local/go
 sudo tar -C /usr/local -xzf "go${GO_VERSION}.linux-amd64.tar.gz"
@@ -14,4 +14,4 @@ go version
 
 echo "**************** Building images ****************"
 
-make images
+VERSION=4.5.16-68548 make images

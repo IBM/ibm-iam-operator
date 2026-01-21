@@ -237,6 +237,8 @@ spec:
                     type: string
                   attrMappingFromConfig:
                     type: boolean
+                  ldapAllowlistEnabled:
+                    type: boolean
                 required:
                 - authUniqueHosts
                 - clusterCADomain

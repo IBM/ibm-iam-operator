@@ -223,6 +223,8 @@ spec:
                     type: string
                   isOpenshiftEnv:
                     type: boolean
+                  ldapAllowlistEnabled:
+                    type: boolean
                   nonceEnabled:
                     type: boolean
                   oidcIssuerURL:

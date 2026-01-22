@@ -7,7 +7,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2
 	github.com/opdev/subreconciler v0.0.3
-	github.com/openshift/api v0.0.0-20251120145848-32e27fc232a9
+	github.com/openshift/api v0.0.0-20260121130051-59aa3e50a9fb
 	github.com/zach-klippenstein/goregen v0.0.0-20160303162051-795b5e3961ea
 	k8s.io/api v0.34.2
 	k8s.io/apimachinery v0.34.2

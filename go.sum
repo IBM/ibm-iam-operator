@@ -122,6 +122,8 @@ github.com/opdev/subreconciler v0.0.3 h1:nxn69iW9LxLqD4jSjYD1NFpbAvnY+KQKT5AXYOv
 github.com/opdev/subreconciler v0.0.3/go.mod h1:6tYcZpeEElu/FIPHSeSD9wdq8O+odsjo4gUPWXVcZo4=
 github.com/openshift/api v0.0.0-20251120145848-32e27fc232a9 h1:oof7rtwtidp0ktq759ahPvuexk7nppGWTJo0ubXuupo=
 github.com/openshift/api v0.0.0-20251120145848-32e27fc232a9/go.mod h1:d5uzF0YN2nQQFA0jIEWzzOZ+edmo6wzlGLvx5Fhz4uY=
+github.com/openshift/api v0.0.0-20260121130051-59aa3e50a9fb h1:RVp6dStgKyXbGL9b13ffQNBcmMnzh5pSkjB5tgNZJ24=
+github.com/openshift/api v0.0.0-20260121130051-59aa3e50a9fb/go.mod h1:d5uzF0YN2nQQFA0jIEWzzOZ+edmo6wzlGLvx5Fhz4uY=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

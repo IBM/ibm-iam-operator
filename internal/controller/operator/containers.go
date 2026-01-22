@@ -1186,6 +1186,10 @@ func buildIdentityProviderVolumeMounts(auditSecretName *string, ldapSpcExist boo
 			MountPath: "/opt/ibm/identity-provider/certs",
 		},
 		{
+			Name:      "ldaps-ca-cert",
+			MountPath: "/opt/ibm/ldaps",
+		},
+		{
 			Name:      "saml-cert",
 			MountPath: "/certs/saml-certs",
 		},

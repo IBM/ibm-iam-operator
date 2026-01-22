@@ -474,6 +474,56 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}), builder.WithPredicates(predicate.Or(globalCMPred, productCMPred)),
 	)
 
+	imSecretPredicate := predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			secret := e.Object.(*corev1.Secret)
+			if labels := secret.GetLabels(); labels != nil {
+				return labels[IMPartOfLabel] == IMPartOfValue
+			}
+			return false
+		},
+
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldSecret := e.ObjectOld.(*corev1.Secret)
+			newSecret := e.ObjectNew.(*corev1.Secret)
+
+			oldHasLabel := false
+			if oldLabels := oldSecret.GetLabels(); oldLabels != nil {
+				oldHasLabel = oldLabels[IMPartOfLabel] == IMPartOfValue
+			}
+
+			newHasLabel := false
+			if newLabels := newSecret.GetLabels(); newLabels != nil {
+				newHasLabel = newLabels[IMPartOfLabel] == IMPartOfValue
+			}
+
+			return oldHasLabel || newHasLabel
+		},
+
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			secret := e.Object.(*corev1.Secret)
+			if labels := secret.GetLabels(); labels != nil {
+				return labels[IMPartOfLabel] == IMPartOfValue
+			}
+			return false
+		},
+	}
+
+	authCtrl.Watches(&corev1.Secret{},
+		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
+			authCR, _ := common.GetAuthentication(ctx, r.Client)
+			if authCR == nil {
+				return
+			}
+			return []reconcile.Request{
+				{NamespacedName: types.NamespacedName{
+					Name:      authCR.Name,
+					Namespace: authCR.Namespace,
+				}},
+			}
+		}), builder.WithPredicates(imSecretPredicate),
+	)
+
 	authCtrl.Watches(&operatorv1alpha1.Authentication{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(bootstrappedPred))
 	return authCtrl.Named("controller_authentication").
 		Complete(r)

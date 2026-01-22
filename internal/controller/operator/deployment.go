@@ -910,12 +910,12 @@ func hasDataField(fields metav1.ManagedFieldsEntry) bool {
 // In this code, we refer to it as "samlCertSecret" for clarity.
 //
 // Decision logic:
-// 1. If routerCertSecret is default ("saml-auth-secret") AND custom ingress cert exists:
-//    → Use the custom ingress certificate (reproduces pre-4.x behavior)
-// 2. If routerCertSecret is set to a custom value:
-//    → Use that custom value (respects user's explicit choice)
-// 3. Otherwise:
-//    → Use the default "saml-auth-secret"
+//  1. If routerCertSecret is default ("saml-auth-secret") AND custom ingress cert exists:
+//     → Use the custom ingress certificate (reproduces pre-4.x behavior)
+//  2. If routerCertSecret is set to a custom value:
+//     → Use that custom value (respects user's explicit choice)
+//  3. Otherwise:
+//     → Use the default "saml-auth-secret"
 func getSAMLCertificateSecretName(authCR *operatorv1alpha1.Authentication) string {
 	const defaultSAMLCertSecret = "saml-auth-secret"
 

@@ -5,7 +5,7 @@ go 1.25.4
 require (
 	github.com/go-logr/logr v1.4.3
 	github.com/onsi/ginkgo/v2 v2.27.5
-	github.com/onsi/gomega v1.38.2
+	github.com/onsi/gomega v1.39.0
 	github.com/opdev/subreconciler v0.0.3
 	github.com/openshift/api v0.0.0-20260121130051-59aa3e50a9fb
 	github.com/zach-klippenstein/goregen v0.0.0-20160303162051-795b5e3961ea

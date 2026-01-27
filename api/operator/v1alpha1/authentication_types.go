@@ -171,6 +171,7 @@ type ConfigSpec struct {
 	AccountIamURL               *string        `json:"accountIamURL,omitempty"`
 	LibertySSCookie             *string        `json:"libertySSCookie,omitempty"`
 	UseSecretsStoreCSI          *bool          `json:"useSecretsStoreCSI,omitempty"`
+	LibertyAuthCacheTimeout     *string        `json:"libertyAuthCacheTimeout,omitempty"`
 }
 
 type ManagedResourceStatus struct {

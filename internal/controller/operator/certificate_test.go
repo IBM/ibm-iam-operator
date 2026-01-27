@@ -193,7 +193,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 			}
 		})
 		It("will produce a function that signals to requeue after deleting v1alpha1 Certificates", func() {
-			fieldsList := generateCertificateFieldsList(authCR)
+			fieldsList := r.generateCertificateFieldsList(ctx, authCR)
 			remainingCertsCount := 4
 			for _, fields := range fieldsList {
 				fn := r.removeV1Alpha1Cert(authCR, fields)
@@ -218,7 +218,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 				},
 				DiscoveryClient: *dc,
 			}
-			fieldsList := generateCertificateFieldsList(authCR)
+			fieldsList := r.generateCertificateFieldsList(ctx, authCR)
 			remainingCertsCount := 4
 			for _, fields := range fieldsList {
 				fn := rFailing.removeV1Alpha1Cert(authCR, fields)
@@ -243,7 +243,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(len(certList.Items)).To(BeZero())
 			By("looking for v1alpha1 Certificates to delete and finding none")
-			fieldsList := generateCertificateFieldsList(authCR)
+			fieldsList := r.generateCertificateFieldsList(ctx, authCR)
 			for _, fields := range fieldsList {
 				fn := r.removeV1Alpha1Cert(authCR, fields)
 				result, err := fn(ctx)
@@ -364,7 +364,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 		})
 
 		It("will produce a function that signals to requeue after deleting v1alpha1 Certificates", func() {
-			fieldsList := generateCertificateFieldsList(authCR)
+			fieldsList := r.generateCertificateFieldsList(ctx, authCR)
 			fn := r.removeV1Alpha1Certs(authCR, fieldsList)
 			result, err := fn(ctx)
 			testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
@@ -387,7 +387,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 				DiscoveryClient: *dc,
 			}
 			remainingCertsCount := 4
-			fieldsList := generateCertificateFieldsList(authCR)
+			fieldsList := r.generateCertificateFieldsList(ctx, authCR)
 			fn := rFailing.removeV1Alpha1Certs(authCR, fieldsList)
 			result, err := fn(ctx)
 			testutil.ConfirmThatItRequeuesWithError(result, err)
@@ -406,7 +406,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(len(certList.Items)).To(BeZero())
 			By("looking for v1alpha1 Certificates to delete and finding none")
-			fieldsList := generateCertificateFieldsList(authCR)
+			fieldsList := r.generateCertificateFieldsList(ctx, authCR)
 			fn := r.removeV1Alpha1Certs(authCR, fieldsList)
 			result, err := fn(ctx)
 			testutil.ConfirmThatItContinuesReconciling(result, err)
@@ -496,7 +496,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 		})
 
 		It("returns a function that signals to requeue with delay after creating a v1 Certificate", func() {
-			fieldsList := generateCertificateFieldsList(authCR)
+			fieldsList := r.generateCertificateFieldsList(ctx, authCR)
 			expectedCertificateCount := 0
 			for _, fields := range fieldsList {
 				fn := r.createV1CertificateIfNotPresent(authCR, fields)
@@ -526,7 +526,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 		})
 
 		It("returns a function that signals to requeue with error if there is a failure while trying to create the v1 Certificate", func() {
-			fieldsList := generateCertificateFieldsList(authCR)
+			fieldsList := r.generateCertificateFieldsList(ctx, authCR)
 			By("simulating a failure to create the Certificate")
 			timeoutClient := testutil.NewFakeTimeoutClient(cl)
 
@@ -552,7 +552,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 		})
 
 		It("returns a function that signals to continue reconciling when the v1 Certificate already exists", func() {
-			fieldsList := generateCertificateFieldsList(authCR)
+			fieldsList := r.generateCertificateFieldsList(ctx, authCR)
 			createdCerts := 0
 			for _, fields := range fieldsList {
 				// Set CommonName to a dummy value so that it's easy to see that dummy Certificate was
@@ -670,7 +670,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 		})
 
 		It("returns a function that signals to requeue with delay after creating a v1 Certificate", func() {
-			fieldsList := generateCertificateFieldsList(authCR)
+			fieldsList := r.generateCertificateFieldsList(ctx, authCR)
 			expectedCertificateCount := 4
 			fn := r.createV1CertificatesIfNotPresent(authCR, fieldsList)
 			result, err := fn(ctx)
@@ -699,7 +699,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 		})
 
 		It("returns a function that signals to requeue with error if there is a failure while trying to create the v1 Certificate", func() {
-			fieldsList := generateCertificateFieldsList(authCR)
+			fieldsList := r.generateCertificateFieldsList(ctx, authCR)
 			By("simulating a failure to create the Certificate")
 			timeoutClient := testutil.NewFakeTimeoutClient(cl)
 			// Allowing Get gets to part of function that attempts to create a new Certificate
@@ -724,7 +724,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 		})
 
 		It("returns a function that signals to continue reconciling when the v1 Certificate already exists", func() {
-			fieldsList := generateCertificateFieldsList(authCR)
+			fieldsList := r.generateCertificateFieldsList(ctx, authCR)
 			createdCerts := 0
 			dummyName := "dummy-name"
 			for _, fields := range fieldsList {
@@ -797,7 +797,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 		})
 
 		It("returns a slice of structs containing the unique fields to set for each Route", func() {
-			fieldsList := generateCertificateFieldsList(authCR)
+			fieldsList := r.generateCertificateFieldsList(ctx, authCR)
 			namesList := []string{}
 			expectedNamesList := []any{
 				"platform-auth-cert",

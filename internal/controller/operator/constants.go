@@ -34,6 +34,8 @@ const (
 	ProxyAddress         string = "proxy_address"
 	ProviderSVC          string = "im_idprovider_endpoint"
 	IDMgmtSVC            string = "im_idmgmt_endpoint"
+	IMPartOfLabel        string = "app.kubernetes.io/part-of"
+	IMPartOfValue        string = "im"
 )
 
 var ArchList = []string{

@@ -1055,6 +1055,199 @@ var _ = Describe("ConfigMap handling", func() {
 				Expect(observed.Data[test]).To(Equal(generated.Data[test]))
 			}
 		})
+
+		It("sets EXPOSE_ADDITIONAL_PATHS to true when .spec.config.ingress.gvk is 'none'", func() {
+			gvk := "none"
+			authCR.Spec.Config.Ingress = &operatorv1alpha1.IngressConfig{
+				GVK: &gvk,
+			}
+			Expect(r.Update(ctx, authCR)).To(Succeed())
+
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).
+				To(Succeed())
+
+			Expect(generated.Data).To(HaveKeyWithValue("EXPOSE_ADDITIONAL_PATHS", "true"))
+		})
+
+		It("sets EXPOSE_ADDITIONAL_PATHS to false when .spec.config.ingress.gvk is 'openshift.io/v1/route'", func() {
+			// Configure for OpenShift environment (not CNCF)
+			delete(globalConfigMap.Data, "kubernetes_cluster_type")
+			Expect(r.Update(ctx, globalConfigMap)).To(Succeed())
+
+			gvk := "openshift.io/v1/route"
+			authCR.Spec.Config.Ingress = &operatorv1alpha1.IngressConfig{
+				GVK: &gvk,
+			}
+			Expect(r.Update(ctx, authCR)).To(Succeed())
+
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).
+				To(Succeed())
+
+			Expect(generated.Data).To(HaveKeyWithValue("EXPOSE_ADDITIONAL_PATHS", "false"))
+		})
+
+		It("sets EXPOSE_ADDITIONAL_PATHS to false when .spec.config.ingress.gvk is unspecified on OpenShift", func() {
+			// Configure for OpenShift environment (not CNCF) - remove kubernetes_cluster_type to make isOSEnv true
+			delete(globalConfigMap.Data, "kubernetes_cluster_type")
+			Expect(r.Update(ctx, globalConfigMap)).To(Succeed())
+
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).
+				To(Succeed())
+
+			Expect(generated.Data).To(HaveKeyWithValue("EXPOSE_ADDITIONAL_PATHS", "false"))
+		})
+
+		It("sets EXPOSE_ADDITIONAL_PATHS to true when running on CNCF cluster", func() {
+			// Update ibm-cpp-config to indicate CNCF cluster
+			globalConfigMap.Data["kubernetes_cluster_type"] = "cncf"
+			globalConfigMap.Data["domain_name"] = "example.ibm.com"
+			Expect(r.Update(ctx, globalConfigMap)).To(Succeed())
+
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).
+				To(Succeed())
+
+			Expect(generated.Data).To(HaveKeyWithValue("EXPOSE_ADDITIONAL_PATHS", "true"))
+		})
+
+		It("sets EXPOSE_ADDITIONAL_PATHS to true when gvk='none' even on OpenShift", func() {
+			// Configure for OpenShift environment (not CNCF) - remove kubernetes_cluster_type to make isOSEnv true
+			delete(globalConfigMap.Data, "kubernetes_cluster_type")
+			Expect(r.Update(ctx, globalConfigMap)).To(Succeed())
+
+			gvk := "none"
+			authCR.Spec.Config.Ingress = &operatorv1alpha1.IngressConfig{
+				GVK: &gvk,
+			}
+			Expect(r.Update(ctx, authCR)).To(Succeed())
+
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).
+				To(Succeed())
+
+			Expect(generated.Data).To(HaveKeyWithValue("EXPOSE_ADDITIONAL_PATHS", "true"))
+		})
+
+		It("always updates EXPOSE_ADDITIONAL_PATHS field in updatePlatformAuthIDP", func() {
+			// Test that EXPOSE_ADDITIONAL_PATHS is in the always-update list
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			// Create observed ConfigMap with different value
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"EXPOSE_ADDITIONAL_PATHS": "dummy_value",
+				},
+			}
+
+			// Generate the expected ConfigMap
+			generated := &corev1.ConfigMap{}
+			r.Create(ctx, &batchv1.Job{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "batch/v1",
+					Kind:       "Job",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "im-has-saml",
+					Namespace: authCR.Namespace,
+					UID:       types.UID("96467cef-a1d2-455c-97be-eae3d6196e95"),
+				},
+				Spec: batchv1.JobSpec{},
+			})
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).
+				To(Succeed())
+
+			// Call updatePlatformAuthIDP
+			updated, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(updated).To(BeTrue())
+
+			// Verify that EXPOSE_ADDITIONAL_PATHS was updated to match generated value
+			Expect(observed.Data["EXPOSE_ADDITIONAL_PATHS"]).To(Equal(generated.Data["EXPOSE_ADDITIONAL_PATHS"]))
+		})
+
+		It("updates EXPOSE_ADDITIONAL_PATHS when value changes from false to true", func() {
+			// Start with OpenShift setup (EXPOSE_ADDITIONAL_PATHS should be false)
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"EXPOSE_ADDITIONAL_PATHS": "false",
+				},
+			}
+
+			// Generate ConfigMap for CNCF cluster (should be true)
+			globalConfigMap.Data["kubernetes_cluster_type"] = "cncf"
+			globalConfigMap.Data["domain_name"] = "example.ibm.com"
+			Expect(r.Update(ctx, globalConfigMap)).To(Succeed())
+
+			generated := &corev1.ConfigMap{}
+			r.Create(ctx, &batchv1.Job{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "batch/v1",
+					Kind:       "Job",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "im-has-saml",
+					Namespace: authCR.Namespace,
+					UID:       types.UID("96467cef-a1d2-455c-97be-eae3d6196e95"),
+				},
+				Spec: batchv1.JobSpec{},
+			})
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).
+				To(Succeed())
+
+			// Verify generated has true
+			Expect(generated.Data["EXPOSE_ADDITIONAL_PATHS"]).To(Equal("true"))
+
+			// Call updatePlatformAuthIDP
+			updated, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(updated).To(BeTrue())
+
+			// Verify that observed was updated to true
+			Expect(observed.Data["EXPOSE_ADDITIONAL_PATHS"]).To(Equal("true"))
+		})
 	})
 
 	Describe("oauth-client-map handling", func() {

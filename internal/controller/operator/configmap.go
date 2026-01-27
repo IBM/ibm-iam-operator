@@ -331,6 +331,7 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"ACCOUNT_IAM_URL",
 			"LIBERTY_SAMESITE_COOKIE",
 			"SECRETS_STORE_AVAILABLE",
+			"EXPOSE_ADDITIONAL_PATHS",
 			"LIBERTY_AUTH_CACHE_TIMEOUT",
 		),
 		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("SESSION_TIMEOUT", "43200"),
@@ -626,6 +627,17 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"LIBERTY_AUTH_CACHE_TIMEOUT":         libertyAuthCacheTimeout,
 			},
 		}
+
+		// Set EXPOSE_ADDITIONAL_PATHS based on ingress.gvk setting or CNCF cluster detection
+		// When gvk is "none" OR running on CNCF cluster, microservices should expose APIs on additional paths
+		shouldExposeAdditionalPaths := false
+		if authCR.Spec.Config.Ingress != nil && authCR.Spec.Config.Ingress.GVK != nil && *authCR.Spec.Config.Ingress.GVK == "none" {
+			shouldExposeAdditionalPaths = true
+		} else if !isOSEnv {
+			// Running on CNCF cluster (not OpenShift)
+			shouldExposeAdditionalPaths = true
+		}
+		generated.Data["EXPOSE_ADDITIONAL_PATHS"] = strconv.FormatBool(shouldExposeAdditionalPaths)
 
 		if secretsStoreAvailable {
 			generated.Data["SECRETS_STORE_AVAILABLE"] = strconv.FormatBool(secretsStoreAvailable)

@@ -385,7 +385,7 @@ func generatePlatformAuthService(imagePullSecret, samlCertSecret, ldapSPCName, e
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildAuthSvcVolumes(ldapCACert, routerCertSecret, "", ldapSPCName, edbSPCName),
+						Volumes:        buildAuthSvcVolumes(ldapCACert, samlCertSecret, "", ldapSPCName, edbSPCName),
 						Containers:     buildContainers(authCR, authServiceImage, ldapSPCExists),
 						InitContainers: buildInitContainers(initContainerImage),
 					},
@@ -561,7 +561,7 @@ func generatePlatformIdentityManagement(imagePullSecret, samlCertSecret, auditSe
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildMgmtVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName, edbSPCName),
+						Volumes:        buildMgmtVolumes(ldapCACert, samlCertSecret, auditSecretName, ldapSPCName, edbSPCName),
 						Containers:     buildManagerContainers(authCR, identityManagerImage, ldapSPCExists),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
@@ -736,7 +736,7 @@ func generatePlatformIdentityProvider(imagePullSecret, samlCertSecret, saasServi
 								Operator: corev1.TolerationOpExists,
 							},
 						},
-						Volumes:        buildProviderVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName, edbSPCName),
+						Volumes:        buildProviderVolumes(ldapCACert, samlCertSecret, auditSecretName, ldapSPCName, edbSPCName),
 						Containers:     buildProviderContainers(authCR, identityProviderImage, saasServiceIdCrn, ldapSPCExists),
 						InitContainers: buildInitForMngrAndProvider(initContainerImage),
 					},
@@ -1292,7 +1292,7 @@ func buildMgmtVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName
 	return volumes
 }
 
-func buildProviderVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName, edbSPCName string) []corev1.Volume {
+func buildProviderVolumes(ldapCACert, samlCertSecret, auditSecretName, ldapSPCName, edbSPCName string) []corev1.Volume {
 	volumes := []corev1.Volume{
 		{
 			Name: "auth-key",
@@ -1337,10 +1337,25 @@ func buildProviderVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPC
 			},
 		},
 		{
+			Name: "ldaps-ca-cert",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: ldapCACert,
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "certificate",
+							Path: "ldaps-ca.crt",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		},
+		{
 			Name: "saml-cert",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: routerCertSecret,
+					SecretName: samlCertSecret,
 					Items: []corev1.KeyToPath{
 						{
 							Key:  "tls.crt",

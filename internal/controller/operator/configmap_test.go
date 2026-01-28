@@ -770,6 +770,12 @@ var _ = Describe("ConfigMap handling", func() {
 						"LIBERTY_AUTH_CACHE_TIMEOUT",
 					},
 				},
+				{
+					"LDAP_CLIENT_CONNECT_TIMEOUT",
+					[]string{
+						"LDAP_CLIENT_CONNECT_TIMEOUT",
+					},
+				},
 			}
 
 			setDummyData := func(pkey string, keys []string, o *corev1.ConfigMap) {

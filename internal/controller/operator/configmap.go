@@ -333,6 +333,7 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"SECRETS_STORE_AVAILABLE",
 			"EXPOSE_ADDITIONAL_PATHS",
 			"LIBERTY_AUTH_CACHE_TIMEOUT",
+			"LDAP_CLIENT_CONNECT_TIMEOUT",
 		),
 		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("SESSION_TIMEOUT", "43200"),
 			"SESSION_TIMEOUT"),

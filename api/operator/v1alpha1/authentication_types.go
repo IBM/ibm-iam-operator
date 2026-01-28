@@ -172,6 +172,7 @@ type ConfigSpec struct {
 	LibertySSCookie             *string        `json:"libertySSCookie,omitempty"`
 	UseSecretsStoreCSI          *bool          `json:"useSecretsStoreCSI,omitempty"`
 	LibertyAuthCacheTimeout     *string        `json:"libertyAuthCacheTimeout,omitempty"`
+	LdapClientConnectTimeout    *string        `json:"ldapClientConnectTimeout,omitempty"`
 }
 
 type ManagedResourceStatus struct {

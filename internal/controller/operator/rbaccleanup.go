@@ -27,6 +27,7 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -43,6 +44,28 @@ func (r *AuthenticationReconciler) cleanupOldRBAC(ctx context.Context, req ctrl.
 	}
 	crbname := fmt.Sprintf("ibm-iam-operand-restricted-%s", authCR.Namespace)
 
+	// Create list of namespaced resources to delete
+	objectsToDelete := []client.Object{
+		&rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "ibm-iam-operand-restricted",
+				Namespace: authCR.Namespace,
+			},
+		},
+		&rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "ibm-iam-operand-restricted",
+				Namespace: authCR.Namespace,
+			},
+		},
+		&corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "ibm-iam-operand-restricted",
+				Namespace: authCR.Namespace,
+			},
+		},
+	}
+
 	// Check if operator has permission to delete ClusterRoleBinding
 	canDeleteCRB, err := r.hasAPIAccess(debugCtx, "", rbacv1.SchemeGroupVersion.Group, "clusterrolebindings", []string{"delete"})
 	if err != nil {
@@ -53,20 +76,12 @@ func (r *AuthenticationReconciler) cleanupOldRBAC(ctx context.Context, req ctrl.
 	if !canDeleteCRB {
 		log.Info("Operator does not have permission to delete ClusterRoleBinding, skipping deletion")
 	} else {
-		// Delete ClusterRoleBinding
-		clusterRoleBinding := &rbacv1.ClusterRoleBinding{
+		// Add ClusterRoleBinding to deletion list
+		objectsToDelete = append(objectsToDelete, &rbacv1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: crbname,
 			},
-		}
-		err = r.Client.Delete(debugCtx, clusterRoleBinding)
-		if err != nil && !k8sErrors.IsNotFound(err) {
-			log.Error(err, "Failed to delete ClusterRoleBinding ibm-iam-operand-restricted")
-			return subreconciler.RequeueWithError(err)
-		}
-		if err == nil {
-			log.Info("ClusterRoleBinding deleted successfully")
-		}
+		})
 	}
 
 	// Check if operator has permission to delete ClusterRole
@@ -79,67 +94,24 @@ func (r *AuthenticationReconciler) cleanupOldRBAC(ctx context.Context, req ctrl.
 	if !canDeleteCR {
 		log.Info("Operator does not have permission to delete ClusterRole, skipping deletion")
 	} else {
-		// Delete ClusterRole
-		clusterRole := &rbacv1.ClusterRole{
+		// Add ClusterRole to deletion list
+		objectsToDelete = append(objectsToDelete, &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "ibm-iam-operand-restricted",
 			},
-		}
-		err = r.Client.Delete(debugCtx, clusterRole)
+		})
+	}
+
+	// Delete all objects in the list
+	for _, obj := range objectsToDelete {
+		err = r.Client.Delete(debugCtx, obj)
 		if err != nil && !k8sErrors.IsNotFound(err) {
-			log.Error(err, "Failed to delete ClusterRole ibm-iam-operand-restricted")
+			log.Error(err, "Failed to delete resource", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName())
 			return subreconciler.RequeueWithError(err)
 		}
 		if err == nil {
-			log.Info("ClusterRole ibm-iam-operand-restricted deleted successfully")
+			log.Info("Resource deleted successfully", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName())
 		}
-	}
-
-	// Delete RoleBinding
-	roleBinding := &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ibm-iam-operand-restricted",
-			Namespace: authCR.Namespace,
-		},
-	}
-	err = r.Client.Delete(debugCtx, roleBinding)
-	if err != nil && !k8sErrors.IsNotFound(err) {
-		log.Error(err, "Failed to delete RoleBinding ibm-iam-operand-restricted")
-		return subreconciler.RequeueWithError(err)
-	}
-	if err == nil {
-		log.Info("RoleBinding ibm-iam-operand-restricted deleted successfully")
-	}
-
-	// Delete Role
-	role := &rbacv1.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ibm-iam-operand-restricted",
-			Namespace: authCR.Namespace,
-		},
-	}
-	err = r.Client.Delete(debugCtx, role)
-	if err != nil && !k8sErrors.IsNotFound(err) {
-		log.Error(err, "Failed to delete Role ibm-iam-operand-restricted")
-		return subreconciler.RequeueWithError(err)
-	}
-	if err == nil {
-		log.Info("Role ibm-iam-operand-restricted deleted successfully")
-	}
-	// Delete ServiceAccount
-	sa := &corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ibm-iam-operand-restricted",
-			Namespace: authCR.Namespace,
-		},
-	}
-	err = r.Client.Delete(debugCtx, sa)
-	if err != nil && !k8sErrors.IsNotFound(err) {
-		log.Error(err, "Failed to delete ServiceAccount ibm-iam-operand-restricted")
-		return subreconciler.RequeueWithError(err)
-	}
-	if err == nil {
-		log.Info("ServiceAccount ibm-iam-operand-restricted deleted successfully")
 	}
 
 	log.Info("Cleanup of ibm-iam-operand-restricted resources completed")

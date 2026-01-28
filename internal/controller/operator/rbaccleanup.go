@@ -102,15 +102,15 @@ func (r *AuthenticationReconciler) cleanupOldRBAC(ctx context.Context, req ctrl.
 		})
 	}
 
-	// Delete all objects in the list
 	for _, obj := range objectsToDelete {
-		err = r.Client.Delete(debugCtx, obj)
-		if err != nil && !k8sErrors.IsNotFound(err) {
-			log.Error(err, "Failed to delete resource", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName())
+		deleteLog := log.WithValues("Object.Name", obj.GetName(), "Object.Kind", obj.GetObjectKind().GroupVersionKind().Kind)
+		if err = r.Client.Delete(debugCtx, obj); k8sErrors.IsNotFound(err) {
+			deleteLog.Info("Object not found; skipping")
+		} else if err != nil && !k8sErrors.IsNotFound(err) {
+			deleteLog.Error(err, "Failed to delete Object")
 			return subreconciler.RequeueWithError(err)
-		}
-		if err == nil {
-			log.Info("Resource deleted successfully", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName())
+		} else {
+			deleteLog.Info("Object deleted successfully")
 		}
 	}
 

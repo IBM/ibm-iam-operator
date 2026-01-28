@@ -154,24 +154,12 @@ func generateSAObject(ctx context.Context, instance *operatorv1alpha1.Authentica
 	log := logf.FromContext(ctx)
 
 	metaLabels := common.MergeMaps(nil, map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"}, common.GetCommonLabels())
-	var operandSA *corev1.ServiceAccount
-	if operandSAName == imOperandSA {
-		operandSA = &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      operandSAName,
-				Labels:    metaLabels,
-				Namespace: instance.Namespace,
-			},
-			AutomountServiceAccountToken: &falseVar,
-		}
-	} else {
-		operandSA = &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      operandSAName,
-				Labels:    metaLabels,
-				Namespace: instance.Namespace,
-			},
-		}
+	operandSA := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      operandSAName,
+			Labels:    metaLabels,
+			Namespace: instance.Namespace,
+		},
 	}
 
 	// Set Authentication instance as the owner and controller of the operand serviceaccount

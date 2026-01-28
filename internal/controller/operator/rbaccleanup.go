@@ -106,7 +106,7 @@ func (r *AuthenticationReconciler) cleanupOldRBAC(ctx context.Context, req ctrl.
 		deleteLog := log.WithValues("Object.Name", obj.GetName(), "Object.Kind", obj.GetObjectKind().GroupVersionKind().Kind)
 		if err = r.Client.Delete(debugCtx, obj); k8sErrors.IsNotFound(err) {
 			deleteLog.Info("Object not found; skipping")
-		} else if err != nil && !k8sErrors.IsNotFound(err) {
+		} else if err != nil {
 			deleteLog.Error(err, "Failed to delete Object")
 			return subreconciler.RequeueWithError(err)
 		} else {

@@ -530,6 +530,13 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 		if authCR.Spec.Config.LibertyAuthCacheTimeout != nil {
 			libertyAuthCacheTimeout = *authCR.Spec.Config.LibertyAuthCacheTimeout
 		}
+		var ldapClientConnectTimeout string
+		if authCR.Spec.Config.LdapClientConnectTimeout != nil {
+			ldapClientConnectTimeout = *authCR.Spec.Config.LdapClientConnectTimeout
+		} else {
+			ldapClientConnectTimeout = "30000"
+		}
+
 		*generated = corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      s.GetName(),
@@ -625,6 +632,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"LIBERTY_SAMESITE_COOKIE":            libertySSCookie,
 				"OAUTH_21_ENABLED":                   strconv.FormatBool(oauth21Enabled),
 				"LIBERTY_AUTH_CACHE_TIMEOUT":         libertyAuthCacheTimeout,
+				"LDAP_CLIENT_CONNECT_TIMEOUT":        ldapClientConnectTimeout,
 			},
 		}
 

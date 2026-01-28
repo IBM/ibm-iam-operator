@@ -427,11 +427,11 @@ func (r *ClientReconciler) processOidcRegistration(ctx context.Context, req ctrl
 	return subreconciler.ContinueReconciling()
 }
 
-// annotateServiceAccount updates ibm-iam-operand-restricted SA with redirecturi's present in the Client CR for
+// annotateServiceAccount updates platform-identity-provider SA with redirecturi's present in the Client CR for
 // updateClient Call
 func (r *ClientReconciler) annotateServiceAccount(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx)
-	reqLogger.Info("Add any missing Client annotations to ibm-iam-operand-restricted ServiceAccount")
+	reqLogger.Info("Add any missing Client annotations to platform-identity-provider ServiceAccount")
 
 	clientCR := &oidcsecurityv1.Client{}
 
@@ -444,11 +444,11 @@ func (r *ClientReconciler) annotateServiceAccount(ctx context.Context, req ctrl.
 
 	// Though there should be redirectURIs, if there are none, there is nothing to do but continue reconciling
 	if len(redirectURIs) == 0 {
-		reqLogger.Info("No annotations to add to ServiceAccount ibm-iam-operand-restricted; skipping")
+		reqLogger.Info("No annotations to add to ServiceAccount platform-identity-provider; skipping")
 		return subreconciler.ContinueReconciling()
 	}
 
-	sAccName := "ibm-iam-operand-restricted"
+	sAccName := "platform-identity-provider"
 	sAccNamespace, err := common.GetServicesNamespace(ctx, r.Client)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
@@ -457,7 +457,7 @@ func (r *ClientReconciler) annotateServiceAccount(ctx context.Context, req ctrl.
 	serviceAccount := &corev1.ServiceAccount{}
 	err = r.Get(ctx, types.NamespacedName{Name: sAccName, Namespace: sAccNamespace}, serviceAccount)
 	if err != nil {
-		reqLogger.Error(err, "failed to GET ServiceAccount ibm-iam-operand-restricted")
+		reqLogger.Error(err, "failed to GET ServiceAccount platform-identity-provider")
 		return subreconciler.RequeueWithError(err)
 	}
 
@@ -475,7 +475,7 @@ func (r *ClientReconciler) annotateServiceAccount(ctx context.Context, req ctrl.
 	}
 
 	if !changed {
-		reqLogger.Info("No new annotations to add to ServiceAccount ibm-iam-operand-restricted; skipping")
+		reqLogger.Info("No new annotations to add to ServiceAccount platform-identity-provider; skipping")
 		return subreconciler.ContinueReconciling()
 	}
 
@@ -487,7 +487,7 @@ func (r *ClientReconciler) annotateServiceAccount(ctx context.Context, req ctrl.
 	}
 
 	// annotation got updated properly
-	reqLogger.Info("ibm-iam-operand-restricted SA is updated with annotations successfully")
+	reqLogger.Info("platform-identity-provider SA is updated with annotations successfully")
 
 	return subreconciler.Requeue()
 }
@@ -672,7 +672,7 @@ func (r *ClientReconciler) finalizeClient(ctx context.Context, req ctrl.Request)
 		reqLogger.Info("Zen instance registration deletion succeeded", "ZenInstanceId", clientCR.Spec.ZenInstanceId)
 	}
 
-	reqLogger.Info("Deleting annotations from ibm-iam-operand-restricted ServiceAccount")
+	reqLogger.Info("Deleting annotations from platform-identity-provider ServiceAccount")
 	if result, err = r.removeAnnotationFromSA(ctx, req); subreconciler.ShouldRequeue(result, err) {
 		return subreconciler.RequeueWithError(err)
 	}
@@ -813,7 +813,7 @@ func (r *ClientReconciler) createNewSecretForClient(ctx context.Context, client 
 	return secret, nil
 }
 
-// removeAnnotationFromSA removes respective redirecturi annotation present in ibm-iam-operand-restricted SA for deleteClient Call
+// removeAnnotationFromSA removes respective redirecturi annotation present in platform-identity-provider SA for deleteClient Call
 func (r *ClientReconciler) removeAnnotationFromSA(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	reqLogger := logf.FromContext(ctx)
 	clientCR := &oidcsecurityv1.Client{}
@@ -830,7 +830,7 @@ func (r *ClientReconciler) removeAnnotationFromSA(ctx context.Context, req ctrl.
 		return subreconciler.ContinueReconciling()
 	}
 
-	sAccName := "ibm-iam-operand-restricted"
+	sAccName := "platform-identity-provider"
 	sAccNamespace, err := common.GetServicesNamespace(ctx, r.Client)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get services namespace")
@@ -840,7 +840,7 @@ func (r *ClientReconciler) removeAnnotationFromSA(ctx context.Context, req ctrl.
 	serviceAccount := &corev1.ServiceAccount{}
 	err = r.Get(ctx, types.NamespacedName{Name: sAccName, Namespace: sAccNamespace}, serviceAccount)
 	if err != nil {
-		reqLogger.Error(err, "failed to GET ServiceAccount ibm-iam-operand-restricted")
+		reqLogger.Error(err, "failed to GET ServiceAccount platform-identity-provider")
 		return subreconciler.RequeueWithError(err)
 	}
 
@@ -859,7 +859,7 @@ func (r *ClientReconciler) removeAnnotationFromSA(ctx context.Context, req ctrl.
 	}
 
 	if !changed {
-		reqLogger.Info("No annotation deletions on SA ibm-iam-operand-restricted necessary")
+		reqLogger.Info("No annotation deletions on SA platform-identity-provider necessary")
 		return subreconciler.ContinueReconciling()
 	}
 
@@ -872,7 +872,7 @@ func (r *ClientReconciler) removeAnnotationFromSA(ctx context.Context, req ctrl.
 	}
 
 	// annotation got updated properly
-	reqLogger.Info("Annotations for Client removed from ibm-iam-operand-restricted SA successfully")
+	reqLogger.Info("Annotations for Client removed from platform-identity-provider SA successfully")
 
 	return subreconciler.Requeue()
 }

@@ -28,6 +28,7 @@ rules:
   - clusterrolebindings
   verbs:
   - create
+  - delete
 - apiGroups:
   - user.openshift.io
   resources:

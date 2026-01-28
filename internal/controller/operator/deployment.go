@@ -293,7 +293,7 @@ func generatePlatformAuthService(imagePullSecret, samlCertSecret, ldapSPCName, e
 					},
 					Spec: corev1.PodSpec{
 						TerminationGracePeriodSeconds: &seconds60,
-						ServiceAccountName:            serviceAccountName,
+						ServiceAccountName:            imOperandSA,
 						HostIPC:                       falseVar,
 						HostPID:                       falseVar,
 						SecurityContext: &corev1.PodSecurityContext{
@@ -470,7 +470,7 @@ func generatePlatformIdentityManagement(imagePullSecret, samlCertSecret, auditSe
 					},
 					Spec: corev1.PodSpec{
 						TerminationGracePeriodSeconds: &seconds60,
-						ServiceAccountName:            serviceAccountName,
+						ServiceAccountName:            mgmtSA,
 						HostIPC:                       falseVar,
 						HostPID:                       falseVar,
 						SecurityContext: &corev1.PodSecurityContext{
@@ -644,7 +644,7 @@ func generatePlatformIdentityProvider(imagePullSecret, samlCertSecret, saasServi
 					},
 					Spec: corev1.PodSpec{
 						TerminationGracePeriodSeconds: &seconds60,
-						ServiceAccountName:            serviceAccountName,
+						ServiceAccountName:            providerSA,
 						HostIPC:                       falseVar,
 						HostPID:                       falseVar,
 						SecurityContext: &corev1.PodSecurityContext{

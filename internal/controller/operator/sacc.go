@@ -20,6 +20,7 @@ import (
 	"context"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
+	"github.com/IBM/ibm-iam-operator/internal/controller/common"
 	"github.com/opdev/subreconciler"
 
 	corev1 "k8s.io/api/core/v1"
@@ -33,8 +34,13 @@ import (
 )
 
 func (r *AuthenticationReconciler) createSA(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	operandSAKey := types.NamespacedName{Name: "ibm-iam-operand-restricted", Namespace: req.Namespace}
-	log := logf.FromContext(ctx, "ServiceAccount.Name", operandSAKey.Name)
+	// Define the ServiceAccount names to create
+	serviceAccountNames := []string{
+		imOperandSA,
+		providerSA,
+		mgmtSA,
+	}
+	log := logf.FromContext(ctx)
 	debugLog := log.V(1)
 	debugCtx := logf.IntoContext(ctx, debugLog)
 
@@ -43,35 +49,62 @@ func (r *AuthenticationReconciler) createSA(ctx context.Context, req ctrl.Reques
 	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
+	// Track if any ServiceAccount was created
+	anyCreated := false
 
-	serviceAccount := &corev1.ServiceAccount{}
-	err = r.Client.Get(debugCtx, operandSAKey, serviceAccount)
-	if err == nil {
-		log.Info("ServiceAccount already exists")
-		return subreconciler.ContinueReconciling()
-	} else if !k8sErrors.IsNotFound(err) {
-		log.Error(err, "Failed to get ServiceAccount")
-		return subreconciler.RequeueWithError(err)
+	// Iterate through each ServiceAccount name
+	for _, saName := range serviceAccountNames {
+		operandSAKey := types.NamespacedName{Name: saName, Namespace: req.Namespace}
+		saLog := logf.FromContext(ctx, "ServiceAccount.Name", operandSAKey.Name)
+		saDebugLog := saLog.V(1)
+		saDebugCtx := logf.IntoContext(ctx, saDebugLog)
+
+		serviceAccount := &corev1.ServiceAccount{}
+		err = r.Client.Get(saDebugCtx, operandSAKey, serviceAccount)
+		if err == nil {
+			saLog.Info("ServiceAccount already exists")
+			continue
+		} else if !k8sErrors.IsNotFound(err) {
+			saLog.Error(err, "Failed to get ServiceAccount")
+			return subreconciler.RequeueWithError(err)
+		}
+
+		saDebugLog.Info("Did not find ServiceAccount")
+		// Define a new operand ServiceAccount
+		operandSA := generateSAObject(ctx, authCR, r.Scheme, operandSAKey.Name)
+		saDebugLog.Info("Creating ServiceAccount")
+		err = r.Client.Create(saDebugCtx, operandSA)
+		if err != nil {
+			saLog.Error(err, "Failed to create ServiceAccount")
+			return subreconciler.RequeueWithError(err)
+		}
+		// ServiceAccount created successfully
+		saLog.Info("Created ServiceAccount", "serviceAccountName", operandSAKey.Name)
+		anyCreated = true
 	}
-	debugLog.Info("Did not find ServiceAccount")
-	// Define a new operand ServiceAccount
-	operandSA := generateSAObject(ctx, authCR, r.Scheme, operandSAKey.Name)
-	debugLog.Info("Creating ServiceAccount")
-	err = r.Client.Create(debugCtx, operandSA)
-	if err != nil {
-		log.Error(err, "Failed to create ServiceAccount")
-		return
+
+	// If any ServiceAccount was created, requeue to ensure all are ready
+	if anyCreated {
+		log.Info("ServiceAccounts created successfully")
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
-	// serviceaccount created successfully - return and requeue
-	log.Info("Created ServiceAccount")
-	return subreconciler.RequeueWithDelay(defaultLowerWait)
+
+	log.Info("All ServiceAccounts already exist")
+	return subreconciler.ContinueReconciling()
+
 }
 
 func (r *AuthenticationReconciler) handleServiceAccount(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	operandSAKey := types.NamespacedName{Name: "ibm-iam-operand-restricted", Namespace: req.Namespace}
-	log := logf.FromContext(ctx, "ServiceAccount.Name", operandSAKey.Name)
+	// Define the ServiceAccount names to update
+	serviceAccountNames := []string{
+		imOperandSA,
+		providerSA,
+		mgmtSA,
+	}
+	log := logf.FromContext(ctx)
 	debugLog := log.V(1)
 	debugCtx := logf.IntoContext(ctx, debugLog)
+
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
@@ -84,37 +117,43 @@ func (r *AuthenticationReconciler) handleServiceAccount(ctx context.Context, req
 	}
 	redirectURI := "https://" + consoleURL + "/auth/liberty/callback"
 
-	// Get existing annotations from SA
-	serviceAccount := &corev1.ServiceAccount{}
-	if err = r.Client.Get(debugCtx, operandSAKey, serviceAccount); err != nil {
-		log.Error(err, "Failed to GET ServiceAccount")
-		return subreconciler.RequeueWithError(err)
+	// Iterate through each ServiceAccount and update annotations
+	for _, saName := range serviceAccountNames {
+		operandSAKey := types.NamespacedName{Name: saName, Namespace: req.Namespace}
+		saLog := log.WithValues("ServiceAccount.Name", operandSAKey.Name)
+		saDebugLog := saLog.V(1)
+		saDebugCtx := logf.IntoContext(ctx, saDebugLog)
+
+		// Get existing annotations from SA
+		serviceAccount := &corev1.ServiceAccount{}
+		if err = r.Client.Get(saDebugCtx, operandSAKey, serviceAccount); err != nil {
+			saLog.Error(err, "Failed to GET ServiceAccount")
+			return subreconciler.RequeueWithError(err)
+		}
+
+		if serviceAccount.ObjectMeta.Annotations == nil {
+			serviceAccount.ObjectMeta.Annotations = make(map[string]string)
+		}
+		serviceAccount.ObjectMeta.Annotations["serviceaccounts.openshift.io/oauth-redirecturi.first"] = redirectURI
+
+		// update the SAcc with this annotation
+		if err = r.Client.Update(saDebugCtx, serviceAccount); err != nil {
+			// error updating annotation
+			saLog.Error(err, "Error updating annotation in ServiceAccount")
+			return subreconciler.RequeueWithError(err)
+		}
+
+		saLog.Info("ServiceAccount is updated with annotation successfully")
 	}
 
-	if serviceAccount.ObjectMeta.Annotations == nil {
-		serviceAccount.ObjectMeta.Annotations = make(map[string]string)
-	}
-	serviceAccount.ObjectMeta.Annotations["serviceaccounts.openshift.io/oauth-redirecturi.first"] = redirectURI
-
-	// update the SAcc with this annotation
-	if err = r.Client.Update(debugCtx, serviceAccount); err != nil {
-		// error updating annotation
-		log.Error(err, "Error updating annotation in ServiceAccount")
-		return subreconciler.RequeueWithError(err)
-	}
-
-	log.Info("ServiceAccount is updated with annotation successfully")
-	return
+	log.Info("All ServiceAccounts updated with annotations successfully")
+	return subreconciler.ContinueReconciling()
 }
 
 func generateSAObject(ctx context.Context, instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, operandSAName string) *corev1.ServiceAccount {
 	log := logf.FromContext(ctx)
-	metaLabels := map[string]string{
-		"app.kubernetes.io/instance":   "ibm-iam-operator",
-		"app.kubernetes.io/managed-by": "ibm-iam-operator",
-		"app.kubernetes.io/name":       "ibm-iam-operator",
-	}
 
+	metaLabels := common.MergeMaps(nil, map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"}, common.GetCommonLabels())
 	operandSA := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      operandSAName,

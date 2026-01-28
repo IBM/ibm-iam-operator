@@ -219,6 +219,7 @@ rules:
   - patch
   - update
   - watch
+  - delete
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
@@ -226,6 +227,7 @@ rules:
   - rolebindings
   verbs:
   - create
+  - delete
 - apiGroups:
   - zen.cpd.ibm.com
   resources:
@@ -284,6 +286,7 @@ rules:
   - clusterrolebindings
   verbs:
   - create
+  - delete
 - apiGroups:
   - user.openshift.io
   resources:

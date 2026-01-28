@@ -29,7 +29,7 @@ metadata:
               "resources": {
                 "limits": {
                   "cpu": "1000m",
-                  "ephemeral-storage": "650Mi",
+                  "ephemeral-storage": "300Mi",
                   "memory": "1Gi"
                 },
                 "requests": {
@@ -51,7 +51,7 @@ metadata:
                 },
                 "requests": {
                   "cpu": "100m",
-                  "ephemeral-storage": "158Mi",
+                  "ephemeral-storage": "50Mi",
                   "memory": "128Mi"
                 }
               }
@@ -104,12 +104,12 @@ metadata:
               "resources": {
                 "limits": {
                   "cpu": "1000m",
-                  "ephemeral-storage": "550Mi",
+                  "ephemeral-storage": "50Mi",
                   "memory": "1Gi"
                 },
                 "requests": {
                   "cpu": "50m",
-                  "ephemeral-storage": "300Mi",
+                  "ephemeral-storage": "150Mi",
                   "memory": "150Mi"
                 }
               }
@@ -121,12 +121,12 @@ metadata:
               "resources": {
                 "limits": {
                   "cpu": "1000m",
-                  "ephemeral-storage": "550Mi",
+                  "ephemeral-storage": "200Mi",
                   "memory": "1Gi"
                 },
                 "requests": {
                   "cpu": "50m",
-                  "ephemeral-storage": "300Mi",
+                  "ephemeral-storage": "100Mi",
                   "memory": "150Mi"
                 }
               }
@@ -142,7 +142,7 @@ metadata:
                 },
                 "requests": {
                   "cpu": "100m",
-                  "ephemeral-storage": "178Mi",
+                  "ephemeral-storage": "100Mi",
                   "memory": "128Mi"
                 }
               }
@@ -342,10 +342,11 @@ spec:
                     resources:
                       limits:
                         cpu: 25m
+                        ephemeral-storage: 100Mi
                         memory: 320Mi
                       requests:
                         cpu: 20m
-                        ephemeral-storage: 256Mi
+                        ephemeral-storage: 50Mi
                         memory: 80Mi
                     securityContext:
                       allowPrivilegeEscalation: false

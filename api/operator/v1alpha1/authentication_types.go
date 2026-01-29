@@ -173,6 +173,7 @@ type ConfigSpec struct {
 	UseSecretsStoreCSI          *bool          `json:"useSecretsStoreCSI,omitempty"`
 	LibertyAuthCacheTimeout     *string        `json:"libertyAuthCacheTimeout,omitempty"`
 	LdapClientConnectTimeout    *string        `json:"ldapClientConnectTimeout,omitempty"`
+	LDAPAllowlistEnabled        *bool          `json:"ldapAllowlistEnabled,omitempty"`
 }
 
 type ManagedResourceStatus struct {
@@ -424,4 +425,11 @@ func (s ServiceStatus) ServicesReady() bool {
 func init() {
 	SchemeBuilder.Register(&Authentication{}, &AuthenticationList{})
 	ODLMEnabledSchemeBuilder.Register(&Authentication{}, &AuthenticationList{})
+}
+
+func (a *Authentication) IsLDAPAllowlistEnabled() bool {
+	if a.Spec.Config.LDAPAllowlistEnabled == nil {
+		return true
+	}
+	return *a.Spec.Config.LDAPAllowlistEnabled
 }

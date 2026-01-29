@@ -29,12 +29,12 @@ metadata:
               "resources": {
                 "limits": {
                   "cpu": "1000m",
-                  "ephemeral-storage": "300Mi",
+                  "ephemeral-storage": "400Mi",
                   "memory": "1Gi"
                 },
                 "requests": {
                   "cpu": "100m",
-                  "ephemeral-storage": "400Mi",
+                  "ephemeral-storage": "300Mi",
                   "memory": "350Mi"
                 }
               },
@@ -51,7 +51,7 @@ metadata:
                 },
                 "requests": {
                   "cpu": "100m",
-                  "ephemeral-storage": "50Mi",
+                  "ephemeral-storage": "100Mi",
                   "memory": "128Mi"
                 }
               }
@@ -104,12 +104,12 @@ metadata:
               "resources": {
                 "limits": {
                   "cpu": "1000m",
-                  "ephemeral-storage": "50Mi",
+                  "ephemeral-storage": "150Mi",
                   "memory": "1Gi"
                 },
                 "requests": {
                   "cpu": "50m",
-                  "ephemeral-storage": "150Mi",
+                  "ephemeral-storage": "50Mi",
                   "memory": "150Mi"
                 }
               }
@@ -156,7 +156,7 @@ metadata:
     categories: Security
     certified: "false"
     containerImage: icr.io/cpopen/ibm-iam-operator:4.16.0
-    createdAt: "2025-12-17T21:58:19Z"
+    createdAt: "2026-01-29T02:40:48Z"
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage the lifecycle of IAM services. With this operator, you can simply deploy and upgrade the IAM services
     features.operators.openshift.io/disconnected: "true"
     features.operators.openshift.io/fips-compliant: "true"

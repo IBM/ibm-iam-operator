@@ -262,6 +262,8 @@ spec:
                     type: boolean
                   accountIamURL:
                     type: string
+                  ldapAllowlistEnabled:
+                    type: boolean
                 required:
                 - authUniqueHosts
                 - clusterCADomain

@@ -334,6 +334,7 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"EXPOSE_ADDITIONAL_PATHS",
 			"LIBERTY_AUTH_CACHE_TIMEOUT",
 			"LDAP_CLIENT_CONNECT_TIMEOUT",
+			"LDAP_ALLOWLIST_ENABLED",
 		),
 		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("SESSION_TIMEOUT", "43200"),
 			"SESSION_TIMEOUT"),
@@ -634,6 +635,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"OAUTH_21_ENABLED":                   strconv.FormatBool(oauth21Enabled),
 				"LIBERTY_AUTH_CACHE_TIMEOUT":         libertyAuthCacheTimeout,
 				"LDAP_CLIENT_CONNECT_TIMEOUT":        ldapClientConnectTimeout,
+				"LDAP_ALLOWLIST_ENABLED":             strconv.FormatBool(authCR.IsLDAPAllowlistEnabled()),
 			},
 		}
 

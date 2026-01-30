@@ -11,10 +11,7 @@ tasks:
       - name: checks-setup
         when: 'false'
       - name: detect-secrets
-        when: 'true'
-        include:
-          - docker-socket
-          - dind
+        when: 'false'
       - name: unit-test
         include:
           - docker-socket

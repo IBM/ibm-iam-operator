@@ -40,12 +40,12 @@ metadata:
               "resources": {
                 "limits": {
                   "cpu": "1000m",
-                  "ephemeral-storage": "400Mi",
+                  "ephemeral-storage": "600Mi",
                   "memory": "1Gi"
                 },
                 "requests": {
                   "cpu": "100m",
-                  "ephemeral-storage": "300Mi",
+                  "ephemeral-storage": "500Mi",
                   "memory": "350Mi"
                 }
               },
@@ -111,12 +111,12 @@ metadata:
               "resources": {
                 "limits": {
                   "cpu": "1000m",
-                  "ephemeral-storage": "150Mi",
+                  "ephemeral-storage": "300Mi",
                   "memory": "1Gi"
                 },
                 "requests": {
                   "cpu": "50m",
-                  "ephemeral-storage": "50Mi",
+                  "ephemeral-storage": "100Mi",
                   "memory": "150Mi"
                 }
               }
@@ -128,12 +128,12 @@ metadata:
               "resources": {
                 "limits": {
                   "cpu": "1000m",
-                  "ephemeral-storage": "200Mi",
+                  "ephemeral-storage": "400Mi",
                   "memory": "1Gi"
                 },
                 "requests": {
                   "cpu": "50m",
-                  "ephemeral-storage": "100Mi",
+                  "ephemeral-storage": "200Mi",
                   "memory": "150Mi"
                 }
               }

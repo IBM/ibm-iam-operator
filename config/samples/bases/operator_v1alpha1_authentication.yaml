@@ -21,11 +21,11 @@ spec:
       limits:
         cpu: 1000m
         memory: 1Gi
-        ephemeral-storage: 400Mi
+        ephemeral-storage: 600Mi
       requests:
         cpu: 100m
         memory: 350Mi
-        ephemeral-storage: 300Mi
+        ephemeral-storage: 500Mi
     routerCertSecret: saml-auth-secret
   clientRegistration:
     imageName: im-initcontainer
@@ -95,11 +95,11 @@ spec:
       limits:
         cpu: 1000m
         memory: 1Gi
-        ephemeral-storage: 150Mi
+        ephemeral-storage: 300Mi
       requests:
         cpu: 50m
         memory: 150Mi
-        ephemeral-storage: 50Mi
+        ephemeral-storage: 100Mi
   identityProvider:
     imageName: icp-identity-provider
     imageRegistry: quay.io/opencloudio
@@ -108,11 +108,11 @@ spec:
       limits:
         cpu: 1000m
         memory: 1Gi
-        ephemeral-storage: 200Mi
+        ephemeral-storage: 400Mi
       requests:
         cpu: 50m
         memory: 150Mi
-        ephemeral-storage: 100Mi
+        ephemeral-storage: 200Mi
   initMongodb:
     imageName: im-initcontainer
     imageRegistry: quay.io/opencloudio

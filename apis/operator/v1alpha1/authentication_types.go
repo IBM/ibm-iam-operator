@@ -146,6 +146,7 @@ type ConfigSpec struct {
 	ScopeClaim                  string `json:"scopeClaim,omitempty"`
 	OIDCIssuerURL               string `json:"oidcIssuerURL"`
 	AttrMappingFromConfig       bool   `json:"attrMappingFromConfig,omitempty"`
+	LDAPAllowlistEnabled        *bool  `json:"ldapAllowlistEnabled,omitempty"`
 	LibertyAuthCacheTimeout     string `json:"libertyAuthCacheTimeout,omitempty"`
 }
 
@@ -318,4 +319,11 @@ func (a *Authentication) GetDBSchemaVersion() string {
 
 func (a *Authentication) IsReady() bool {
 	return a.Status.Service.Status == "Ready"
+}
+
+func (a *Authentication) IsLDAPAllowlistEnabled() bool {
+	if a.Spec.Config.LDAPAllowlistEnabled == nil {
+		return true
+	}
+	return *a.Spec.Config.LDAPAllowlistEnabled
 }

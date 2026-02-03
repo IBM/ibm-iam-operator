@@ -24,7 +24,7 @@ metadata:
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.5.17",
+              "imageTag": "4.5.18",
               "ldapsCACert": "platform-auth-ldaps-ca-cert",
               "resources": {
                 "limits": {
@@ -43,7 +43,7 @@ metadata:
             "clientRegistration": {
               "imageName": "im-initcontainer",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.5.17",
+              "imageTag": "4.5.18",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -93,7 +93,7 @@ metadata:
             "identityManager": {
               "imageName": "icp-identity-manager",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.5.17",
+              "imageTag": "4.5.18",
               "masterNodesList": "10.0.0.1",
               "resources": {
                 "limits": {
@@ -111,7 +111,7 @@ metadata:
             "identityProvider": {
               "imageName": "icp-identity-provider",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.5.17",
+              "imageTag": "4.5.18",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
@@ -128,7 +128,7 @@ metadata:
             "initMongodb": {
               "imageName": "im-initcontainer",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.5.17",
+              "imageTag": "4.5.18",
               "resources": {
                 "limits": {
                   "cpu": "100m",
@@ -190,10 +190,10 @@ metadata:
     capabilities: Basic Install
     categories: Security
     certified: "false"
-    containerImage: icr.io/cpopen/ibm-iam-operator:4.5.17
-    createdAt: "2025-11-10T14:24:51Z"
+    containerImage: icr.io/cpopen/ibm-iam-operator:4.5.18
+    createdAt: "2026-01-30T09:17:46Z"
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage the lifecycle of IAM services. With this operator, you can simply deploy and upgrade the IAM services
-    olm.skipRange: <4.5.17
+    olm.skipRange: <4.5.18
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/IBM/ibm-iam-operator
@@ -203,7 +203,7 @@ metadata:
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
     operatorframework.io/os.linux: supported
-  name: ibm-iam-operator.v4.5.17
+  name: ibm-iam-operator.v4.5.18
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -352,14 +352,14 @@ spec:
                       - name: ROUTE_HTTPS_PORT
                       - name: cluster_name
                       - name: ICP_PLATFORM_AUTH_IMAGE
-                        value: icr.io/cpopen/cpfs/icp-platform-auth:4.5.17
+                        value: icr.io/cpopen/cpfs/icp-platform-auth:4.5.18
                       - name: ICP_IDENTITY_PROVIDER_IMAGE
-                        value: icr.io/cpopen/cpfs/icp-identity-provider:4.5.17
+                        value: icr.io/cpopen/cpfs/icp-identity-provider:4.5.18
                       - name: ICP_IDENTITY_MANAGER_IMAGE
-                        value: icr.io/cpopen/cpfs/icp-identity-manager:4.5.17
+                        value: icr.io/cpopen/cpfs/icp-identity-manager:4.5.18
                       - name: IM_INITCONTAINER_IMAGE
-                        value: icr.io/cpopen/cpfs/im-initcontainer:4.5.17
-                    image: icr.io/cpopen/ibm-iam-operator:4.5.17
+                        value: icr.io/cpopen/cpfs/im-initcontainer:4.5.18
+                    image: icr.io/cpopen/ibm-iam-operator:4.5.18
                     imagePullPolicy: IfNotPresent
                     livenessProbe:
                       failureThreshold: 10
@@ -645,17 +645,17 @@ spec:
   maturity: stable
   provider:
     name: IBM
-  version: 4.5.17
+  version: 4.5.18
   relatedImages:
-    - image: icr.io/cpopen/ibm-iam-operator:4.5.17
+    - image: icr.io/cpopen/ibm-iam-operator:4.5.18
       name: IBM_IAM_OPERATOR_IMAGE
-    - image: icr.io/cpopen/cpfs/icp-platform-auth:4.5.17
+    - image: icr.io/cpopen/cpfs/icp-platform-auth:4.5.18
       name: ICP_PLATFORM_AUTH_IMAGE
-    - image: icr.io/cpopen/cpfs/icp-identity-provider:4.5.17
+    - image: icr.io/cpopen/cpfs/icp-identity-provider:4.5.18
       name: ICP_IDENTITY_PROVIDER_IMAGE
-    - image: icr.io/cpopen/cpfs/icp-identity-manager:4.5.17
+    - image: icr.io/cpopen/cpfs/icp-identity-manager:4.5.18
       name: ICP_IDENTITY_MANAGER_IMAGE
-    - image: icr.io/cpopen/cpfs/im-initcontainer:4.5.17
+    - image: icr.io/cpopen/cpfs/im-initcontainer:4.5.18
       name: IM_INITCONTAINER_IMAGE
-    - image: icr.io/cpopen/cpfs/iam-custom-hostname:4.5.17
+    - image: icr.io/cpopen/cpfs/iam-custom-hostname:4.5.18
       name: IAM_CUSTOM_HOSTNAME_IMAGE

@@ -234,7 +234,6 @@ func (r *AuthenticationReconciler) handleAuthenticationFinalizer(ctx context.Con
 		log.Info("Finalizer already present")
 		return subreconciler.ContinueReconciling()
 	}
-	log.Info("Authentication is being deleted")
 
 	// delete clusterrole and clusterrolebinding
 	objectsToDelete := []client.Object{}
@@ -248,20 +247,21 @@ func (r *AuthenticationReconciler) handleAuthenticationFinalizer(ctx context.Con
 	if !canDeleteCRB {
 		log.Info("Operator does not have permission to delete ClusterRoleBinding, skipping deletion")
 	} else {
-		providerCRB := fmt.Sprintf("platform-identity-provider"+"-%s", authCR.Namespace)
-		mgmtCRB := fmt.Sprintf("platform-identity-management"+"-%s", authCR.Namespace)
+		providerCRB := fmt.Sprintf("%s-%s", common.PlatformIdentityProvider, authCR.Namespace)
+		mgmtCRB := fmt.Sprintf("%s-%s", common.PlatformIdentityManagement, authCR.Namespace)
 		// Add ClusterRoleBinding to deletion list
-		objectsToDelete = append(objectsToDelete, &rbacv1.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: providerCRB,
+		objectsToDelete = append(
+			objectsToDelete,
+			&rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: providerCRB,
+				},
 			},
-		})
-		objectsToDelete = append(objectsToDelete, &rbacv1.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: mgmtCRB,
-			},
-		})
-
+			&rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: mgmtCRB,
+				},
+			})
 	}
 	// Check if operator has permission to delete ClusterRole
 	canDeleteCR, err := r.hasAPIAccess(ctx, "", rbacv1.SchemeGroupVersion.Group, "clusterroles", []string{"delete"})
@@ -274,16 +274,19 @@ func (r *AuthenticationReconciler) handleAuthenticationFinalizer(ctx context.Con
 		log.Info("Operator does not have permission to delete ClusterRole, skipping deletion")
 	} else {
 		// Add ClusterRole to deletion list
-		objectsToDelete = append(objectsToDelete, &rbacv1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "platform-identity-provider",
+		objectsToDelete = append(
+			objectsToDelete,
+			&rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: string(common.PlatformIdentityManagement),
+				},
 			},
-		})
-		objectsToDelete = append(objectsToDelete, &rbacv1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "platform-identity-management",
+			&rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: string(common.PlatformIdentityManagement),
+				},
 			},
-		})
+		)
 	}
 
 	for _, obj := range objectsToDelete {
@@ -298,6 +301,7 @@ func (r *AuthenticationReconciler) handleAuthenticationFinalizer(ctx context.Con
 		}
 	}
 
+	log.Info("Authentication is being deleted")
 	// Object scheduled to be deleted
 	if err = r.removeFinalizer(ctx, finalizerName, authCR); err != nil {
 		log.Info("Failed to remove finalizer")

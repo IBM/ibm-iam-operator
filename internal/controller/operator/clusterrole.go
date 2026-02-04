@@ -119,6 +119,5 @@ func (r *AuthenticationReconciler) iamOperandClusterRole(instance *operatorv1alp
 			},
 		}
 	}
-
 	return operandClusterRole
 }

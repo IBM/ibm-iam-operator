@@ -26,6 +26,7 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -93,6 +94,11 @@ func (r *AuthenticationReconciler) iamOperandRB(instance *operatorv1alpha1.Authe
 				Namespace: instance.Namespace,
 			},
 		},
+	}
+	// Set Authentication instance as the owner and controller for rolebinding
+	err := controllerutil.SetControllerReference(instance, operandRB, r.Scheme)
+	if err != nil {
+		return nil
 	}
 	return operandRB
 }

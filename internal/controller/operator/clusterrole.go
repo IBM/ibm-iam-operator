@@ -27,6 +27,7 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -86,11 +87,11 @@ func (r *AuthenticationReconciler) handleClusterRoles(ctx context.Context, req c
 
 func (r *AuthenticationReconciler) iamOperandClusterRole(instance *operatorv1alpha1.Authentication, rolename string) *rbacv1.ClusterRole {
 
-	var operandRole *rbacv1.ClusterRole
+	var operandClusterRole *rbacv1.ClusterRole
 
 	switch rolename {
 	case "platform-identity-provider":
-		operandRole = &rbacv1.ClusterRole{
+		operandClusterRole = &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   rolename,
 				Labels: common.MergeMaps(nil, map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"}, common.GetCommonLabels()),
@@ -105,7 +106,7 @@ func (r *AuthenticationReconciler) iamOperandClusterRole(instance *operatorv1alp
 		}
 
 	case "platform-identity-management":
-		operandRole = &rbacv1.ClusterRole{
+		operandClusterRole = &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   rolename,
 				Labels: common.MergeMaps(nil, map[string]string{"app.kubernetes.io/instance": "ibm-iam-operator", "app.kubernetes.io/name": "ibm-iam-operator"}, common.GetCommonLabels()),
@@ -119,6 +120,11 @@ func (r *AuthenticationReconciler) iamOperandClusterRole(instance *operatorv1alp
 			},
 		}
 	}
+	// Set Authentication instance as the owner and controller for clusterrole
+	err := controllerutil.SetControllerReference(instance, operandClusterRole, r.Scheme)
+	if err != nil {
+		return nil
+	}
 
-	return operandRole
+	return operandClusterRole
 }

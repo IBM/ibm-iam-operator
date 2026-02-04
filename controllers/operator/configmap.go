@@ -390,7 +390,7 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 				currentConfigMap.Data["LDAP_ALLOWLIST_ENABLED"] = newConfigMap.Data["LDAP_ALLOWLIST_ENABLED"]
 				cmUpdateRequired = true
 			}
-			if _, keyExists := currentConfigMap.Data["LIBERTY_AUTH_CACHE_TIMEOUT"]; !keyExists {
+			if curVal, keyExists := currentConfigMap.Data["LIBERTY_AUTH_CACHE_TIMEOUT"]; !keyExists || curVal != newConfigMap.Data["LIBERTY_AUTH_CACHE_TIMEOUT"] {
 				reqLogger.Info("Updating an existing Configmap to add liberty auth cache timeout", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
 				currentConfigMap.Data["LIBERTY_AUTH_CACHE_TIMEOUT"] = newConfigMap.Data["LIBERTY_AUTH_CACHE_TIMEOUT"]
 				cmUpdateRequired = true

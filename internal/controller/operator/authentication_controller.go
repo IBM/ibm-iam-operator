@@ -36,6 +36,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -233,8 +234,74 @@ func (r *AuthenticationReconciler) handleAuthenticationFinalizer(ctx context.Con
 		log.Info("Finalizer already present")
 		return subreconciler.ContinueReconciling()
 	}
-	log.Info("Authentication is being deleted")
 
+	// delete clusterrole and clusterrolebinding
+	objectsToDelete := []client.Object{}
+	// Check if operator has permission to delete ClusterRoleBinding
+	canDeleteCRB, err := r.hasAPIAccess(ctx, "", rbacv1.SchemeGroupVersion.Group, "clusterrolebindings", []string{"delete"})
+	if err != nil {
+		log.Error(err, "Failed to check delete permission for ClusterRoleBinding")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	if !canDeleteCRB {
+		log.Info("Operator does not have permission to delete ClusterRoleBinding, skipping deletion")
+	} else {
+		providerCRB := fmt.Sprintf("%s-%s", common.PlatformIdentityProvider, authCR.Namespace)
+		mgmtCRB := fmt.Sprintf("%s-%s", common.PlatformIdentityManagement, authCR.Namespace)
+		// Add ClusterRoleBinding to deletion list
+		objectsToDelete = append(
+			objectsToDelete,
+			&rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: providerCRB,
+				},
+			},
+			&rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: mgmtCRB,
+				},
+			})
+	}
+	// Check if operator has permission to delete ClusterRole
+	canDeleteCR, err := r.hasAPIAccess(ctx, "", rbacv1.SchemeGroupVersion.Group, "clusterroles", []string{"delete"})
+	if err != nil {
+		log.Error(err, "Failed to check delete permission for ClusterRole")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	if !canDeleteCR {
+		log.Info("Operator does not have permission to delete ClusterRole, skipping deletion")
+	} else {
+		// Add ClusterRole to deletion list
+		objectsToDelete = append(
+			objectsToDelete,
+			&rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: string(common.PlatformIdentityManagement),
+				},
+			},
+			&rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: string(common.PlatformIdentityManagement),
+				},
+			},
+		)
+	}
+
+	for _, obj := range objectsToDelete {
+		deleteLog := log.WithValues("Object.Name", obj.GetName(), "Object.Kind", obj.GetObjectKind().GroupVersionKind().Kind)
+		if err = r.Client.Delete(ctx, obj); k8sErrors.IsNotFound(err) {
+			deleteLog.Info("Object not found; skipping")
+		} else if err != nil {
+			deleteLog.Error(err, "Failed to delete Object")
+			return subreconciler.RequeueWithError(err)
+		} else {
+			deleteLog.Info("Object deleted successfully")
+		}
+	}
+
+	log.Info("Authentication is being deleted")
 	// Object scheduled to be deleted
 	if err = r.removeFinalizer(ctx, finalizerName, authCR); err != nil {
 		log.Info("Failed to remove finalizer")

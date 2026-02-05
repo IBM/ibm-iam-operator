@@ -204,6 +204,8 @@ spec:
                     type: boolean
                   ldapAllowlistEnabled:
                     type: boolean
+                  libertyAuthCacheTimeout:
+                    type: string
                   nonceEnabled:
                     type: boolean
                   oidcIssuerURL:

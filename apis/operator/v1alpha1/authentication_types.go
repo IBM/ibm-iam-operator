@@ -147,6 +147,7 @@ type ConfigSpec struct {
 	OIDCIssuerURL               string `json:"oidcIssuerURL"`
 	AttrMappingFromConfig       bool   `json:"attrMappingFromConfig,omitempty"`
 	LDAPAllowlistEnabled        *bool  `json:"ldapAllowlistEnabled,omitempty"`
+	LibertyAuthCacheTimeout     string `json:"libertyAuthCacheTimeout,omitempty"`
 }
 
 type ManagedResourceStatus struct {

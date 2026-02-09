@@ -327,3 +327,11 @@ func (a *Authentication) IsLDAPAllowlistEnabled() bool {
 	}
 	return *a.Spec.Config.LDAPAllowlistEnabled
 }
+
+func (a *Authentication) GetLibertyAuthCacheTimeout() string {
+	libertyAuthCacheTimeout := ""
+	if a.Spec.Config.LibertyAuthCacheTimeout != nil {
+		libertyAuthCacheTimeout = *a.Spec.Config.LibertyAuthCacheTimeout
+	}
+	return libertyAuthCacheTimeout
+}

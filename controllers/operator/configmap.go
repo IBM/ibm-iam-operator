@@ -628,6 +628,10 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 	if isPublicCloud {
 		roksUserPrefix = "IAM#"
 	}
+	var libertyAuthCacheTimeout string
+	if instance.Spec.Config.LibertyAuthCacheTimeout != nil {
+		libertyAuthCacheTimeout = *instance.Spec.Config.LibertyAuthCacheTimeout
+	}
 
 	// Set the path for SAML connections
 	masterPath := "/idauth"
@@ -722,7 +726,7 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 			"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
 			"LIBERTY_SAMESITE_COOKIE":            "",
 			"LDAP_ALLOWLIST_ENABLED":             strconv.FormatBool(instance.IsLDAPAllowlistEnabled()),
-			"LIBERTY_AUTH_CACHE_TIMEOUT":         instance.Spec.Config.LibertyAuthCacheTimeout,
+			"LIBERTY_AUTH_CACHE_TIMEOUT":         libertyAuthCacheTimeout,
 		},
 	}
 

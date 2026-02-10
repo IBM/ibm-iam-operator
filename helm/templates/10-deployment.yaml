@@ -293,11 +293,10 @@ spec:
         resources:
           limits:
             cpu: 25m
-            ephemeral-storage: 100Mi
             memory: 320Mi
           requests:
             cpu: 20m
-            ephemeral-storage: 50Mi
+            ephemeral-storage: 256Mi
             memory: 80Mi
         securityContext:
           allowPrivilegeEscalation: false

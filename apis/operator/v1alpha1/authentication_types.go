@@ -112,41 +112,42 @@ type ClientRegistrationSpec struct {
 }
 
 type ConfigSpec struct {
-	ClusterCADomain             string `json:"clusterCADomain"`
-	DefaultAdminUser            string `json:"defaultAdminUser"`
-	DefaultAdminPassword        string `json:"defaultAdminPassword"`
-	ScimAdminUser               string `json:"scimAdminUser"`
-	ScimAdminPassword           string `json:"scimAdminPassword"`
-	ClusterName                 string `json:"clusterName"`
-	ClusterInternalAddress      string `json:"clusterInternalAddress"`
-	ClusterExternalAddress      string `json:"clusterExternalAddress"`
-	WLPClientID                 string `json:"wlpClientID"`
-	WLPClientSecret             string `json:"wlpClientSecret"`
-	AuthUniqueHosts             string `json:"authUniqueHosts"`
-	WLPClientRegistrationSecret string `json:"wlpClientRegistrationSecret"`
-	InstallType                 string `json:"installType"`
-	IsOpenshiftEnv              bool   `json:"isOpenshiftEnv"`
-	OpenshiftPort               int32  `json:"openshiftPort"`
-	ICPPort                     int32  `json:"icpPort"`
-	FIPSEnabled                 bool   `json:"fipsEnabled"`
-	ROKSEnabled                 bool   `json:"roksEnabled"`
-	IBMCloudSaas                bool   `json:"ibmCloudSaas,omitempty"`
-	OnPremMultipleDeploy        bool   `json:"onPremMultipleDeploy,omitempty"`
-	SaasClientRedirectUrl       string `json:"saasClientRedirectUrl,omitempty"`
-	NONCEEnabled                bool   `json:"nonceEnabled"`
-	XFrameDomain                string `json:"xframeDomain,omitempty"`
-	PreferredLogin              string `json:"preferredLogin,omitempty"`
-	ROKSURL                     string `json:"roksURL"`
-	ROKSUserPrefix              string `json:"roksUserPrefix"`
-	EnableImpersonation         bool   `json:"enableImpersonation"`
-	BootstrapUserId             string `json:"bootstrapUserId,omitempty"`
-	ProviderIssuerURL           string `json:"providerIssuerURL,omitempty"`
-	ClaimsSupported             string `json:"claimsSupported,omitempty"`
-	ClaimsMap                   string `json:"claimsMap,omitempty"`
-	ScopeClaim                  string `json:"scopeClaim,omitempty"`
-	OIDCIssuerURL               string `json:"oidcIssuerURL"`
-	AttrMappingFromConfig       bool   `json:"attrMappingFromConfig,omitempty"`
-	LDAPAllowlistEnabled        *bool  `json:"ldapAllowlistEnabled,omitempty"`
+	ClusterCADomain             string  `json:"clusterCADomain"`
+	DefaultAdminUser            string  `json:"defaultAdminUser"`
+	DefaultAdminPassword        string  `json:"defaultAdminPassword"`
+	ScimAdminUser               string  `json:"scimAdminUser"`
+	ScimAdminPassword           string  `json:"scimAdminPassword"`
+	ClusterName                 string  `json:"clusterName"`
+	ClusterInternalAddress      string  `json:"clusterInternalAddress"`
+	ClusterExternalAddress      string  `json:"clusterExternalAddress"`
+	WLPClientID                 string  `json:"wlpClientID"`
+	WLPClientSecret             string  `json:"wlpClientSecret"`
+	AuthUniqueHosts             string  `json:"authUniqueHosts"`
+	WLPClientRegistrationSecret string  `json:"wlpClientRegistrationSecret"`
+	InstallType                 string  `json:"installType"`
+	IsOpenshiftEnv              bool    `json:"isOpenshiftEnv"`
+	OpenshiftPort               int32   `json:"openshiftPort"`
+	ICPPort                     int32   `json:"icpPort"`
+	FIPSEnabled                 bool    `json:"fipsEnabled"`
+	ROKSEnabled                 bool    `json:"roksEnabled"`
+	IBMCloudSaas                bool    `json:"ibmCloudSaas,omitempty"`
+	OnPremMultipleDeploy        bool    `json:"onPremMultipleDeploy,omitempty"`
+	SaasClientRedirectUrl       string  `json:"saasClientRedirectUrl,omitempty"`
+	NONCEEnabled                bool    `json:"nonceEnabled"`
+	XFrameDomain                string  `json:"xframeDomain,omitempty"`
+	PreferredLogin              string  `json:"preferredLogin,omitempty"`
+	ROKSURL                     string  `json:"roksURL"`
+	ROKSUserPrefix              string  `json:"roksUserPrefix"`
+	EnableImpersonation         bool    `json:"enableImpersonation"`
+	BootstrapUserId             string  `json:"bootstrapUserId,omitempty"`
+	ProviderIssuerURL           string  `json:"providerIssuerURL,omitempty"`
+	ClaimsSupported             string  `json:"claimsSupported,omitempty"`
+	ClaimsMap                   string  `json:"claimsMap,omitempty"`
+	ScopeClaim                  string  `json:"scopeClaim,omitempty"`
+	OIDCIssuerURL               string  `json:"oidcIssuerURL"`
+	AttrMappingFromConfig       bool    `json:"attrMappingFromConfig,omitempty"`
+	LDAPAllowlistEnabled        *bool   `json:"ldapAllowlistEnabled,omitempty"`
+	LibertyAuthCacheTimeout     *string `json:"libertyAuthCacheTimeout,omitempty"`
 }
 
 type ManagedResourceStatus struct {
@@ -325,4 +326,12 @@ func (a *Authentication) IsLDAPAllowlistEnabled() bool {
 		return true
 	}
 	return *a.Spec.Config.LDAPAllowlistEnabled
+}
+
+func (a *Authentication) GetLibertyAuthCacheTimeout() string {
+	libertyAuthCacheTimeout := ""
+	if a.Spec.Config.LibertyAuthCacheTimeout != nil {
+		libertyAuthCacheTimeout = *a.Spec.Config.LibertyAuthCacheTimeout
+	}
+	return libertyAuthCacheTimeout
 }

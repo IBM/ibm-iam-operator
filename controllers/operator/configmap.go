@@ -390,6 +390,11 @@ func (r *AuthenticationReconciler) handleConfigMap(instance *operatorv1alpha1.Au
 				currentConfigMap.Data["LDAP_ALLOWLIST_ENABLED"] = newConfigMap.Data["LDAP_ALLOWLIST_ENABLED"]
 				cmUpdateRequired = true
 			}
+			if curVal, keyExists := currentConfigMap.Data["LIBERTY_AUTH_CACHE_TIMEOUT"]; !keyExists || curVal != newConfigMap.Data["LIBERTY_AUTH_CACHE_TIMEOUT"] {
+				reqLogger.Info("Updating an existing Configmap to add liberty auth cache timeout", "Configmap.Namespace", currentConfigMap.Namespace, "ConfigMap.Name", currentConfigMap.Name)
+				currentConfigMap.Data["LIBERTY_AUTH_CACHE_TIMEOUT"] = newConfigMap.Data["LIBERTY_AUTH_CACHE_TIMEOUT"]
+				cmUpdateRequired = true
+			}
 			// Indicates an upgrade from a previous
 			if _, keyExists := currentConfigMap.Data["MASTER_PATH"]; !keyExists {
 				req := ctrl.Request{NamespacedName: types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}}
@@ -717,6 +722,7 @@ func (r *AuthenticationReconciler) authIdpConfigMap(instance *operatorv1alpha1.A
 			"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
 			"LIBERTY_SAMESITE_COOKIE":            "",
 			"LDAP_ALLOWLIST_ENABLED":             strconv.FormatBool(instance.IsLDAPAllowlistEnabled()),
+			"LIBERTY_AUTH_CACHE_TIMEOUT":         instance.GetLibertyAuthCacheTimeout(),
 		},
 	}
 

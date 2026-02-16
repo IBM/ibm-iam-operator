@@ -119,32 +119,19 @@ install_catutil() {
     local install_dir="/usr/local/bin"
     local temp_dir=$(mktemp -d)
     
-    # Download catutil binary directly (not tar.gz)
-    # The actual release provides direct binary downloads
-    local catutil_url="https://github.com/IBM/operator-catalog-tools/releases/download/${CATUTIL_VERSION}/catutil-linux-${ARCH}"
+    # catutil is from IBM internal GitHub Enterprise
+    # URL format: https://github.ibm.com/CloudPakOpenContent/catalog-utils/releases/download/VERSION/catutil-linux-amd64
+    local catutil_url="https://github.ibm.com/CloudPakOpenContent/catalog-utils/releases/download/${CATUTIL_VERSION}/catutil-linux-${ARCH}"
     
-    log_info "Downloading catutil from: $catutil_url"
+    log_info "Downloading catutil from IBM GitHub Enterprise: $catutil_url"
     
+    # Download catutil binary
     if ! curl -L -f -o "$temp_dir/catutil" "$catutil_url"; then
         log_error "Failed to download catutil from $catutil_url"
-        log_info "Trying alternative download method..."
-        
-        # Try with tar.gz format as fallback
-        catutil_url="https://github.com/IBM/operator-catalog-tools/releases/download/${CATUTIL_VERSION}/catutil-linux-${ARCH}.tar.gz"
-        log_info "Trying: $catutil_url"
-        
-        if curl -L -f -o "$temp_dir/catutil.tar.gz" "$catutil_url" 2>/dev/null; then
-            tar -xzf "$temp_dir/catutil.tar.gz" -C "$temp_dir" 2>/dev/null || {
-                log_error "Failed to extract catutil"
-                rm -rf "$temp_dir"
-                exit 1
-            }
-        else
-            log_error "Failed to download catutil. Please install it manually."
-            log_error "Visit: https://github.com/IBM/operator-catalog-tools/releases"
-            rm -rf "$temp_dir"
-            exit 1
-        fi
+        log_error "Please ensure you have access to IBM GitHub Enterprise (github.ibm.com)"
+        log_error "Or install catutil manually from: https://github.ibm.com/CloudPakOpenContent/catalog-utils/releases"
+        rm -rf "$temp_dir"
+        exit 1
     fi
     
     # Make executable
@@ -180,36 +167,49 @@ install_skopeo() {
         return 0
     fi
     
-    local install_dir="/usr/local/bin"
-    local temp_dir=$(mktemp -d)
+    log_info "Installing skopeo via package manager..."
     
-    # Download skopeo binary
-    local skopeo_url="https://github.com/lework/skopeo-binary/releases/download/v${SKOPEO_VERSION}/skopeo-linux-${ARCH}"
-    
-    log_info "Downloading skopeo from: $skopeo_url"
-    
-    if ! curl -L -o "$temp_dir/skopeo" "$skopeo_url"; then
-        log_error "Failed to download skopeo"
-        rm -rf "$temp_dir"
-        exit 1
-    fi
-    
-    chmod +x "$temp_dir/skopeo"
-    
-    # Install skopeo
-    if [[ -w "$install_dir" ]]; then
-        mv "$temp_dir/skopeo" "$install_dir/skopeo"
+    # Detect OS and install accordingly
+    if [[ -f /etc/redhat-release ]]; then
+        # RHEL/CentOS/Fedora
+        log_info "Detected RHEL-based system, installing via yum/dnf..."
+        if command -v dnf &> /dev/null; then
+            sudo dnf install -y skopeo
+        else
+            sudo yum install -y skopeo
+        fi
+    elif [[ -f /etc/debian_version ]]; then
+        # Debian/Ubuntu
+        log_info "Detected Debian-based system, installing via apt..."
+        sudo apt-get update
+        sudo apt-get install -y skopeo
+    elif [[ -f /etc/alpine-release ]]; then
+        # Alpine
+        log_info "Detected Alpine Linux, installing via apk..."
+        sudo apk add skopeo
     else
-        log_info "Installing skopeo with sudo..."
-        sudo mv "$temp_dir/skopeo" "$install_dir/skopeo"
+        log_warn "Unknown OS. Attempting to install via package manager..."
+        # Try common package managers
+        if command -v dnf &> /dev/null; then
+            sudo dnf install -y skopeo
+        elif command -v yum &> /dev/null; then
+            sudo yum install -y skopeo
+        elif command -v apt-get &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y skopeo
+        elif command -v apk &> /dev/null; then
+            sudo apk add skopeo
+        else
+            log_error "Could not find a suitable package manager to install skopeo"
+            log_error "Please install skopeo manually: https://github.com/containers/skopeo/blob/main/install.md"
+            exit 1
+        fi
     fi
-    
-    rm -rf "$temp_dir"
     
     if command -v skopeo &> /dev/null; then
         log_info "skopeo installed successfully: $(skopeo --version)"
     else
         log_error "Failed to install skopeo"
+        log_error "Please install manually: https://github.com/containers/skopeo/blob/main/install.md"
         exit 1
     fi
 }

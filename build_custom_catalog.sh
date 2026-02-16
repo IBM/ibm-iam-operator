@@ -119,26 +119,43 @@ install_catutil() {
     local install_dir="/usr/local/bin"
     local temp_dir=$(mktemp -d)
     
-    # Download catutil
-    local catutil_url="https://github.com/IBM/operator-catalog-tools/releases/download/${CATUTIL_VERSION}/catutil-linux-${ARCH}.tar.gz"
+    # Download catutil binary directly (not tar.gz)
+    # The actual release provides direct binary downloads
+    local catutil_url="https://github.com/IBM/operator-catalog-tools/releases/download/${CATUTIL_VERSION}/catutil-linux-${ARCH}"
     
     log_info "Downloading catutil from: $catutil_url"
     
-    if ! curl -L -o "$temp_dir/catutil.tar.gz" "$catutil_url"; then
-        log_error "Failed to download catutil"
-        rm -rf "$temp_dir"
-        exit 1
+    if ! curl -L -f -o "$temp_dir/catutil" "$catutil_url"; then
+        log_error "Failed to download catutil from $catutil_url"
+        log_info "Trying alternative download method..."
+        
+        # Try with tar.gz format as fallback
+        catutil_url="https://github.com/IBM/operator-catalog-tools/releases/download/${CATUTIL_VERSION}/catutil-linux-${ARCH}.tar.gz"
+        log_info "Trying: $catutil_url"
+        
+        if curl -L -f -o "$temp_dir/catutil.tar.gz" "$catutil_url" 2>/dev/null; then
+            tar -xzf "$temp_dir/catutil.tar.gz" -C "$temp_dir" 2>/dev/null || {
+                log_error "Failed to extract catutil"
+                rm -rf "$temp_dir"
+                exit 1
+            }
+        else
+            log_error "Failed to download catutil. Please install it manually."
+            log_error "Visit: https://github.com/IBM/operator-catalog-tools/releases"
+            rm -rf "$temp_dir"
+            exit 1
+        fi
     fi
     
-    # Extract and install
-    tar -xzf "$temp_dir/catutil.tar.gz" -C "$temp_dir"
+    # Make executable
+    chmod +x "$temp_dir/catutil"
     
+    # Install
     if [[ -w "$install_dir" ]]; then
         mv "$temp_dir/catutil" "$install_dir/catutil"
     else
         log_info "Installing catutil with sudo..."
         sudo mv "$temp_dir/catutil" "$install_dir/catutil"
-        sudo chmod +x "$install_dir/catutil"
     fi
     
     rm -rf "$temp_dir"

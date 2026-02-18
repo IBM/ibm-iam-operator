@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -85,8 +86,33 @@ func (r *AuthenticationReconciler) handleJob(instance *operatorv1alpha1.Authenti
 		return
 	}
 
+	// Check if Job needs to be replaced due to failure
+	if shouldReplaceJob(currentJob) {
+		reqLogger.Info("Job is stuck or failed; deleting for recreation", "Job.Name", job)
+		err = r.Client.Delete(context.TODO(), currentJob, client.PropagationPolicy(metav1.DeletePropagationBackground))
+		if err != nil {
+			reqLogger.Error(err, "Failed to delete stuck Job", "Job.Name", job)
+			return
+		}
+		*needToRequeue = true
+		return
+	}
+
 	return
 
+}
+
+// shouldReplaceJob determines if a Job should be deleted and recreated
+// This handles cases where the Job is stuck or has failed
+func shouldReplaceJob(job *batchv1.Job) bool {
+	// Check if Job has failed
+	for _, condition := range job.Status.Conditions {
+		if condition.Type == batchv1.JobFailed && condition.Status == corev1.ConditionTrue {
+			return true
+		}
+	}
+
+	return false
 }
 
 func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, jobName string) *batchv1.Job {
@@ -121,6 +147,7 @@ func generateJobObject(instance *operatorv1alpha1.Authentication, scheme *runtim
 			Labels:    metaLabels,
 		},
 		Spec: batchv1.JobSpec{
+			BackoffLimit: ptr.To(int32(6)),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   jobName,

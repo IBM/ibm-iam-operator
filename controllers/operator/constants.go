@@ -41,28 +41,68 @@ var ArchList = []string{
 }
 
 const registerClientScript = `#!/bin/sh
-HTTP_CODE=""
-while true
+
+MAX_ATTEMPTS=30
+ATTEMPT=0
+
+while [ $ATTEMPT -lt $MAX_ATTEMPTS ]
 do
-  HTTP_CODE=$(curl -k -o /dev/null -I  -w "%{http_code}"  -X GET -u oauthadmin:$WLP_CLIENT_REGISTRATION_SECRET -H "Content-Type: application/json" https://platform-auth-service:9443/oidc/endpoint/OP/registration/$WLP_CLIENT_ID)
-  if [ $HTTP_CODE = "404" -o $HTTP_CODE = "200" ] ; then
-	 break;
+  ATTEMPT=$((ATTEMPT + 1))
+  echo "Attempt $ATTEMPT of $MAX_ATTEMPTS"
+  
+  HTTP_CODE=""
+  GET_ATTEMPTS=0
+  MAX_GET_ATTEMPTS=10
+  while [ $GET_ATTEMPTS -lt $MAX_GET_ATTEMPTS ]
+  do
+    GET_ATTEMPTS=$((GET_ATTEMPTS + 1))
+    HTTP_CODE=$(curl -k -o /dev/null -I -w "%{http_code}" -X GET -u oauthadmin:$WLP_CLIENT_REGISTRATION_SECRET -H "Content-Type: application/json" https://platform-auth-service:9443/oidc/endpoint/OP/registration/$WLP_CLIENT_ID)
+    if [ "$HTTP_CODE" = "404" ] || [ "$HTTP_CODE" = "200" ]; then
+      break
+    fi
+    echo "GET returned $HTTP_CODE, retrying... ($GET_ATTEMPTS/$MAX_GET_ATTEMPTS)"
+    sleep 1
+  done
+  
+  if [ "$HTTP_CODE" != "404" ] && [ "$HTTP_CODE" != "200" ]; then
+    echo "GET did not return 404 or 200 after $MAX_GET_ATTEMPTS attempts, retrying outer loop"
+    sleep 2
+    continue
+  fi
+  
+  if [ "$HTTP_CODE" = "404" ]; then
+    echo "GET returned 404 - attempting to create client"
+    RESPONSE=$(curl -i -k -X POST -u oauthadmin:$WLP_CLIENT_REGISTRATION_SECRET \
+     -H "Content-Type: application/json" \
+     --data @/jsons/platform-oidc-registration.json \
+     https://platform-auth-service:9443/oidc/endpoint/OP/registration 2>&1)
+    
+    if echo "$RESPONSE" | grep -q '201 Created'; then
+      echo "Client created successfully"
+      exit 0
+    else
+      echo "POST did not return 201 Created, will retry from beginning"
+      sleep 1
+    fi
+  else
+    echo "GET returned 200 - attempting to update client"
+    RESPONSE=$(curl -i -k -X PUT -u oauthadmin:$WLP_CLIENT_REGISTRATION_SECRET \
+     -H "Content-Type: application/json" \
+     --data @/jsons/platform-oidc-registration.json \
+     https://platform-auth-service:9443/oidc/endpoint/OP/registration/$WLP_CLIENT_ID 2>&1)
+    
+    if echo "$RESPONSE" | grep -q '200 OK'; then
+      echo "Client updated successfully"
+      exit 0
+    else
+      echo "PUT did not return 200 OK, will retry from beginning"
+      sleep 1
+    fi
   fi
 done
-if [ $HTTP_CODE = "404" ]
-then
-  echo "Running new client id registration"
-  until curl -i -k -X POST -u oauthadmin:$WLP_CLIENT_REGISTRATION_SECRET \
-   -H "Content-Type: application/json" \
-   --data @/jsons/platform-oidc-registration.json \
-   https://platform-auth-service:9443/oidc/endpoint/OP/registration | grep '201 Created'; do sleep 1; done;
-else
-  echo "Running update client id registration."
-  until curl -i -k -X PUT -u oauthadmin:$WLP_CLIENT_REGISTRATION_SECRET \
-   -H "Content-Type: application/json" \
-   --data @/jsons/platform-oidc-registration.json \
-   https://platform-auth-service:9443/oidc/endpoint/OP/registration/$WLP_CLIENT_ID | grep '200 OK'; do sleep 1; done;
-fi
+
+echo "Failed to register/update client after $MAX_ATTEMPTS attempts"
+exit 1
 `
 
 var registrationJson string = `{

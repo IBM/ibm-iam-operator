@@ -393,7 +393,6 @@ spec:
               resources:
                 - pods
                 - services
-                - services/finalizers
                 - endpoints
                 - persistentvolumeclaims
                 - events
@@ -407,6 +406,13 @@ spec:
                 - patch
                 - update
                 - watch
+            - apiGroups:
+                - ""
+              resources:
+                - services/finalizers
+              verbs:
+                - update
+                - patch
             - apiGroups:
                 - apps
               resources:
@@ -425,7 +431,6 @@ spec:
                 - oidc.security.ibm.com
               resources:
                 - clients
-                - clients/finalizers
                 - clients/status
               verbs:
                 - create
@@ -435,6 +440,13 @@ spec:
                 - patch
                 - update
                 - watch
+            - apiGroups:
+                - oidc.security.ibm.com
+              resources:
+                - clients/finalizers
+              verbs:
+                - update
+                - patch
             - apiGroups:
                 - apps
               resourceNames:

@@ -39,7 +39,6 @@ rules:
   resources:
   - pods
   - services
-  - services/finalizers
   - endpoints
   - persistentvolumeclaims
   - events
@@ -53,6 +52,13 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - services/finalizers
+  verbs:
+  - update
+  - patch
 - apiGroups:
   - apps
   resources:
@@ -71,7 +77,6 @@ rules:
   - oidc.security.ibm.com
   resources:
   - clients
-  - clients/finalizers
   - clients/status
   verbs:
   - create
@@ -81,6 +86,13 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - oidc.security.ibm.com
+  resources:
+  - clients/finalizers
+  verbs:
+  - update
+  - patch
 - apiGroups:
   - apps
   resourceNames:

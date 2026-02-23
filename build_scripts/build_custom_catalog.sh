@@ -34,8 +34,8 @@ log_error() {
 ###############################################################################
 
 # Registry and image configuration
-export REGISTRY="${REGISTRY:-docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-scratch-docker-local/tmannaru}"
-export TAG="${TAG:-v4.9.0}"
+export REGISTRY="${REGISTRY:-docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-scratch-docker-local/ibmcom}"
+export TAG="${TAG:-vtest}"
 export CATALOG_TO_CUSTOMIZE="${CATALOG_TO_CUSTOMIZE:-docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-daily-docker-local/ibmcom/ibm-common-service-catalog:cd}"
 
 # Derived variables

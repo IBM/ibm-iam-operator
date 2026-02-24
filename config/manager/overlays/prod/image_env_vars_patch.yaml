@@ -2,27 +2,27 @@
   path: /spec/template/spec/containers/0/env/-
   value:
     name: ICP_PLATFORM_AUTH_IMAGE
-    value: icr.io/cpopen/cpfs/icp-platform-auth:4.16.0
+    value: icr.io/cpopen/cpfs/icp-platform-auth:4.17.0
 - op: add
   path: /spec/template/spec/containers/0/env/-
   value:
     name: ICP_IDENTITY_PROVIDER_IMAGE
-    value: icr.io/cpopen/cpfs/icp-identity-provider:4.16.0
+    value: icr.io/cpopen/cpfs/icp-identity-provider:4.17.0
 - op: add
   path: /spec/template/spec/containers/0/env/-
   value:
     name: ICP_IDENTITY_MANAGER_IMAGE
-    value: icr.io/cpopen/cpfs/icp-identity-manager:4.16.0
+    value: icr.io/cpopen/cpfs/icp-identity-manager:4.17.0
 - op: add
   path: /spec/template/spec/containers/0/env/-
   value:
     name: IM_INITCONTAINER_IMAGE
-    value: icr.io/cpopen/cpfs/im-initcontainer:4.16.0
+    value: icr.io/cpopen/cpfs/im-initcontainer:4.17.0
 - op: add
   path: /spec/template/spec/containers/0/env/-
   value:
     name: IM_DB_MIGRATOR_IMAGE
-    value: icr.io/cpopen/cpfs/ibm-im-db-migrator:4.16.0
+    value: icr.io/cpopen/cpfs/ibm-im-db-migrator:4.17.0
 - op: replace
   path: /spec/template/spec/containers/0/imagePullPolicy
   value: IfNotPresent

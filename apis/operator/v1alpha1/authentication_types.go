@@ -276,6 +276,7 @@ func init() {
 const AnnotationAuthMigrationComplete string = "authentication.operator.ibm.com/migration-complete"
 const AnnotationAuthRetainMigrationArtifacts string = "authentication.operator.ibm.com/retain-migration-artifacts"
 const AnnotationAuthDBSchemaVersion string = "authentication.operator.ibm.com/db-schema-version"
+const AnnotationMongoMigrationStatus string = "authentication.operator.ibm.com/mongo-migration-status"
 
 func (a *Authentication) HasBeenMigrated() bool {
 	return meta.IsStatusConditionPresentAndEqual(a.Status.Conditions, ConditionMigrated, metav1.ConditionTrue)

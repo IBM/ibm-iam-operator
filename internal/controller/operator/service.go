@@ -57,6 +57,19 @@ func (r *AuthenticationReconciler) handleServices(ctx context.Context, req ctrl.
 			)).
 			WithModifyFns(validateCP3PodSelectorAndLabel, updateSessionAffinity),
 		common.NewSecondaryReconcilerBuilder[*corev1.Service]().
+			WithName("platform-auth-service-headless").
+			WithGenerateFns(generateHeadlessService(
+				corev1.ServicePort{
+					Name: "p9443",
+					Port: 9443,
+				},
+				corev1.ServicePort{
+					Name: "p3100",
+					Port: 3100,
+				},
+			)).
+			WithModifyFns(validateCP3PodSelectorAndLabel),
+		common.NewSecondaryReconcilerBuilder[*corev1.Service]().
 			WithName("platform-identity-management").
 			WithGenerateFns(generateService(
 				false,
@@ -137,6 +150,39 @@ func generateService(useSessionAffinity bool, ports ...corev1.ServicePort) commo
 		}
 		if useSessionAffinity {
 			service.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
+		}
+
+		// Set Authentication instance as the owner and controller of the Service
+		err = controllerutil.SetControllerReference(s.GetPrimary(), service, s.GetClient().Scheme())
+		return
+	}
+}
+
+// generateHeadlessService returns a GenerateFn that creates a Headless Service
+// for direct Pod access. ClusterIP is set to None to bypass load balancing and
+// enable direct Pod-to-Pod communication via DNS without requiring ServiceAccount
+// tokens to query the Endpoints API.
+func generateHeadlessService(ports ...corev1.ServicePort) common.GenerateFn[*corev1.Service] {
+	return func(s common.SecondaryReconciler, ctx context.Context, service *corev1.Service) (err error) {
+		*service = corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      s.GetName(),
+				Namespace: s.GetNamespace(),
+				Labels: map[string]string{
+					"app":          "platform-auth-service",
+					"service-type": "headless",
+				},
+			},
+			Spec: corev1.ServiceSpec{
+				Ports: ports,
+				Selector: map[string]string{
+					"k8s-app": "platform-auth-service",
+				},
+				ClusterIP:                "None", // Headless Service - no load balancing
+				Type:                     "ClusterIP",
+				SessionAffinity:          corev1.ServiceAffinityNone,
+				PublishNotReadyAddresses: false, // Only return ready Pods in DNS
+			},
 		}
 
 		// Set Authentication instance as the owner and controller of the Service

@@ -3,6 +3,7 @@ package operator
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"text/template"
 	"time"
@@ -13,6 +14,7 @@ import (
 	database "github.com/IBM/ibm-iam-operator/database"
 	dbconn "github.com/IBM/ibm-iam-operator/database/connectors"
 	"github.com/IBM/ibm-iam-operator/database/migration"
+	v1schema "github.com/IBM/ibm-iam-operator/database/schema/v1"
 	certmgr "github.com/ibm/ibm-cert-manager-operator/apis/cert-manager/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -466,25 +468,57 @@ func (r *AuthenticationReconciler) hasMongoDBService(ctx context.Context, authCR
 	return true, nil
 }
 
-// needToMigrateFromMongo attempts to determine whether a migration from MongoDB is needed. Returns an error when an
-// unexpected error occurs while trying to get resources from the cluster.
 func (r *AuthenticationReconciler) needToMigrateFromMongo(ctx context.Context, authCR *operatorv1alpha1.Authentication) (need bool, err error) {
+	reqLogger := logf.FromContext(ctx)
+
+	if val, ok := authCR.Annotations[operatorv1alpha1.AnnotationMongoMigrationStatus]; ok {
+		switch val {
+		case "complete", "not-needed":
+			reqLogger.Info("Annotation indicates MongoDB migration not needed", "value", val)
+			return false, nil
+		case "required":
+			reqLogger.Info("Annotation indicates MongoDB migration required", "value", val)
+			return true, nil
+		}
+	}
+
 	if authCR.HasBeenMigrated() {
 		return false, nil
 	}
+
+	postgres, err := r.getPostgresDB(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+		Name: authCR.Name, Namespace: authCR.Namespace}})
+	if err == nil {
+		changelogs, err := v1schema.GetChangelogs(ctx, postgres)
+		if err == nil {
+			if _, exists := changelogs[v1schema.MongoToEDBv1.ID]; exists {
+				reqLogger.Info("MongoToEDB migration found in changelog; no migration needed")
+				return false, nil
+			}
+			reqLogger.Info("Changelog exists but MongoToEDB not recorded; checking for MongoDB resources")
+		} else if errors.Is(err, v1schema.ErrTableDoesNotExist) {
+			reqLogger.Info("Changelog table does not exist; checking for MongoDB resources to determine migration need")
+		} else {
+			reqLogger.Error(err, "Failed to read changelog; will check MongoDB resources as fallback")
+		}
+	}
+
 	var hasResource bool
 	if hasResource, err = r.hasPreloadMongoDBConfigMap(ctx, authCR.Namespace); hasResource {
+		reqLogger.Info("Found MongoDB preload ConfigMap; migration needed")
 		return true, nil
 	} else if err != nil {
 		return false, err
 	}
 
 	if hasResource, err = r.hasMongoDBService(ctx, authCR); hasResource {
+		reqLogger.Info("Found MongoDB Service; migration needed")
 		return true, nil
 	} else if err != nil {
 		return false, err
 	}
 
+	reqLogger.Info("No MongoDB resources found; no migration needed")
 	return false, nil
 }
 

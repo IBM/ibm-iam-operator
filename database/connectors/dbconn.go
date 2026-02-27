@@ -85,8 +85,35 @@ func (p *PostgresDB) Disconnect(ctx context.Context) error {
 }
 
 func (p *PostgresDB) RunDDL(ctx context.Context, ddl string) (err error) {
-	_, err = p.Conn.Exec(ctx, ddl)
-	return
+	reqLogger := logf.FromContext(ctx)
+
+	tx, err := p.Conn.Begin(ctx)
+	if err != nil {
+		reqLogger.Error(err, "Failed to begin transaction for DDL")
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			reqLogger.Info("Rolling back DDL transaction due to error")
+			if rbErr := tx.Rollback(ctx); rbErr != nil {
+				reqLogger.Error(rbErr, "Failed to rollback DDL transaction")
+			}
+		}
+	}()
+
+	if _, err = tx.Exec(ctx, ddl); err != nil {
+		reqLogger.Error(err, "Failed to execute DDL")
+		return err
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		reqLogger.Error(err, "Failed to commit DDL transaction")
+		return err
+	}
+
+	reqLogger.Info("Successfully executed and committed DDL")
+	return nil
 }
 
 func (p *PostgresDB) HasSchemas(ctx context.Context) (bool, error) {

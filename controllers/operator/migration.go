@@ -3,6 +3,7 @@ package operator
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"text/template"
 	"time"
@@ -13,6 +14,7 @@ import (
 	database "github.com/IBM/ibm-iam-operator/database"
 	dbconn "github.com/IBM/ibm-iam-operator/database/connectors"
 	"github.com/IBM/ibm-iam-operator/database/migration"
+	v1schema "github.com/IBM/ibm-iam-operator/database/schema/v1"
 	certmgr "github.com/ibm/ibm-cert-manager-operator/apis/cert-manager/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -367,7 +369,15 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		return subreconciler.RequeueWithError(err)
 	} else if needsMongoMigration {
 		if mongo, err = r.getMongoDB(ctx, req); k8sErrors.IsNotFound(err) {
-			reqLogger.Info("Could not find all resources for configuring MongoDB connection; requeueing")
+			// Check if user forced migration via annotation
+			if val, ok := authCR.Annotations[operatorv1alpha1.AnnotationMongoMigrationStatus]; ok && val == "required" {
+				reqLogger.Info("MongoDB migration forced via annotation but MongoDB resources not found - migration cannot proceed",
+					"annotation", operatorv1alpha1.AnnotationMongoMigrationStatus,
+					"value", val,
+					"recommendation", "Remove annotation or ensure MongoDB resources exist")
+			} else {
+				reqLogger.Info("Could not find all resources for configuring MongoDB connection; requeueing")
+			}
 			return subreconciler.RequeueWithDelay(opreqWait)
 		} else if err != nil {
 			reqLogger.Error(err, "Failed to find resources for configuring MongoDB connection")
@@ -399,6 +409,11 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 
 	if r.dbSetupChan == nil {
 		reqLogger.Info("No active or pending migrations; continuing")
+		// Remove the annotation if it exists since migrations are not needed
+		if err := r.removeMongoMigrationAnnotation(ctx, authCR); err != nil {
+			reqLogger.Error(err, "Failed to remove mongo-migration-status annotation, but continuing")
+			// Don't fail the reconciliation for annotation cleanup
+		}
 		return subreconciler.ContinueReconciling()
 	}
 
@@ -424,9 +439,19 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		} else if migrationResult != nil {
 			reqLogger.Info("Completed all migrations successfully")
 			performedCondition = operatorv1alpha1.NewMigrationCompleteCondition()
+			// Remove the annotation since migrations completed successfully
+			if err := r.removeMongoMigrationAnnotation(ctx, authCR); err != nil {
+				reqLogger.Error(err, "Failed to remove mongo-migration-status annotation, but continuing")
+				// Don't fail the reconciliation for annotation cleanup
+			}
 		} else {
 			reqLogger.Info("No migrations needed to be performed by the worker")
 			performedCondition = operatorv1alpha1.NewMigrationCompleteCondition()
+			// Remove the annotation since no migrations were needed
+			if err := r.removeMongoMigrationAnnotation(ctx, authCR); err != nil {
+				reqLogger.Error(err, "Failed to remove mongo-migration-status annotation, but continuing")
+				// Don't fail the reconciliation for annotation cleanup
+			}
 		}
 		runningCondition = operatorv1alpha1.NewMigrationFinishedCondition()
 		r.dbSetupChan = nil
@@ -438,6 +463,31 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		reqLogger.Info("Migration still in progress; check again in 10s")
 		return subreconciler.RequeueWithDelay(migrationWait)
 	}
+}
+
+// removeMongoMigrationAnnotation removes the mongo-migration-status annotation from the Authentication CR
+// This should be called when migrations are complete or not needed, regardless of the annotation's value.
+// This prevents infinite re-migration loops when the annotation is set to "required".
+func (r *AuthenticationReconciler) removeMongoMigrationAnnotation(ctx context.Context, authCR *operatorv1alpha1.Authentication) error {
+	reqLogger := logf.FromContext(ctx)
+
+	if authCR.Annotations == nil {
+		return nil
+	}
+
+	val, exists := authCR.Annotations[operatorv1alpha1.AnnotationMongoMigrationStatus]
+	if !exists {
+		return nil
+	}
+
+	delete(authCR.Annotations, operatorv1alpha1.AnnotationMongoMigrationStatus)
+	if err := r.Update(ctx, authCR); err != nil {
+		reqLogger.Error(err, "Failed to remove mongo-migration-status annotation")
+		return err
+	}
+
+	reqLogger.Info("Removed mongo-migration-status annotation from Authentication CR", "previousValue", val)
+	return nil
 }
 
 func (r *AuthenticationReconciler) getPreloadMongoDBConfigMap(ctx context.Context, namespace string) (cm *corev1.ConfigMap, err error) {
@@ -466,25 +516,57 @@ func (r *AuthenticationReconciler) hasMongoDBService(ctx context.Context, authCR
 	return true, nil
 }
 
-// needToMigrateFromMongo attempts to determine whether a migration from MongoDB is needed. Returns an error when an
-// unexpected error occurs while trying to get resources from the cluster.
 func (r *AuthenticationReconciler) needToMigrateFromMongo(ctx context.Context, authCR *operatorv1alpha1.Authentication) (need bool, err error) {
+	reqLogger := logf.FromContext(ctx)
+
+	if val, ok := authCR.Annotations[operatorv1alpha1.AnnotationMongoMigrationStatus]; ok {
+		switch val {
+		case "not-needed":
+			reqLogger.Info("Annotation indicates MongoDB migration not needed", "value", val)
+			return false, nil
+		case "required":
+			reqLogger.Info("Annotation indicates MongoDB migration required", "value", val)
+			return true, nil
+		}
+	}
+
 	if authCR.HasBeenMigrated() {
 		return false, nil
 	}
+
+	postgres, err := r.getPostgresDB(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+		Name: authCR.Name, Namespace: authCR.Namespace}})
+	if err == nil {
+		changelogs, err := v1schema.GetChangelogs(ctx, postgres)
+		if err == nil {
+			if _, exists := changelogs[v1schema.MongoToEDBv1.ID]; exists {
+				reqLogger.Info("MongoToEDB migration found in changelog; no migration needed")
+				return false, nil
+			}
+			reqLogger.Info("Changelog exists but MongoToEDB not recorded; checking for MongoDB resources")
+		} else if errors.Is(err, v1schema.ErrTableDoesNotExist) {
+			reqLogger.Info("Changelog table does not exist; checking for MongoDB resources to determine migration need")
+		} else {
+			reqLogger.Error(err, "Failed to read changelog; will check MongoDB resources as fallback")
+		}
+	}
+
 	var hasResource bool
 	if hasResource, err = r.hasPreloadMongoDBConfigMap(ctx, authCR.Namespace); hasResource {
+		reqLogger.Info("Found MongoDB preload ConfigMap; migration needed")
 		return true, nil
 	} else if err != nil {
 		return false, err
 	}
 
 	if hasResource, err = r.hasMongoDBService(ctx, authCR); hasResource {
+		reqLogger.Info("Found MongoDB Service; migration needed")
 		return true, nil
 	} else if err != nil {
 		return false, err
 	}
 
+	reqLogger.Info("No MongoDB resources found; no migration needed")
 	return false, nil
 }
 

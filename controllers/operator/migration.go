@@ -401,6 +401,11 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 
 	if r.dbSetupChan == nil {
 		reqLogger.Info("No active or pending migrations; continuing")
+		// Remove the annotation if it exists since migrations are not needed
+		if err := r.removeMongoMigrationAnnotation(ctx, authCR); err != nil {
+			reqLogger.Error(err, "Failed to remove mongo-migration-status annotation, but continuing")
+			// Don't fail the reconciliation for annotation cleanup
+		}
 		return subreconciler.ContinueReconciling()
 	}
 
@@ -426,9 +431,19 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		} else if migrationResult != nil {
 			reqLogger.Info("Completed all migrations successfully")
 			performedCondition = operatorv1alpha1.NewMigrationCompleteCondition()
+			// Remove the annotation since migrations completed successfully
+			if err := r.removeMongoMigrationAnnotation(ctx, authCR); err != nil {
+				reqLogger.Error(err, "Failed to remove mongo-migration-status annotation, but continuing")
+				// Don't fail the reconciliation for annotation cleanup
+			}
 		} else {
 			reqLogger.Info("No migrations needed to be performed by the worker")
 			performedCondition = operatorv1alpha1.NewMigrationCompleteCondition()
+			// Remove the annotation since no migrations were needed
+			if err := r.removeMongoMigrationAnnotation(ctx, authCR); err != nil {
+				reqLogger.Error(err, "Failed to remove mongo-migration-status annotation, but continuing")
+				// Don't fail the reconciliation for annotation cleanup
+			}
 		}
 		runningCondition = operatorv1alpha1.NewMigrationFinishedCondition()
 		r.dbSetupChan = nil
@@ -440,6 +455,31 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		reqLogger.Info("Migration still in progress; check again in 10s")
 		return subreconciler.RequeueWithDelay(migrationWait)
 	}
+}
+
+// removeMongoMigrationAnnotation removes the mongo-migration-status annotation from the Authentication CR
+// This should be called when migrations are complete or not needed, regardless of the annotation's value.
+// This prevents infinite re-migration loops when the annotation is set to "required".
+func (r *AuthenticationReconciler) removeMongoMigrationAnnotation(ctx context.Context, authCR *operatorv1alpha1.Authentication) error {
+	reqLogger := logf.FromContext(ctx)
+
+	if authCR.Annotations == nil {
+		return nil
+	}
+
+	val, exists := authCR.Annotations[operatorv1alpha1.AnnotationMongoMigrationStatus]
+	if !exists {
+		return nil
+	}
+
+	delete(authCR.Annotations, operatorv1alpha1.AnnotationMongoMigrationStatus)
+	if err := r.Update(ctx, authCR); err != nil {
+		reqLogger.Error(err, "Failed to remove mongo-migration-status annotation")
+		return err
+	}
+
+	reqLogger.Info("Removed mongo-migration-status annotation from Authentication CR", "previousValue", val)
+	return nil
 }
 
 func (r *AuthenticationReconciler) getPreloadMongoDBConfigMap(ctx context.Context, namespace string) (cm *corev1.ConfigMap, err error) {
@@ -473,7 +513,7 @@ func (r *AuthenticationReconciler) needToMigrateFromMongo(ctx context.Context, a
 
 	if val, ok := authCR.Annotations[operatorv1alpha1.AnnotationMongoMigrationStatus]; ok {
 		switch val {
-		case "complete", "not-needed":
+		case "not-needed":
 			reqLogger.Info("Annotation indicates MongoDB migration not needed", "value", val)
 			return false, nil
 		case "required":

@@ -67,8 +67,7 @@ func (r *AuthenticationReconciler) handleServices(ctx context.Context, req ctrl.
 					Name: "p3100",
 					Port: 3100,
 				},
-			)).
-			WithModifyFns(validateCP3PodSelectorAndLabel),
+			)),
 		common.NewSecondaryReconcilerBuilder[*corev1.Service]().
 			WithName("platform-identity-management").
 			WithGenerateFns(generateService(

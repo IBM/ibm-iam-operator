@@ -369,7 +369,15 @@ func (r *AuthenticationReconciler) handleMigrations(ctx context.Context, req ctr
 		return subreconciler.RequeueWithError(err)
 	} else if needsMongoMigration {
 		if mongo, err = r.getMongoDB(ctx, req); k8sErrors.IsNotFound(err) {
-			reqLogger.Info("Could not find all resources for configuring MongoDB connection; requeueing")
+			// Check if user forced migration via annotation
+			if val, ok := authCR.Annotations[operatorv1alpha1.AnnotationMongoMigrationStatus]; ok && val == "required" {
+				reqLogger.Info("MongoDB migration forced via annotation but MongoDB resources not found - migration cannot proceed",
+					"annotation", operatorv1alpha1.AnnotationMongoMigrationStatus,
+					"value", val,
+					"recommendation", "Remove annotation or ensure MongoDB resources exist")
+			} else {
+				reqLogger.Info("Could not find all resources for configuring MongoDB connection; requeueing")
+			}
 			return subreconciler.RequeueWithDelay(opreqWait)
 		} else if err != nil {
 			reqLogger.Error(err, "Failed to find resources for configuring MongoDB connection")

@@ -40,7 +40,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
-	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -73,10 +72,10 @@ func validateCSPExtension(csp *operatorv1alpha1.CSPExtensionConfig) error {
 	}
 	var allEntries []fieldEntry
 	for _, v := range csp.FrameAncestors {
-		allEntries = append(allEntries, fieldEntry{"frameAncestors", v})
+		allEntries = append(allEntries, fieldEntry{field: "frameAncestors", value: v})
 	}
 	for _, v := range csp.ConnectSrc {
-		allEntries = append(allEntries, fieldEntry{"connectSrc", v})
+		allEntries = append(allEntries, fieldEntry{field: "connectSrc", value: v})
 	}
 
 	var invalidEntries []string
@@ -109,29 +108,6 @@ func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctr
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
-	}
-
-	// Validate spec.config.cspExtension before proceeding.
-	// If invalid, set a status condition and halt without propagating the bad
-	// value to the platform-auth-idp ConfigMap.
-	if validationErr := validateCSPExtension(authCR.Spec.Config.CSPExtension); validationErr != nil {
-		log.Error(validationErr, "spec.config.cspExtension contains invalid entries; halting ConfigMap reconciliation")
-		observed := authCR.DeepCopy()
-		k8smeta.SetStatusCondition(&observed.Status.Conditions, *operatorv1alpha1.NewCSPExtensionInvalidCondition(validationErr.Error()))
-		if statusErr := r.Client.Status().Update(ctx, observed); statusErr != nil {
-			log.Error(statusErr, "Failed to update Authentication status with CSPExtension validation error")
-		}
-		// Do not requeue — the CR must be corrected by the user.
-		return subreconciler.DoNotRequeue()
-	}
-
-	// CSPExtension is valid (or absent); clear any previous invalid condition.
-	{
-		observed := authCR.DeepCopy()
-		k8smeta.SetStatusCondition(&observed.Status.Conditions, *operatorv1alpha1.NewCSPExtensionValidCondition())
-		if statusErr := r.Client.Status().Update(ctx, observed); statusErr != nil {
-			log.Error(statusErr, "Failed to clear CSPExtensionInvalid status condition")
-		}
 	}
 
 	// Ensure that the ibmcloud-cluster-info configmap is created
@@ -398,7 +374,8 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"ACCOUNT_IAM_URL",
 			"LIBERTY_SAMESITE_COOKIE",
 			"SECRETS_STORE_AVAILABLE",
-			"CSP_EXTENSION",
+			"CSP_FRAME_ANCESTORS",
+			"CSP_CONNECT_SRC",
 		),
 		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("SESSION_TIMEOUT", "43200"),
 			"SESSION_TIMEOUT"),
@@ -592,13 +569,16 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 		if authCR.Spec.Config.LibertySSCookie != nil && strings.EqualFold(*authCR.Spec.Config.LibertySSCookie, "none") {
 			libertySSCookie = *authCR.Spec.Config.LibertySSCookie
 		}
-		var cspExtension string
+		var cspFrameAncestors string
+		var cspConnectSrc string
 		if authCR.Spec.Config.CSPExtension != nil {
-			if b, jsonErr := json.Marshal(authCR.Spec.Config.CSPExtension); jsonErr != nil {
-				reqLogger.Error(jsonErr, "Failed to marshal CSPExtension")
-			} else {
-				cspExtension = string(b)
+			if err = validateCSPExtension(authCR.Spec.Config.CSPExtension); err != nil {
+				reqLogger.Error(err, "spec.config.cspExtension contains invalid entries; skipping CSP fields in ConfigMap")
+				err = fmt.Errorf("could not set CSP_EXTENSION: %w", err)
+				return
 			}
+			cspFrameAncestors = strings.Join(authCR.Spec.Config.CSPExtension.FrameAncestors, " ")
+			cspConnectSrc = strings.Join(authCR.Spec.Config.CSPExtension.ConnectSrc, " ")
 		}
 
 		*generated = corev1.ConfigMap{
@@ -695,7 +675,8 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"IS_OPENSHIFT_ENV":                   strconv.FormatBool(isOSEnv),
 				"LIBERTY_SAMESITE_COOKIE":            libertySSCookie,
 				"OAUTH_21_ENABLED":                   strconv.FormatBool(oauth21Enabled),
-				"CSP_EXTENSION":                      cspExtension,
+				"CSP_FRAME_ANCESTORS":                cspFrameAncestors,
+				"CSP_CONNECT_SRC":                    cspConnectSrc,
 			},
 		}
 

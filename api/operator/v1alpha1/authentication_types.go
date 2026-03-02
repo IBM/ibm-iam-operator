@@ -126,51 +126,51 @@ type CSPExtensionConfig struct {
 }
 
 type ConfigSpec struct {
-	ClusterCADomain             string         `json:"clusterCADomain"`
-	DefaultAdminUser            string         `json:"defaultAdminUser"`
-	DefaultAdminPassword        string         `json:"defaultAdminPassword"`
-	ScimAdminUser               string         `json:"scimAdminUser"`
-	ScimAdminPassword           string         `json:"scimAdminPassword"`
-	ClusterName                 string         `json:"clusterName"`
-	ClusterInternalAddress      string         `json:"clusterInternalAddress"`
-	ClusterExternalAddress      string         `json:"clusterExternalAddress"`
-	WLPClientID                 string         `json:"wlpClientID"`
-	WLPClientSecret             string         `json:"wlpClientSecret"`
-	AuthUniqueHosts             string         `json:"authUniqueHosts"`
-	WLPClientRegistrationSecret string         `json:"wlpClientRegistrationSecret"`
-	InstallType                 string         `json:"installType"`
-	IsOpenshiftEnv              bool           `json:"isOpenshiftEnv"`
-	OpenshiftPort               int32          `json:"openshiftPort"`
-	ICPPort                     int32          `json:"icpPort"`
-	FIPSEnabled                 bool           `json:"fipsEnabled"`
-	ROKSEnabled                 bool           `json:"roksEnabled"`
-	AuditUrl                    *string        `json:"auditUrl,omitempty"`
-	AuditSecret                 *string        `json:"auditSecret,omitempty"`
-	IBMCloudSaas                bool           `json:"ibmCloudSaas,omitempty"`
-	OnPremMultipleDeploy        bool           `json:"onPremMultipleDeploy,omitempty"`
-	SaasClientRedirectUrl       string         `json:"saasClientRedirectUrl,omitempty"`
-	NONCEEnabled                bool           `json:"nonceEnabled"`
-	XFrameDomain                string         `json:"xframeDomain,omitempty"`
-	PreferredLogin              string         `json:"preferredLogin,omitempty"`
-	DefaultLogin                string         `json:"defaultLogin,omitempty"`
-	ROKSURL                     string         `json:"roksURL"`
-	ROKSUserPrefix              string         `json:"roksUserPrefix"`
-	EnableImpersonation         bool           `json:"enableImpersonation"`
-	BootstrapUserId             string         `json:"bootstrapUserId,omitempty"`
-	ProviderIssuerURL           string         `json:"providerIssuerURL,omitempty"`
-	ClaimsSupported             string         `json:"claimsSupported,omitempty"`
-	ClaimsMap                   string         `json:"claimsMap,omitempty"`
-	ScopeClaim                  string         `json:"scopeClaim,omitempty"`
-	OIDCIssuerURL               string         `json:"oidcIssuerURL"`
-	AttrMappingFromConfig       bool           `json:"attrMappingFromConfig,omitempty"`
-	ZenFrontDoor                bool           `json:"zenFrontDoor,omitempty"`
-	Ingress                     *IngressConfig `json:"ingress,omitempty"`
+	ClusterCADomain             string              `json:"clusterCADomain"`
+	DefaultAdminUser            string              `json:"defaultAdminUser"`
+	DefaultAdminPassword        string              `json:"defaultAdminPassword"`
+	ScimAdminUser               string              `json:"scimAdminUser"`
+	ScimAdminPassword           string              `json:"scimAdminPassword"`
+	ClusterName                 string              `json:"clusterName"`
+	ClusterInternalAddress      string              `json:"clusterInternalAddress"`
+	ClusterExternalAddress      string              `json:"clusterExternalAddress"`
+	WLPClientID                 string              `json:"wlpClientID"`
+	WLPClientSecret             string              `json:"wlpClientSecret"`
+	AuthUniqueHosts             string              `json:"authUniqueHosts"`
+	WLPClientRegistrationSecret string              `json:"wlpClientRegistrationSecret"`
+	InstallType                 string              `json:"installType"`
+	IsOpenshiftEnv              bool                `json:"isOpenshiftEnv"`
+	OpenshiftPort               int32               `json:"openshiftPort"`
+	ICPPort                     int32               `json:"icpPort"`
+	FIPSEnabled                 bool                `json:"fipsEnabled"`
+	ROKSEnabled                 bool                `json:"roksEnabled"`
+	AuditUrl                    *string             `json:"auditUrl,omitempty"`
+	AuditSecret                 *string             `json:"auditSecret,omitempty"`
+	IBMCloudSaas                bool                `json:"ibmCloudSaas,omitempty"`
+	OnPremMultipleDeploy        bool                `json:"onPremMultipleDeploy,omitempty"`
+	SaasClientRedirectUrl       string              `json:"saasClientRedirectUrl,omitempty"`
+	NONCEEnabled                bool                `json:"nonceEnabled"`
+	XFrameDomain                string              `json:"xframeDomain,omitempty"`
+	PreferredLogin              string              `json:"preferredLogin,omitempty"`
+	DefaultLogin                string              `json:"defaultLogin,omitempty"`
+	ROKSURL                     string              `json:"roksURL"`
+	ROKSUserPrefix              string              `json:"roksUserPrefix"`
+	EnableImpersonation         bool                `json:"enableImpersonation"`
+	BootstrapUserId             string              `json:"bootstrapUserId,omitempty"`
+	ProviderIssuerURL           string              `json:"providerIssuerURL,omitempty"`
+	ClaimsSupported             string              `json:"claimsSupported,omitempty"`
+	ClaimsMap                   string              `json:"claimsMap,omitempty"`
+	ScopeClaim                  string              `json:"scopeClaim,omitempty"`
+	OIDCIssuerURL               string              `json:"oidcIssuerURL"`
+	AttrMappingFromConfig       bool                `json:"attrMappingFromConfig,omitempty"`
+	ZenFrontDoor                bool                `json:"zenFrontDoor,omitempty"`
+	Ingress                     *IngressConfig      `json:"ingress,omitempty"`
 	CSPExtension                *CSPExtensionConfig `json:"cspExtension,omitempty"`
-	OAuth21Enabled              *bool          `json:"oauth21Enabled,omitempty"`
-	IamUm                       *bool          `json:"iamUm,omitempty"`
-	AccountIamURL               *string        `json:"accountIamURL,omitempty"`
-	LibertySSCookie             *string        `json:"libertySSCookie,omitempty"`
-	UseSecretsStoreCSI          *bool          `json:"useSecretsStoreCSI,omitempty"`
+	OAuth21Enabled              *bool               `json:"oauth21Enabled,omitempty"`
+	IamUm                       *bool               `json:"iamUm,omitempty"`
+	AccountIamURL               *string             `json:"accountIamURL,omitempty"`
+	LibertySSCookie             *string             `json:"libertySSCookie,omitempty"`
+	UseSecretsStoreCSI          *bool               `json:"useSecretsStoreCSI,omitempty"`
 }
 
 type ManagedResourceStatus struct {
@@ -230,38 +230,6 @@ const ReasonMigrationComplete string = "Complete"
 const ReasonMigrationsInProgress string = "InProgress"
 const ReasonMigrationsDone string = "Done"
 const ReasonMigrationFailure string = "Failed"
-
-// ConditionCSPExtensionInvalid is set on the Authentication CR when the
-// spec.config.cspExtension field contains invalid URL entries (non-https or
-// containing wildcards). When this condition is True, the invalid value is
-// not propagated to the platform-auth-idp ConfigMap.
-const ConditionCSPExtensionInvalid string = "CSPExtensionInvalid"
-
-const ReasonCSPExtensionInvalid string = "InvalidURL"
-const ReasonCSPExtensionValid string = "Valid"
-
-// NewCSPExtensionInvalidCondition creates a condition indicating that
-// spec.config.cspExtension contains one or more invalid URL entries.
-// The message should describe which entries are invalid and why.
-func NewCSPExtensionInvalidCondition(message string) *metav1.Condition {
-	return &metav1.Condition{
-		Type:    ConditionCSPExtensionInvalid,
-		Status:  metav1.ConditionTrue,
-		Reason:  ReasonCSPExtensionInvalid,
-		Message: message,
-	}
-}
-
-// NewCSPExtensionValidCondition creates a condition indicating that
-// spec.config.cspExtension is valid (or absent).
-func NewCSPExtensionValidCondition() *metav1.Condition {
-	return &metav1.Condition{
-		Type:    ConditionCSPExtensionInvalid,
-		Status:  metav1.ConditionFalse,
-		Reason:  ReasonCSPExtensionValid,
-		Message: "spec.config.cspExtension is valid",
-	}
-}
 
 // Creates a new ConditionMigrationsRunning condition for when the migration Job
 // is still running.

@@ -1050,7 +1050,7 @@ var _ = Describe("ConfigMap handling", func() {
 			}
 		})
 
-		It("sets CSP_EXTENSION to empty string when cspExtension is not configured in the auth CR", func() {
+		It("sets CSP_FRAME_ANCESTORS and CSP_CONNECT_SRC to empty string when cspExtension is not configured in the auth CR", func() {
 			// authCR has no CSPExtension set (nil)
 			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
 				WithName("platform-auth-idp").
@@ -1059,11 +1059,13 @@ var _ = Describe("ConfigMap handling", func() {
 				WithPrimary(authCR).MustBuild()
 			generated := &corev1.ConfigMap{}
 			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
-			Expect(generated.Data).To(HaveKey("CSP_EXTENSION"))
-			Expect(generated.Data["CSP_EXTENSION"]).To(Equal(""))
+			Expect(generated.Data).To(HaveKey("CSP_FRAME_ANCESTORS"))
+			Expect(generated.Data["CSP_FRAME_ANCESTORS"]).To(Equal(""))
+			Expect(generated.Data).To(HaveKey("CSP_CONNECT_SRC"))
+			Expect(generated.Data["CSP_CONNECT_SRC"]).To(Equal(""))
 		})
 
-		It("sets CSP_EXTENSION to a JSON string when cspExtension is configured in the auth CR", func() {
+		It("sets CSP_FRAME_ANCESTORS and CSP_CONNECT_SRC to space-joined strings when cspExtension is configured in the auth CR", func() {
 			authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
 				FrameAncestors: []string{"https://cpd-zen.apps.cluster.com/", "https://custom-portal.customer.com/"},
 				ConnectSrc:     []string{"https://cpd-api.apps.cluster.com/"},
@@ -1075,13 +1077,13 @@ var _ = Describe("ConfigMap handling", func() {
 				WithPrimary(authCR).MustBuild()
 			generated := &corev1.ConfigMap{}
 			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
-			Expect(generated.Data).To(HaveKey("CSP_EXTENSION"))
-			Expect(generated.Data["CSP_EXTENSION"]).To(Equal(
-				`{"frameAncestors":["https://cpd-zen.apps.cluster.com/","https://custom-portal.customer.com/"],"connectSrc":["https://cpd-api.apps.cluster.com/"]}`,
-			))
+			Expect(generated.Data).To(HaveKey("CSP_FRAME_ANCESTORS"))
+			Expect(generated.Data["CSP_FRAME_ANCESTORS"]).To(Equal("https://cpd-zen.apps.cluster.com/ https://custom-portal.customer.com/"))
+			Expect(generated.Data).To(HaveKey("CSP_CONNECT_SRC"))
+			Expect(generated.Data["CSP_CONNECT_SRC"]).To(Equal("https://cpd-api.apps.cluster.com/"))
 		})
 
-		It("sets CSP_EXTENSION to a JSON string with only frameAncestors when connectSrc is not set", func() {
+		It("sets CSP_FRAME_ANCESTORS when only frameAncestors is set and CSP_CONNECT_SRC is empty", func() {
 			authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
 				FrameAncestors: []string{"https://cpd-zen.apps.cluster.com/"},
 			}
@@ -1092,13 +1094,13 @@ var _ = Describe("ConfigMap handling", func() {
 				WithPrimary(authCR).MustBuild()
 			generated := &corev1.ConfigMap{}
 			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
-			Expect(generated.Data).To(HaveKey("CSP_EXTENSION"))
-			Expect(generated.Data["CSP_EXTENSION"]).To(Equal(
-				`{"frameAncestors":["https://cpd-zen.apps.cluster.com/"]}`,
-			))
+			Expect(generated.Data).To(HaveKey("CSP_FRAME_ANCESTORS"))
+			Expect(generated.Data["CSP_FRAME_ANCESTORS"]).To(Equal("https://cpd-zen.apps.cluster.com/"))
+			Expect(generated.Data).To(HaveKey("CSP_CONNECT_SRC"))
+			Expect(generated.Data["CSP_CONNECT_SRC"]).To(Equal(""))
 		})
 
-		It("sets CSP_EXTENSION to a JSON string with only connectSrc when frameAncestors is not set", func() {
+		It("sets CSP_CONNECT_SRC when only connectSrc is set and CSP_FRAME_ANCESTORS is empty", func() {
 			authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
 				ConnectSrc: []string{"https://cpd-api.apps.cluster.com/"},
 			}
@@ -1109,13 +1111,13 @@ var _ = Describe("ConfigMap handling", func() {
 				WithPrimary(authCR).MustBuild()
 			generated := &corev1.ConfigMap{}
 			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
-			Expect(generated.Data).To(HaveKey("CSP_EXTENSION"))
-			Expect(generated.Data["CSP_EXTENSION"]).To(Equal(
-				`{"connectSrc":["https://cpd-api.apps.cluster.com/"]}`,
-			))
+			Expect(generated.Data).To(HaveKey("CSP_FRAME_ANCESTORS"))
+			Expect(generated.Data["CSP_FRAME_ANCESTORS"]).To(Equal(""))
+			Expect(generated.Data).To(HaveKey("CSP_CONNECT_SRC"))
+			Expect(generated.Data["CSP_CONNECT_SRC"]).To(Equal("https://cpd-api.apps.cluster.com/"))
 		})
 
-		It("always overwrites CSP_EXTENSION in observed configmap from the generated value", func() {
+		It("always overwrites CSP_FRAME_ANCESTORS and CSP_CONNECT_SRC in observed configmap from the generated value", func() {
 			authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
 				FrameAncestors: []string{"https://cpd-zen.apps.cluster.com/"},
 				ConnectSrc:     []string{"https://cpd-api.apps.cluster.com/"},
@@ -1126,16 +1128,18 @@ var _ = Describe("ConfigMap handling", func() {
 				WithClient(cl).
 				WithPrimary(authCR).MustBuild()
 			observed := getObserved(authCR.Namespace)
-			observed.Data["CSP_EXTENSION"] = "stale-value"
+			observed.Data["CSP_FRAME_ANCESTORS"] = "stale-frame-value"
+			observed.Data["CSP_CONNECT_SRC"] = "stale-connect-value"
 			generated := &corev1.ConfigMap{}
 			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
 			updated, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(updated).To(BeTrue())
-			Expect(observed.Data["CSP_EXTENSION"]).To(Equal(generated.Data["CSP_EXTENSION"]))
+			Expect(observed.Data["CSP_FRAME_ANCESTORS"]).To(Equal(generated.Data["CSP_FRAME_ANCESTORS"]))
+			Expect(observed.Data["CSP_CONNECT_SRC"]).To(Equal(generated.Data["CSP_CONNECT_SRC"]))
 		})
 
-		It("overwrites CSP_EXTENSION in observed configmap with empty string when cspExtension is removed from auth CR", func() {
+		It("overwrites CSP_FRAME_ANCESTORS and CSP_CONNECT_SRC in observed configmap with empty string when cspExtension is removed from auth CR", func() {
 			// authCR has no CSPExtension (nil) — simulates removing it after it was previously set
 			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
 				WithName("platform-auth-idp").
@@ -1143,14 +1147,33 @@ var _ = Describe("ConfigMap handling", func() {
 				WithClient(cl).
 				WithPrimary(authCR).MustBuild()
 			observed := getObserved(authCR.Namespace)
-			observed.Data["CSP_EXTENSION"] = `{"frameAncestors":["https://old-value.example.com/"]}`
+			observed.Data["CSP_FRAME_ANCESTORS"] = "https://old-value.example.com/"
+			observed.Data["CSP_CONNECT_SRC"] = "https://old-api.example.com/"
 			generated := &corev1.ConfigMap{}
 			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
-			Expect(generated.Data["CSP_EXTENSION"]).To(Equal(""))
+			Expect(generated.Data["CSP_FRAME_ANCESTORS"]).To(Equal(""))
+			Expect(generated.Data["CSP_CONNECT_SRC"]).To(Equal(""))
 			updated, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(updated).To(BeTrue())
-			Expect(observed.Data["CSP_EXTENSION"]).To(Equal(""))
+			Expect(observed.Data["CSP_FRAME_ANCESTORS"]).To(Equal(""))
+			Expect(observed.Data["CSP_CONNECT_SRC"]).To(Equal(""))
+		})
+		It("returns an error from generateAuthIdpConfigMap when cspExtension contains invalid entries in frameAncestors and connectSrc", func() {
+			authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"http://insecure.example.com/"},
+				ConnectSrc:     []string{"https://*.wildcard.example.com/"},
+			}
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+			generated := &corev1.ConfigMap{}
+			err := r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("frameAncestors"))
+			Expect(err.Error()).To(ContainSubstring("connectSrc"))
 		})
 	})
 

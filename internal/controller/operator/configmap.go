@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"strconv"
@@ -39,6 +40,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -54,6 +56,49 @@ const AnnotationSHA1Sum string = "authentication.operator.ibm.com/sha1sum"
 const ZenProductConfigmapName = "product-configmap"
 const URL_PREFIX = "URL_PREFIX"
 
+// validateCSPExtension validates all URL entries in the CSPExtension config.
+// It rejects any entry that:
+//   - contains a wildcard character ('*')
+//   - is not a valid URL with the https scheme
+//
+// Returns a non-nil error describing all invalid entries if any are found,
+// or nil when the config is absent or all entries are valid.
+func validateCSPExtension(csp *operatorv1alpha1.CSPExtensionConfig) error {
+	if csp == nil {
+		return nil
+	}
+	type fieldEntry struct {
+		field string
+		value string
+	}
+	var allEntries []fieldEntry
+	for _, v := range csp.FrameAncestors {
+		allEntries = append(allEntries, fieldEntry{"frameAncestors", v})
+	}
+	for _, v := range csp.ConnectSrc {
+		allEntries = append(allEntries, fieldEntry{"connectSrc", v})
+	}
+
+	var invalidEntries []string
+	for _, e := range allEntries {
+		if strings.Contains(e.value, "*") {
+			invalidEntries = append(invalidEntries,
+				fmt.Sprintf("spec.config.cspExtension.%s: %q contains a wildcard character ('*')", e.field, e.value))
+			continue
+		}
+		parsed, parseErr := url.Parse(e.value)
+		if parseErr != nil || parsed.Scheme != "https" || parsed.Host == "" {
+			invalidEntries = append(invalidEntries,
+				fmt.Sprintf("spec.config.cspExtension.%s: %q is not a valid https URL", e.field, e.value))
+		}
+	}
+
+	if len(invalidEntries) > 0 {
+		return fmt.Errorf("invalid cspExtension entries: %s", strings.Join(invalidEntries, "; "))
+	}
+	return nil
+}
+
 // handleConfigMaps is a subreconciler.FnWithRequest that handles the
 // reconciliation of all ConfigMaps created for a given Authentication.
 func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
@@ -64,6 +109,29 @@ func (r *AuthenticationReconciler) handleConfigMaps(ctx context.Context, req ctr
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
+	}
+
+	// Validate spec.config.cspExtension before proceeding.
+	// If invalid, set a status condition and halt without propagating the bad
+	// value to the platform-auth-idp ConfigMap.
+	if validationErr := validateCSPExtension(authCR.Spec.Config.CSPExtension); validationErr != nil {
+		log.Error(validationErr, "spec.config.cspExtension contains invalid entries; halting ConfigMap reconciliation")
+		observed := authCR.DeepCopy()
+		k8smeta.SetStatusCondition(&observed.Status.Conditions, *operatorv1alpha1.NewCSPExtensionInvalidCondition(validationErr.Error()))
+		if statusErr := r.Client.Status().Update(ctx, observed); statusErr != nil {
+			log.Error(statusErr, "Failed to update Authentication status with CSPExtension validation error")
+		}
+		// Do not requeue — the CR must be corrected by the user.
+		return subreconciler.DoNotRequeue()
+	}
+
+	// CSPExtension is valid (or absent); clear any previous invalid condition.
+	{
+		observed := authCR.DeepCopy()
+		k8smeta.SetStatusCondition(&observed.Status.Conditions, *operatorv1alpha1.NewCSPExtensionValidCondition())
+		if statusErr := r.Client.Status().Update(ctx, observed); statusErr != nil {
+			log.Error(statusErr, "Failed to clear CSPExtensionInvalid status condition")
+		}
 	}
 
 	// Ensure that the ibmcloud-cluster-info configmap is created

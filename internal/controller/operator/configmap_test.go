@@ -1154,6 +1154,111 @@ var _ = Describe("ConfigMap handling", func() {
 		})
 	})
 
+	Describe("validate CSPExtension", func() {
+		It("returns nil when CSPExtension is nil", func() {
+			Expect(validateCSPExtension(nil)).To(Succeed())
+		})
+
+		It("returns nil when CSPExtension has empty slices", func() {
+			Expect(validateCSPExtension(&operatorv1alpha1.CSPExtensionConfig{})).To(Succeed())
+		})
+
+		It("returns nil for valid https URLs in frameAncestors and connectSrc", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{
+					"https://cpd-zen.apps.cluster.com/",
+					"https://custom-portal.customer.com/",
+				},
+				ConnectSrc: []string{
+					"https://cpd-api.apps.cluster.com/",
+				},
+			}
+			Expect(validateCSPExtension(csp)).To(Succeed())
+		})
+
+		It("returns an error when a frameAncestors entry contains a wildcard", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"https://*.example.com/"},
+			}
+			err := validateCSPExtension(csp)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("frameAncestors"))
+			Expect(err.Error()).To(ContainSubstring("wildcard"))
+		})
+
+		It("returns an error when a connectSrc entry contains a wildcard", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				ConnectSrc: []string{"https://*.api.example.com/"},
+			}
+			err := validateCSPExtension(csp)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("connectSrc"))
+			Expect(err.Error()).To(ContainSubstring("wildcard"))
+		})
+
+		It("returns an error when a frameAncestors entry uses http instead of https", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"http://insecure.example.com/"},
+			}
+			err := validateCSPExtension(csp)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("frameAncestors"))
+			Expect(err.Error()).To(ContainSubstring("not a valid https URL"))
+		})
+
+		It("returns an error when a connectSrc entry uses http instead of https", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				ConnectSrc: []string{"http://insecure-api.example.com/"},
+			}
+			err := validateCSPExtension(csp)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("connectSrc"))
+			Expect(err.Error()).To(ContainSubstring("not a valid https URL"))
+		})
+
+		It("returns an error when a frameAncestors entry is not a URL at all", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"not-a-url"},
+			}
+			err := validateCSPExtension(csp)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("frameAncestors"))
+			Expect(err.Error()).To(ContainSubstring("not a valid https URL"))
+		})
+
+		It("returns an error listing all invalid entries when multiple are invalid", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{
+					"https://valid.example.com/",
+					"http://bad.example.com/",
+					"https://*.wildcard.example.com/",
+				},
+				ConnectSrc: []string{
+					"https://valid-api.example.com/",
+					"ftp://wrong-scheme.example.com/",
+				},
+			}
+			err := validateCSPExtension(csp)
+			Expect(err).To(HaveOccurred())
+			// Should mention both invalid entries
+			Expect(err.Error()).To(ContainSubstring(`"http://bad.example.com/"`))
+			Expect(err.Error()).To(ContainSubstring(`"https://*.wildcard.example.com/"`))
+			Expect(err.Error()).To(ContainSubstring(`"ftp://wrong-scheme.example.com/"`))
+			// Should NOT mention the valid entries
+			Expect(err.Error()).NotTo(ContainSubstring("valid.example.com"))
+			Expect(err.Error()).NotTo(ContainSubstring("valid-api.example.com"))
+		})
+
+		It("returns an error when a frameAncestors entry has no host", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"https://"},
+			}
+			err := validateCSPExtension(csp)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("not a valid https URL"))
+		})
+	})
+
 	Describe("oauth-client-map handling", func() {
 		var authCR *operatorv1alpha1.Authentication
 		var cb fakeclient.ClientBuilder

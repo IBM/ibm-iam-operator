@@ -231,6 +231,38 @@ const ReasonMigrationsInProgress string = "InProgress"
 const ReasonMigrationsDone string = "Done"
 const ReasonMigrationFailure string = "Failed"
 
+// ConditionCSPExtensionInvalid is set on the Authentication CR when the
+// spec.config.cspExtension field contains invalid URL entries (non-https or
+// containing wildcards). When this condition is True, the invalid value is
+// not propagated to the platform-auth-idp ConfigMap.
+const ConditionCSPExtensionInvalid string = "CSPExtensionInvalid"
+
+const ReasonCSPExtensionInvalid string = "InvalidURL"
+const ReasonCSPExtensionValid string = "Valid"
+
+// NewCSPExtensionInvalidCondition creates a condition indicating that
+// spec.config.cspExtension contains one or more invalid URL entries.
+// The message should describe which entries are invalid and why.
+func NewCSPExtensionInvalidCondition(message string) *metav1.Condition {
+	return &metav1.Condition{
+		Type:    ConditionCSPExtensionInvalid,
+		Status:  metav1.ConditionTrue,
+		Reason:  ReasonCSPExtensionInvalid,
+		Message: message,
+	}
+}
+
+// NewCSPExtensionValidCondition creates a condition indicating that
+// spec.config.cspExtension is valid (or absent).
+func NewCSPExtensionValidCondition() *metav1.Condition {
+	return &metav1.Condition{
+		Type:    ConditionCSPExtensionInvalid,
+		Status:  metav1.ConditionFalse,
+		Reason:  ReasonCSPExtensionValid,
+		Message: "spec.config.cspExtension is valid",
+	}
+}
+
 // Creates a new ConditionMigrationsRunning condition for when the migration Job
 // is still running.
 func NewMigrationInProgressCondition() *metav1.Condition {

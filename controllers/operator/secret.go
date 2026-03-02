@@ -98,8 +98,6 @@ func (r *AuthenticationReconciler) generateSecretData(instance *operatorv1alpha1
 			"WLP_CLIENT_SECRET":                 []byte(wlpClientSecret),
 			"WLP_SCOPE":                         []byte("openid+profile+email"),
 			"OAUTH2_CLIENT_REGISTRATION_SECRET": []byte(wlpClientRegistrationSecret),
-			"IBMID_CLIENT_SECRET":               []byte("903305fb599c8328a4d86d4cbdd07368"),
-			"IBMID_PROFILE_CLIENT_SECRET":       []byte("C1bR0rO7kE0cE3xM2tV1gI0mG1cH3jK4dD7iQ8rW6pF1aF4mQ5"),
 		},
 		//@posriniv - verify once again - This is a dummy cert which has to be replaced by the user
 		"platform-auth-ibmid-jwk": {

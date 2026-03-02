@@ -22,6 +22,7 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func (r *AuthenticationReconciler) createRoleBinding(instance *operatorv1alpha1.Authentication) {
@@ -57,6 +58,11 @@ func (r *AuthenticationReconciler) iamOperandRB(instance *operatorv1alpha1.Authe
 				Namespace: instance.Namespace,
 			},
 		},
+	}
+	// Set Authentication instance as the owner and controller for rolebinding
+	err := controllerutil.SetControllerReference(instance, operandRB, r.Scheme)
+	if err != nil {
+		return nil
 	}
 	return operandRB
 

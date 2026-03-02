@@ -30,9 +30,11 @@ import (
 	certmgr "github.com/ibm/ibm-cert-manager-operator/apis/cert-manager/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -248,6 +250,59 @@ func (r *AuthenticationReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			return
 		}
 	} else {
+		// delete clusterrole and clusterrolebinding
+		objectsToDelete := []client.Object{}
+		var canDeleteCRB, canDeleteCR bool
+		// Check if operator has permission to delete ClusterRoleBinding
+		canDeleteCRB, err = r.hasAPIAccess(ctx, "", rbacv1.SchemeGroupVersion.Group, "clusterrolebindings", []string{"delete"})
+		if err != nil {
+			log.Error(err, "Failed to check delete permission for ClusterRoleBinding")
+		}
+
+		if !canDeleteCRB {
+			log.Info("Operator does not have permission to delete ClusterRoleBinding, skipping deletion")
+		} else {
+			operandCRB := fmt.Sprintf("ibm-iam-operand-restricted-%s", instance.Namespace)
+			// Add ClusterRoleBinding to deletion list
+			objectsToDelete = append(
+				objectsToDelete,
+				&rbacv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: operandCRB,
+					},
+				})
+		}
+		// Check if operator has permission to delete ClusterRole
+		canDeleteCR, err = r.hasAPIAccess(ctx, "", rbacv1.SchemeGroupVersion.Group, "clusterroles", []string{"delete"})
+		if err != nil {
+			log.Error(err, "Failed to check delete permission for ClusterRole")
+		}
+
+		if !canDeleteCR {
+			log.Info("Operator does not have permission to delete ClusterRole, skipping deletion")
+		} else {
+			// Add ClusterRole to deletion list
+			objectsToDelete = append(
+				objectsToDelete,
+				&rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "ibm-iam-operand-restricted",
+					},
+				})
+		}
+
+		for _, obj := range objectsToDelete {
+			deleteLog := log.WithValues("Object.Name", obj.GetName(), "Object.Kind", obj.GetObjectKind().GroupVersionKind().Kind)
+			if err = r.Client.Delete(ctx, obj); k8sErrors.IsNotFound(err) {
+				deleteLog.Info("Object not found; skipping")
+			} else if err != nil {
+				deleteLog.Error(err, "Failed to delete Object")
+			} else {
+				deleteLog.Info("Object deleted successfully")
+			}
+		}
+
+		log.Info("Authentication is being deleted")
 		// Object scheduled to be deleted
 		err = r.removeFinalizer(reconcileCtx, finalizerName, instance)
 		return
@@ -457,4 +512,34 @@ func removeString(slice []string, s string) (result []string) {
 		result = append(result, item)
 	}
 	return
+}
+
+// hasAPIAccess uses SelfSubjectAccessReviews to confirm whether the Opertor's ServiceAccount has authorization to use a
+// list of verbs on a given apiversion and kind.
+func (r *AuthenticationReconciler) hasAPIAccess(ctx context.Context, namespace string, group string, resource string, verbs []string) (hasAccess bool, err error) {
+	reqLogger := logf.FromContext(ctx).V(1).WithValues("namespace", namespace, "group", group, "resource", resource, "verbs", verbs)
+	for _, verb := range verbs {
+		ssar := &authorizationv1.SelfSubjectAccessReview{
+			Spec: authorizationv1.SelfSubjectAccessReviewSpec{
+				ResourceAttributes: &authorizationv1.ResourceAttributes{
+					Namespace: namespace,
+					Verb:      verb,
+					Group:     group,
+					Resource:  resource,
+				},
+			},
+		}
+		reqLogger.Info("Creating SSAR", "namespace", namespace, "verb", verb, "group", group, "resource", resource)
+		if err = r.Create(ctx, ssar); err != nil {
+			reqLogger.Error(err, "Failed to make access check query")
+			return false, fmt.Errorf("failed to make access check query: %w", err)
+		}
+		if !ssar.Status.Allowed {
+			reqLogger.Info("Operator ServiceAccount is not authorized", "allowed", ssar.Status.Allowed, "denied", ssar.Status.Denied, "reason", ssar.Status.Reason)
+			return
+		}
+	}
+
+	reqLogger.Info("Operator ServiceAccount is authorized")
+	return true, nil
 }

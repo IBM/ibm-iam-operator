@@ -46,6 +46,11 @@ func (r *AuthenticationReconciler) createSA(instance *operatorv1alpha1.Authentic
 			return
 		}
 		// serviceaccount created successfully - return and requeue
+		// Set Authentication instance as the owner and controller for serviceaccount
+		err = controllerutil.SetControllerReference(instance, operandSA, r.Scheme)
+		if err != nil {
+			return nil
+		}
 		*needToRequeue = true
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get serviceaccount")

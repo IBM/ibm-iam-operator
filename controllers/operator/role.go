@@ -22,6 +22,7 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func (r *AuthenticationReconciler) createRole(instance *operatorv1alpha1.Authentication) {
@@ -58,6 +59,11 @@ func (r *AuthenticationReconciler) iamOperandRole(instance *operatorv1alpha1.Aut
 				Verbs:     []string{"create", "delete", "watch", "get", "list", "patch", "update"},
 			},
 		},
+	}
+	// Set Authentication instance as the owner and controller for role
+	err := controllerutil.SetControllerReference(instance, operandRole, r.Scheme)
+	if err != nil {
+		return nil
 	}
 	return operandRole
 

@@ -122,7 +122,7 @@ type IngressConfig struct {
 
 type CSPExtensionConfig struct {
 	FrameAncestors []string `json:"frameAncestors,omitempty"`
-	ConnectSrc []string `json:"connectSrc,omitempty"`
+	ConnectSrc     []string `json:"connectSrc,omitempty"`
 }
 
 type ConfigSpec struct {

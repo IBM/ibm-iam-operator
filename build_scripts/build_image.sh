@@ -14,4 +14,4 @@ go version
 
 echo "**************** Building images ****************"
 
-make images
+VERSION=4.15-66578 make images

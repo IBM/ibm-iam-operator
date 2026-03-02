@@ -1047,11 +1047,114 @@ var _ = Describe("ConfigMap handling", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(updated).To(BeTrue())
 				Expect(observed.Data[test]).To(Equal(generated.Data[test]))
-			}
+				}
+			})
+	
+			It("sets CSP_EXTENSION to empty string when cspExtension is not configured in the auth CR", func() {
+				// authCR has no CSPExtension set (nil)
+				resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+					WithName("platform-auth-idp").
+					WithNamespace(authCR.Namespace).
+					WithClient(cl).
+					WithPrimary(authCR).MustBuild()
+				generated := &corev1.ConfigMap{}
+				Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+				Expect(generated.Data).To(HaveKey("CSP_EXTENSION"))
+				Expect(generated.Data["CSP_EXTENSION"]).To(Equal(""))
+			})
+	
+			It("sets CSP_EXTENSION to a JSON string when cspExtension is configured in the auth CR", func() {
+				authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
+					FrameAncestors: []string{"https://cpd-zen.apps.cluster.com/", "https://custom-portal.customer.com/"},
+					ConnectSrc:     []string{"https://cpd-api.apps.cluster.com/"},
+				}
+				resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+					WithName("platform-auth-idp").
+					WithNamespace(authCR.Namespace).
+					WithClient(cl).
+					WithPrimary(authCR).MustBuild()
+				generated := &corev1.ConfigMap{}
+				Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+				Expect(generated.Data).To(HaveKey("CSP_EXTENSION"))
+				Expect(generated.Data["CSP_EXTENSION"]).To(Equal(
+					`{"frameAncestors":["https://cpd-zen.apps.cluster.com/","https://custom-portal.customer.com/"],"connectSrc":["https://cpd-api.apps.cluster.com/"]}`,
+				))
+			})
+	
+			It("sets CSP_EXTENSION to a JSON string with only frameAncestors when connectSrc is not set", func() {
+				authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
+					FrameAncestors: []string{"https://cpd-zen.apps.cluster.com/"},
+				}
+				resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+					WithName("platform-auth-idp").
+					WithNamespace(authCR.Namespace).
+					WithClient(cl).
+					WithPrimary(authCR).MustBuild()
+				generated := &corev1.ConfigMap{}
+				Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+				Expect(generated.Data).To(HaveKey("CSP_EXTENSION"))
+				Expect(generated.Data["CSP_EXTENSION"]).To(Equal(
+					`{"frameAncestors":["https://cpd-zen.apps.cluster.com/"]}`,
+				))
+			})
+	
+			It("sets CSP_EXTENSION to a JSON string with only connectSrc when frameAncestors is not set", func() {
+				authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
+					ConnectSrc: []string{"https://cpd-api.apps.cluster.com/"},
+				}
+				resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+					WithName("platform-auth-idp").
+					WithNamespace(authCR.Namespace).
+					WithClient(cl).
+					WithPrimary(authCR).MustBuild()
+				generated := &corev1.ConfigMap{}
+				Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+				Expect(generated.Data).To(HaveKey("CSP_EXTENSION"))
+				Expect(generated.Data["CSP_EXTENSION"]).To(Equal(
+					`{"connectSrc":["https://cpd-api.apps.cluster.com/"]}`,
+				))
+			})
+	
+			It("always overwrites CSP_EXTENSION in observed configmap from the generated value", func() {
+				authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
+					FrameAncestors: []string{"https://cpd-zen.apps.cluster.com/"},
+					ConnectSrc:     []string{"https://cpd-api.apps.cluster.com/"},
+				}
+				resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+					WithName("platform-auth-idp").
+					WithNamespace(authCR.Namespace).
+					WithClient(cl).
+					WithPrimary(authCR).MustBuild()
+				observed := getObserved(authCR.Namespace)
+				observed.Data["CSP_EXTENSION"] = "stale-value"
+				generated := &corev1.ConfigMap{}
+				Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+				updated, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(updated).To(BeTrue())
+				Expect(observed.Data["CSP_EXTENSION"]).To(Equal(generated.Data["CSP_EXTENSION"]))
+			})
+	
+			It("overwrites CSP_EXTENSION in observed configmap with empty string when cspExtension is removed from auth CR", func() {
+				// authCR has no CSPExtension (nil) — simulates removing it after it was previously set
+				resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+					WithName("platform-auth-idp").
+					WithNamespace(authCR.Namespace).
+					WithClient(cl).
+					WithPrimary(authCR).MustBuild()
+				observed := getObserved(authCR.Namespace)
+				observed.Data["CSP_EXTENSION"] = `{"frameAncestors":["https://old-value.example.com/"]}`
+				generated := &corev1.ConfigMap{}
+				Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+				Expect(generated.Data["CSP_EXTENSION"]).To(Equal(""))
+				updated, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(updated).To(BeTrue())
+				Expect(observed.Data["CSP_EXTENSION"]).To(Equal(""))
+			})
 		})
-	})
-
-	Describe("oauth-client-map handling", func() {
+	
+		Describe("oauth-client-map handling", func() {
 		var authCR *operatorv1alpha1.Authentication
 		var cb fakeclient.ClientBuilder
 		var cl client.WithWatch

@@ -194,6 +194,18 @@ spec:
                     type: string
                   clusterName:
                     type: string
+                  cspExtension:
+                    properties:
+                      frameAncestors: 
+                        type: array
+                        items:
+                          type: string
+                      connectSrc:
+                        type: array
+                        items:
+                          type: string
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
                   defaultAdminPassword:
                     type: string
                   defaultAdminUser:

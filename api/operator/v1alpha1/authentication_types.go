@@ -120,6 +120,11 @@ type IngressConfig struct {
 	Secret   *string `json:"secret,omitempty"`
 }
 
+type CSPExtensionConfig struct {
+	FrameAncestors []string `json:"frameAncestors,omitempty"`
+	ConnectSrc []string `json:"connectSrc,omitempty"`
+}
+
 type ConfigSpec struct {
 	ClusterCADomain             string         `json:"clusterCADomain"`
 	DefaultAdminUser            string         `json:"defaultAdminUser"`
@@ -160,6 +165,7 @@ type ConfigSpec struct {
 	AttrMappingFromConfig       bool           `json:"attrMappingFromConfig,omitempty"`
 	ZenFrontDoor                bool           `json:"zenFrontDoor,omitempty"`
 	Ingress                     *IngressConfig `json:"ingress,omitempty"`
+	CSPExtension                *CSPExtensionConfig `json:"cspExtension,omitempty"`
 	OAuth21Enabled              *bool          `json:"oauth21Enabled,omitempty"`
 	IamUm                       *bool          `json:"iamUm,omitempty"`
 	AccountIamURL               *string        `json:"accountIamURL,omitempty"`

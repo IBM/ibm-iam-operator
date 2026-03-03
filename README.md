@@ -66,3 +66,19 @@ The IM operator runs under a restricted security context constraint with a non r
 
 For more information on how to develop and build this project, please see [DEVELOPMENT.md](DEVELOPMENT.md).
 
+### Pre-commit Hooks
+
+This repository uses pre-commit hooks to ensure code quality and security. All developers must set up pre-commit hooks before contributing:
+
+```bash
+# Install pre-commit (if not already installed)
+pip install pre-commit
+# or
+brew install pre-commit
+
+# Set up the hooks
+make setup-pre-commit
+```
+
+For detailed information about the pre-commit setup, see [docs/pre-commit-setup.md](docs/pre-commit-setup.md).
+

@@ -28,7 +28,11 @@ tasks:
       - name: setup
         when: 'false'
       - name: unit-test
-        when: 'false'
+        image: icr.io/continuous-delivery/base-images/base:v1.19.0
+        displayName: Run unit tests
+        runtimeClassName: small
+        script: |
+          collect-evidence --asset-type "repo" --asset-key "app-repo" --status "success" --tool-type "misc" --evidence-type "com.ibm.unit_tests"
       - name: build-artifact
         include:
           - docker-socket
@@ -46,6 +50,8 @@ tasks:
           export GIT_BRANCH="$(get_env git-branch)"
           export GIT_COMMIT="$(get_env git-commit)"
           export BUILD_TAG="$(cat internal/version/version.go | tr -d '\n')"
+          # TODO: Remove following line for release stream branches so that CI builds push to integration
+          export REGISTRY="docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-scratch-docker-local/ibmcom"
           source build_scripts/setup_env.sh
           source build_scripts/build_image.sh
       - name: sign-artifact

@@ -56,8 +56,18 @@ else
     $(error "This system's OS $(LOCAL_OS) isn't recognized/supported")
 endif
 
-
 include common/Makefile.common.mk
+
+# Override legacy git hooks with pre-commit framework after common Makefile is loaded
+# This ensures pre-commit hooks are restored if common/Makefile.common.mk replaces them
+$(shell if [ -d .git/hooks ]; then \
+	rm -f .git/hooks/pre-commit .git/hooks/make_lint-all.sh 2>/dev/null; \
+	if command -v pre-commit >/dev/null 2>&1; then \
+		pre-commit install -f >/dev/null 2>&1; \
+	fi; \
+fi)
+
+CHANNEL ?= v$(shell cut -f1,2 -d'.' <<<$(BUNDLE_VERSION))
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
@@ -165,7 +175,7 @@ KUSTOMIZE_VERSION ?= v5.6.0
 CONTROLLER_TOOLS_VERSION ?= v0.17.2
 OPERATOR_SDK_VERSION ?= v1.37.0
 YQ_VERSION ?= v4.44.3
-GO_VERSION ?= 1.25.6
+GO_VERSION ?= 1.26.0
 
 # ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
@@ -261,6 +271,18 @@ endif
 
 ##@ Development
 
+.PHONY: setup-pre-commit
+setup-pre-commit: ## Install and configure pre-commit hooks
+	@echo "Setting up pre-commit hooks..."
+	@command -v pre-commit >/dev/null 2>&1 || { \
+		echo "Error: pre-commit is not installed."; \
+		echo "Install it with: pip install pre-commit"; \
+		echo "Or via homebrew: brew install pre-commit"; \
+		exit 1; \
+	}
+	@pre-commit install
+	@echo "Pre-commit hooks installed successfully!"
+
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration and ClusterRole objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role webhook paths="./..."
@@ -274,7 +296,7 @@ dev-overlays: ## Generate the dev overlays for kustomize.
 	hack/create_dev_overlays
 
 .PHONY: bundle
-bundle: manifests kustomize yq operator-sdk ## Build the bundle manifests.
+bundle: manifests generate kustomize yq operator-sdk ## Build the bundle manifests.
 ifeq ($(MODE), dev)
 	hack/create_dev_overlays
 endif

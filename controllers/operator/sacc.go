@@ -55,6 +55,31 @@ func (r *AuthenticationReconciler) createSA(instance *operatorv1alpha1.Authentic
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to get serviceaccount")
 		return
+	} else {
+		// ServiceAccount exists, check if controller reference is set
+		hasControllerRef := false
+		for _, ownerRef := range currentSA.GetOwnerReferences() {
+			if ownerRef.Controller != nil && *ownerRef.Controller {
+				hasControllerRef = true
+				break
+			}
+		}
+
+		if !hasControllerRef {
+			reqLogger.Info("ServiceAccount exists but missing controller reference, setting it now", "name", operandSAName)
+			err = controllerutil.SetControllerReference(instance, currentSA, r.Scheme)
+			if err != nil {
+				reqLogger.Error(err, "Failed to set controller reference for existing serviceaccount")
+				return
+			}
+			err = r.Client.Update(context.TODO(), currentSA)
+			if err != nil {
+				reqLogger.Error(err, "Failed to update serviceaccount with controller reference")
+				return
+			}
+			reqLogger.Info("Successfully set controller reference for existing serviceaccount", "name", operandSAName)
+			*needToRequeue = true
+		}
 	}
 
 	return

@@ -222,9 +222,17 @@ rules:
   - create
   - get
   - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  resourceNames:
+  - ibm-iam-operand-restricted
+  verbs:
   - patch
   - update
-  - watch
+  - delete
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
@@ -232,6 +240,20 @@ rules:
   - rolebindings
   verbs:
   - create
+  - get
+  - list
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  - rolebindings
+  resourceNames:
+  - ibm-iam-operand-restricted
+  verbs:
+  - patch
+  - update
+  - delete
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1

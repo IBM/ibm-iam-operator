@@ -21,20 +21,56 @@ import (
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/apis/operator/v1alpha1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func (r *AuthenticationReconciler) createRole(instance *operatorv1alpha1.Authentication) {
 
 	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
-	// Define a new Role
-	operandRole := r.iamOperandRole(instance)
-	reqLogger.Info("Creating ibm-iam-operand-restricted role")
-	err := r.Client.Create(context.TODO(), operandRole)
-	if err != nil {
-		reqLogger.Info("Failed to create ibm-iam-operand-restricted role or its already present")
+	roleName := "ibm-iam-operand-restricted"
+
+	// Check if Role already exists
+	existingRole := &rbacv1.Role{}
+	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: roleName, Namespace: instance.Namespace}, existingRole)
+
+	if err != nil && errors.IsNotFound(err) {
+		// Define a new Role
+		operandRole := r.iamOperandRole(instance)
+		reqLogger.Info("Creating ibm-iam-operand-restricted role")
+		err = r.Client.Create(context.TODO(), operandRole)
+		if err != nil {
+			reqLogger.Error(err, "Failed to create ibm-iam-operand-restricted role")
+		}
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to get role")
+	} else {
+		// Role exists, check if controller reference is set
+		hasControllerRef := false
+		for _, ownerRef := range existingRole.GetOwnerReferences() {
+			if ownerRef.Controller != nil && *ownerRef.Controller {
+				hasControllerRef = true
+				break
+			}
+		}
+
+		if !hasControllerRef {
+			reqLogger.Info("Role exists but missing controller reference, setting it now", "name", roleName)
+			err = controllerutil.SetControllerReference(instance, existingRole, r.Scheme)
+			if err != nil {
+				reqLogger.Error(err, "Failed to set controller reference for existing role")
+				return
+			}
+			err = r.Client.Update(context.TODO(), existingRole)
+			if err != nil {
+				reqLogger.Error(err, "Failed to update role with controller reference")
+				return
+			}
+			reqLogger.Info("Successfully set controller reference for existing role", "name", roleName)
+		}
 	}
-	// Role created successfully - return and requeue
 
 }
 func (r *AuthenticationReconciler) iamOperandRole(instance *operatorv1alpha1.Authentication) *rbacv1.Role {
@@ -58,6 +94,11 @@ func (r *AuthenticationReconciler) iamOperandRole(instance *operatorv1alpha1.Aut
 				Verbs:     []string{"create", "delete", "watch", "get", "list", "patch", "update"},
 			},
 		},
+	}
+	// Set Authentication instance as the owner and controller for role
+	err := controllerutil.SetControllerReference(instance, operandRole, r.Scheme)
+	if err != nil {
+		return nil
 	}
 	return operandRole
 

@@ -282,6 +282,20 @@ spec:
               verbs:
                 - create
             - apiGroups:
+                - rbac.authorization.k8s.io
+              resources:
+                - clusterrolebindings
+              verbs:
+                - delete
+            - apiGroups:
+                - rbac.authorization.k8s.io
+              resources:
+                - clusterroles
+              resourceNames:
+                - ibm-iam-operand-restricted
+              verbs:
+                - delete
+            - apiGroups:
                 - user.openshift.io
               resources:
                 - users
@@ -613,11 +627,19 @@ spec:
                 - serviceaccounts
               verbs:
                 - create
-                - get
                 - list
+                - watch
+            - apiGroups:
+                - ""
+              resources:
+                - serviceaccounts
+              resourceNames:
+                - ibm-iam-operand-restricted
+              verbs:
+                - get
                 - patch
                 - update
-                - watch
+                - delete
             - apiGroups:
                 - rbac.authorization.k8s.io
               resources:
@@ -625,6 +647,20 @@ spec:
                 - rolebindings
               verbs:
                 - create
+                - list
+                - watch
+            - apiGroups:
+                - rbac.authorization.k8s.io
+              resources:
+                - roles
+                - rolebindings
+              resourceNames:
+                - ibm-iam-operand-restricted
+              verbs:
+                - get
+                - patch
+                - update
+                - delete
           serviceAccountName: ibm-iam-operator
     strategy: deployment
   installModes:

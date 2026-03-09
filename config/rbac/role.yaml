@@ -220,7 +220,6 @@ rules:
   - serviceaccounts
   verbs:
   - create
-  - get
   - list
   - watch
 - apiGroups:
@@ -230,6 +229,7 @@ rules:
   resourceNames:
   - ibm-iam-operand-restricted
   verbs:
+  - get
   - patch
   - update
   - delete
@@ -240,7 +240,6 @@ rules:
   - rolebindings
   verbs:
   - create
-  - get
   - list
   - watch
 - apiGroups:
@@ -251,6 +250,7 @@ rules:
   resourceNames:
   - ibm-iam-operand-restricted
   verbs:
+  - get
   - patch
   - update
   - delete
@@ -286,6 +286,20 @@ rules:
   - clusterrolebindings
   verbs:
   - create
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterrolebindings
+  verbs:
+  - delete
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterroles
+  resourceNames:
+  - ibm-iam-operand-restricted
+  verbs:
+  - delete
 - apiGroups:
   - user.openshift.io
   resources:

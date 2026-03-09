@@ -36,7 +36,7 @@ func (r *AuthenticationReconciler) createRole(instance *operatorv1alpha1.Authent
 	existingRole := &rbacv1.Role{}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: roleName, Namespace: instance.Namespace}, existingRole)
 
-	if err != nil && errors.IsNotFound(err) {
+	if errors.IsNotFound(err) {
 		// Define a new Role
 		operandRole := r.iamOperandRole(instance)
 		reqLogger.Info("Creating ibm-iam-operand-restricted role")

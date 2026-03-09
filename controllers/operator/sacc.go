@@ -35,54 +35,66 @@ func (r *AuthenticationReconciler) createSA(instance *operatorv1alpha1.Authentic
 	operandSAName := "ibm-iam-operand-restricted"
 
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: operandSAName, Namespace: instance.Namespace}, currentSA)
-	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Did not find ServiceAccount", "name", operandSAName, "namespace", instance.Namespace)
-		// Define a new operand ServiceAccount
-		operandSA := generateSAObject(instance, r.Scheme, operandSAName)
-		reqLogger.Info("Creating a ibm-iam-operand-restricted serviceaccount")
-		err = r.Client.Create(context.TODO(), operandSA)
-		if err != nil {
-			reqLogger.Error(err, "Failed to create ibm-iam-operand-restricted serviceaccount")
-			return
-		}
-		// serviceaccount created successfully - return and requeue
-		// Set Authentication instance as the owner and controller for serviceaccount
-		err = controllerutil.SetControllerReference(instance, operandSA, r.Scheme)
-		if err != nil {
-			return nil
-		}
-		*needToRequeue = true
-	} else if err != nil {
-		reqLogger.Error(err, "Failed to get serviceaccount")
-		return
-	} else {
-		// ServiceAccount exists, check if controller reference is set
-		hasControllerRef := false
-		for _, ownerRef := range currentSA.GetOwnerReferences() {
-			if ownerRef.Controller != nil && *ownerRef.Controller {
-				hasControllerRef = true
-				break
-			}
-		}
 
-		if !hasControllerRef {
-			reqLogger.Info("ServiceAccount exists but missing controller reference, setting it now", "name", operandSAName)
-			err = controllerutil.SetControllerReference(instance, currentSA, r.Scheme)
-			if err != nil {
-				reqLogger.Error(err, "Failed to set controller reference for existing serviceaccount")
-				return
-			}
-			err = r.Client.Update(context.TODO(), currentSA)
-			if err != nil {
-				reqLogger.Error(err, "Failed to update serviceaccount with controller reference")
-				return
-			}
-			reqLogger.Info("Successfully set controller reference for existing serviceaccount", "name", operandSAName)
-			*needToRequeue = true
-		}
+	// Handle errors other than NotFound
+	if err != nil && !errors.IsNotFound(err) {
+		reqLogger.Error(err, "Failed to get serviceaccount")
+		return err
 	}
 
-	return
+	// ServiceAccount doesn't exist, create it
+	if errors.IsNotFound(err) {
+		reqLogger.Info("Did not find ServiceAccount", "name", operandSAName, "namespace", instance.Namespace)
+		operandSA := generateSAObject(instance, r.Scheme, operandSAName)
+		reqLogger.Info("Creating a ibm-iam-operand-restricted serviceaccount")
+
+		if err = r.Client.Create(context.TODO(), operandSA); err != nil {
+			reqLogger.Error(err, "Failed to create ibm-iam-operand-restricted serviceaccount")
+			return err
+		}
+
+		// Set Authentication instance as the owner and controller for serviceaccount
+		if err = controllerutil.SetControllerReference(instance, operandSA, r.Scheme); err != nil {
+			reqLogger.Error(err, "Failed to set controller reference for new serviceaccount")
+			return err
+		}
+
+		*needToRequeue = true
+		return nil
+	}
+
+	// ServiceAccount exists, check if controller reference is set
+	if hasControllerReference(currentSA) {
+		return nil
+	}
+
+	// Controller reference is missing, set it
+	reqLogger.Info("ServiceAccount exists but missing controller reference, setting it now", "name", operandSAName)
+
+	if err = controllerutil.SetControllerReference(instance, currentSA, r.Scheme); err != nil {
+		reqLogger.Error(err, "Failed to set controller reference for existing serviceaccount")
+		return err
+	}
+
+	if err = r.Client.Update(context.TODO(), currentSA); err != nil {
+		reqLogger.Error(err, "Failed to update serviceaccount with controller reference")
+		return err
+	}
+
+	reqLogger.Info("Successfully set controller reference for existing serviceaccount", "name", operandSAName)
+	*needToRequeue = true
+
+	return nil
+}
+
+// hasControllerReference checks if the object has a controller reference set
+func hasControllerReference(obj metav1.Object) bool {
+	for _, ownerRef := range obj.GetOwnerReferences() {
+		if ownerRef.Controller != nil && *ownerRef.Controller {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *AuthenticationReconciler) handleServiceAccount(instance *operatorv1alpha1.Authentication, needToRequeue *bool) {
@@ -123,7 +135,6 @@ func (r *AuthenticationReconciler) handleServiceAccount(instance *operatorv1alph
 }
 
 func generateSAObject(instance *operatorv1alpha1.Authentication, scheme *runtime.Scheme, operndSAName string) *corev1.ServiceAccount {
-	reqLogger := log.WithValues("Instance.Namespace", instance.Namespace, "Instance.Name", instance.Name)
 	metaLabels := map[string]string{
 		"app.kubernetes.io/instance":   "ibm-iam-operator",
 		"app.kubernetes.io/managed-by": "ibm-iam-operator",
@@ -136,13 +147,6 @@ func generateSAObject(instance *operatorv1alpha1.Authentication, scheme *runtime
 			Labels:    metaLabels,
 			Namespace: instance.Namespace,
 		},
-	}
-
-	// Set Authentication instance as the owner and controller of the operand serviceaccount
-	err := controllerutil.SetControllerReference(instance, operandSA, scheme)
-	if err != nil {
-		reqLogger.Error(err, "Failed to set owner for serviceaccount")
-		return nil
 	}
 	return operandSA
 }

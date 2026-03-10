@@ -170,8 +170,6 @@ func (r *AuthenticationReconciler) getSecretSubreconcilers(ctx context.Context, 
 					"WLP_CLIENT_SECRET":                 wlpClientSecret,
 					"WLP_SCOPE":                         []byte("openid+profile+email"),
 					"OAUTH2_CLIENT_REGISTRATION_SECRET": wlpClientRegistrationSecret,
-					"IBMID_CLIENT_SECRET":               []byte("903305fb599c8328a4d86d4cbdd07368"),
-					"IBMID_PROFILE_CLIENT_SECRET":       []byte("C1bR0rO7kE0cE3xM2tV1gI0mG1cH3jK4dD7iQ8rW6pF1aF4mQ5"),
 				})).
 			WithModifyFns(ensureSecretLabels, ensureChecksumAnnotation).
 			WithOnWriteFns(signalNeedRolloutFn[*corev1.Secret](r)),

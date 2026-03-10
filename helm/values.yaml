@@ -13,19 +13,18 @@ global:
 #   - tenant1
 #   - tenant2
 operator:
-  imageTag: "4.16.0"
+  imageTag: "4.17.0"
 operands:
   platformIdentityProvider:
-    imageTag: "4.16.0"
+    imageTag: "4.17.0"
   platformAuthService:
-    imageTag: "4.16.0"
+    imageTag: "4.17.0"
   platformIdentityManagement:
-    imageTag: "4.16.0"
+    imageTag: "4.17.0"
   imInitContainer:
-    imageTag: "4.16.0"
+    imageTag: "4.17.0"
   imDBMigrator:
-    imageTag: "4.16.0"
-
+    imageTag: "4.17.0"
 #common ui specific
 # Enabling this sets WATCH_NAMESPACE to look for namespace-scope ConfigMap for
 # the list of namespaces. Disabling generates the comma-separated list based upon

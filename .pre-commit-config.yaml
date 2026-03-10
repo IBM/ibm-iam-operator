@@ -1,0 +1,74 @@
+# Copyright 2026 IBM Corporation.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+repos:
+  # detect-secrets for credentials scanning 
+  - repo: https://github.com/ibm/detect-secrets
+    rev: 0.13.1+ibm.64.dss
+    hooks:
+      - id: detect-secrets # pragma: whitelist secret
+        args: [--baseline, .secrets.baseline, --use-all-plugins]
+
+  # Shellcheck for shell script linting
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+        args: [--exclude=SC2086]
+
+  # Hadolint for Dockerfile linting
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.14.0
+    hooks:
+      - id: hadolint
+        args: [--config, ./common/config/.hadolint.yml]
+
+  # Yamllint for YAML file linting
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.38.0
+    hooks:
+      - id: yamllint
+        args: [-c, ./common/config/.yamllint.yml]
+        # Exclude files with template syntax (containing "{{")
+        exclude: '.*\{\{.*'
+
+  # Local hooks for remaining checks from legacy pre-commit hook
+  - repo: local
+    hooks:
+      - id: lint-helm
+        name: Lint Helm charts
+        entry: bash -c 'find . \( -path ./.git -o -path ./.github \) -prune -o -name "Chart.yaml" -type f -print0 | xargs -0 -L 1 dirname | xargs helm lint'
+        language: system
+        pass_filenames: false
+        files: 'Chart\.yaml$'
+        
+      - id: lint-copyright-banner
+        name: Check copyright banners
+        entry: common/scripts/lint_copyright_banner.sh
+        language: system
+        types_or: [go, c, c++, proto, python, shell, executable, yaml, makefile]
+        exclude: '(\.gen\.go|\.pb\.go|_pb2\.py)$'
+        
+      - id: gofmt
+        name: Format Go code with gofmt
+        entry: gofmt -w -s -l
+        language: system
+        types: [go]
+        pass_filenames: true
+        
+      - id: make-bundle
+        name: Validate bundle manifests are up-to-date
+        entry: hack/pre-commit-bundle-check.sh
+        language: system
+        pass_filenames: false
+        files: '^(api/|bundle/|config/|internal/controller/|cmd/main\.go)'

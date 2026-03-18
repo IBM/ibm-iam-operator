@@ -585,8 +585,8 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 			ldapClientConnectTimeout = "30000"
 		}
 		// Initialize CSP values with 'self' as default
-		cspFrameAncestors := "'self'"
-		cspConnectSrc := "'self'"
+		cspFrameAncestors := `'self'`
+		cspConnectSrc := `'self'`
 
 		if authCR.Spec.Config.CSPExtension != nil {
 			if err = validateCSPExtension(authCR.Spec.Config.CSPExtension); err != nil {

@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"strconv"
@@ -54,6 +55,49 @@ import (
 const AnnotationSHA1Sum string = "authentication.operator.ibm.com/sha1sum"
 const ZenProductConfigmapName = "product-configmap"
 const URL_PREFIX = "URL_PREFIX"
+
+// validateCSPExtension validates all URL entries in the CSPExtension config.
+// It rejects any entry that:
+//   - contains a wildcard character ('*')
+//   - is not a valid URL with the https scheme
+//
+// Returns a non-nil error describing all invalid entries if any are found,
+// or nil when the config is absent or all entries are valid.
+func validateCSPExtension(csp *operatorv1alpha1.CSPExtensionConfig) error {
+	if csp == nil {
+		return nil
+	}
+	type fieldEntry struct {
+		field string
+		value string
+	}
+	var allEntries []fieldEntry
+	for _, v := range csp.FrameAncestors {
+		allEntries = append(allEntries, fieldEntry{field: "frameAncestors", value: v})
+	}
+	for _, v := range csp.ConnectSrc {
+		allEntries = append(allEntries, fieldEntry{field: "connectSrc", value: v})
+	}
+
+	var invalidEntries []string
+	for _, e := range allEntries {
+		if strings.Contains(e.value, "*") {
+			invalidEntries = append(invalidEntries,
+				fmt.Sprintf("spec.config.cspExtension.%s: %q contains a wildcard character ('*')", e.field, e.value))
+			continue
+		}
+		parsed, parseErr := url.Parse(e.value)
+		if parseErr != nil || parsed.Scheme != "https" || parsed.Host == "" {
+			invalidEntries = append(invalidEntries,
+				fmt.Sprintf("spec.config.cspExtension.%s: %q is not a valid https URL", e.field, e.value))
+		}
+	}
+
+	if len(invalidEntries) > 0 {
+		return fmt.Errorf("invalid cspExtension entries: %s", strings.Join(invalidEntries, "; "))
+	}
+	return nil
+}
 
 // handleConfigMaps is a subreconciler.FnWithRequest that handles the
 // reconciliation of all ConfigMaps created for a given Authentication.
@@ -335,6 +379,8 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"LIBERTY_AUTH_CACHE_TIMEOUT",
 			"LDAP_CLIENT_CONNECT_TIMEOUT",
 			"LDAP_ALLOWLIST_ENABLED",
+			"CSP_FRAME_ANCESTORS",
+			"CSP_CONNECT_SRC",
 		),
 		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("SESSION_TIMEOUT", "43200"),
 			"SESSION_TIMEOUT"),
@@ -538,6 +584,24 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 		} else {
 			ldapClientConnectTimeout = "30000"
 		}
+		// Initialize CSP values with 'self' as default
+		cspFrameAncestors := "'self'"
+		cspConnectSrc := "'self'"
+
+		if authCR.Spec.Config.CSPExtension != nil {
+			if err = validateCSPExtension(authCR.Spec.Config.CSPExtension); err != nil {
+				reqLogger.Error(err, "spec.config.cspExtension contains invalid entries; skipping CSP fields in ConfigMap")
+				err = fmt.Errorf("could not set CSP_EXTENSION: %w", err)
+				return
+			}
+			// Append configured values to 'self' if provided
+			if len(authCR.Spec.Config.CSPExtension.FrameAncestors) > 0 {
+				cspFrameAncestors += " " + strings.Join(authCR.Spec.Config.CSPExtension.FrameAncestors, " ")
+			}
+			if len(authCR.Spec.Config.CSPExtension.ConnectSrc) > 0 {
+				cspConnectSrc += " " + strings.Join(authCR.Spec.Config.CSPExtension.ConnectSrc, " ")
+			}
+		}
 
 		*generated = corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -631,6 +695,8 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"LIBERTY_AUTH_CACHE_TIMEOUT":         libertyAuthCacheTimeout,
 				"LDAP_CLIENT_CONNECT_TIMEOUT":        ldapClientConnectTimeout,
 				"LDAP_ALLOWLIST_ENABLED":             strconv.FormatBool(authCR.IsLDAPAllowlistEnabled()),
+				"CSP_FRAME_ANCESTORS":                cspFrameAncestors,
+				"CSP_CONNECT_SRC":                    cspConnectSrc,
 			},
 		}
 

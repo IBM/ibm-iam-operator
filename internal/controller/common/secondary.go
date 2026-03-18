@@ -18,6 +18,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -453,26 +454,62 @@ func (b *SecondaryReconcilerBuilder[T]) WithOnFinishedFns(fns ...OnFinishedFn[T]
 }
 
 // SecondaryReconcilerFn is an adapter so that subreconciler.Fn's implement Subreconciler.
-type SecondaryReconcilerFn subreconciler.Fn
+type SubreconcilerFn subreconciler.Fn
 
-var _ Subreconciler = SecondaryReconcilerFn(func(ctx context.Context) (result *ctrl.Result, err error) { return })
+var _ Subreconciler = SubreconcilerFn(func(ctx context.Context) (result *ctrl.Result, err error) { return })
 
 // Reconcile implements Subreconciler.
-func (f SecondaryReconcilerFn) Reconcile(ctx context.Context) (result *ctrl.Result, err error) {
+func (f SubreconcilerFn) Reconcile(ctx context.Context) (result *ctrl.Result, err error) {
 	return f(ctx)
 }
 
 // NewSecondaryReconcilerFn creates a new SecondaryReconcilerFn from a subreconciler.FnWithRequest.
-func NewSecondaryReconcilerFn(req ctrl.Request, fn subreconciler.FnWithRequest) SecondaryReconcilerFn {
-	return func(ctx context.Context) (result *ctrl.Result, err error) {
+func newSubreconcilerFn(req ctrl.Request, fn subreconciler.FnWithRequest) Subreconciler {
+	return SubreconcilerFn(func(ctx context.Context) (result *ctrl.Result, err error) {
 		return fn(ctx, req)
+	})
+}
+
+func NewSubreconcilers(req ctrl.Request, fns ...subreconciler.FnWithRequest) (subs Subreconcilers) {
+	subs = []Subreconciler{}
+	for _, fn := range fns {
+		subs = append(subs, newSubreconcilerFn(req, fn))
 	}
+	return
+}
+
+// NewSubreconcilersWithResultLog is a helper function that logs the result of a subreconciler
+func NewSubreconcilersWithResultLog(req ctrl.Request, fns ...subreconciler.FnWithRequest) (subs Subreconcilers) {
+	subs = []Subreconciler{}
+	for _, fn := range fns {
+		var fnWithLog Subreconciler = newSubreconcilerFn(req, func(rootCtx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+			fnName := GetFunctionName(fn)
+			log := logf.FromContext(rootCtx, "subreconciler", fnName)
+			ctx := logf.IntoContext(rootCtx, log)
+			log.V(1).Info("Running subreconciler")
+			if result, err = fn(ctx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
+				log.V(1).Info("Result: should halt or requeue ", "result", result, "err", err)
+				return
+			}
+			log.V(1).Info("Result: no requeue necessary", "result", result, "err", err)
+			return
+		})
+		subs = append(subs, fnWithLog)
+	}
+	return
 }
 
 // Subreconcilers implements Subreconciler
 type Subreconcilers []Subreconciler
 
 var _ Subreconciler = Subreconcilers{}
+
+type StrategicSubreconcilers interface {
+	Subreconciler
+	GetStrategy() func(s *subreconcilers, ctx context.Context) (result *ctrl.Result, err error)
+}
+
+var _ Subreconciler = NewStrictSubreconcilers([]Subreconciler{}...)
 
 func (s Subreconcilers) Reconcile(ctx context.Context) (result *ctrl.Result, err error) {
 	results := []*ctrl.Result{}
@@ -485,6 +522,33 @@ func (s Subreconcilers) Reconcile(ctx context.Context) (result *ctrl.Result, err
 	return ReduceSubreconcilerResultsAndErrors(results, errs)
 }
 
+// ReduceSubreconcilerResultsAndErrors takes a slice of Result pointers and a slice of errors and reduces them to a
+// single Result pointer and error to be used in a subreconciler.Evaluate call.
+func ReduceSubreconcilerResultsAndErrors(results []*ctrl.Result, errs []error) (result *ctrl.Result, err error) {
+	err = errors.Join(errs...)
+	for _, r := range results {
+		if r == nil {
+			continue
+		}
+		if result == nil {
+			result = &ctrl.Result{}
+			*result = *r
+			continue
+		}
+		if r.Requeue {
+			result.Requeue = true
+		}
+		// Always use exponential back off for results that have errors
+		if err != nil {
+			result.RequeueAfter = 0
+		} else if r.RequeueAfter > result.RequeueAfter {
+			result.RequeueAfter = r.RequeueAfter
+		}
+	}
+
+	return
+}
+
 type subreconcilers struct {
 	Subreconcilers
 	strategy func(*subreconcilers, context.Context) (*ctrl.Result, error)
@@ -494,16 +558,20 @@ func (s *subreconcilers) Reconcile(ctx context.Context) (result *ctrl.Result, er
 	return s.strategy(s, ctx)
 }
 
-func NewStrictSubreconcilers(fns ...Subreconciler) *subreconcilers {
+func (s *subreconcilers) GetStrategy() func(s *subreconcilers, ctx context.Context) (result *ctrl.Result, err error) {
+	return s.strategy
+}
+
+func NewStrictSubreconcilers(subs ...Subreconciler) StrategicSubreconcilers {
 	return &subreconcilers{
-		Subreconcilers: fns,
+		Subreconcilers: subs,
 		strategy:       strictReconcile,
 	}
 }
 
-func NewLazySubreconcilers(fns ...Subreconciler) *subreconcilers {
+func NewLazySubreconcilers(subs ...Subreconciler) StrategicSubreconcilers {
 	return &subreconcilers{
-		Subreconcilers: fns,
+		Subreconcilers: subs,
 		strategy:       lazyReconcile,
 	}
 }
@@ -511,7 +579,7 @@ func NewLazySubreconcilers(fns ...Subreconciler) *subreconcilers {
 func strictReconcile(s *subreconcilers, ctx context.Context) (result *ctrl.Result, err error) {
 	for _, reconciler := range s.Subreconcilers {
 		result, err = reconciler.Reconcile(ctx)
-		if err != nil {
+		if subreconciler.ShouldHaltOrRequeue(result, err) {
 			return
 		}
 	}

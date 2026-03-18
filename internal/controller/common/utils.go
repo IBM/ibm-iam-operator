@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
+	"runtime"
 	"strings"
 	"time"
 
@@ -34,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	discovery "k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	sscsidriverv1 "sigs.k8s.io/secrets-store-csi-driver/apis/v1"
@@ -360,33 +361,6 @@ func GetBindInfoRefreshMap() map[string]string {
 	}
 }
 
-// ReduceSubreconcilerResultsAndErrors takes a slice of Result pointers and a slice of errors and reduces them to a
-// single Result pointer and error to be used in a subreconciler.Evaluate call.
-func ReduceSubreconcilerResultsAndErrors(results []*ctrl.Result, errs []error) (result *ctrl.Result, err error) {
-	err = errors.Join(errs...)
-	for _, r := range results {
-		if r == nil {
-			continue
-		}
-		if result == nil {
-			result = &ctrl.Result{}
-			*result = *r
-			continue
-		}
-		if r.Requeue {
-			result.Requeue = true
-		}
-		// Always use exponential back off for results that have errors
-		if err != nil {
-			result.RequeueAfter = 0
-		} else if r.RequeueAfter > result.RequeueAfter {
-			result.RequeueAfter = r.RequeueAfter
-		}
-	}
-
-	return
-}
-
 // Returns whether the string slice contains the provided string.
 func ContainsString(slice []string, s string) bool {
 	for _, item := range slice {
@@ -457,4 +431,9 @@ func ScrubMap(m map[string][]byte) (n int) {
 		m[key] = nil
 	}
 	return
+}
+
+func GetFunctionName(fn any) string {
+	fnStrs := strings.Split(runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name(), ".")
+	return strings.Split(fnStrs[len(fnStrs)-1], "-")[0]
 }

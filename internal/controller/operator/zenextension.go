@@ -83,8 +83,8 @@ func (zs *ZenExtensionWithSpec) ToUnstructured(s *runtime.Scheme) (u *unstructur
 	return u, nil
 }
 
-func (r *AuthenticationReconciler) removeZenExtension(authCR *operatorv1alpha1.Authentication) common.SecondaryReconcilerFn {
-	return func(ctx context.Context) (result *ctrl.Result, err error) {
+func (r *AuthenticationReconciler) removeZenExtension(authCR *operatorv1alpha1.Authentication) common.Subreconciler {
+	return common.SubreconcilerFn(func(ctx context.Context) (result *ctrl.Result, err error) {
 		log := logf.FromContext(ctx, "ZenExtension.Name", ImZenExtName)
 		log.Info("Removing ZenExtension")
 		observedZenExt := &zenv1.ZenExtension{
@@ -107,5 +107,5 @@ func (r *AuthenticationReconciler) removeZenExtension(authCR *operatorv1alpha1.A
 		}
 		log.Info("Zen front door deleted successfully")
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
+	})
 }

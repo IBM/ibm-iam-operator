@@ -63,7 +63,7 @@ func (r *AuthenticationReconciler) removeIngresses(ctx context.Context, req ctrl
 	return subRec.Reconcile(debugCtx)
 }
 
-func (r *AuthenticationReconciler) removeIngress(name string, namespace string) common.SecondaryReconcilerFn {
+func (r *AuthenticationReconciler) removeIngress(name string, namespace string) common.SubreconcilerFn {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		log := logf.FromContext(ctx, "Ingress.Name", name)
 

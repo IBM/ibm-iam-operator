@@ -27,7 +27,7 @@ For more information about the available IBM Cloud Platform Common Services, see
 
 ## Operator versions
 
-- 4.5.18
+- 4.5.19
 
 ## Prerequisites
 

@@ -68,14 +68,6 @@ metadata:
               "clusterExternalAddress": "10.0.0.1",
               "clusterInternalAddress": "10.0.0.1",
               "clusterName": "mycluster",
-              "cspExtension": {
-                "connectSrc": [
-                  "'self'"
-                ],
-                "frameAncestors": [
-                  "'self'"
-                ]
-              },
               "defaultAdminPassword": "password",
               "defaultAdminUser": "cpadmin",
               "defaultLogin": "",
@@ -164,7 +156,7 @@ metadata:
     categories: Security
     certified: "false"
     containerImage: icr.io/cpopen/ibm-iam-operator:4.17.0
-    createdAt: "2026-03-24T10:39:59Z"
+    createdAt: "2026-03-18T09:05:37Z"
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage the lifecycle of IAM services. With this operator, you can simply deploy and upgrade the IAM services
     features.operators.openshift.io/disconnected: "true"
     features.operators.openshift.io/fips-compliant: "true"

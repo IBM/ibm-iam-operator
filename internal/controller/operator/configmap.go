@@ -55,6 +55,8 @@ import (
 const AnnotationSHA1Sum string = "authentication.operator.ibm.com/sha1sum"
 const ZenProductConfigmapName = "product-configmap"
 const URL_PREFIX = "URL_PREFIX"
+const CSPSelfUnquoted = "self"
+const CSPSelfQuoted = "'self'"
 
 // validateCSPExtension validates all URL entries in the CSPExtension config.
 // It rejects any entry that:
@@ -81,6 +83,10 @@ func validateCSPExtension(csp *operatorv1alpha1.CSPExtensionConfig) error {
 
 	var invalidEntries []string
 	for _, e := range allEntries {
+		//allow self as a valid entry (both quoted and unquoted)
+		if e.value == CSPSelfUnquoted || e.value == CSPSelfQuoted {
+			continue
+		}
 		if strings.Contains(e.value, "*") {
 			invalidEntries = append(invalidEntries,
 				fmt.Sprintf("spec.config.cspExtension.%s: %q contains a wildcard character ('*')", e.field, e.value))
@@ -97,6 +103,16 @@ func validateCSPExtension(csp *operatorv1alpha1.CSPExtensionConfig) error {
 		return fmt.Errorf("invalid cspExtension entries: %s", strings.Join(invalidEntries, "; "))
 	}
 	return nil
+}
+
+// appendCSPValues appends CSP values to the base string, skipping "self" and "'self'" to avoid duplicates
+func appendCSPValues(base string, values []string) string {
+	for _, v := range values {
+		if v != CSPSelfUnquoted && v != CSPSelfQuoted {
+			base += " " + v
+		}
+	}
+	return base
 }
 
 // handleConfigMaps is a subreconciler.FnWithRequest that handles the
@@ -584,9 +600,9 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 		} else {
 			ldapClientConnectTimeout = "30000"
 		}
-		// Initialize CSP values with 'self' as default
-		cspFrameAncestors := `'self'`
-		cspConnectSrc := `'self'`
+		// Initialize CSP values with `'self'` as default
+		cspFrameAncestors := CSPSelfQuoted
+		cspConnectSrc := CSPSelfQuoted
 
 		if authCR.Spec.Config.CSPExtension != nil {
 			if err = validateCSPExtension(authCR.Spec.Config.CSPExtension); err != nil {
@@ -594,12 +610,12 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				err = fmt.Errorf("could not set CSP_EXTENSION: %w", err)
 				return
 			}
-			// Append configured values to 'self' if provided
+			// Append configured values to 'self', skipping any "self" entries to avoid duplicates
 			if len(authCR.Spec.Config.CSPExtension.FrameAncestors) > 0 {
-				cspFrameAncestors += " " + strings.Join(authCR.Spec.Config.CSPExtension.FrameAncestors, " ")
+				cspFrameAncestors = appendCSPValues(cspFrameAncestors, authCR.Spec.Config.CSPExtension.FrameAncestors)
 			}
 			if len(authCR.Spec.Config.CSPExtension.ConnectSrc) > 0 {
-				cspConnectSrc += " " + strings.Join(authCR.Spec.Config.CSPExtension.ConnectSrc, " ")
+				cspConnectSrc = appendCSPValues(cspConnectSrc, authCR.Spec.Config.CSPExtension.ConnectSrc)
 			}
 		}
 

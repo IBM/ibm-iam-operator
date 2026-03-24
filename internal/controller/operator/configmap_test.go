@@ -1250,8 +1250,8 @@ var _ = Describe("ConfigMap handling", func() {
 			Expect(observed.Data["EXPOSE_ADDITIONAL_PATHS"]).To(Equal("true"))
 		})
 
-		It("sets CSP_FRAME_ANCESTORS and CSP_CONNECT_SRC to 'self' when cspExtension is not configured in the auth CR", func() {
-			// authCR has no CSPExtension set (nil)
+		It("sets CSP_FRAME_ANCESTORS and CSP_CONNECT_SRC to 'self' as fallback when cspExtension is nil", func() {
+			// authCR has no CSPExtension set (nil) - fallback to 'self'
 			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
 				WithName("platform-auth-idp").
 				WithNamespace(authCR.Namespace).
@@ -1265,10 +1265,10 @@ var _ = Describe("ConfigMap handling", func() {
 			Expect(generated.Data["CSP_CONNECT_SRC"]).To(Equal("'self'"))
 		})
 
-		It("sets CSP_FRAME_ANCESTORS and CSP_CONNECT_SRC with 'self' prepended when cspExtension is configured in the auth CR", func() {
+		It("sets CSP_FRAME_ANCESTORS and CSP_CONNECT_SRC from CR values with 'self' first", func() {
 			authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
-				FrameAncestors: []string{"https://cpd-zen.apps.cluster.com/", "https://custom-portal.customer.com/"},
-				ConnectSrc:     []string{"https://cpd-api.apps.cluster.com/"},
+				FrameAncestors: []string{"'self'", "https://cpd-zen.apps.cluster.com/", "https://custom-portal.customer.com/"},
+				ConnectSrc:     []string{"'self'", "https://cpd-api.apps.cluster.com/"},
 			}
 			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
 				WithName("platform-auth-idp").
@@ -1283,9 +1283,10 @@ var _ = Describe("ConfigMap handling", func() {
 			Expect(generated.Data["CSP_CONNECT_SRC"]).To(Equal("'self' https://cpd-api.apps.cluster.com/"))
 		})
 
-		It("sets CSP_FRAME_ANCESTORS with 'self' prepended when only frameAncestors is set and CSP_CONNECT_SRC defaults to 'self'", func() {
+		It("sets CSP_FRAME_ANCESTORS with additional URLs and CSP_CONNECT_SRC with only 'self'", func() {
 			authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
-				FrameAncestors: []string{"https://cpd-zen.apps.cluster.com/"},
+				FrameAncestors: []string{"'self'", "https://cpd-zen.apps.cluster.com/"},
+				ConnectSrc:     []string{"'self'"},
 			}
 			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
 				WithName("platform-auth-idp").
@@ -1300,9 +1301,10 @@ var _ = Describe("ConfigMap handling", func() {
 			Expect(generated.Data["CSP_CONNECT_SRC"]).To(Equal("'self'"))
 		})
 
-		It("sets CSP_CONNECT_SRC with 'self' prepended when only connectSrc is set and CSP_FRAME_ANCESTORS defaults to 'self'", func() {
+		It("sets CSP_CONNECT_SRC with additional URLs and CSP_FRAME_ANCESTORS with only 'self'", func() {
 			authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
-				ConnectSrc: []string{"https://cpd-api.apps.cluster.com/"},
+				FrameAncestors: []string{"'self'"},
+				ConnectSrc:     []string{"'self'", "https://cpd-api.apps.cluster.com/"},
 			}
 			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
 				WithName("platform-auth-idp").
@@ -1319,8 +1321,8 @@ var _ = Describe("ConfigMap handling", func() {
 
 		It("always overwrites CSP_FRAME_ANCESTORS and CSP_CONNECT_SRC in observed configmap from the generated value", func() {
 			authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
-				FrameAncestors: []string{"https://cpd-zen.apps.cluster.com/"},
-				ConnectSrc:     []string{"https://cpd-api.apps.cluster.com/"},
+				FrameAncestors: []string{"'self'", "https://cpd-zen.apps.cluster.com/"},
+				ConnectSrc:     []string{"'self'", "https://cpd-api.apps.cluster.com/"},
 			}
 			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
 				WithName("platform-auth-idp").
@@ -1395,6 +1397,28 @@ var _ = Describe("ConfigMap handling", func() {
 				ConnectSrc: []string{
 					"https://cpd-api.apps.cluster.com/",
 				},
+			}
+			Expect(validateCSPExtension(csp)).To(Succeed())
+		})
+
+		It("returns nil when 'self' is included in frameAncestors and connectSrc", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{
+					"'self'",
+					"https://cpd-zen.apps.cluster.com/",
+				},
+				ConnectSrc: []string{
+					"'self'",
+					"https://cpd-api.apps.cluster.com/",
+				},
+			}
+			Expect(validateCSPExtension(csp)).To(Succeed())
+		})
+
+		It("returns nil when only 'self' is specified", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"'self'"},
+				ConnectSrc:     []string{"'self'"},
 			}
 			Expect(validateCSPExtension(csp)).To(Succeed())
 		})

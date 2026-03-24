@@ -81,6 +81,10 @@ func validateCSPExtension(csp *operatorv1alpha1.CSPExtensionConfig) error {
 
 	var invalidEntries []string
 	for _, e := range allEntries {
+		// Skip validation for 'self' keyword
+		if e.value == "'self'" {
+			continue
+		}
 		if strings.Contains(e.value, "*") {
 			invalidEntries = append(invalidEntries,
 				fmt.Sprintf("spec.config.cspExtension.%s: %q contains a wildcard character ('*')", e.field, e.value))
@@ -584,23 +588,22 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 		} else {
 			ldapClientConnectTimeout = "30000"
 		}
-		// Initialize CSP values with 'self' as default
-		cspFrameAncestors := `'self'`
-		cspConnectSrc := `'self'`
-
+		// Initialize CSP values from CR
+		// CSPExtension should always be present with default values
+		var cspFrameAncestors string
+		var cspConnectSrc string
 		if authCR.Spec.Config.CSPExtension != nil {
 			if err = validateCSPExtension(authCR.Spec.Config.CSPExtension); err != nil {
 				reqLogger.Error(err, "spec.config.cspExtension contains invalid entries; skipping CSP fields in ConfigMap")
 				err = fmt.Errorf("could not set CSP_EXTENSION: %w", err)
 				return
 			}
-			// Append configured values to 'self' if provided
-			if len(authCR.Spec.Config.CSPExtension.FrameAncestors) > 0 {
-				cspFrameAncestors += " " + strings.Join(authCR.Spec.Config.CSPExtension.FrameAncestors, " ")
-			}
-			if len(authCR.Spec.Config.CSPExtension.ConnectSrc) > 0 {
-				cspConnectSrc += " " + strings.Join(authCR.Spec.Config.CSPExtension.ConnectSrc, " ")
-			}
+			cspFrameAncestors = strings.Join(authCR.Spec.Config.CSPExtension.FrameAncestors, " ")
+			cspConnectSrc = strings.Join(authCR.Spec.Config.CSPExtension.ConnectSrc, " ")
+		} else {
+			// Fallback to default 'self' if CSPExtension is nil
+			cspFrameAncestors = "'self'"
+			cspConnectSrc = "'self'"
 		}
 
 		*generated = corev1.ConfigMap{

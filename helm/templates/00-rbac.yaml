@@ -62,7 +62,6 @@ rules:
   - services
   - endpoints
   - persistentvolumeclaims
-  - events
   - configmaps
   - secrets
   verbs:
@@ -73,6 +72,13 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
 - apiGroups:
   - ""
   resources:

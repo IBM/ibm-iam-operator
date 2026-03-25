@@ -54,6 +54,8 @@ rules:
   - ""
   resources:
   - services/finalizers
+  resourceNames:
+  - mongodb
   verbs:
   - update
   - patch

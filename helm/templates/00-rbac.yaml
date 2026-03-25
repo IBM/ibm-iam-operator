@@ -294,7 +294,6 @@ rules:
   - postgresql.k8s.enterprisedb.io
   resources:
   - clusters
-  - clusters/status
   verbs:
   - get
   - list

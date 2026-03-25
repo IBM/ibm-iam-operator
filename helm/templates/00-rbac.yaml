@@ -56,14 +56,6 @@ rules:
   verbs:
   - create
 - apiGroups:
-  - route.openshift.io
-  resources:
-  - routes/status
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - ""
   resources:
   - pods

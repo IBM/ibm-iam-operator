@@ -273,20 +273,62 @@ func (r *AuthenticationReconciler) handleAuthenticationFinalizer(ctx context.Con
 	if !canDeleteCR {
 		log.Info("Operator does not have permission to delete ClusterRole, skipping deletion")
 	} else {
-		// Add ClusterRole to deletion list
-		objectsToDelete = append(
-			objectsToDelete,
-			&rbacv1.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: string(common.PlatformIdentityManagement),
-				},
-			},
-			&rbacv1.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: string(common.PlatformIdentityManagement),
-				},
-			},
-		)
+		// Check if operator has permission to list ClusterRoleBindings
+		canListCRB, err := r.hasAPIAccess(ctx, "", rbacv1.SchemeGroupVersion.Group, "clusterrolebindings", []string{"list"})
+		if err != nil {
+			log.Error(err, "Failed to check list permission for ClusterRoleBinding")
+			return subreconciler.RequeueWithError(err)
+		}
+
+		// Check each ClusterRole to see if it should be deleted
+		clusterRolesToCheck := []string{
+			string(common.PlatformIdentityProvider),
+			string(common.PlatformIdentityManagement),
+		}
+
+		for _, clusterRoleName := range clusterRolesToCheck {
+			shouldDeleteClusterRole := true
+
+			if canListCRB {
+				// List ClusterRoleBindings managed by ibm-iam-operator that reference this ClusterRole
+				crbList := &rbacv1.ClusterRoleBindingList{}
+				listOpts := []client.ListOption{
+					client.MatchingLabels{"app.kubernetes.io/managed-by": "ibm-iam-operator"},
+				}
+				if err := r.Client.List(ctx, crbList, listOpts...); err != nil {
+					log.Error(err, "Failed to list ClusterRoleBindings")
+					return subreconciler.RequeueWithError(err)
+				}
+
+				// Count ClusterRoleBindings that reference this ClusterRole
+				count := 0
+				for _, crb := range crbList.Items {
+					if crb.RoleRef.Kind == "ClusterRole" && crb.RoleRef.Name == clusterRoleName {
+						count++
+					}
+				}
+
+				// Only delete ClusterRole if there's one or fewer ClusterRoleBindings
+				// (the one being deleted or none)
+				if count > 1 {
+					log.Info("Multiple ClusterRoleBindings reference the ClusterRole, skipping ClusterRole deletion", "ClusterRole", clusterRoleName, "count", count)
+					shouldDeleteClusterRole = false
+				} else {
+					log.Info("Single or no ClusterRoleBinding references the ClusterRole, proceeding with ClusterRole deletion", "ClusterRole", clusterRoleName, "count", count)
+				}
+			} else {
+				log.Info("Operator does not have permission to list ClusterRoleBindings, proceeding with ClusterRole deletion", "ClusterRole", clusterRoleName)
+			}
+
+			if shouldDeleteClusterRole {
+				// Add ClusterRole to deletion list
+				objectsToDelete = append(objectsToDelete, &rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: clusterRoleName,
+					},
+				})
+			}
+		}
 	}
 
 	for _, obj := range objectsToDelete {

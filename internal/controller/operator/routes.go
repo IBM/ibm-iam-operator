@@ -178,9 +178,13 @@ func modifyRoute(s common.SecondaryReconciler, ctx context.Context, observed, ge
 		}
 	}
 
+	// Preserve custom labels observed in the cluster, then apply common labels on top
+	generated.Labels = common.MergeMaps(nil, observed.Labels, generated.Labels, map[string]string{"app": "im"}, common.GetCommonLabels())
+
 	if !IsRouteEqual(ctx, generated, observed) {
 		observed.Name = generated.Name
 		observed.Annotations = generated.Annotations
+		observed.Labels = generated.Labels
 		observed.Spec = generated.Spec
 		modified = true
 	}
@@ -609,6 +613,13 @@ func IsRouteEqual(ctx context.Context, oldRoute, newRoute *routev1.Route) bool {
 		log.Info("Annotations not equal",
 			"old", fmt.Sprintf("%v", oldRoute.Annotations),
 			"new", fmt.Sprintf("%v", newRoute.Annotations))
+		return false
+	}
+
+	if !reflect.DeepEqual(oldRoute.Labels, newRoute.Labels) {
+		log.Info("Labels not equal",
+			"old", fmt.Sprintf("%v", oldRoute.Labels),
+			"new", fmt.Sprintf("%v", newRoute.Labels))
 		return false
 	}
 

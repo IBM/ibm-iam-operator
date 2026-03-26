@@ -354,7 +354,7 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 	}
 	if err = r.Get(ctx, types.NamespacedName{Name: "common-service-db", Namespace: req.Namespace}, u); k8sErrors.IsNotFound(err) {
 		log.Info("Cluster not found")
-		return subreconciler.Requeue()
+		return subreconciler.RequeueWithDelay(30 * time.Second)
 	} else if err != nil {
 		log.Error(err, "Cluster could not be retrieved")
 		return subreconciler.RequeueWithError(err)

@@ -383,6 +383,7 @@ func (r *BootstrapReconciler) writeConfigurationsToAuthenticationCR(ctx context.
 		"LIBERTY_SAMESITE_COOKIE":     &authCR.Spec.Config.LibertySSCookie,
 		"LIBERTY_AUTH_CACHE_TIMEOUT":  &authCR.Spec.Config.LibertyAuthCacheTimeout,
 		"LDAP_CLIENT_CONNECT_TIMEOUT": &authCR.Spec.Config.LdapClientConnectTimeout,
+		"CSP_EXTENSION":               &authCR.Spec.Config.CSPExtension,
 	}
 
 	for key, crField := range keys {

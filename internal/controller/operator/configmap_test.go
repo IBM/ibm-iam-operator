@@ -1249,6 +1249,329 @@ var _ = Describe("ConfigMap handling", func() {
 			// Verify that observed was updated to true
 			Expect(observed.Data["EXPOSE_ADDITIONAL_PATHS"]).To(Equal("true"))
 		})
+
+		It("sets CSP_FRAME_ANCESTORS and CSP_CONNECT_SRC to 'self' when cspExtension is not configured in the auth CR", func() {
+			// authCR has no CSPExtension set (nil)
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+			Expect(generated.Data).To(HaveKey("CSP_FRAME_ANCESTORS"))
+			Expect(generated.Data["CSP_FRAME_ANCESTORS"]).To(Equal("'self'"))
+			Expect(generated.Data).To(HaveKey("CSP_CONNECT_SRC"))
+			Expect(generated.Data["CSP_CONNECT_SRC"]).To(Equal("'self'"))
+		})
+
+		It("sets CSP_FRAME_ANCESTORS and CSP_CONNECT_SRC with 'self' prepended when cspExtension is configured in the auth CR", func() {
+			authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"https://cpd-zen.apps.cluster.com/", "https://custom-portal.customer.com/"},
+				ConnectSrc:     []string{"https://cpd-api.apps.cluster.com/"},
+			}
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+			Expect(generated.Data).To(HaveKey("CSP_FRAME_ANCESTORS"))
+			Expect(generated.Data["CSP_FRAME_ANCESTORS"]).To(Equal("'self' https://cpd-zen.apps.cluster.com/ https://custom-portal.customer.com/"))
+			Expect(generated.Data).To(HaveKey("CSP_CONNECT_SRC"))
+			Expect(generated.Data["CSP_CONNECT_SRC"]).To(Equal("'self' https://cpd-api.apps.cluster.com/"))
+		})
+
+		It("sets CSP_FRAME_ANCESTORS with 'self' prepended when only frameAncestors is set and CSP_CONNECT_SRC defaults to 'self'", func() {
+			authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"https://cpd-zen.apps.cluster.com/"},
+			}
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+			Expect(generated.Data).To(HaveKey("CSP_FRAME_ANCESTORS"))
+			Expect(generated.Data["CSP_FRAME_ANCESTORS"]).To(Equal("'self' https://cpd-zen.apps.cluster.com/"))
+			Expect(generated.Data).To(HaveKey("CSP_CONNECT_SRC"))
+			Expect(generated.Data["CSP_CONNECT_SRC"]).To(Equal("'self'"))
+		})
+
+		It("sets CSP_CONNECT_SRC with 'self' prepended when only connectSrc is set and CSP_FRAME_ANCESTORS defaults to 'self'", func() {
+			authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
+				ConnectSrc: []string{"https://cpd-api.apps.cluster.com/"},
+			}
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+			Expect(generated.Data).To(HaveKey("CSP_FRAME_ANCESTORS"))
+			Expect(generated.Data["CSP_FRAME_ANCESTORS"]).To(Equal("'self'"))
+			Expect(generated.Data).To(HaveKey("CSP_CONNECT_SRC"))
+			Expect(generated.Data["CSP_CONNECT_SRC"]).To(Equal("'self' https://cpd-api.apps.cluster.com/"))
+		})
+
+		It("always overwrites CSP_FRAME_ANCESTORS and CSP_CONNECT_SRC in observed configmap from the generated value", func() {
+			authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"https://cpd-zen.apps.cluster.com/"},
+				ConnectSrc:     []string{"https://cpd-api.apps.cluster.com/"},
+			}
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+			observed := getObserved(authCR.Namespace)
+			observed.Data["CSP_FRAME_ANCESTORS"] = "stale-frame-value"
+			observed.Data["CSP_CONNECT_SRC"] = "stale-connect-value"
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+			updated, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(updated).To(BeTrue())
+			Expect(observed.Data["CSP_FRAME_ANCESTORS"]).To(Equal(generated.Data["CSP_FRAME_ANCESTORS"]))
+			Expect(observed.Data["CSP_CONNECT_SRC"]).To(Equal(generated.Data["CSP_CONNECT_SRC"]))
+		})
+
+		It("overwrites CSP_FRAME_ANCESTORS and CSP_CONNECT_SRC in observed configmap with 'self' when cspExtension is removed from auth CR", func() {
+			// authCR has no CSPExtension (nil) — simulates removing it after it was previously set
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+			observed := getObserved(authCR.Namespace)
+			observed.Data["CSP_FRAME_ANCESTORS"] = "https://old-value.example.com/"
+			observed.Data["CSP_CONNECT_SRC"] = "https://old-api.example.com/"
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+			Expect(generated.Data["CSP_FRAME_ANCESTORS"]).To(Equal("'self'"))
+			Expect(generated.Data["CSP_CONNECT_SRC"]).To(Equal("'self'"))
+			updated, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(updated).To(BeTrue())
+			Expect(observed.Data["CSP_FRAME_ANCESTORS"]).To(Equal("'self'"))
+			Expect(observed.Data["CSP_CONNECT_SRC"]).To(Equal("'self'"))
+		})
+		It("returns an error from generateAuthIdpConfigMap when cspExtension contains invalid entries in frameAncestors and connectSrc", func() {
+			authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"http://insecure.example.com/"},
+				ConnectSrc:     []string{"https://*.wildcard.example.com/"},
+			}
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+			generated := &corev1.ConfigMap{}
+			err := r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("frameAncestors"))
+			Expect(err.Error()).To(ContainSubstring("connectSrc"))
+		})
+
+		It("avoids duplicate 'self' when frameAncestors contains 'self' (unquoted)", func() {
+			authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"self", "https://example.com/"},
+			}
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+			Expect(generated.Data["CSP_FRAME_ANCESTORS"]).To(Equal("'self' https://example.com/"))
+		})
+
+		It("avoids duplicate 'self' when frameAncestors contains 'self' (quoted)", func() {
+			authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"'self'", "https://example.com/"},
+			}
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+			Expect(generated.Data["CSP_FRAME_ANCESTORS"]).To(Equal("'self' https://example.com/"))
+		})
+
+		It("avoids duplicate 'self' when connectSrc contains both 'self' forms", func() {
+			authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
+				ConnectSrc: []string{"self", "'self'", "https://api.example.com/"},
+			}
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+			Expect(generated.Data["CSP_CONNECT_SRC"]).To(Equal("'self' https://api.example.com/"))
+		})
+
+		It("sets only 'self' when frameAncestors contains only 'self' (unquoted)", func() {
+			authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"self"},
+			}
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+			Expect(generated.Data["CSP_FRAME_ANCESTORS"]).To(Equal("'self'"))
+		})
+
+		It("sets only 'self' when connectSrc contains only 'self' (quoted)", func() {
+			authCR.Spec.Config.CSPExtension = &operatorv1alpha1.CSPExtensionConfig{
+				ConnectSrc: []string{"'self'"},
+			}
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+			Expect(generated.Data["CSP_CONNECT_SRC"]).To(Equal("'self'"))
+		})
+	})
+
+	Describe("validate CSPExtension", func() {
+		It("returns nil when CSPExtension is nil", func() {
+			Expect(validateCSPExtension(nil)).To(Succeed())
+		})
+
+		It("returns nil when CSPExtension has empty slices", func() {
+			Expect(validateCSPExtension(&operatorv1alpha1.CSPExtensionConfig{})).To(Succeed())
+		})
+
+		It("returns nil for valid https URLs in frameAncestors and connectSrc", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{
+					"https://cpd-zen.apps.cluster.com/",
+					"https://custom-portal.customer.com/",
+				},
+				ConnectSrc: []string{
+					"https://cpd-api.apps.cluster.com/",
+				},
+			}
+			Expect(validateCSPExtension(csp)).To(Succeed())
+		})
+
+		It("returns an error when a frameAncestors entry contains a wildcard", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"https://*.example.com/"},
+			}
+			err := validateCSPExtension(csp)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("frameAncestors"))
+			Expect(err.Error()).To(ContainSubstring("wildcard"))
+		})
+
+		It("returns an error when a connectSrc entry contains a wildcard", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				ConnectSrc: []string{"https://*.api.example.com/"},
+			}
+			err := validateCSPExtension(csp)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("connectSrc"))
+			Expect(err.Error()).To(ContainSubstring("wildcard"))
+		})
+
+		It("returns an error when a frameAncestors entry uses http instead of https", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"http://insecure.example.com/"},
+			}
+			err := validateCSPExtension(csp)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("frameAncestors"))
+			Expect(err.Error()).To(ContainSubstring("not a valid https URL"))
+		})
+
+		It("returns an error when a connectSrc entry uses http instead of https", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				ConnectSrc: []string{"http://insecure-api.example.com/"},
+			}
+			err := validateCSPExtension(csp)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("connectSrc"))
+			Expect(err.Error()).To(ContainSubstring("not a valid https URL"))
+		})
+
+		It("returns an error when a frameAncestors entry is not a URL at all", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"not-a-url"},
+			}
+			err := validateCSPExtension(csp)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("frameAncestors"))
+			Expect(err.Error()).To(ContainSubstring("not a valid https URL"))
+		})
+
+		It("returns an error listing all invalid entries when multiple are invalid", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{
+					"https://valid.example.com/",
+					"http://bad.example.com/",
+					"https://*.wildcard.example.com/",
+				},
+				ConnectSrc: []string{
+					"https://valid-api.example.com/",
+					"ftp://wrong-scheme.example.com/",
+				},
+			}
+			err := validateCSPExtension(csp)
+			Expect(err).To(HaveOccurred())
+			// Should mention both invalid entries
+			Expect(err.Error()).To(ContainSubstring(`"http://bad.example.com/"`))
+			Expect(err.Error()).To(ContainSubstring(`"https://*.wildcard.example.com/"`))
+			Expect(err.Error()).To(ContainSubstring(`"ftp://wrong-scheme.example.com/"`))
+			// Should NOT mention the valid entries
+			Expect(err.Error()).NotTo(ContainSubstring("valid.example.com"))
+			Expect(err.Error()).NotTo(ContainSubstring("valid-api.example.com"))
+		})
+
+		It("returns an error when a frameAncestors entry has no host", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"https://"},
+			}
+			err := validateCSPExtension(csp)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("not a valid https URL"))
+		})
+
+		It("returns nil when frameAncestors contains 'self' (unquoted)", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"self"},
+			}
+			Expect(validateCSPExtension(csp)).To(Succeed())
+		})
+
+		It("returns nil when frameAncestors contains 'self' (quoted)", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"'self'"},
+			}
+			Expect(validateCSPExtension(csp)).To(Succeed())
+		})
+
+		It("returns nil when both 'self' forms are mixed with valid URLs", func() {
+			csp := &operatorv1alpha1.CSPExtensionConfig{
+				FrameAncestors: []string{"self", "https://example.com/"},
+				ConnectSrc:     []string{"'self'", "https://api.example.com/"},
+			}
+			Expect(validateCSPExtension(csp)).To(Succeed())
+		})
 	})
 
 	Describe("oauth-client-map handling", func() {

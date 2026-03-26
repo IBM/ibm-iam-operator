@@ -62,12 +62,11 @@ for bundle_file in "${BUNDLE_FILES[@]}"; do
         continue
     fi
     
-    # Get the HEAD version of the file
-    git show HEAD:"${bundle_file}" > "${TEMP_DIR}/original.yaml" 2>/dev/null || {
-        echo "Warning: Could not get HEAD version of ${bundle_file}"
-        echo "This might be a new file. Checking staged version..."
-        git show :"${bundle_file}" > "${TEMP_DIR}/original.yaml" 2>/dev/null || {
-            echo "Warning: Could not get staged version of ${bundle_file}"
+    # Get the staged version of the file (from the index), fall back to HEAD if not staged
+    git show :"${bundle_file}" > "${TEMP_DIR}/original.yaml" 2>/dev/null || {
+        echo "Warning: ${bundle_file} is not staged, using HEAD version as baseline..."
+        git show HEAD:"${bundle_file}" > "${TEMP_DIR}/original.yaml" 2>/dev/null || {
+            echo "Warning: Could not get HEAD version of ${bundle_file}"
             echo "Skipping this file..."
             continue
         }

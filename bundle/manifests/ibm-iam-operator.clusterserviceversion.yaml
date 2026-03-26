@@ -156,7 +156,7 @@ metadata:
     categories: Security
     certified: "false"
     containerImage: icr.io/cpopen/ibm-iam-operator:4.17.0
-    createdAt: "2026-03-03T16:23:52Z"
+    createdAt: "2026-03-26T08:49:20Z"
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage the lifecycle of IAM services. With this operator, you can simply deploy and upgrade the IAM services
     features.operators.openshift.io/disconnected: "true"
     features.operators.openshift.io/fips-compliant: "true"
@@ -381,21 +381,12 @@ spec:
               verbs:
                 - create
             - apiGroups:
-                - route.openshift.io
-              resources:
-                - routes/status
-              verbs:
-                - get
-                - list
-                - watch
-            - apiGroups:
                 - ""
               resources:
                 - pods
                 - services
                 - endpoints
                 - persistentvolumeclaims
-                - events
                 - configmaps
                 - secrets
               verbs:
@@ -409,7 +400,16 @@ spec:
             - apiGroups:
                 - ""
               resources:
+                - events
+              verbs:
+                - create
+                - patch
+            - apiGroups:
+                - ""
+              resources:
                 - services/finalizers
+              resourceNames:
+                - mongodb
               verbs:
                 - update
                 - patch
@@ -555,12 +555,9 @@ spec:
               resources:
                 - ingresses
               verbs:
-                - create
                 - delete
                 - get
                 - list
-                - patch
-                - update
                 - watch
             - apiGroups:
                 - batch
@@ -622,7 +619,6 @@ spec:
                 - postgresql.k8s.enterprisedb.io
               resources:
                 - clusters
-                - clusters/status
               verbs:
                 - get
                 - list

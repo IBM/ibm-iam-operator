@@ -56,21 +56,12 @@ rules:
   verbs:
   - create
 - apiGroups:
-  - route.openshift.io
-  resources:
-  - routes/status
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - ""
   resources:
   - pods
   - services
   - endpoints
   - persistentvolumeclaims
-  - events
   - configmaps
   - secrets
   verbs:
@@ -84,7 +75,16 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
   - services/finalizers
+  resourceNames:
+  - mongodb
   verbs:
   - update
   - patch
@@ -230,12 +230,9 @@ rules:
   resources:
   - ingresses
   verbs:
-  - create
   - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - batch
@@ -297,7 +294,6 @@ rules:
   - postgresql.k8s.enterprisedb.io
   resources:
   - clusters
-  - clusters/status
   verbs:
   - get
   - list

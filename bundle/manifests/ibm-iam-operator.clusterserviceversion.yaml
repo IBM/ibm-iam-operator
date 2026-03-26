@@ -406,10 +406,10 @@ spec:
                 - patch
             - apiGroups:
                 - ""
-              resourceNames:
-                - mongodb
               resources:
                 - services/finalizers
+              resourceNames:
+                - mongodb
               verbs:
                 - update
                 - patch

@@ -46,7 +46,7 @@ func (r *AuthenticationReconciler) addEmbeddedDBIfNeeded(ctx context.Context, au
 	if usingExternal, err = r.isConfiguredForExternalEDB(ctx, authCR); err != nil || usingExternal {
 		return
 	}
-	name := "common-service-postgresql"
+	name := "common-service-cnpg"
 	*operands = append(*operands, operatorv1alpha1.Operand{
 		Name: name,
 		Bindings: map[string]operatorv1alpha1.Bindable{
@@ -343,7 +343,8 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 		return subreconciler.RequeueWithError(err)
 	}
 
-	clusterAPIVersion := "postgresql.k8s.enterprisedb.io/v1"
+	// clusterAPIVersion := "postgresql.k8s.enterprisedb.io/v1"
+	clusterAPIVersion := "pg.ibm.com/v1"
 	log = log.WithValues("Object.Name", "common-service-db", "Object.Kind", "Cluster", "Object.APIVersion", clusterAPIVersion)
 
 	u := &unstructured.Unstructured{

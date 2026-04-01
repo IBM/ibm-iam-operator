@@ -789,6 +789,11 @@ func buildMigratorContainer(s common.SecondaryReconciler, image string, resource
 				MountPath: "/etc/postgres/certs",
 				ReadOnly:  true,
 			},
+			{
+				Name:      "default-admin-creds",
+				MountPath: "/etc/default-admin",
+				ReadOnly:  true,
+			},
 		},
 		Command: []string{"/usr/local/bin/migrator", "migrate", "--postgres-config", "/etc/postgres"},
 	}
@@ -825,6 +830,21 @@ func buildMigratorVolumes(needsMongoDBMigration bool, edbSPCName string) (volume
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: common.DatastoreEDBCMName,
+					},
+					DefaultMode: ptr.To(int32(420)),
+				},
+			},
+		},
+		{
+			Name: "default-admin-creds",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-auth-idp-credentials",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "admin_username",
+							Path: "username",
+						},
 					},
 					DefaultMode: ptr.To(int32(420)),
 				},

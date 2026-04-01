@@ -178,9 +178,13 @@ func modifyRoute(s common.SecondaryReconciler, ctx context.Context, observed, ge
 		}
 	}
 
+	// Preserve custom labels observed in the cluster, then apply common labels on top
+	generated.Labels = common.MergeMaps(nil, observed.Labels, generated.Labels, map[string]string{"app": "im"}, common.GetCommonLabels())
+
 	if !IsRouteEqual(ctx, generated, observed) {
 		observed.Name = generated.Name
 		observed.Annotations = generated.Annotations
+		observed.Labels = generated.Labels
 		observed.Spec = generated.Spec
 		modified = true
 	}
@@ -227,8 +231,8 @@ func (r *AuthenticationReconciler) getRouteSubreconcilers(authCR *operatorv1alph
 // Authentication CR. Skips when this field is not configured or if the Zen
 // front door has been enabled on the Authentication CR with
 // .spec.config.zenFrontDoor set to true.
-func (r *AuthenticationReconciler) updateCPConsoleCertificates(authCR *operatorv1alpha1.Authentication) common.SecondaryReconcilerFn {
-	return common.SecondaryReconcilerFn(func(ctx context.Context) (result *ctrl.Result, err error) {
+func (r *AuthenticationReconciler) updateCPConsoleCertificates(authCR *operatorv1alpha1.Authentication) common.SubreconcilerFn {
+	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		log := logf.FromContext(ctx, "Route.Name", "cp-console", "Route.Namespace", authCR.Namespace)
 		log.Info("Update certificates on UI Route if custom TLS configured")
 		if authCR.Spec.Config.ZenFrontDoor {
@@ -295,12 +299,12 @@ func (r *AuthenticationReconciler) updateCPConsoleCertificates(authCR *operatorv
 		}
 		log.Info("UI Route successfully updated with custom TLS; requeueing")
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	})
+	}
 }
 
 // removeExtraRoutes produces a subreconciler that deletes any Route that is labeled as IM's and is not in the list of
 // Routes that the Operator wants to exist.
-func (r *AuthenticationReconciler) removeExtraRoutes(authCR *operatorv1alpha1.Authentication, allRoutesFields *map[string]*reconcileRouteFields) (fn common.SecondaryReconcilerFn) {
+func (r *AuthenticationReconciler) removeExtraRoutes(authCR *operatorv1alpha1.Authentication, allRoutesFields *map[string]*reconcileRouteFields) (fn common.SubreconcilerFn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		log := logf.FromContext(ctx)
 		routesList := &routev1.RouteList{}
@@ -372,7 +376,7 @@ func (r *AuthenticationReconciler) removeAllManagedRoutes(ctx context.Context, a
 	return subreconciler.ContinueReconciling()
 }
 
-func (r *AuthenticationReconciler) getCustomTLS(authCR *operatorv1alpha1.Authentication, secret *corev1.Secret) common.SecondaryReconcilerFn {
+func (r *AuthenticationReconciler) getCustomTLS(authCR *operatorv1alpha1.Authentication, secret *corev1.Secret) common.SubreconcilerFn {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		if !authCR.HasCustomIngressCertificate() {
 			return subreconciler.ContinueReconciling()
@@ -612,6 +616,13 @@ func IsRouteEqual(ctx context.Context, oldRoute, newRoute *routev1.Route) bool {
 		return false
 	}
 
+	if !reflect.DeepEqual(oldRoute.Labels, newRoute.Labels) {
+		log.Info("Labels not equal",
+			"old", fmt.Sprintf("%v", oldRoute.Labels),
+			"new", fmt.Sprintf("%v", newRoute.Labels))
+		return false
+	}
+
 	if !reflect.DeepEqual(oldRoute.Spec, newRoute.Spec) {
 		//ugly, but don't print the CA to the log
 		var loggedValues []interface{}
@@ -718,7 +729,7 @@ func generateRouteObject(fields *reconcileRouteFields) common.GenerateFn[*routev
 	}
 }
 
-func (r *AuthenticationReconciler) getClusterAddress(authCR *operatorv1alpha1.Authentication, clusterAddress *string) (fn common.SecondaryReconcilerFn) {
+func (r *AuthenticationReconciler) getClusterAddress(authCR *operatorv1alpha1.Authentication, clusterAddress *string) (fn common.SubreconcilerFn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		clusterInfoConfigMap := &corev1.ConfigMap{}
 
@@ -815,7 +826,7 @@ func (r *AuthenticationReconciler) ensureConfigMapHasEqualFields(_ *operatorv1al
 	}
 }
 
-func (r *AuthenticationReconciler) getWlpClientID(authCR *operatorv1alpha1.Authentication, wlpClientID *string) (fn common.SecondaryReconcilerFn) {
+func (r *AuthenticationReconciler) getWlpClientID(authCR *operatorv1alpha1.Authentication, wlpClientID *string) (fn common.SubreconcilerFn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		log := logf.FromContext(ctx)
 
@@ -839,7 +850,7 @@ func (r *AuthenticationReconciler) getWlpClientID(authCR *operatorv1alpha1.Authe
 
 // getCertificateForService uses the provided Service name to determine which Secret contains the matching certificate
 // data and returns it.
-func (r *AuthenticationReconciler) getCertificateForService(serviceName string, authCR *operatorv1alpha1.Authentication, certificate *[]byte) (fn common.SecondaryReconcilerFn) {
+func (r *AuthenticationReconciler) getCertificateForService(serviceName string, authCR *operatorv1alpha1.Authentication, certificate *[]byte) (fn common.SubreconcilerFn) {
 	return func(ctx context.Context) (result *ctrl.Result, err error) {
 		log := logf.FromContext(ctx)
 		secret := &corev1.Secret{}

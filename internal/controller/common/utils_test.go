@@ -45,4 +45,23 @@ var _ = Describe("objectTable", func() {
 			Expect(o).ToNot(BeNil())
 		},
 		Entry("*corev1.Secret", func() Secondary { return NewSecondaryReconcilerBuilder[*corev1.Secret]().WithClient(cl).MustBuild() }, &corev1.Secret{}))
+
+	Describe("GetFunctionName", func() {
+		Context("when given a function", func() {
+			It("should return a non-empty function identifier", func() {
+				testFunc := func() {}
+				name := GetFunctionName(testFunc)
+				Expect(name).NotTo(BeEmpty())
+			})
+		})
+
+		Context("when given a method", func() {
+			It("should return the method name", func() {
+				name := GetFunctionName(cl.Get)
+				Expect(name).NotTo(BeEmpty())
+				// Should contain "Get" as part of the method name
+				Expect(name).To(ContainSubstring("Get"))
+			})
+		})
+	})
 })

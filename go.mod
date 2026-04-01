@@ -1,6 +1,6 @@
 module github.com/IBM/ibm-iam-operator
 
-go 1.25.6
+go 1.26.1
 
 require (
 	github.com/go-logr/logr v1.4.3
@@ -43,7 +43,6 @@ require (
 	github.com/go-openapi/swag/typeutils v0.25.3 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.3 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
-	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect

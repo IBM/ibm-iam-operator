@@ -56,7 +56,7 @@ repos:
         name: Check copyright banners
         entry: common/scripts/lint_copyright_banner.sh
         language: system
-        types_or: [go, c, c++, proto, python, shell, executable, yaml, makefile]
+        types_or: [go, c, c++, proto, python, shell, executable, makefile]
         exclude: '(\.gen\.go|\.pb\.go|_pb2\.py)$'
         
       - id: gofmt

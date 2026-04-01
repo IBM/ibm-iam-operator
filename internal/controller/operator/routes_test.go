@@ -1107,4 +1107,213 @@ var _ = Describe("Route handling", func() {
 		})
 
 	})
+
+	Describe("IsRouteEqual", func() {
+		var ctx context.Context
+		var route1, route2 *routev1.Route
+
+		BeforeEach(func() {
+			ctx = context.Background()
+			route1 = &routev1.Route{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-route",
+					Annotations: map[string]string{
+						"annotation1": "value1",
+					},
+					Labels: map[string]string{
+						"label1": "value1",
+					},
+				},
+				Spec: routev1.RouteSpec{
+					Host: "test.example.com",
+					Path: "/test",
+				},
+			}
+			route2 = route1.DeepCopy()
+		})
+
+		Context("when routes are identical", func() {
+			It("should return true", func() {
+				Expect(IsRouteEqual(ctx, route1, route2)).To(BeTrue())
+			})
+		})
+
+		Context("when names differ", func() {
+			It("should return false", func() {
+				route2.Name = "different-name"
+				Expect(IsRouteEqual(ctx, route1, route2)).To(BeFalse())
+			})
+		})
+
+		Context("when annotations differ", func() {
+			It("should return false", func() {
+				route2.Annotations["annotation2"] = "value2"
+				Expect(IsRouteEqual(ctx, route1, route2)).To(BeFalse())
+			})
+		})
+
+		Context("when labels differ", func() {
+			It("should return false when new label is added", func() {
+				route2.Labels["label2"] = "value2"
+				Expect(IsRouteEqual(ctx, route1, route2)).To(BeFalse())
+			})
+
+			It("should return false when label value changes", func() {
+				route2.Labels["label1"] = "different-value"
+				Expect(IsRouteEqual(ctx, route1, route2)).To(BeFalse())
+			})
+
+			It("should return false when label is removed", func() {
+				delete(route2.Labels, "label1")
+				Expect(IsRouteEqual(ctx, route1, route2)).To(BeFalse())
+			})
+		})
+
+		Context("when specs differ", func() {
+			It("should return false", func() {
+				route2.Spec.Host = "different.example.com"
+				Expect(IsRouteEqual(ctx, route1, route2)).To(BeFalse())
+			})
+		})
+	})
+
+	Describe("modifyRoute", func() {
+		var ctx context.Context
+		var observed, generated *routev1.Route
+		var s ctrlcommon.SecondaryReconciler
+
+		BeforeEach(func() {
+			ctx = context.Background()
+			observed = &routev1.Route{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-route",
+					Annotations: map[string]string{
+						"custom-annotation":                          "custom-value",
+						"haproxy.router.openshift.io/rewrite-target": "/old",
+					},
+					Labels: map[string]string{
+						"custom-label":              "custom-value",
+						"app.kubernetes.io/part-of": "old-value",
+					},
+				},
+				Spec: routev1.RouteSpec{
+					Host: "test.example.com",
+				},
+			}
+			generated = &routev1.Route{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-route",
+					Annotations: map[string]string{
+						"haproxy.router.openshift.io/rewrite-target": "/new",
+						"generated-annotation":                       "generated-value",
+					},
+					Labels: map[string]string{
+						"app":                          "im",
+						"app.kubernetes.io/part-of":    "im",
+						"app.kubernetes.io/managed-by": "ibm-iam-operator",
+					},
+				},
+				Spec: routev1.RouteSpec{
+					Host: "test.example.com",
+				},
+			}
+		})
+
+		Context("when preserving custom annotations", func() {
+			It("should preserve custom annotations from observed route", func() {
+				// After merging, generated will have both custom and generated annotations
+				// but the rewrite-target from generated is preserved
+				modified, err := modifyRoute(s, ctx, observed, generated)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(generated.Annotations).To(HaveKeyWithValue("custom-annotation", "custom-value"))
+				Expect(generated.Annotations).To(HaveKeyWithValue("generated-annotation", "generated-value"))
+				Expect(generated.Annotations).To(HaveKeyWithValue("haproxy.router.openshift.io/rewrite-target", "/new"))
+				// Since annotations differ after merge, it should be marked as modified
+				Expect(modified).To(BeTrue())
+			})
+
+			It("should not allow changes to rewrite-target annotation", func() {
+				_, err := modifyRoute(s, ctx, observed, generated)
+				Expect(err).ToNot(HaveOccurred())
+				// The generated rewrite-target should be preserved, not the observed one
+				Expect(generated.Annotations).To(HaveKeyWithValue("haproxy.router.openshift.io/rewrite-target", "/new"))
+			})
+
+			It("should keep generated annotations", func() {
+				_, err := modifyRoute(s, ctx, observed, generated)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(generated.Annotations).To(HaveKeyWithValue("generated-annotation", "generated-value"))
+			})
+		})
+
+		Context("when preserving and merging labels", func() {
+			It("should preserve custom labels from observed route", func() {
+				_, err := modifyRoute(s, ctx, observed, generated)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(generated.Labels).To(HaveKeyWithValue("custom-label", "custom-value"))
+			})
+
+			It("should apply common labels from GetCommonLabels", func() {
+				_, err := modifyRoute(s, ctx, observed, generated)
+				Expect(err).ToNot(HaveOccurred())
+				// Common labels should override observed labels
+				Expect(generated.Labels).To(HaveKeyWithValue("app.kubernetes.io/part-of", "im"))
+				Expect(generated.Labels).To(HaveKeyWithValue("app.kubernetes.io/managed-by", "ibm-iam-operator"))
+			})
+
+			It("should override observed common labels with GetCommonLabels values", func() {
+				// Observed has old-value for part-of, but GetCommonLabels should override it
+				_, err := modifyRoute(s, ctx, observed, generated)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(generated.Labels["app.kubernetes.io/part-of"]).To(Equal("im"))
+				Expect(generated.Labels["app.kubernetes.io/part-of"]).ToNot(Equal("old-value"))
+			})
+
+			It("should have all three types of labels: custom, generated, and common", func() {
+				_, err := modifyRoute(s, ctx, observed, generated)
+				Expect(err).ToNot(HaveOccurred())
+				// Custom from observed
+				Expect(generated.Labels).To(HaveKeyWithValue("custom-label", "custom-value"))
+				// Common labels (overriding any conflicts)
+				Expect(generated.Labels).To(HaveKeyWithValue("app.kubernetes.io/part-of", "im"))
+				Expect(generated.Labels).To(HaveKeyWithValue("app.kubernetes.io/managed-by", "ibm-iam-operator"))
+			})
+		})
+
+		Context("when routes differ", func() {
+			It("should mark as modified and update observed route", func() {
+				observed.Spec.Host = "different.example.com"
+				modified, err := modifyRoute(s, ctx, observed, generated)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(modified).To(BeTrue())
+				Expect(observed.Spec.Host).To(Equal(generated.Spec.Host))
+				Expect(observed.Labels).To(Equal(generated.Labels))
+			})
+		})
+
+		Context("when routes are equal after merging", func() {
+			It("should not mark as modified", func() {
+				// Make observed match what generated will become after merging
+				// Note: observed also needs the "app" label that's in the generated route from generateRouteObject
+				observed.Annotations = map[string]string{
+					"custom-annotation":                          "custom-value",
+					"haproxy.router.openshift.io/rewrite-target": "/new",
+					"generated-annotation":                       "generated-value",
+				}
+				observed.Labels = map[string]string{
+					"app":                          "im",
+					"custom-label":                 "custom-value",
+					"app.kubernetes.io/part-of":    "im",
+					"app.kubernetes.io/managed-by": "ibm-iam-operator",
+				}
+				// Also update generated to have the custom label so they match after merge
+				generated.Labels["custom-label"] = "custom-value"
+				generated.Annotations["custom-annotation"] = "custom-value"
+
+				modified, err := modifyRoute(s, ctx, observed, generated)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(modified).To(BeFalse())
+			})
+		})
+	})
 })

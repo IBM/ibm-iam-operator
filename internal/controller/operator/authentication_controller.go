@@ -18,9 +18,6 @@ package operator
 
 import (
 	"context"
-	"reflect"
-	"runtime"
-	"strings"
 
 	"fmt"
 	"sync"
@@ -157,27 +154,6 @@ type AuthenticationReconciler struct {
 	clusterType     common.ClusterType
 	needsRollout    bool
 	common.ByteGenerator
-}
-
-func GetFunctionName(fn any) string {
-	fnStrs := strings.Split(runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name(), ".")
-	return strings.Split(fnStrs[len(fnStrs)-1], "-")[0]
-}
-
-// withResultLog is a helper function that logs the result of a subreconciler
-func withResultLog(fn subreconciler.FnWithRequest) func(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	return func(rootCtx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-		fnName := GetFunctionName(fn)
-		log := logf.FromContext(rootCtx, "subreconciler", fnName)
-		ctx := logf.IntoContext(rootCtx, log)
-		log.V(1).Info("Running subreconciler")
-		if result, err = fn(ctx, req); subreconciler.ShouldHaltOrRequeue(result, err) {
-			log.V(1).Info("Result: should halt or requeue ", "result", result, "err", err)
-			return
-		}
-		log.V(1).Info("Result: no requeue necessary", "result", result, "err", err)
-		return
-	}
 }
 
 func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
@@ -370,29 +346,9 @@ func (r *AuthenticationReconciler) ensureBootstrapIsComplete(ctx context.Context
 	return subreconciler.ContinueReconciling()
 }
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
-	log := logf.FromContext(rootCtx).WithName("controller_authentication")
-	ctx := logf.IntoContext(rootCtx, log)
-	log.Info("Reconciling Authentication CR")
-
-	// Fetch the Authentication instance
-	authCR := &operatorv1alpha1.Authentication{}
-	err = r.Get(ctx, req.NamespacedName, authCR)
-	if k8sErrors.IsNotFound(err) {
-		return result, nil
-	} else if err != nil {
-		return
-	}
-
-	if !common.ClusterHasCSIGroupVersion(&r.DiscoveryClient) && authCR.SecretsStoreCSIEnabled() {
-		log.Info("useSecretsStoreCSI is enabled, but the API is not available on this cluster. Ignoring setting until Secrets Store CSI driver is installed.")
-	}
-
-	var subResult *ctrl.Result
-
-	fns := []subreconciler.FnWithRequest{
+// runNonStatusSubreconcilers runs all of the non-status reconciliation behavior.
+func (r *AuthenticationReconciler) runNonStatusSubreconcilers(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	return common.NewStrictSubreconcilers(common.NewSubreconcilersWithResultLog(req,
 		r.ensureBootstrapIsComplete,
 		r.handleAuthenticationFinalizer,
 		r.createSA,
@@ -423,25 +379,45 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 		r.handleHPAs,
 		r.syncClientHostnames,
 		r.handleMongoDBCleanup,
-		r.cleanupOldRBAC,
+		r.cleanupOldRBAC)).Reconcile(ctx)
+}
+
+// Reconcile is part of the main kubernetes reconciliation loop which aims to
+// move the current state of the cluster closer to the desired state.
+func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
+	log := logf.FromContext(rootCtx).WithName("controller_authentication")
+	ctx := logf.IntoContext(rootCtx, log)
+	log.Info("Reconciling Authentication CR")
+
+	// Fetch the Authentication instance
+	authCR := &operatorv1alpha1.Authentication{}
+	err = r.Get(ctx, req.NamespacedName, authCR)
+	if k8sErrors.IsNotFound(err) {
+		return result, nil
+	} else if err != nil {
+		return
 	}
 
-	for _, fn := range fns {
-		if subResult, err = withResultLog(fn)(ctx, req); subreconciler.ShouldHaltOrRequeue(subResult, err) {
-			break
-		}
+	if !common.ClusterHasCSIGroupVersion(&r.DiscoveryClient) && authCR.SecretsStoreCSIEnabled() {
+		log.Info("useSecretsStoreCSI is enabled, but the API is not available on this cluster. Ignoring setting until Secrets Store CSI driver is installed.")
 	}
 
-	subResult, err = r.updateAuthenticationStatus(ctx, req)
-	if subreconciler.ShouldRequeue(subResult, err) {
-		log.Info("Reconciliation for Authentication CR spec incomplete; requeueing")
-	} else if subreconciler.ShouldContinue(subResult, err) {
-		log.Info("Reconciliation for Authentication CR spec complete")
+	// Evaluate the secondary resources and the primary's status, then
+	// requeue if any changes or issues were encountered in either
+	finalResult, err := common.NewLazySubreconcilers(common.NewSubreconcilers(req,
+		r.runNonStatusSubreconcilers,
+		r.updateAuthenticationStatus)).Reconcile(ctx)
+
+	if subreconciler.ShouldRequeue(finalResult, err) {
+		log.Info("Reconciliation for Authentication CR incomplete; requeueing")
 	} else {
-		log.Info("Reconciling Authentication CR complete")
+		if subreconciler.ShouldContinue(finalResult, err) {
+			finalResult, err = subreconciler.DoNotRequeue()
+		}
+		log.Info("Reconciliation for Authentication CR complete")
 	}
 
-	result, err = subreconciler.Evaluate(subResult, err)
+	result, err = subreconciler.Evaluate(finalResult, err)
 	log.V(1).Info("Reconciliation return", "result", result, "err", err)
 	return
 }

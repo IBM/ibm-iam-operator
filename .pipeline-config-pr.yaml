@@ -32,6 +32,7 @@ tasks:
           export GIT_BRANCH="$(get_env git-branch)"
           export GIT_COMMIT="$(get_env git-commit)"
           export BUILD_TAG="${GIT_COMMIT:0:7}"
+          export REGISTRY="docker-na-public.artifactory.swg-devops.com/hyc-cloud-private-scratch-docker-local/ibmcom"
           source build_scripts/setup_env.sh
           source build_scripts/build_image.sh
       - name: compliance-checks

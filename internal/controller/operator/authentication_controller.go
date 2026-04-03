@@ -331,6 +331,7 @@ func (r *AuthenticationReconciler) runNonStatusSubreconcilers(ctx context.Contex
 		r.handleServiceAccount,
 		r.ensureMigrationJobSucceeded,
 		r.handleDeployments,
+		r.validateBasicRegistryAccounts,
 		r.ensureOIDCClientRegistrationJobRuns,
 		r.handleZenFrontDoor,
 		r.handleRoutes,

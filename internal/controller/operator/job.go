@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 
+	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/api/oidc.security/v1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/internal/controller/common"
 	"github.com/opdev/subreconciler"
@@ -620,6 +621,11 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 
 	imagePullSecret := os.Getenv("IMAGE_PULL_SECRET")
 
+	zenInstanceID, err := getZenInstanceIDForMigratorJob(s.GetClient(), ctx, authCR.Namespace)
+	if err != nil {
+		return
+	}
+
 	var mongoHost string
 	var needsMongoDBMigration bool
 	if needsMongoDBMigration, err = mongoIsPresent(s.GetClient(), ctx, authCR); err != nil {
@@ -642,17 +648,30 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 		}
 	}
 
+	jobLabels := common.MergeMaps(nil, metaLabels)
+	podTemplateLabels := common.MergeMaps(nil, podLabels)
+	if zenInstanceID != "" {
+		if jobLabels == nil {
+			jobLabels = map[string]string{}
+		}
+		if podTemplateLabels == nil {
+			podTemplateLabels = map[string]string{}
+		}
+		jobLabels["authentication.operator.ibm.com/zen-instance-id"] = zenInstanceID
+		podTemplateLabels["authentication.operator.ibm.com/zen-instance-id"] = zenInstanceID
+	}
+
 	*job = batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      s.GetName(),
 			Namespace: s.GetNamespace(),
-			Labels:    metaLabels,
+			Labels:    jobLabels,
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   s.GetName(),
-					Labels: podLabels,
+					Labels: podTemplateLabels,
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
 						"productName":   "IBM Cloud Platform Common Services",
@@ -739,8 +758,8 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 							Operator: corev1.TolerationOpExists,
 						},
 					},
-					Volumes:    buildMigratorVolumes(needsMongoDBMigration, edbspc.Name),
-					Containers: buildMigratorContainer(s, image, resources, mongoHost),
+					Volumes:    buildMigratorVolumes(needsMongoDBMigration, edbspc.Name, zenInstanceID),
+					Containers: buildMigratorContainer(s, image, resources, mongoHost, zenInstanceID),
 				},
 			},
 		},
@@ -760,7 +779,7 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 	return
 }
 
-func buildMigratorContainer(s common.SecondaryReconciler, image string, resources *corev1.ResourceRequirements, mongoHost string) (containers []corev1.Container) {
+func buildMigratorContainer(s common.SecondaryReconciler, image string, resources *corev1.ResourceRequirements, mongoHost string, zenInstanceID string) (containers []corev1.Container) {
 	container := corev1.Container{
 		Name:            s.GetName(),
 		Image:           image,
@@ -794,6 +813,11 @@ func buildMigratorContainer(s common.SecondaryReconciler, image string, resource
 				MountPath: "/etc/default-admin",
 				ReadOnly:  true,
 			},
+			{
+				Name:      "zen-instance-id",
+				MountPath: "/etc/zen",
+				ReadOnly:  true,
+			},
 		},
 		Command: []string{"/usr/local/bin/migrator", "migrate", "--postgres-config", "/etc/postgres"},
 	}
@@ -822,7 +846,26 @@ func buildMigratorContainer(s common.SecondaryReconciler, image string, resource
 	return []corev1.Container{container}
 }
 
-func buildMigratorVolumes(needsMongoDBMigration bool, edbSPCName string) (volumes []corev1.Volume) {
+func getZenInstanceIDForMigratorJob(cl client.Client, ctx context.Context, namespace string) (zenInstanceID string, err error) {
+	clientList := &oidcsecurityv1.ClientList{}
+	if err = cl.List(ctx, clientList, client.InNamespace(namespace)); err != nil {
+		return "", fmt.Errorf("failed to list Client CRs in namespace %s: %w", namespace, err)
+	}
+
+	for _, clientCR := range clientList.Items {
+		if !isOwnedByZenService(&clientCR) {
+			continue
+		}
+		if clientCR.Spec.ZenInstanceId == "" {
+			continue
+		}
+		return clientCR.Spec.ZenInstanceId, nil
+	}
+
+	return "", fmt.Errorf("failed to find Client CR owned by ZenService with non-empty spec.zenInstanceId in namespace %s", namespace)
+}
+
+func buildMigratorVolumes(needsMongoDBMigration bool, edbSPCName string, zenInstanceID string) (volumes []corev1.Volume) {
 	volumes = []corev1.Volume{
 		{
 			Name: "postgres-config",
@@ -847,6 +890,23 @@ func buildMigratorVolumes(needsMongoDBMigration bool, edbSPCName string) (volume
 						},
 					},
 					DefaultMode: ptr.To(int32(420)),
+				},
+			},
+		},
+		{
+			Name: "zen-instance-id",
+			VolumeSource: corev1.VolumeSource{
+				DownwardAPI: &corev1.DownwardAPIVolumeSource{
+					DefaultMode: ptr.To(int32(420)),
+					Items: []corev1.DownwardAPIVolumeFile{
+						{
+							Path: "instance-id",
+							FieldRef: &corev1.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "metadata.labels['authentication.operator.ibm.com/zen-instance-id']",
+							},
+						},
+					},
 				},
 			},
 		},

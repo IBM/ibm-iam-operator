@@ -324,8 +324,22 @@ func removeJobIfFailedOrImageDifferent(imageRef string) common.GenerateFn[*batch
 			return
 		}
 
-		// Leave the Job alone if the image refs haven't changed and the Job hasn't failed
-		if job.Spec.Template.Spec.Containers[0].Image == common.GetImageRef(imageRef) && !jobFailedConditionIsTrue(job) {
+		// Check if there's a Client CR with zenInstanceId
+		zenInstanceID, err := getZenInstanceIDForMigratorJob(s.GetClient(), ctx, s.GetNamespace())
+		if err != nil {
+			log.Error(err, "Failed to get zenInstanceID for migrator job")
+			return err
+		}
+
+		// Check if the zen-instance-id label is properly set
+		zenLabelSet := true
+		if zenInstanceID != "" {
+			jobZenLabel, exists := job.Labels["authentication.operator.ibm.com/zen-instance-id"]
+			zenLabelSet = exists && jobZenLabel == zenInstanceID
+		}
+
+		// Leave the Job alone if the image refs haven't changed and the Job hasn't failed and the zen label is properly set
+		if job.Spec.Template.Spec.Containers[0].Image == common.GetImageRef(imageRef) && !jobFailedConditionIsTrue(job) && zenLabelSet {
 			log.Info("No changes found that warrant replacing the Job")
 			return
 		}
@@ -862,7 +876,7 @@ func getZenInstanceIDForMigratorJob(cl client.Client, ctx context.Context, names
 		return clientCR.Spec.ZenInstanceId, nil
 	}
 
-	return "", fmt.Errorf("failed to find Client CR owned by ZenService with non-empty spec.zenInstanceId in namespace %s", namespace)
+	return "", nil
 }
 
 func buildMigratorVolumes(needsMongoDBMigration bool, edbSPCName string, zenInstanceID string) (volumes []corev1.Volume) {

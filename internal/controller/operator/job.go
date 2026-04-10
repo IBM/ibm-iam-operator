@@ -142,6 +142,7 @@ func (r *AuthenticationReconciler) getMigrationJobSubreconciler(authCR *operator
 	return common.NewSecondaryReconcilerBuilder[*batchv1.Job]().
 		WithName(MigrationJobName).
 		WithGenerateFns(removeJobIfFailedOrImageDifferent("IM_DB_MIGRATOR_IMAGE"),
+			removeJobIfZenInstanceLabelStale(),
 			generateMigratorJobObject).
 		WithClient(r.Client).
 		WithNamespace(authCR.Namespace).
@@ -312,10 +313,10 @@ func jobFailedConditionIsTrue(job *batchv1.Job) bool {
 	return false
 }
 
-func removeJobIfFailedOrImageDifferent(imageRef string) common.GenerateFn[*batchv1.Job] {
+func removeJobIfZenInstanceLabelStale() common.GenerateFn[*batchv1.Job] {
 	return func(s common.SecondaryReconciler, ctx context.Context, job *batchv1.Job) (err error) {
 		log := logf.FromContext(ctx)
-		log.Info("Determine whether Job needs to be replaced")
+		log.Info("Determine whether Job needs to be replaced to include label at start")
 		if err = s.GetClient().Get(ctx, common.GetObjectKey(s), job); k8sErrors.IsNotFound(err) {
 			log.Info("Job not found, nothing to remove")
 			return nil
@@ -331,15 +332,54 @@ func removeJobIfFailedOrImageDifferent(imageRef string) common.GenerateFn[*batch
 			return err
 		}
 
-		// Check if the zen-instance-id label is properly set
+		// Check if the zen-instance-id label is properly set on both the Job and Pod template spec
 		zenLabelSet := true
 		if zenInstanceID != "" {
 			jobZenLabel, exists := job.Labels["authentication.operator.ibm.com/zen-instance-id"]
-			zenLabelSet = exists && jobZenLabel == zenInstanceID
+			jobZenLabelSet := exists && jobZenLabel == zenInstanceID
+
+			podZenLabel, podExists := job.Spec.Template.Labels["authentication.operator.ibm.com/zen-instance-id"]
+			podZenLabelSet := podExists && podZenLabel == zenInstanceID
+
+			zenLabelSet = jobZenLabelSet && podZenLabelSet
 		}
 
 		// Leave the Job alone if the image refs haven't changed and the Job hasn't failed and the zen label is properly set
-		if job.Spec.Template.Spec.Containers[0].Image == common.GetImageRef(imageRef) && !jobFailedConditionIsTrue(job) && zenLabelSet {
+		if zenLabelSet {
+			log.Info("No changes found that warrant replacing the Job")
+			return
+		}
+
+		log.Info("Job needs to be replaced due to stale Zen instance ID label; deleting first", "label", "authentication.operator.ibm.com/zen-instance-id", "expected", zenInstanceID)
+		deleteOpts := []client.DeleteOption{
+			client.PropagationPolicy(metav1.DeletePropagationForeground),
+		}
+		if err = s.GetClient().Delete(ctx, job, deleteOpts...); k8sErrors.IsNotFound(err) {
+			log.Info("No Job to delete")
+			return nil
+		} else if err != nil {
+			log.Error(err, "Failed to delete Job")
+		} else {
+			log.Info("Deleted Job")
+		}
+		return
+	}
+}
+
+func removeJobIfFailedOrImageDifferent(imageRef string) common.GenerateFn[*batchv1.Job] {
+	return func(s common.SecondaryReconciler, ctx context.Context, job *batchv1.Job) (err error) {
+		log := logf.FromContext(ctx)
+		log.Info("Determine whether Job needs to be replaced due to a previous Job failure or an image change")
+		if err = s.GetClient().Get(ctx, common.GetObjectKey(s), job); k8sErrors.IsNotFound(err) {
+			log.Info("Job not found, nothing to remove")
+			return nil
+		} else if err != nil {
+			log.Error(err, "Attempt to find Job failed")
+			return
+		}
+
+		// Leave the Job alone if the image refs haven't changed and the Job hasn't failed and the zen label is properly set
+		if job.Spec.Template.Spec.Containers[0].Image == common.GetImageRef(imageRef) && !jobFailedConditionIsTrue(job) {
 			log.Info("No changes found that warrant replacing the Job")
 			return
 		}

@@ -130,6 +130,9 @@ func (r *AuthenticationReconciler) ensureMigrationJobSucceeded(ctx context.Conte
 
 	if job.Status.Succeeded == 1 {
 		log.Info("Job succeeded")
+		if err = removeMongoMigrationAnnotation(r.Client, debugCtx, authCR); err != nil {
+			return subreconciler.RequeueWithDelayAndError(defaultLowerWait, err)
+		}
 		return subreconciler.ContinueReconciling()
 	}
 
@@ -622,7 +625,7 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 
 	var mongoHost string
 	var needsMongoDBMigration bool
-	if needsMongoDBMigration, err = mongoIsPresent(s.GetClient(), ctx, authCR); err != nil {
+	if needsMongoDBMigration, err = needToMigrateFromMongo(s.GetClient(), ctx, authCR); err != nil {
 		return
 	} else if needsMongoDBMigration {
 		if mongoHost, err = getMongoHost(s.GetClient(), ctx, s.GetNamespace()); err != nil {

@@ -1,3 +1,19 @@
+//
+// Copyright 2020, 2026 IBM Corporation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
 package operator
 
 import (
@@ -88,7 +104,7 @@ func (r *AuthenticationReconciler) addMongoMigrationFinalizers(ctx context.Conte
 		return
 	}
 
-	if needToMigrate, err := mongoIsPresent(r.Client, debugCtx, authCR); !needToMigrate && err == nil {
+	if needToMigrate, err := needToMigrateFromMongo(r.Client, debugCtx, authCR); !needToMigrate && err == nil {
 		log.Info("No MongoDB migration required, so no need for finalizers; continuing")
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {
@@ -286,25 +302,6 @@ func hasMongoDBService(c client.Client, ctx context.Context, authCR *operatorv1a
 	return true, nil
 }
 
-// mongoIsPresent attempts to determine whether a migration from MongoDB is needed. Returns an error when an
-// unexpected error occurs while trying to get resources from the cluster.
-func mongoIsPresent(cl client.Client, ctx context.Context, authCR *operatorv1alpha1.Authentication) (need bool, err error) {
-	var hasResource bool
-	if hasResource, err = hasPreloadMongoDBConfigMap(cl, ctx, authCR.Namespace); hasResource {
-		return true, nil
-	} else if err != nil {
-		return false, err
-	}
-
-	if hasResource, err = hasMongoDBService(cl, ctx, authCR); hasResource {
-		return true, nil
-	} else if err != nil {
-		return false, err
-	}
-
-	return false, nil
-}
-
 // ensureDatastoreSecretAndCM makes sure that the datastore Secret and ConfigMap are present in the services namespace;
 // these contain the configuration details that allow for connections to EDB
 func (r *AuthenticationReconciler) ensureDatastoreSecretAndCM(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
@@ -373,6 +370,68 @@ func (r *AuthenticationReconciler) ensureDatastoreSecretAndCM(ctx context.Contex
 	return subreconciler.ContinueReconciling()
 }
 
+// removeMongoMigrationAnnotation removes the mongo-migration-status annotation from the Authentication CR
+// This should be called when migrations are complete or not needed, regardless of the annotation's value.
+// This prevents infinite re-migration loops when the annotation is set to "required".
+func removeMongoMigrationAnnotation(cl client.Client, ctx context.Context, authCR *operatorv1alpha1.Authentication) error {
+	reqLogger := logf.FromContext(ctx)
+
+	if authCR.Annotations == nil {
+		return nil
+	}
+
+	val, exists := authCR.Annotations[operatorv1alpha1.AnnotationMongoMigrationStatus]
+	if !exists {
+		return nil
+	}
+
+	delete(authCR.Annotations, operatorv1alpha1.AnnotationMongoMigrationStatus)
+	if err := cl.Update(ctx, authCR); err != nil {
+		reqLogger.Error(err, "Failed to remove mongo-migration-status annotation")
+		return err
+	}
+
+	reqLogger.Info("Removed mongo-migration-status annotation from Authentication CR", "previousValue", val)
+	return nil
+}
+
+func needToMigrateFromMongo(cl client.Client, ctx context.Context, authCR *operatorv1alpha1.Authentication) (need bool, err error) {
+	reqLogger := logf.FromContext(ctx)
+
+	if val, ok := authCR.Annotations[operatorv1alpha1.AnnotationMongoMigrationStatus]; ok {
+		switch val {
+		case "not-needed":
+			reqLogger.Info("Annotation indicates MongoDB migration not needed", "value", val)
+			return false, nil
+		case "required":
+			reqLogger.Info("Annotation indicates MongoDB migration required", "value", val)
+			return true, nil
+		}
+	}
+
+	if authCR.HasBeenMigrated() {
+		return false, nil
+	}
+
+	var hasResource bool
+	if hasResource, err = hasPreloadMongoDBConfigMap(cl, ctx, authCR.Namespace); hasResource {
+		reqLogger.Info("Found MongoDB preload ConfigMap; migration needed")
+		return true, nil
+	} else if err != nil {
+		return false, err
+	}
+
+	if hasResource, err = hasMongoDBService(cl, ctx, authCR); hasResource {
+		reqLogger.Info("Found MongoDB Service; migration needed")
+		return true, nil
+	} else if err != nil {
+		return false, err
+	}
+
+	reqLogger.Info("No MongoDB resources found; no migration needed")
+	return false, nil
+}
+
 func (r *AuthenticationReconciler) overrideMongoDBBootstrap(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
 	debugLog := log.V(1)
@@ -382,7 +441,7 @@ func (r *AuthenticationReconciler) overrideMongoDBBootstrap(ctx context.Context,
 	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
-	if needsMongoMigration, err := mongoIsPresent(r.Client, ctx, authCR); err != nil {
+	if needsMongoMigration, err := needToMigrateFromMongo(r.Client, ctx, authCR); err != nil {
 		log.Error(err, "Failed to determine whether migration from MongoDB is needed")
 		return subreconciler.RequeueWithError(err)
 	} else if !needsMongoMigration {

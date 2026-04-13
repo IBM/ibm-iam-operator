@@ -147,7 +147,7 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 	// If MongoDB is still needed, and observed OpReq has MongoDB, and the list of desired Operands does not have
 	// MongoDB listed
 
-	needToMigrate, err := mongoIsPresent(r.Client, debugCtx, authCR)
+	needToMigrate, err := needToMigrateFromMongo(r.Client, debugCtx, authCR)
 	if err != nil {
 		log.Info("Failed to determine whether there is a need to migrate from MongoDB", "err", err.Error())
 		return subreconciler.RequeueWithDelay(defaultLowerWait)

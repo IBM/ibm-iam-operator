@@ -19,6 +19,7 @@ package operator
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"time"
 
@@ -37,13 +38,14 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// addEmbeddedDBIfNeeded appends the common-service-postgresql Operand to the list of Operands when the IM install is
-// configured to use an embedded EDB. If there is an error while trying to obtain the relevant IM configuration for EDB,
-// it will skip adding the Operand and return the encountered error.
+// addEmbeddedDBIfNeeded appends the common-service-cnpg Operand to the list of
+// Operands when the IM install is configured to use an embedded IBM CNPG. If there
+// is an error while trying to obtain the relevant IM configuration for IBM
+// CNPG, it will skip adding the Operand and return the encountered error.
 func (r *AuthenticationReconciler) addEmbeddedDBIfNeeded(ctx context.Context, authCR *operatorv1alpha1.Authentication,
 	operands *[]operatorv1alpha1.Operand) (err error) {
 	var usingExternal bool
-	if usingExternal, err = r.isConfiguredForExternalEDB(ctx, authCR); err != nil || usingExternal {
+	if usingExternal, err = r.isConfiguredForExternalDB(ctx, authCR); err != nil || usingExternal {
 		return
 	}
 	name := "common-service-cnpg"
@@ -59,17 +61,40 @@ func (r *AuthenticationReconciler) addEmbeddedDBIfNeeded(ctx context.Context, au
 	return
 }
 
-// handleOperandRequest manages the ibm-iam-request OperandRequest and adds or removes Operand entries from it depending
-// upon what the IM install needs. At a minimum, the UI Operator is included.
+// addEmbeddedEDBIfNeeded appends the common-service-postgresql Operand to the list of Operands when the IM install is
+// configured to use an embedded EDB. If there is an error while trying to obtain the relevant IM configuration for EDB,
+// it will skip adding the Operand and return the encountered error.
+func (r *AuthenticationReconciler) addEmbeddedEDBIfNeeded(ctx context.Context, authCR *operatorv1alpha1.Authentication,
+	operands *[]operatorv1alpha1.Operand) (err error) {
+	var usingExternal bool
+	if usingExternal, err = r.isConfiguredForExternalDB(ctx, authCR); err != nil || usingExternal {
+		return
+	}
+	name := "common-service-postgresql"
+	*operands = append(*operands, operatorv1alpha1.Operand{
+		Name: name,
+		Bindings: map[string]operatorv1alpha1.Bindable{
+			"protected-im-db": {
+				Secret:    ctrlcommon.DatastoreEDBSecretName,
+				Configmap: ctrlcommon.DatastoreEDBCMName,
+			},
+		},
+	})
+	return
+}
+
+// handleOperandRequest manages the OperandRequest for database operands. For backward compatibility,
+// it uses "ibm-iam-request" if it already exists, otherwise creates "im-needs-database".
+// The UI Operator is now managed by a separate OperandRequest (im-needs-ui).
 func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	opReqName := "ibm-iam-request"
+	legacyOpReqName := "ibm-iam-request"
+	newOpReqName := "im-needs-database"
 	log := logf.FromContext(ctx)
 	debugLog := log.V(1)
 	debugCtx := logf.IntoContext(ctx, debugLog)
 
 	log.Info("Ensure OperandRequest is present when supported by cluster and contains correct Operands")
 
-	log = logf.FromContext(ctx, "OperandRequest.Name", opReqName)
 	if !ctrlcommon.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
 		log.Info("The OperandRequest API resource is not supported by this cluster; assuming EDB connection will be configured manually", "Secret", ctrlcommon.DatastoreEDBSecretName, "ConfigMap", ctrlcommon.DatastoreEDBCMName, "Namespace", req.Namespace)
 		return subreconciler.ContinueReconciling()
@@ -80,14 +105,30 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 		return
 	}
 
-	desiredOperands := []operatorv1alpha1.Operand{
-		{Name: "ibm-idp-config-ui-operator"},
+	// Check if legacy OperandRequest exists and use the legacy name if it does exist
+	var opReqName string
+	legacyOpReq := &operatorv1alpha1.OperandRequest{}
+	desiredOperands := []operatorv1alpha1.Operand{}
+	if err = r.Get(debugCtx, types.NamespacedName{Name: legacyOpReqName, Namespace: authCR.Namespace}, legacyOpReq); k8sErrors.IsNotFound(err) {
+		opReqName = newOpReqName
+		log.Info("Using new OperandRequest name", "OperandRequest.Name", opReqName)
+		if err = r.addEmbeddedDBIfNeeded(debugCtx, authCR, &desiredOperands); err != nil {
+			log.Error(err, "Unexpected error was encountered while attempting to determine whether IBM CNPG needed")
+			return subreconciler.RequeueWithError(err)
+		}
+	} else if err != nil {
+		log.Error(err, "Unexpected error was encountered while trying to retrieve legacy OperandRequest", "OperandRequest.Name", legacyOpReqName)
+		return subreconciler.RequeueWithDelayAndError(defaultLowerWait, err)
+	} else {
+		opReqName = legacyOpReqName
+		log.Info("Using legacy OperandRequest name for backward compatibility", "OperandRequest.Name", opReqName)
+		if err = r.addEmbeddedEDBIfNeeded(debugCtx, authCR, &desiredOperands); err != nil {
+			log.Error(err, "Unexpected error was encountered while attempting to determine whether EDB needed")
+			return subreconciler.RequeueWithError(err)
+		}
 	}
 
-	if err = r.addEmbeddedDBIfNeeded(debugCtx, authCR, &desiredOperands); err != nil {
-		log.Error(err, "Unexpected error was encountered while attempting to determine whether EDB needed")
-		return subreconciler.RequeueWithError(err)
-	}
+	log = log.WithValues("OperandRequest.Name", opReqName)
 
 	observedOpReq := &operatorv1alpha1.OperandRequest{}
 	err = r.Get(debugCtx, types.NamespacedName{Name: opReqName, Namespace: authCR.Namespace}, observedOpReq)
@@ -154,7 +195,8 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 	}
 
 	if needToMigrate && observedMongoDBOperand != nil &&
-		!hasMongoDBOperandFromOperands(desiredOperands) {
+		!hasMongoDBOperandFromOperands(desiredOperands) &&
+		opReqName == legacyOpReqName { // TODO: Potentially remove this if IBM CNPG migration from MongoDB to be supported
 		desiredOperands = append(desiredOperands, *observedMongoDBOperand)
 	}
 
@@ -207,11 +249,11 @@ func operandsAreEqual(operandsA, operandsB []operatorv1alpha1.Operand) bool {
 	return true
 }
 
-// configuredForExternalEDB returns whether an Authentication is configured for connecting to an external EDB.
+// configuredForExternalDB returns whether an Authentication is configured for connecting to an external EDB.
 // This is determined by obtaining the `im-datastore-edb-cm` ConfigMap and reading its `IS_EMBEDDED` field.
 // If this value is set to "false", then the IM instance needs to use the connection details contained within this
 // ConfigMap.
-func (r *AuthenticationReconciler) isConfiguredForExternalEDB(ctx context.Context, authCR *operatorv1alpha1.Authentication) (isConfigured bool, err error) {
+func (r *AuthenticationReconciler) isConfiguredForExternalDB(ctx context.Context, authCR *operatorv1alpha1.Authentication) (isConfigured bool, err error) {
 	// stubbed until external EDB is supported
 	log := logf.FromContext(ctx)
 	cm := &corev1.ConfigMap{}
@@ -232,7 +274,7 @@ func (r *AuthenticationReconciler) needsExternalEDB(ctx context.Context, authCR 
 	if !ctrlcommon.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
 		return true, nil
 	}
-	isConfiguredForExternal, err := r.isConfiguredForExternalEDB(ctx, authCR)
+	isConfiguredForExternal, err := r.isConfiguredForExternalDB(ctx, authCR)
 	return isConfiguredForExternal, err
 }
 
@@ -383,4 +425,65 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 	}
 	log.Info("Cluster is not Ready")
 	return subreconciler.RequeueWithDelay(30 * time.Second)
+}
+
+// handleUIOperandRequest manages the UI OperandRequest using a SecondaryReconciler
+func (r *AuthenticationReconciler) handleUIOperandRequest(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	log := logf.FromContext(ctx)
+	log.Info("Ensure UI OperandRequest is present when supported by cluster")
+
+	if !ctrlcommon.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
+		log.Info("The OperandRequest API resource is not supported by this cluster; skipping UI OperandRequest creation")
+		return subreconciler.ContinueReconciling()
+	}
+
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+
+	return r.getUIOperandRequestSubreconciler(authCR).Reconcile(ctx)
+}
+
+// getUIOperandRequestSubreconciler creates a subreconciler for managing the UI OperandRequest
+func (r *AuthenticationReconciler) getUIOperandRequestSubreconciler(authCR *operatorv1alpha1.Authentication) (subRec ctrlcommon.Subreconciler) {
+	return ctrlcommon.NewSecondaryReconcilerBuilder[*operatorv1alpha1.OperandRequest]().
+		WithName("im-needs-ui").
+		WithGenerateFns(generateUIOperandRequest).
+		WithClient(r.Client).
+		WithNamespace(authCR.Namespace).
+		WithPrimary(authCR).MustBuild()
+}
+
+// generateUIOperandRequest creates the OperandRequest for the UI operator
+func generateUIOperandRequest(s ctrlcommon.SecondaryReconciler, ctx context.Context, opReq *operatorv1alpha1.OperandRequest) error {
+	log := logf.FromContext(ctx)
+
+	primary := s.GetPrimary()
+	authCR, ok := primary.(*operatorv1alpha1.Authentication)
+	if !ok {
+		log.Error(nil, "Primary is not an Authentication CR")
+		return fmt.Errorf("primary is not an Authentication CR")
+	}
+
+	opReq.SetName(s.GetName())
+	opReq.SetNamespace(s.GetNamespace())
+
+	desiredOperands := []operatorv1alpha1.Operand{
+		{Name: "ibm-idp-config-ui-operator"},
+	}
+
+	desiredRequests := []operatorv1alpha1.Request{
+		{
+			Registry:          "common-service",
+			RegistryNamespace: authCR.Namespace,
+			Operands:          desiredOperands,
+		},
+	}
+
+	opReq.Spec = operatorv1alpha1.OperandRequestSpec{
+		Requests: desiredRequests,
+	}
+
+	return nil
 }

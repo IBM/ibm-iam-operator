@@ -334,6 +334,7 @@ func (r *AuthenticationReconciler) runNonStatusSubreconcilers(ctx context.Contex
 		r.ensureOIDCClientRegistrationJobRuns,
 		r.handleZenFrontDoor,
 		r.handleRoutes,
+		r.handleUIOperandRequest,
 		r.handleHPAs,
 		r.syncClientHostnames,
 		r.handleMongoDBCleanup,

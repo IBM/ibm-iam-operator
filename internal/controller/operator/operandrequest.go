@@ -385,9 +385,9 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 		return subreconciler.RequeueWithError(err)
 	}
 
-	// clusterAPIVersion := "postgresql.k8s.enterprisedb.io/v1"
-	clusterAPIVersion := "pg.ibm.com/v1"
-	log = log.WithValues("Object.Name", "common-service-db", "Object.Kind", "Cluster", "Object.APIVersion", clusterAPIVersion)
+	legacyClusterAPIVersion := "postgresql.k8s.enterprisedb.io/v1"
+	cnpgClusterAPIVersion := "pg.ibm.com/v1"
+	clusterAPIVersion := cnpgClusterAPIVersion
 
 	u := &unstructured.Unstructured{
 		Object: map[string]any{
@@ -396,12 +396,21 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 		},
 	}
 	if err = r.Get(ctx, types.NamespacedName{Name: "common-service-db", Namespace: req.Namespace}, u); k8sErrors.IsNotFound(err) {
-		log.Info("Cluster not found")
+		log.Info("CNPG Cluster not found, try getting legacy EDB Cluster")
+		clusterAPIVersion = legacyClusterAPIVersion
+		u.Object["apiVersion"] = clusterAPIVersion
+		if err = r.Get(ctx, types.NamespacedName{Name: "common-service-db", Namespace: req.Namespace}, u); err != nil && !k8sErrors.IsNotFound(err) {
+			log.Error(err, "Legacy EDB Cluster could not be retrieved")
+			return subreconciler.RequeueWithError(err)
+		}
+		log.Info("Legacy EDB Cluster not found, requeueing")
 		return subreconciler.RequeueWithDelay(30 * time.Second)
 	} else if err != nil {
-		log.Error(err, "Cluster could not be retrieved")
+		log.Error(err, "CNPG Cluster could not be retrieved")
 		return subreconciler.RequeueWithError(err)
 	}
+
+	log = log.WithValues("Object.Name", "common-service-db", "Object.Kind", "Cluster", "Object.APIVersion", clusterAPIVersion)
 	type cluster struct {
 		metav1.ObjectMeta
 		metav1.TypeMeta

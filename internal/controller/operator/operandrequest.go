@@ -451,6 +451,11 @@ func (r *AuthenticationReconciler) handleUIOperandRequest(ctx context.Context, r
 		return
 	}
 
+	if !authCR.Status.Service.DeploymentsReady() {
+		log.Info("IM Deployments are not Ready yet; requeueing")
+		return subreconciler.RequeueWithDelay(10 * time.Second)
+	}
+
 	return r.getUIOperandRequestSubreconciler(authCR).Reconcile(ctx)
 }
 

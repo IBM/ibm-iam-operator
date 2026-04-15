@@ -153,8 +153,8 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 			Spec:       desiredOperandSpec,
 		}
 
-		if err = controllerutil.SetOwnerReference(authCR, desiredOpReq, r.Scheme); err != nil {
-			log.Error(err, "Failed to set owner reference on OperandRequest")
+		if err = controllerutil.SetControllerReference(authCR, desiredOpReq, r.Scheme); err != nil {
+			log.Error(err, "Failed to set controller reference on OperandRequest")
 			return subreconciler.RequeueWithError(err)
 		}
 		if err = r.Create(debugCtx, desiredOpReq); k8sErrors.IsAlreadyExists(err) {
@@ -217,8 +217,8 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 		return subreconciler.ContinueReconciling()
 	}
 
-	if err = controllerutil.SetOwnerReference(authCR, observedOpReq, r.Scheme); err != nil {
-		log.Error(err, "Failed to set owner reference on OperandRequest")
+	if err = controllerutil.SetControllerReference(authCR, observedOpReq, r.Scheme); err != nil {
+		log.Error(err, "Failed to set controller reference on OperandRequest")
 		return subreconciler.RequeueWithError(err)
 	}
 	if err = r.Update(debugCtx, observedOpReq); err != nil {
@@ -483,6 +483,11 @@ func generateUIOperandRequest(s ctrlcommon.SecondaryReconciler, ctx context.Cont
 
 	opReq.Spec = operatorv1alpha1.OperandRequestSpec{
 		Requests: desiredRequests,
+	}
+
+	if err := controllerutil.SetControllerReference(authCR, opReq, s.GetClient().Scheme()); err != nil {
+		log.Error(err, "Failed to set controller reference on OperandRequest")
+		return err
 	}
 
 	return nil

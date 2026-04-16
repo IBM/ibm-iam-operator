@@ -49,7 +49,7 @@ var _ = Describe("OperandBindInfo handling", func() {
 			crds, err := envtest.InstallCRDs(cfg, envtest.CRDInstallOptions{
 				Paths: []string{filepath.Join(".", "testdata", "crds", "odlm")},
 			})
-			Expect(crds).To(HaveLen(1))
+			Expect(crds).To(HaveLen(2)) // operandbindinfo and operandrequest
 			Expect(err).ToNot(HaveOccurred())
 
 			authCR = &operatorv1alpha1.Authentication{

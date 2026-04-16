@@ -270,6 +270,14 @@ rules:
   - list
   - watch
 - apiGroups:
+    - pg.ibm.com
+  resources:
+    - clusters
+  verbs:
+    - get
+    - list
+    - watch
+- apiGroups:
   - secrets-store.csi.x-k8s.io
   resources:
   - secretproviderclasses

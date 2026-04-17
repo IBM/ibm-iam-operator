@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 
+	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/api/oidc.security/v1"
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
 	"github.com/IBM/ibm-iam-operator/internal/controller/common"
 	"github.com/opdev/subreconciler"
@@ -141,6 +142,7 @@ func (r *AuthenticationReconciler) getMigrationJobSubreconciler(authCR *operator
 	return common.NewSecondaryReconcilerBuilder[*batchv1.Job]().
 		WithName(MigrationJobName).
 		WithGenerateFns(removeJobIfFailedOrImageDifferent("IM_DB_MIGRATOR_IMAGE"),
+			removeJobIfZenInstanceLabelStale(),
 			generateMigratorJobObject).
 		WithClient(r.Client).
 		WithNamespace(authCR.Namespace).
@@ -311,10 +313,10 @@ func jobFailedConditionIsTrue(job *batchv1.Job) bool {
 	return false
 }
 
-func removeJobIfFailedOrImageDifferent(imageRef string) common.GenerateFn[*batchv1.Job] {
+func removeJobIfZenInstanceLabelStale() common.GenerateFn[*batchv1.Job] {
 	return func(s common.SecondaryReconciler, ctx context.Context, job *batchv1.Job) (err error) {
 		log := logf.FromContext(ctx)
-		log.Info("Determine whether Job needs to be replaced")
+		log.Info("Determine whether Job needs to be replaced to include label at start")
 		if err = s.GetClient().Get(ctx, common.GetObjectKey(s), job); k8sErrors.IsNotFound(err) {
 			log.Info("Job not found, nothing to remove")
 			return nil
@@ -323,7 +325,60 @@ func removeJobIfFailedOrImageDifferent(imageRef string) common.GenerateFn[*batch
 			return
 		}
 
-		// Leave the Job alone if the image refs haven't changed and the Job hasn't failed
+		// Check if there's a Client CR with zenInstanceId
+		zenInstanceID, err := getZenInstanceIDForMigratorJob(s.GetClient(), ctx, s.GetNamespace())
+		if err != nil {
+			log.Error(err, "Failed to get zenInstanceID for migrator job")
+			return err
+		}
+
+		// Check if the zen-instance-id label is properly set on both the Job and Pod template spec
+		zenLabelSet := true
+		if zenInstanceID != "" {
+			jobZenLabel, exists := job.Labels["authentication.operator.ibm.com/zen-instance-id"]
+			jobZenLabelSet := exists && jobZenLabel == zenInstanceID
+
+			podZenLabel, podExists := job.Spec.Template.Labels["authentication.operator.ibm.com/zen-instance-id"]
+			podZenLabelSet := podExists && podZenLabel == zenInstanceID
+
+			zenLabelSet = jobZenLabelSet && podZenLabelSet
+		}
+
+		// Leave the Job alone if the image refs haven't changed and the Job hasn't failed and the zen label is properly set
+		if zenLabelSet {
+			log.Info("No changes found that warrant replacing the Job")
+			return
+		}
+
+		log.Info("Job needs to be replaced due to stale Zen instance ID label; deleting first", "label", "authentication.operator.ibm.com/zen-instance-id", "expected", zenInstanceID)
+		deleteOpts := []client.DeleteOption{
+			client.PropagationPolicy(metav1.DeletePropagationForeground),
+		}
+		if err = s.GetClient().Delete(ctx, job, deleteOpts...); k8sErrors.IsNotFound(err) {
+			log.Info("No Job to delete")
+			return nil
+		} else if err != nil {
+			log.Error(err, "Failed to delete Job")
+		} else {
+			log.Info("Deleted Job")
+		}
+		return
+	}
+}
+
+func removeJobIfFailedOrImageDifferent(imageRef string) common.GenerateFn[*batchv1.Job] {
+	return func(s common.SecondaryReconciler, ctx context.Context, job *batchv1.Job) (err error) {
+		log := logf.FromContext(ctx)
+		log.Info("Determine whether Job needs to be replaced due to a previous Job failure or an image change")
+		if err = s.GetClient().Get(ctx, common.GetObjectKey(s), job); k8sErrors.IsNotFound(err) {
+			log.Info("Job not found, nothing to remove")
+			return nil
+		} else if err != nil {
+			log.Error(err, "Attempt to find Job failed")
+			return
+		}
+
+		// Leave the Job alone if the image refs haven't changed and the Job hasn't failed and the zen label is properly set
 		if job.Spec.Template.Spec.Containers[0].Image == common.GetImageRef(imageRef) && !jobFailedConditionIsTrue(job) {
 			log.Info("No changes found that warrant replacing the Job")
 			return
@@ -620,6 +675,11 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 
 	imagePullSecret := os.Getenv("IMAGE_PULL_SECRET")
 
+	zenInstanceID, err := getZenInstanceIDForMigratorJob(s.GetClient(), ctx, authCR.Namespace)
+	if err != nil {
+		return
+	}
+
 	var mongoHost string
 	var needsMongoDBMigration bool
 	if needsMongoDBMigration, err = mongoIsPresent(s.GetClient(), ctx, authCR); err != nil {
@@ -642,17 +702,30 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 		}
 	}
 
+	jobLabels := common.MergeMaps(nil, metaLabels)
+	podTemplateLabels := common.MergeMaps(nil, podLabels)
+	if zenInstanceID != "" {
+		if jobLabels == nil {
+			jobLabels = map[string]string{}
+		}
+		if podTemplateLabels == nil {
+			podTemplateLabels = map[string]string{}
+		}
+		jobLabels["authentication.operator.ibm.com/zen-instance-id"] = zenInstanceID
+		podTemplateLabels["authentication.operator.ibm.com/zen-instance-id"] = zenInstanceID
+	}
+
 	*job = batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      s.GetName(),
 			Namespace: s.GetNamespace(),
-			Labels:    metaLabels,
+			Labels:    jobLabels,
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   s.GetName(),
-					Labels: podLabels,
+					Labels: podTemplateLabels,
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",
 						"productName":   "IBM Cloud Platform Common Services",
@@ -739,8 +812,8 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 							Operator: corev1.TolerationOpExists,
 						},
 					},
-					Volumes:    buildMigratorVolumes(needsMongoDBMigration, edbspc.Name),
-					Containers: buildMigratorContainer(s, image, resources, mongoHost),
+					Volumes:    buildMigratorVolumes(needsMongoDBMigration, edbspc.Name, zenInstanceID),
+					Containers: buildMigratorContainer(s, image, resources, mongoHost, zenInstanceID),
 				},
 			},
 		},
@@ -760,7 +833,7 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 	return
 }
 
-func buildMigratorContainer(s common.SecondaryReconciler, image string, resources *corev1.ResourceRequirements, mongoHost string) (containers []corev1.Container) {
+func buildMigratorContainer(s common.SecondaryReconciler, image string, resources *corev1.ResourceRequirements, mongoHost string, zenInstanceID string) (containers []corev1.Container) {
 	container := corev1.Container{
 		Name:            s.GetName(),
 		Image:           image,
@@ -787,6 +860,16 @@ func buildMigratorContainer(s common.SecondaryReconciler, image string, resource
 			{
 				Name:      "pgsql-certs",
 				MountPath: "/etc/postgres/certs",
+				ReadOnly:  true,
+			},
+			{
+				Name:      "default-admin-creds",
+				MountPath: "/etc/default-admin",
+				ReadOnly:  true,
+			},
+			{
+				Name:      "zen-instance-id",
+				MountPath: "/etc/zen",
 				ReadOnly:  true,
 			},
 		},
@@ -817,7 +900,26 @@ func buildMigratorContainer(s common.SecondaryReconciler, image string, resource
 	return []corev1.Container{container}
 }
 
-func buildMigratorVolumes(needsMongoDBMigration bool, edbSPCName string) (volumes []corev1.Volume) {
+func getZenInstanceIDForMigratorJob(cl client.Client, ctx context.Context, namespace string) (zenInstanceID string, err error) {
+	clientList := &oidcsecurityv1.ClientList{}
+	if err = cl.List(ctx, clientList, client.InNamespace(namespace)); err != nil {
+		return "", fmt.Errorf("failed to list Client CRs in namespace %s: %w", namespace, err)
+	}
+
+	for _, clientCR := range clientList.Items {
+		if !isOwnedByZenService(&clientCR) {
+			continue
+		}
+		if clientCR.Spec.ZenInstanceId == "" {
+			continue
+		}
+		return clientCR.Spec.ZenInstanceId, nil
+	}
+
+	return "", nil
+}
+
+func buildMigratorVolumes(needsMongoDBMigration bool, edbSPCName string, zenInstanceID string) (volumes []corev1.Volume) {
 	volumes = []corev1.Volume{
 		{
 			Name: "postgres-config",
@@ -827,6 +929,38 @@ func buildMigratorVolumes(needsMongoDBMigration bool, edbSPCName string) (volume
 						Name: common.DatastoreEDBCMName,
 					},
 					DefaultMode: ptr.To(int32(420)),
+				},
+			},
+		},
+		{
+			Name: "default-admin-creds",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-auth-idp-credentials",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "admin_username",
+							Path: "username",
+						},
+					},
+					DefaultMode: ptr.To(int32(420)),
+				},
+			},
+		},
+		{
+			Name: "zen-instance-id",
+			VolumeSource: corev1.VolumeSource{
+				DownwardAPI: &corev1.DownwardAPIVolumeSource{
+					DefaultMode: ptr.To(int32(420)),
+					Items: []corev1.DownwardAPIVolumeFile{
+						{
+							Path: "instance-id",
+							FieldRef: &corev1.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "metadata.labels['authentication.operator.ibm.com/zen-instance-id']",
+							},
+						},
+					},
 				},
 			},
 		},

@@ -86,10 +86,9 @@ func (r *AuthenticationReconciler) addEmbeddedEDBIfNeeded(ctx context.Context, a
 // handleOperandRequest manages the OperandRequest for database operands. For backward compatibility,
 // it uses "ibm-iam-request" if it already exists, otherwise creates "im-needs-database".
 // The UI Operator is now managed by a separate OperandRequest (im-needs-ui).
-func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
-	legacyOpReqName := "ibm-iam-request"
-	newOpReqName := "im-needs-database"
-	log := logf.FromContext(ctx)
+func (r *AuthenticationReconciler) handleDatabaseOperandRequest(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	opReqName := "im-needs-database"
+	log := logf.FromContext(ctx, "OperandRequest.Name", opReqName)
 	debugLog := log.V(1)
 	debugCtx := logf.IntoContext(ctx, debugLog)
 
@@ -105,30 +104,12 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 		return
 	}
 
-	// Check if legacy OperandRequest exists and use the legacy name if it does exist
-	var opReqName string
-	legacyOpReq := &operatorv1alpha1.OperandRequest{}
 	desiredOperands := []operatorv1alpha1.Operand{}
-	if err = r.Get(debugCtx, types.NamespacedName{Name: legacyOpReqName, Namespace: authCR.Namespace}, legacyOpReq); k8sErrors.IsNotFound(err) {
-		opReqName = newOpReqName
-		log.Info("Using new OperandRequest name", "OperandRequest.Name", opReqName)
-		if err = r.addEmbeddedDBIfNeeded(debugCtx, authCR, &desiredOperands); err != nil {
-			log.Error(err, "Unexpected error was encountered while attempting to determine whether IBM CNPG needed")
-			return subreconciler.RequeueWithError(err)
-		}
-	} else if err != nil {
-		log.Error(err, "Unexpected error was encountered while trying to retrieve legacy OperandRequest", "OperandRequest.Name", legacyOpReqName)
-		return subreconciler.RequeueWithDelayAndError(defaultLowerWait, err)
-	} else {
-		opReqName = legacyOpReqName
-		log.Info("Using legacy OperandRequest name for backward compatibility", "OperandRequest.Name", opReqName)
-		if err = r.addEmbeddedEDBIfNeeded(debugCtx, authCR, &desiredOperands); err != nil {
-			log.Error(err, "Unexpected error was encountered while attempting to determine whether EDB needed")
-			return subreconciler.RequeueWithError(err)
-		}
-	}
 
-	log = log.WithValues("OperandRequest.Name", opReqName)
+	if err = r.addEmbeddedDBIfNeeded(debugCtx, authCR, &desiredOperands); err != nil {
+		log.Error(err, "Unexpected error was encountered while attempting to determine whether IBM PG needed")
+		return subreconciler.RequeueWithError(err)
+	}
 
 	observedOpReq := &operatorv1alpha1.OperandRequest{}
 	err = r.Get(debugCtx, types.NamespacedName{Name: opReqName, Namespace: authCR.Namespace}, observedOpReq)
@@ -157,6 +138,7 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 			log.Error(err, "Failed to set controller reference on OperandRequest")
 			return subreconciler.RequeueWithError(err)
 		}
+
 		if err = r.Create(debugCtx, desiredOpReq); k8sErrors.IsAlreadyExists(err) {
 			log.Info("OperandRequest already exists; continuing")
 			return subreconciler.ContinueReconciling()
@@ -164,6 +146,7 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 			log.Error(err, "Failed to create OperandRequest")
 			return subreconciler.RequeueWithError(err)
 		}
+
 		log.Info("Created OperandRequest")
 		return subreconciler.RequeueWithDelay(opreqWait)
 	} else if err != nil {
@@ -172,44 +155,26 @@ func (r *AuthenticationReconciler) handleOperandRequest(ctx context.Context, req
 	}
 
 	changed := false
-	// Previously, the IM Operator used a feature of ODLM to deploy a default Authentication CR that was defined in
-	// its alm-examples on the CSV. Now that the Operator needs to be able to control the Operators it requires
-	// during its runtime instead of between Operator installs or upgrades, it needs to remove the
-	// operator.ibm.com/opreq-control label from the OperandRequest in order to signal that ODLM is no longer
-	// controlling the contents of this OperandRequest.
-	if _, ok := observedOpReq.Labels["operator.ibm.com/opreq-control"]; ok {
-		delete(observedOpReq.Labels, "operator.ibm.com/opreq-control")
+
+	if len(observedOpReq.Spec.Requests) == 0 {
+		observedOpReq.Spec.Requests = []operatorv1alpha1.Request{
+			{Registry: "common-service", RegistryNamespace: authCR.Namespace, Operands: desiredOperands},
+		}
 		changed = true
-	}
+	} else {
+		observedOperands := observedOpReq.Spec.Requests[0].Operands
 
-	observedOperands := observedOpReq.Spec.Requests[0].Operands
-	observedMongoDBOperand := getMongoDBOperandFromOpReq(observedOpReq)
+		log.Info("List Operands", "observedOperands", observedOperands, "desiredOperands", desiredOperands)
+		if !operandsAreEqual(observedOperands, desiredOperands) {
+			debugLog.Info("Operands are different, set to desired")
+			observedOpReq.Spec.Requests[0].Operands = desiredOperands
+			changed = true
+		}
 
-	// If MongoDB is still needed, and observed OpReq has MongoDB, and the list of desired Operands does not have
-	// MongoDB listed
-
-	needToMigrate, err := mongoIsPresent(r.Client, debugCtx, authCR)
-	if err != nil {
-		log.Info("Failed to determine whether there is a need to migrate from MongoDB", "err", err.Error())
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
-
-	if needToMigrate && observedMongoDBOperand != nil &&
-		!hasMongoDBOperandFromOperands(desiredOperands) &&
-		opReqName == legacyOpReqName { // TODO: Potentially remove this if IBM CNPG migration from MongoDB to be supported
-		desiredOperands = append(desiredOperands, *observedMongoDBOperand)
-	}
-
-	log.V(1).Info("List Operands", "observedOperands", observedOperands, "desiredOperands", desiredOperands)
-	if !operandsAreEqual(observedOperands, desiredOperands) {
-		debugLog.Info("Operands are different, set to desired")
-		observedOpReq.Spec.Requests[0].Operands = desiredOperands
-		changed = true
-	}
-
-	if observedOpReq.Spec.Requests[0].RegistryNamespace != authCR.Namespace {
-		observedOpReq.Spec.Requests[0].RegistryNamespace = authCR.Namespace
-		changed = true
+		if observedOpReq.Spec.Requests[0].RegistryNamespace != authCR.Namespace {
+			observedOpReq.Spec.Requests[0].RegistryNamespace = authCR.Namespace
+			changed = true
+		}
 	}
 
 	if !changed {
@@ -365,6 +330,286 @@ func (r *AuthenticationReconciler) createEDBShareClaim(ctx context.Context, req 
 	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
+// handleEDBToIBMPGMigration orchestrates the migration from EDB to IBM PG
+// This should be called before ensureMigrationJobRuns as it handles the database
+// service migration, which is distinct from data migration between running services.
+func (r *AuthenticationReconciler) handleEDBToIBMPGMigration(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
+	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
+
+	log.Info("Checking if EDB to IBM PG migration is needed")
+
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+
+	if needsExternal, err := r.needsExternalEDB(debugCtx, authCR); err == nil && needsExternal {
+		log.Info("Configured to connect to external database; skipping migration check")
+		return subreconciler.ContinueReconciling()
+	} else if err != nil {
+		log.Error(err, "Unexpected error occurred while trying to determine whether external EDB is to be configured")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	if !ctrlcommon.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
+		log.Info("The OperandRequest API resource is not supported by this cluster; skipping migration")
+		return subreconciler.ContinueReconciling()
+	}
+
+	// Check if legacy OperandRequest exists
+	legacyOpReqName := "ibm-iam-request"
+	newOpReqName := "im-needs-database"
+
+	legacyOpReq := &operatorv1alpha1.OperandRequest{}
+	if err = r.Get(debugCtx, types.NamespacedName{Name: legacyOpReqName, Namespace: authCR.Namespace}, legacyOpReq); k8sErrors.IsNotFound(err) {
+		log.Info("EDB operand not present in legacy OperandRequest; migration not needed")
+		return subreconciler.ContinueReconciling()
+	} else if err != nil {
+		log.Error(err, "Failed to check for legacy OperandRequest")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	log.Info("Found legacy OperandRequest; checking migration status")
+
+	// Get or create the new OperandRequest for migration operands
+	newOpReq := &operatorv1alpha1.OperandRequest{}
+	if err = r.Get(debugCtx, types.NamespacedName{Name: newOpReqName, Namespace: authCR.Namespace}, newOpReq); err == nil {
+		log.Info("Database OperandRequest exists; continuing", "OperandRequest.Name", newOpReqName)
+		return subreconciler.ContinueReconciling()
+	} else if err != nil && !k8sErrors.IsNotFound(err) {
+		log.Error(err, "Failed to get new OperandRequest")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	// Check migration state in new OperandRequest
+	hasMigrator := false
+	if len(legacyOpReq.Spec.Requests) == 0 {
+		err = fmt.Errorf("failed to locate migrator request: OperandRequest %s does not have at least one entry in .spec.requests", legacyOpReqName)
+		return subreconciler.RequeueWithError(err)
+	}
+
+	for _, operand := range legacyOpReq.Spec.Requests[0].Operands {
+		if operand.Name == "common-service-pg-migrator" {
+			hasMigrator = true
+		}
+	}
+
+	log.Info("Migration state", "hasMigrator", hasMigrator)
+
+	// Verify EDB Cluster CR is present and healthy
+	if !hasMigrator {
+		log.Info("Verifying EDB Cluster is healthy")
+		if result, err = r.checkEDBClusterHealth(debugCtx, authCR.Namespace); subreconciler.ShouldHaltOrRequeue(result, err) {
+			return
+		}
+
+		// Create/update im-needs-database with common-service-pg-migrator
+		log.Info("Adding common-service-pg-migrator to ibm-iam-request OperandRequest")
+		legacyOpReq.Spec.Requests[0].Operands = append(legacyOpReq.Spec.Requests[0].Operands, operatorv1alpha1.Operand{
+			Name: "common-service-pg-migrator",
+		})
+
+		// Create new OperandRequest with migrator
+		if err = r.Update(debugCtx, legacyOpReq); err != nil {
+			log.Error(err, "Failed to update legacy OperandRequest with migrator")
+			return subreconciler.RequeueWithError(err)
+		}
+		log.Info("Added common-service-pg-migrator to ibm-iam-request OperandRequest")
+		return subreconciler.RequeueWithDelay(30 * time.Second)
+	}
+
+	log.Info("Waiting for migration job to complete")
+	if result, err = r.checkMigrationJobComplete(debugCtx, authCR.Namespace); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+
+	// Wait for IBM PG Cluster to be ready
+	log.Info("Waiting for IBM PG Cluster to be ready")
+	if result, err = r.checkIBMPGClusterHealth(debugCtx, authCR.Namespace); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+
+	log.Info("Data successfully migrated to IBM PG Cluster")
+	return subreconciler.ContinueReconciling()
+}
+
+// checkEDBClusterHealth verifies that the EDB Cluster CR is present and in healthy state
+func (r *AuthenticationReconciler) checkEDBClusterHealth(ctx context.Context, namespace string) (result *ctrl.Result, err error) {
+	log := logf.FromContext(ctx)
+
+	edbClusterAPIVersion := "postgresql.k8s.enterprisedb.io/v1"
+	u := &unstructured.Unstructured{
+		Object: map[string]any{
+			"kind":       "Cluster",
+			"apiVersion": edbClusterAPIVersion,
+		},
+	}
+
+	if err = r.Get(ctx, types.NamespacedName{Name: "common-service-db", Namespace: namespace}, u); k8sErrors.IsNotFound(err) {
+		log.Info("EDB Cluster not found; waiting for it to be created")
+		return subreconciler.RequeueWithDelay(30 * time.Second)
+	} else if err != nil {
+		log.Error(err, "Failed to get EDB Cluster")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	// Check cluster status
+	type cluster struct {
+		metav1.ObjectMeta
+		metav1.TypeMeta
+		Status struct {
+			Instances      int                `json:"instances,omitempty"`
+			ReadyInstances int                `json:"readyInstances,omitempty"`
+			Phase          string             `json:"phase,omitempty"`
+			Conditions     []metav1.Condition `json:"conditions,omitempty"`
+		} `json:"status"`
+	}
+
+	obj := &cluster{}
+	var objJSON []byte
+	if objJSON, err = u.MarshalJSON(); err != nil {
+		log.Error(err, "Failed to marshal EDB Cluster")
+		return subreconciler.RequeueWithError(err)
+	}
+	if err = json.Unmarshal(objJSON, obj); err != nil {
+		log.Error(err, "Failed to unmarshal EDB Cluster status")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	// Check if cluster is ready using conditions or phase
+	isReady := false
+	if obj.Status.Conditions != nil && meta.IsStatusConditionPresentAndEqual(obj.Status.Conditions, "Ready", metav1.ConditionTrue) {
+		isReady = true
+	} else if obj.Status.Phase == "Cluster in healthy state" && obj.Status.ReadyInstances == obj.Status.Instances && obj.Status.Instances > 0 {
+		isReady = true
+	}
+
+	if isReady {
+		log.Info("IBM PG Cluster is healthy", "instances", obj.Status.Instances, "readyInstances", obj.Status.ReadyInstances)
+		return subreconciler.ContinueReconciling()
+	}
+
+	log.Info("EDB Cluster not yet healthy; waiting", "phase", obj.Status.Phase, "instances", obj.Status.Instances, "readyInstances", obj.Status.ReadyInstances)
+	return subreconciler.RequeueWithDelay(30 * time.Second)
+}
+
+// checkMigrationJobComplete verifies that the migration job has completed successfully
+func (r *AuthenticationReconciler) checkMigrationJobComplete(ctx context.Context, namespace string) (result *ctrl.Result, err error) {
+	log := logf.FromContext(ctx)
+
+	jobName := "common-service-db-pg-migration-job"
+	u := &unstructured.Unstructured{
+		Object: map[string]any{
+			"kind":       "Job",
+			"apiVersion": "batch/v1",
+		},
+	}
+
+	if err = r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: namespace}, u); k8sErrors.IsNotFound(err) {
+		log.Info("Migration job not found; waiting for it to be created")
+		return subreconciler.RequeueWithDelay(30 * time.Second)
+	} else if err != nil {
+		log.Error(err, "Failed to get migration job")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	// Check job status
+	type job struct {
+		metav1.ObjectMeta
+		metav1.TypeMeta
+		Status struct {
+			Succeeded int `json:"succeeded,omitempty"`
+			Failed    int `json:"failed,omitempty"`
+		} `json:"status"`
+	}
+
+	obj := &job{}
+	var objJSON []byte
+	if objJSON, err = u.MarshalJSON(); err != nil {
+		log.Error(err, "Failed to marshal migration job")
+		return subreconciler.RequeueWithError(err)
+	}
+	if err = json.Unmarshal(objJSON, obj); err != nil {
+		log.Error(err, "Failed to unmarshal migration job status")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	if obj.Status.Succeeded > 0 {
+		log.Info("Migration job completed successfully")
+		return subreconciler.ContinueReconciling()
+	}
+
+	if obj.Status.Failed > 0 {
+		log.Error(fmt.Errorf("migration job failed"), "Migration job failed")
+		return subreconciler.RequeueWithError(fmt.Errorf("migration job failed"))
+	}
+
+	log.Info("Migration job still running; waiting")
+	return subreconciler.RequeueWithDelay(30 * time.Second)
+}
+
+// checkIBMPGClusterHealth verifies that the IBM PG Cluster CR is present and in healthy state
+func (r *AuthenticationReconciler) checkIBMPGClusterHealth(ctx context.Context, namespace string) (result *ctrl.Result, err error) {
+	log := logf.FromContext(ctx)
+
+	ibmPGClusterAPIVersion := "pg.ibm.com/v1"
+	u := &unstructured.Unstructured{
+		Object: map[string]any{
+			"kind":       "Cluster",
+			"apiVersion": ibmPGClusterAPIVersion,
+		},
+	}
+
+	if err = r.Get(ctx, types.NamespacedName{Name: "common-service-db", Namespace: namespace}, u); k8sErrors.IsNotFound(err) {
+		log.Info("IBM PG Cluster not found; waiting for it to be created")
+		return subreconciler.RequeueWithDelay(30 * time.Second)
+	} else if err != nil {
+		log.Error(err, "Failed to get IBM PG Cluster")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	// Check cluster status
+	type cluster struct {
+		metav1.ObjectMeta
+		metav1.TypeMeta
+		Status struct {
+			Instances      int                `json:"instances,omitempty"`
+			ReadyInstances int                `json:"readyInstances,omitempty"`
+			Phase          string             `json:"phase,omitempty"`
+			Conditions     []metav1.Condition `json:"conditions,omitempty"`
+		} `json:"status"`
+	}
+
+	obj := &cluster{}
+	var objJSON []byte
+	if objJSON, err = u.MarshalJSON(); err != nil {
+		log.Error(err, "Failed to marshal IBM PG Cluster")
+		return subreconciler.RequeueWithError(err)
+	}
+	if err = json.Unmarshal(objJSON, obj); err != nil {
+		log.Error(err, "Failed to unmarshal IBM PG Cluster status")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	// Check if cluster is ready using conditions or phase
+	isReady := false
+	if obj.Status.Conditions != nil && meta.IsStatusConditionPresentAndEqual(obj.Status.Conditions, "Ready", metav1.ConditionTrue) {
+		isReady = true
+	} else if obj.Status.Phase == "Cluster in healthy state" && obj.Status.ReadyInstances == obj.Status.Instances && obj.Status.Instances > 0 {
+		isReady = true
+	}
+
+	if isReady {
+		log.Info("IBM PG Cluster is healthy", "instances", obj.Status.Instances, "readyInstances", obj.Status.ReadyInstances)
+		return subreconciler.ContinueReconciling()
+	}
+
+	log.Info("IBM PG Cluster not yet healthy; waiting", "phase", obj.Status.Phase, "instances", obj.Status.Instances, "readyInstances", obj.Status.ReadyInstances)
+	return subreconciler.RequeueWithDelay(30 * time.Second)
+}
+
 func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
 	debugLog := log.V(1)
@@ -377,6 +622,12 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 		return
 	}
 
+	// Skip if cluster doesn't support OperandRequest API
+	if !ctrlcommon.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
+		log.Info("The OperandRequest API resource is not supported by this cluster; skipping wait")
+		return subreconciler.ContinueReconciling()
+	}
+
 	if needsExternal, err := r.needsExternalEDB(debugCtx, authCR); err == nil && needsExternal {
 		log.Info("Configured to connect to external database; skipping this check")
 		return subreconciler.ContinueReconciling()
@@ -385,60 +636,36 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 		return subreconciler.RequeueWithError(err)
 	}
 
-	legacyClusterAPIVersion := "postgresql.k8s.enterprisedb.io/v1"
-	cnpgClusterAPIVersion := "pg.ibm.com/v1"
-	clusterAPIVersion := cnpgClusterAPIVersion
-
-	u := &unstructured.Unstructured{
-		Object: map[string]any{
-			"kind":       "Cluster",
-			"apiVersion": clusterAPIVersion,
-		},
-	}
-	if err = r.Get(ctx, types.NamespacedName{Name: "common-service-db", Namespace: req.Namespace}, u); k8sErrors.IsNotFound(err) {
-		log.Info("CNPG Cluster not found, try getting legacy EDB Cluster")
-		clusterAPIVersion = legacyClusterAPIVersion
-		u.Object["apiVersion"] = clusterAPIVersion
-		if err = r.Get(ctx, types.NamespacedName{Name: "common-service-db", Namespace: req.Namespace}, u); err != nil && !k8sErrors.IsNotFound(err) {
-			log.Error(err, "Legacy EDB Cluster could not be retrieved")
-			return subreconciler.RequeueWithError(err)
-		}
-		log.Info("Legacy EDB Cluster not found, requeueing")
+	opReqName := "im-needs-database"
+	// Get the OperandRequest
+	opReq := &operatorv1alpha1.OperandRequest{}
+	if err = r.Get(debugCtx, types.NamespacedName{Name: opReqName, Namespace: authCR.Namespace}, opReq); k8sErrors.IsNotFound(err) {
+		log.Info("Database OperandRequest not found; waiting for it to be created")
 		return subreconciler.RequeueWithDelay(30 * time.Second)
 	} else if err != nil {
-		log.Error(err, "CNPG Cluster could not be retrieved")
+		log.Error(err, "Failed to get database OperandRequest")
 		return subreconciler.RequeueWithError(err)
 	}
 
-	log = log.WithValues("Object.Name", "common-service-db", "Object.Kind", "Cluster", "Object.APIVersion", clusterAPIVersion)
-	type cluster struct {
-		metav1.ObjectMeta
-		metav1.TypeMeta
-		Status struct {
-			Conditions []metav1.Condition `json:"conditions,omitempty"`
-		} `json:"status"`
+	// Check if OperandRequest has reached Running phase
+	if opReq.Status.Phase != operatorv1alpha1.ClusterPhaseRunning {
+		log.Info("Database OperandRequest not yet in Running phase; waiting",
+			"currentPhase", opReq.Status.Phase,
+			"desiredPhase", operatorv1alpha1.ClusterPhaseRunning)
+		return subreconciler.RequeueWithDelay(30 * time.Second)
 	}
-	obj := &cluster{}
-	var objJSON []byte
-	if objJSON, err = u.MarshalJSON(); err != nil {
-		log.Error(err, "Failed to marshal unstructured Cluster into JSON")
-		return subreconciler.RequeueWithError(err)
-	}
-	if err = json.Unmarshal(objJSON, obj); err != nil {
-		log.Error(err, "Failed to unmarshal JSON into Cluster status")
-		return subreconciler.RequeueWithError(err)
-	}
-	if obj.Status.Conditions != nil && meta.IsStatusConditionPresentAndEqual(obj.Status.Conditions, "Ready", metav1.ConditionTrue) {
-		log.Info("Cluster is Ready")
-		return subreconciler.ContinueReconciling()
-	}
-	log.Info("Cluster is not Ready")
-	return subreconciler.RequeueWithDelay(30 * time.Second)
+
+	log.Info("Database OperandRequest is in Running phase")
+
+	// Log current phase and requeue
+	return r.checkIBMPGClusterHealth(debugCtx, req.Namespace)
 }
 
 // handleUIOperandRequest manages the UI OperandRequest using a SecondaryReconciler
 func (r *AuthenticationReconciler) handleUIOperandRequest(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
+	debugLog := log.V(1)
+	debugCtx := logf.IntoContext(ctx, debugLog)
 	log.Info("Ensure UI OperandRequest is present when supported by cluster")
 
 	if !ctrlcommon.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
@@ -447,7 +674,7 @@ func (r *AuthenticationReconciler) handleUIOperandRequest(ctx context.Context, r
 	}
 
 	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+	if result, err = r.getLatestAuthentication(debugCtx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
 
@@ -456,7 +683,85 @@ func (r *AuthenticationReconciler) handleUIOperandRequest(ctx context.Context, r
 		return subreconciler.RequeueWithDelay(10 * time.Second)
 	}
 
-	return r.getUIOperandRequestSubreconciler(authCR).Reconcile(ctx)
+	if result, err = r.getUIOperandRequestSubreconciler(authCR).Reconcile(debugCtx); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+
+	legacyOpReq := &operatorv1alpha1.OperandRequest{}
+	if err = r.Get(debugCtx, types.NamespacedName{Name: "ibm-iam-request", Namespace: authCR.Namespace}, legacyOpReq); k8sErrors.IsNotFound(err) {
+		log.Info("No legacy OperandRequest to remove; continuing")
+		return subreconciler.ContinueReconciling()
+	} else if err != nil {
+		log.Error(err, "Failed to get legacy OperandRequest")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	log.Info("Found legacy OperandRequest ibm-iam-request; removing if current OperandRequests running")
+
+	uiOpReqName := "im-needs-ui"
+	// Get the OperandRequest
+	uiOpReq := &operatorv1alpha1.OperandRequest{}
+	if err = r.Get(debugCtx, types.NamespacedName{Name: uiOpReqName, Namespace: authCR.Namespace}, uiOpReq); k8sErrors.IsNotFound(err) {
+		log.Info("UI OperandRequest not found; waiting for it to be created")
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	} else if err != nil {
+		log.Error(err, "Failed to get UI OperandRequest")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	// Check if OperandRequest has reached Running phase
+	if uiOpReq.Status.Phase != operatorv1alpha1.ClusterPhaseRunning {
+		log.Info("UI OperandRequest not yet in Running phase; waiting",
+			"currentPhase", uiOpReq.Status.Phase,
+			"desiredPhase", operatorv1alpha1.ClusterPhaseRunning)
+		return subreconciler.RequeueWithDelay(defaultLowerWait)
+	}
+
+	log.Info("UI OperandRequest is in Running phase")
+
+	usingExternalPostgres := false
+	if usingExternalPostgres, err = r.needsExternalEDB(debugCtx, authCR); err != nil {
+		log.Error(err, "Unexpected error occurred while trying to determine whether external EDB is to be configured")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	if !usingExternalPostgres {
+		dbOpReqName := "im-needs-database"
+		// Get the OperandRequest
+		dbOpReq := &operatorv1alpha1.OperandRequest{}
+		if err = r.Get(debugCtx, types.NamespacedName{Name: dbOpReqName, Namespace: authCR.Namespace}, dbOpReq); k8sErrors.IsNotFound(err) {
+			log.Info("Database OperandRequest not found; waiting for it to be created")
+			return subreconciler.RequeueWithDelay(defaultLowerWait)
+		} else if err != nil {
+			log.Error(err, "Failed to get database OperandRequest")
+			return subreconciler.RequeueWithError(err)
+		}
+
+		// Check if OperandRequest has reached Running phase
+		if dbOpReq.Status.Phase != operatorv1alpha1.ClusterPhaseRunning {
+			log.Info("Database OperandRequest not yet in Running phase; waiting",
+				"currentPhase", dbOpReq.Status.Phase,
+				"desiredPhase", operatorv1alpha1.ClusterPhaseRunning)
+			return subreconciler.RequeueWithDelay(defaultLowerWait)
+		}
+
+		log.Info("Database OperandRequest is in Running phase")
+		log.Info("Confirm Cluster CR health before proceeding with legacy OperandRequest removal")
+		if result, err = r.checkIBMPGClusterHealth(debugCtx, req.Namespace); subreconciler.ShouldHaltOrRequeue(result, err) {
+			return
+		}
+	} else {
+		log.Info("Using external Postgres; skipping check for OperandRequest im-needs-database")
+	}
+
+	log.Info("Removing legacy OperandRequest", "OperandRequest.Name", legacyOpReq.Name)
+
+	if err = r.Delete(debugCtx, legacyOpReq); err != nil && !k8sErrors.IsNotFound(err) {
+		log.Error(err, "Failed to delete legacy OperandRequest")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
 // getUIOperandRequestSubreconciler creates a subreconciler for managing the UI OperandRequest

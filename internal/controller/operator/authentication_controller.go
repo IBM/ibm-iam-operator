@@ -316,7 +316,8 @@ func (r *AuthenticationReconciler) runNonStatusSubreconcilers(ctx context.Contex
 		r.handleClusterRoleBindings,
 		r.addMongoMigrationFinalizers,
 		r.overrideMongoDBBootstrap,
-		r.handleOperandRequest,
+		r.handleEDBToIBMPGMigration,
+		r.handleDatabaseOperandRequest,
 		r.createEDBShareClaim,
 		r.ensureDatastoreSecretAndCM,
 		r.ensureCommonServiceDBIsReady,
@@ -338,7 +339,7 @@ func (r *AuthenticationReconciler) runNonStatusSubreconcilers(ctx context.Contex
 		r.handleHPAs,
 		r.syncClientHostnames,
 		r.handleMongoDBCleanup,
-		r.cleanupOldRBAC)).Reconcile(ctx)
+		r.cleanupOldRBAC)...).Reconcile(ctx)
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to

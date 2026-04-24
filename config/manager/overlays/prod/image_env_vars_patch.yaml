@@ -2,7 +2,7 @@
   path: /spec/template/spec/containers/0/env/-
   value:
     name: ICP_PLATFORM_AUTH_IMAGE
-    value: icr.io/cpopen/cpfs/icp-platform-auth:4.17.0
+    value: icr.io/cpopen/cpfs/icp-platform-auth:4.17.1
 - op: add
   path: /spec/template/spec/containers/0/env/-
   value:

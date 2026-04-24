@@ -5,7 +5,7 @@ metadata:
 spec:
   authService:
     imageRegistry: icr.io/cpopen/cpfs
-    imageTag: 4.17.0
+    imageTag: 4.17.1
   clientRegistration:
     imageRegistry: icr.io/cpopen/cpfs
     imageTag: 4.17.0

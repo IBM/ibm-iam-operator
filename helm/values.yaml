@@ -13,12 +13,12 @@ global:
 #   - tenant1
 #   - tenant2
 operator:
-  imageTag: "4.17.0"
+  imageTag: "4.17.1"
 operands:
   platformIdentityProvider:
     imageTag: "4.17.0"
   platformAuthService:
-    imageTag: "4.17.0"
+    imageTag: "4.17.1"
   platformIdentityManagement:
     imageTag: "4.17.0"
   imInitContainer:

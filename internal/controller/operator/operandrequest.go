@@ -761,6 +761,9 @@ func (r *AuthenticationReconciler) handleUIOperandRequest(ctx context.Context, r
 		return subreconciler.RequeueWithError(err)
 	}
 
+	log.Info("Legacy OperandRequest removed; signal need for Deployment rollout")
+	r.needsRollout = true
+
 	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 

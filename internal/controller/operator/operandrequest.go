@@ -358,7 +358,6 @@ func (r *AuthenticationReconciler) handleEDBToIBMPGMigration(ctx context.Context
 		return subreconciler.ContinueReconciling()
 	}
 
-	// Check if legacy OperandRequest exists
 	legacyOpReqName := "ibm-iam-request"
 	newOpReqName := "im-needs-database"
 
@@ -373,7 +372,6 @@ func (r *AuthenticationReconciler) handleEDBToIBMPGMigration(ctx context.Context
 
 	log.Info("Found legacy OperandRequest; checking migration status")
 
-	// Get or create the new OperandRequest for migration operands
 	newOpReq := &operatorv1alpha1.OperandRequest{}
 	if err = r.Get(debugCtx, types.NamespacedName{Name: newOpReqName, Namespace: authCR.Namespace}, newOpReq); err == nil {
 		log.Info("Database OperandRequest exists; continuing", "OperandRequest.Name", newOpReqName)
@@ -383,7 +381,6 @@ func (r *AuthenticationReconciler) handleEDBToIBMPGMigration(ctx context.Context
 		return subreconciler.RequeueWithError(err)
 	}
 
-	// Check migration state in new OperandRequest
 	hasMigrator := false
 	if len(legacyOpReq.Spec.Requests) == 0 {
 		err = fmt.Errorf("failed to locate migrator request: OperandRequest %s does not have at least one entry in .spec.requests", legacyOpReqName)
@@ -398,20 +395,17 @@ func (r *AuthenticationReconciler) handleEDBToIBMPGMigration(ctx context.Context
 
 	log.Info("Migration state", "hasMigrator", hasMigrator)
 
-	// Verify EDB Cluster CR is present and healthy
 	if !hasMigrator {
 		log.Info("Verifying EDB Cluster is healthy")
 		if result, err = r.checkEDBClusterHealth(debugCtx, authCR.Namespace); subreconciler.ShouldHaltOrRequeue(result, err) {
 			return
 		}
 
-		// Create/update im-needs-database with common-service-pg-migrator
 		log.Info("Adding common-service-pg-migrator to ibm-iam-request OperandRequest")
 		legacyOpReq.Spec.Requests[0].Operands = append(legacyOpReq.Spec.Requests[0].Operands, operatorv1alpha1.Operand{
 			Name: "common-service-pg-migrator",
 		})
 
-		// Create new OperandRequest with migrator
 		if err = r.Update(debugCtx, legacyOpReq); err != nil {
 			log.Error(err, "Failed to update legacy OperandRequest with migrator")
 			return subreconciler.RequeueWithError(err)
@@ -425,7 +419,6 @@ func (r *AuthenticationReconciler) handleEDBToIBMPGMigration(ctx context.Context
 		return
 	}
 
-	// Wait for IBM PG Cluster to be ready
 	log.Info("Waiting for IBM PG Cluster to be ready")
 	if result, err = r.checkIBMPGClusterHealth(debugCtx, authCR.Namespace); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
@@ -478,7 +471,6 @@ func (r *AuthenticationReconciler) checkEDBClusterHealth(ctx context.Context, na
 		return subreconciler.RequeueWithError(err)
 	}
 
-	// Check if cluster is ready using conditions or phase
 	isReady := false
 	if obj.Status.Conditions != nil && meta.IsStatusConditionPresentAndEqual(obj.Status.Conditions, "Ready", metav1.ConditionTrue) {
 		isReady = true

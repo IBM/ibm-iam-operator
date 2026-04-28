@@ -94,12 +94,53 @@ func (r *AuthenticationReconciler) cleanupOldRBAC(ctx context.Context, req ctrl.
 	if !canDeleteCR {
 		log.Info("Operator does not have permission to delete ClusterRole, skipping deletion")
 	} else {
-		// Add ClusterRole to deletion list
-		objectsToDelete = append(objectsToDelete, &rbacv1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "ibm-iam-operand-restricted",
-			},
-		})
+		// Check if operator has permission to list ClusterRoleBindings
+		canListCRB, err := r.hasAPIAccess(debugCtx, "", rbacv1.SchemeGroupVersion.Group, "clusterrolebindings", []string{"list"})
+		if err != nil {
+			log.Error(err, "Failed to check list permission for ClusterRoleBinding")
+			return subreconciler.RequeueWithError(err)
+		}
+
+		shouldDeleteClusterRole := true
+		if canListCRB {
+			// List ClusterRoleBindings managed by ibm-iam-operator that reference the ibm-iam-operand-restricted ClusterRole
+			crbList := &rbacv1.ClusterRoleBindingList{}
+			listOpts := []client.ListOption{
+				client.MatchingLabels{"app.kubernetes.io/managed-by": "ibm-iam-operator"},
+			}
+			if err := r.Client.List(debugCtx, crbList, listOpts...); err != nil {
+				log.Error(err, "Failed to list ClusterRoleBindings")
+				return subreconciler.RequeueWithError(err)
+			}
+
+			// Count ClusterRoleBindings that reference the ibm-iam-operand-restricted ClusterRole
+			count := 0
+			for _, crb := range crbList.Items {
+				if crb.RoleRef.Kind == "ClusterRole" && crb.RoleRef.Name == "ibm-iam-operand-restricted" {
+					count++
+				}
+			}
+
+			// Only delete ClusterRole if there's one or fewer ClusterRoleBindings
+			// (the one being deleted or none)
+			if count > 1 {
+				log.Info("Multiple ClusterRoleBindings reference the ClusterRole, skipping ClusterRole deletion", "count", count)
+				shouldDeleteClusterRole = false
+			} else {
+				log.Info("Single or no ClusterRoleBinding references the ClusterRole, proceeding with ClusterRole deletion", "count", count)
+			}
+		} else {
+			log.Info("Operator does not have permission to list ClusterRoleBindings, proceeding with ClusterRole deletion")
+		}
+
+		if shouldDeleteClusterRole {
+			// Add ClusterRole to deletion list
+			objectsToDelete = append(objectsToDelete, &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "ibm-iam-operand-restricted",
+				},
+			})
+		}
 	}
 
 	for _, obj := range objectsToDelete {

@@ -685,10 +685,14 @@ func IsRouteEqual(ctx context.Context, oldRoute, newRoute *routev1.Route) bool {
 func generateRouteObject(fields *reconcileRouteFields) common.GenerateFn[*routev1.Route] {
 	return func(s common.SecondaryReconciler, ctx context.Context, route *routev1.Route) (err error) {
 		log := logf.FromContext(ctx)
+		authCR, ok := s.GetPrimary().(*operatorv1alpha1.Authentication)
+		if !ok {
+			return
+		}
 		weight := int32(100)
 
 		commonLabel := map[string]string{"app": "im"}
-		routeLabels := common.MergeMaps(nil, s.GetPrimary().GetLabels(), commonLabel, common.GetCommonLabels())
+		routeLabels := common.MergeMaps(nil, authCR.Spec.Labels, commonLabel, common.GetCommonLabels())
 
 		*route = routev1.Route{
 			TypeMeta: metav1.TypeMeta{

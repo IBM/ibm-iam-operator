@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -154,6 +155,81 @@ type AuthenticationReconciler struct {
 	clusterType     common.ClusterType
 	needsRollout    bool
 	common.ByteGenerator
+}
+
+func logWatchEvent(watchName string, eventType string, obj client.Object, extra ...interface{}) {
+	if obj == nil {
+		return
+	}
+	values := []interface{}{
+		"watch", watchName,
+		"eventType", eventType,
+		"namespace", obj.GetNamespace(),
+		"name", obj.GetName(),
+		"resourceVersion", obj.GetResourceVersion(),
+		"owners", obj.GetOwnerReferences(),
+	}
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	if gvk.Empty() {
+		values = append(values, "kind", fmt.Sprintf("%T", obj))
+	} else {
+		values = append(values, "apiVersion", gvk.GroupVersion().String(), "kind", gvk.Kind)
+	}
+	values = append(values, extra...)
+	ctrl.Log.WithName("controller_authentication").WithName("watch").V(1).Info("Authentication watch event", values...)
+}
+
+func logWatchUpdate(watchName string, oldObj, newObj client.Object) {
+	if oldObj == nil || newObj == nil {
+		return
+	}
+	logWatchEvent(
+		watchName,
+		"update",
+		newObj,
+		"oldResourceVersion", oldObj.GetResourceVersion(),
+		"newResourceVersion", newObj.GetResourceVersion(),
+		"annotationsChanged", !reflect.DeepEqual(oldObj.GetAnnotations(), newObj.GetAnnotations()),
+		"labelsChanged", !reflect.DeepEqual(oldObj.GetLabels(), newObj.GetLabels()),
+		"ownerRefsChanged", !reflect.DeepEqual(oldObj.GetOwnerReferences(), newObj.GetOwnerReferences()),
+	)
+}
+
+func newLoggingPredicate(watchName string) predicate.Funcs {
+	return predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			logWatchEvent(watchName, "create", e.Object)
+			return true
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			logWatchUpdate(watchName, e.ObjectOld, e.ObjectNew)
+			return true
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			logWatchEvent(watchName, "delete", e.Object)
+			return true
+		},
+		GenericFunc: func(e event.GenericEvent) bool {
+			logWatchEvent(watchName, "generic", e.Object)
+			return true
+		},
+	}
+}
+
+func logAndGetAuthenticationRequests(ctx context.Context, watchName string, c client.Client, obj client.Object) (requests []reconcile.Request) {
+	authCR, _ := common.GetAuthentication(ctx, c)
+	if authCR == nil {
+		logWatchEvent(watchName, "enqueue-skipped", obj, "reason", "authentication-not-found")
+		return nil
+	}
+	requests = []reconcile.Request{
+		{NamespacedName: types.NamespacedName{
+			Name:      authCR.Name,
+			Namespace: authCR.Namespace,
+		}},
+	}
+	logWatchEvent(watchName, "enqueue", obj, "requests", requests, "requestCount", len(requests))
+	return requests
 }
 
 func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
@@ -385,27 +461,27 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 // SetupWithManager sets up the controller with the Manager.
 func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	authCtrl := ctrl.NewControllerManagedBy(mgr).
-		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
-		Watches(&corev1.Secret{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
-		Watches(&certmgr.Certificate{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
-		Watches(&batchv1.Job{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
-		Watches(&corev1.Service{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
-		Watches(&netv1.Ingress{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
-		Watches(&appsv1.Deployment{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
-		Watches(&autoscalingv2.HorizontalPodAutoscaler{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()), builder.WithPredicates(newLoggingPredicate("owned-configmap"))).
+		Watches(&corev1.Secret{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()), builder.WithPredicates(newLoggingPredicate("owned-secret"))).
+		Watches(&certmgr.Certificate{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()), builder.WithPredicates(newLoggingPredicate("owned-certificate"))).
+		Watches(&batchv1.Job{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()), builder.WithPredicates(newLoggingPredicate("owned-job"))).
+		Watches(&corev1.Service{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()), builder.WithPredicates(newLoggingPredicate("owned-service"))).
+		Watches(&netv1.Ingress{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()), builder.WithPredicates(newLoggingPredicate("owned-ingress"))).
+		Watches(&appsv1.Deployment{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()), builder.WithPredicates(newLoggingPredicate("owned-deployment"))).
+		Watches(&autoscalingv2.HorizontalPodAutoscaler{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()), builder.WithPredicates(newLoggingPredicate("owned-hpa")))
 
 	//Add routes
 	if common.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
-		authCtrl.Watches(&routev1.Route{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+		authCtrl.Watches(&routev1.Route{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()), builder.WithPredicates(newLoggingPredicate("owned-route")))
 	}
 	if common.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
-		authCtrl.Watches(&operatorv1alpha1.OperandRequest{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+		authCtrl.Watches(&operatorv1alpha1.OperandRequest{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()), builder.WithPredicates(newLoggingPredicate("owned-operandrequest")))
 	}
 	if common.ClusterHasOperandBindInfoAPIResource(&r.DiscoveryClient) {
-		authCtrl.Watches(&operatorv1alpha1.OperandBindInfo{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+		authCtrl.Watches(&operatorv1alpha1.OperandBindInfo{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()), builder.WithPredicates(newLoggingPredicate("owned-operandbindinfo")))
 	}
 	if common.ClusterHasCSIGroupVersion(&r.DiscoveryClient) {
-		authCtrl.Watches(&sscsidriverv1.SecretProviderClass{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+		authCtrl.Watches(&sscsidriverv1.SecretProviderClass{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()), builder.WithPredicates(newLoggingPredicate("owned-secretproviderclass")))
 		spcLabelSelector := metav1.LabelSelector{
 			MatchExpressions: []metav1.LabelSelectorRequirement{
 				{
@@ -424,19 +500,9 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return err
 		}
 		authCtrl.Watches(&sscsidriverv1.SecretProviderClass{},
-
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
-				authCR, _ := common.GetAuthentication(ctx, r.Client)
-				if authCR == nil {
-					return
-				}
-				return []reconcile.Request{
-					{NamespacedName: types.NamespacedName{
-						Name:      authCR.Name,
-						Namespace: authCR.Namespace,
-					}},
-				}
-			}), builder.WithPredicates(spcLabelPredicate),
+				return logAndGetAuthenticationRequests(ctx, "csi-secretproviderclass-volume", r.Client, o)
+			}), builder.WithPredicates(predicate.And(spcLabelPredicate, newLoggingPredicate("csi-secretproviderclass-volume"))),
 		)
 	}
 
@@ -512,17 +578,8 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	authCtrl.Watches(&corev1.ConfigMap{},
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
-			authCR, _ := common.GetAuthentication(ctx, r.Client)
-			if authCR == nil {
-				return
-			}
-			return []reconcile.Request{
-				{NamespacedName: types.NamespacedName{
-					Name:      authCR.Name,
-					Namespace: authCR.Namespace,
-				}},
-			}
-		}), builder.WithPredicates(predicate.Or(globalCMPred, productCMPred)),
+			return logAndGetAuthenticationRequests(ctx, "global-or-product-configmap", r.Client, o)
+		}), builder.WithPredicates(predicate.And(predicate.Or(globalCMPred, productCMPred), newLoggingPredicate("global-or-product-configmap"))),
 	)
 
 	imSecretPredicate := predicate.Funcs{
@@ -562,20 +619,19 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	authCtrl.Watches(&corev1.Secret{},
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
-			authCR, _ := common.GetAuthentication(ctx, r.Client)
-			if authCR == nil {
-				return
-			}
-			return []reconcile.Request{
-				{NamespacedName: types.NamespacedName{
-					Name:      authCR.Name,
-					Namespace: authCR.Namespace,
-				}},
-			}
-		}), builder.WithPredicates(imSecretPredicate),
+			return logAndGetAuthenticationRequests(ctx, "im-labeled-secret", r.Client, o)
+		}), builder.WithPredicates(predicate.And(imSecretPredicate, newLoggingPredicate("im-labeled-secret"))),
 	)
 
-	authCtrl.Watches(&operatorv1alpha1.Authentication{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(bootstrappedPred))
+	authCtrl.Watches(&operatorv1alpha1.Authentication{},
+		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
+			requests := []reconcile.Request{{NamespacedName: types.NamespacedName{
+				Name:      o.GetName(),
+				Namespace: o.GetNamespace(),
+			}}}
+			logWatchEvent("authentication-self", "enqueue", o, "requests", requests, "requestCount", len(requests))
+			return requests
+		}), builder.WithPredicates(predicate.And(bootstrappedPred, newLoggingPredicate("authentication-self"))))
 	return authCtrl.Named("controller_authentication").
 		Complete(r)
 }

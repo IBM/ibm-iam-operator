@@ -235,6 +235,10 @@ spec:
       containers:
       - command:
         - ibm-iam-operator
+        {{- if and .Values.operator.debug .Values.operator.debug.enabled }}
+        args:
+        - --zap-log-level=debug
+        {{- end }}
         env:
         - name: POD_NAME
           valueFrom:
@@ -264,6 +268,10 @@ spec:
           value: {{ .Values.cpfs.imagePullPrefix | default .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperand }}/ibm-im-db-migrator:{{ .Values.operands.imDBMigrator.imageTag }}
         - name: IMAGE_PULL_SECRET
           value: {{ .Values.global.imagePullSecret }}
+        {{- if and .Values.operator.debug (and .Values.operator.debug.enabled .Values.operator.debug.withEvents) }}
+        - name: ENABLE_EVENT_DEBUG
+          value: "true"
+        {{- end }}
         {{- $watchNamespaces := .Values.global.tetheredNamespaces | default list -}}
         {{- if .Values.global.instanceNamespace -}}
         {{- $watchNamespaces = append $watchNamespaces .Values.global.instanceNamespace -}}

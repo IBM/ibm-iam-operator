@@ -17,9 +17,13 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
+	"fmt"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -33,7 +37,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	sscsidriverv1 "sigs.k8s.io/secrets-store-csi-driver/apis/v1"
 
@@ -231,11 +234,47 @@ func main() {
 	}
 	//+kubebuilder:scaffold:builder
 
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+	readyzLog := ctrl.Log.WithName("probe.readyz").V(1)
+	healthzLog := ctrl.Log.WithName("probe.healthz").V(1)
+	// Readiness check - verifies operator is ready to process requests
+	readyzCheck := func(req *http.Request) error {
+		ctx, cancel := context.WithTimeout(req.Context(), 2*time.Second)
+		defer cancel()
+
+		// Primary check: ensure all Informers have synced
+		if !mgr.GetCache().WaitForCacheSync(ctx) {
+			readyzLog.Info("Readiness check failed")
+			return fmt.Errorf("cache not synced - Informers not ready")
+		} else {
+			readyzLog.Info("Ready!")
+		}
+
+		return nil
+	}
+
+	// Liveness check - verifies operator is alive and can communicate with API server
+	healthzCheck := func(req *http.Request) error {
+		ctx, cancel := context.WithTimeout(req.Context(), 5*time.Second)
+		defer cancel()
+
+		// Verify we can still communicate with the API server
+		// Use a lightweight operation to avoid impacting performance
+		var authList operatorv1alpha1.AuthenticationList
+		if err := mgr.GetClient().List(ctx, &authList, client.Limit(1)); err != nil {
+			healthzLog.Info("Health check failed")
+			return fmt.Errorf("API server connectivity check failed: %w", err)
+		} else {
+			healthzLog.Info("Healthy!")
+		}
+
+		return nil
+	}
+
+	if err := mgr.AddHealthzCheck("healthz", healthzCheck); err != nil {
 		setupLog.Error(err, "unable to set up health check")
 		os.Exit(1)
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+	if err := mgr.AddReadyzCheck("readyz", readyzCheck); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}

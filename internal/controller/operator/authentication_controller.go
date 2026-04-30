@@ -18,6 +18,8 @@ package operator
 
 import (
 	"context"
+	"os"
+	"strconv"
 
 	"fmt"
 	"reflect"
@@ -197,6 +199,11 @@ func logWatchUpdate(watchName string, oldObj, newObj client.Object) {
 }
 
 func newLoggingPredicate(watchName string) predicate.Funcs {
+	eventLoggingEnabled, _ := strconv.ParseBool(os.Getenv("ENABLE_EVENT_DEBUG"))
+	if !eventLoggingEnabled {
+		return predicate.Funcs{}
+	}
+
 	return predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			logWatchEvent(watchName, "create", e.Object)
@@ -592,31 +599,6 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if err != nil {
 		return err
 	}
-
-	//bootstrappedPred := predicate.Funcs{
-	//	UpdateFunc: func(e event.UpdateEvent) bool {
-	//		predLog.Info("Update event", "Label.Version", e.ObjectNew.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.ObjectNew.GetLabels()[common.ManagerVersionLabel] == version.Version)
-	//		return e.ObjectNew.GetLabels()[common.ManagerVersionLabel] == version.Version
-	//	},
-
-	//	// Allow create events
-	//	CreateFunc: func(e event.CreateEvent) bool {
-	//		predLog.Info("Create event", "Label.Version", e.Object.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version)
-	//		return e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version
-	//	},
-
-	//	// Allow delete events
-	//	DeleteFunc: func(e event.DeleteEvent) bool {
-	//		predLog.Info("Delete event", "Label.Version", e.Object.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version)
-	//		return e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version
-	//	},
-
-	//	// Allow generic events (e.g., external triggers)
-	//	GenericFunc: func(e event.GenericEvent) bool {
-	//		predLog.Info("Generic event", "Label.Version", e.Object.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version)
-	//		return e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version
-	//	},
-	//}
 
 	authCtrl.Watches(&corev1.ConfigMap{},
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {

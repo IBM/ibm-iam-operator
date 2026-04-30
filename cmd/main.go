@@ -234,8 +234,8 @@ func main() {
 	}
 	//+kubebuilder:scaffold:builder
 
-	readyzLog := ctrl.Log.WithName("probe.readyz").V(1)
-	healthzLog := ctrl.Log.WithName("probe.healthz").V(1)
+	readyzLog := ctrl.Log.WithName("probe_readyz").V(1)
+	healthzLog := ctrl.Log.WithName("probe_healthz").V(1)
 	// Readiness check - verifies operator is ready to process requests
 	readyzCheck := func(req *http.Request) error {
 		ctx, cancel := context.WithTimeout(req.Context(), 2*time.Second)
@@ -243,7 +243,7 @@ func main() {
 
 		// Primary check: ensure all Informers have synced
 		if !mgr.GetCache().WaitForCacheSync(ctx) {
-			readyzLog.Info("Readiness check failed")
+			readyzLog.Info("Readiness check failed; cache failed to sync")
 			return fmt.Errorf("cache not synced - Informers not ready")
 		} else {
 			readyzLog.Info("Ready!")
@@ -261,7 +261,7 @@ func main() {
 		// Use a lightweight operation to avoid impacting performance
 		var authList operatorv1alpha1.AuthenticationList
 		if err := mgr.GetClient().List(ctx, &authList, client.Limit(1)); err != nil {
-			healthzLog.Info("Health check failed")
+			healthzLog.Info("Health check failed; API server connectivity could not be established", "reason", err.Error())
 			return fmt.Errorf("API server connectivity check failed: %w", err)
 		} else {
 			healthzLog.Info("Healthy!")

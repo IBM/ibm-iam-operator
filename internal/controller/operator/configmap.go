@@ -191,6 +191,28 @@ func getConfigMapDataSHA1Sum(cm *corev1.ConfigMap) (sha string, err error) {
 	return fmt.Sprintf("%x", dataSHA[:]), nil
 }
 
+// ensureConfigMapChecksumAnnotation ensures the ConfigMap has a checksum annotation based on its data
+func ensureConfigMapChecksumAnnotation(s common.SecondaryReconciler, ctx context.Context, observed, generated *corev1.ConfigMap) (modified bool, err error) {
+	beforeSum := observed.Annotations[AnnotationSHA1Sum]
+	afterSum, err := getConfigMapDataSHA1Sum(observed)
+	if err != nil {
+		return false, err
+	}
+
+	if observed.Annotations == nil {
+		observed.Annotations = map[string]string{
+			AnnotationSHA1Sum: afterSum,
+		}
+		return true, nil
+	}
+
+	if beforeSum != afterSum {
+		observed.Annotations[AnnotationSHA1Sum] = afterSum
+		return true, nil
+	}
+	return
+}
+
 // GetCNCFDomain returns the CNCF domain name set in the global ConfigMap, if
 // present. Returns an error when the ConfigMap is not found and returns an
 // empty string whenever the ConfigMap is found but the CNCF domain name is not
@@ -317,6 +339,10 @@ func updateRegistrationJSON(_ common.SecondaryReconciler, ctx context.Context, o
 		// If observed data doesn't unmarshal properly, set it to generated content
 		log.Error(err, "Observed JSON did not unmarshal properly; resetting to default")
 		observed.Data["platform-oidc-registration.json"] = generated.Data["platform-oidc-registration.json"]
+		if observed.Annotations == nil {
+			observed.Annotations = make(map[string]string)
+		}
+		observed.Annotations[AnnotationSHA1Sum] = generated.Annotations[AnnotationSHA1Sum]
 		updated = true
 		err = nil
 		if !reflect.DeepEqual(generated.GetOwnerReferences(), observed.GetOwnerReferences()) {
@@ -372,6 +398,50 @@ func updateRegistrationJSON(_ common.SecondaryReconciler, ctx context.Context, o
 			return
 		}
 		observed.Data["platform-oidc-registration.json"] = string(newJSON[:])
+
+		// Create a copy of generated with observed's URI arrays to calculate the expected checksum
+		generatedCopy := &registrationJSONData{
+			TokenEndpointAuthMethod: generatedJSON.TokenEndpointAuthMethod,
+			ClientID:                generatedJSON.ClientID,
+			ClientSecret:            generatedJSON.ClientSecret,
+			Scope:                   generatedJSON.Scope,
+			GrantTypes:              generatedJSON.GrantTypes,
+			ResponseTypes:           generatedJSON.ResponseTypes,
+			ApplicationType:         generatedJSON.ApplicationType,
+			SubjectType:             generatedJSON.SubjectType,
+			PreauthorizedScope:      generatedJSON.PreauthorizedScope,
+			IntrospectTokens:        generatedJSON.IntrospectTokens,
+			FunctionalUserGroupIDs:  generatedJSON.FunctionalUserGroupIDs,
+			TrustedURIPrefixes:      observedJSON.TrustedURIPrefixes,
+			RedirectURIs:            observedJSON.RedirectURIs,
+			PostLogoutRedirectURIs:  observedJSON.PostLogoutRedirectURIs,
+		}
+
+		// Marshal the updated generated copy to calculate new checksum
+		var generatedCopyBytes []byte
+		if generatedCopyBytes, err = json.MarshalIndent(generatedCopy, "", "  "); err != nil {
+			log.Error(err, "Failed to marshal generated copy for checksum")
+			return
+		}
+
+		// Create a temporary ConfigMap with the updated data to calculate checksum
+		tempCM := &corev1.ConfigMap{
+			Data: map[string]string{
+				"platform-oidc-registration.json": string(generatedCopyBytes),
+			},
+		}
+
+		var newChecksum string
+		if newChecksum, err = getConfigMapDataSHA1Sum(tempCM); err != nil {
+			log.Error(err, "Failed to calculate new checksum")
+			return
+		}
+
+		// Update the checksum annotation
+		if observed.Annotations == nil {
+			observed.Annotations = make(map[string]string)
+		}
+		observed.Annotations[AnnotationSHA1Sum] = newChecksum
 	}
 
 	if !reflect.DeepEqual(generated.GetOwnerReferences(), observed.GetOwnerReferences()) {
@@ -848,7 +918,11 @@ func generateRegistrationJsonConfigMap(clusterInfo *corev1.ConfigMap) common.Gen
 		// Set Authentication authCR as the owner and controller of the ConfigMap
 		if err = controllerutil.SetControllerReference(authCR, generated, s.GetClient().Scheme()); err != nil {
 			reqLogger.Error(err, "Failed to set owner for ConfigMap")
+			return
 		}
+
+		// Generate checksum annotation for the ConfigMap data
+		_, err = ensureConfigMapChecksumAnnotation(s, ctx, generated, generated)
 		return
 	}
 }

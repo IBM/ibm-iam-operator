@@ -337,7 +337,6 @@ func (r *AuthenticationReconciler) runNonStatusSubreconcilers(ctx context.Contex
 		r.handleUIOperandRequest,
 		r.handleRoutes,
 		r.handleHPAs,
-		r.syncClientHostnames,
 		r.handleMongoDBCleanup,
 		r.cleanupOldRBAC)...).Reconcile(ctx)
 }

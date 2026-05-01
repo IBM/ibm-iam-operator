@@ -311,23 +311,69 @@ func replaceOIDCClientRegistrationJob(s common.SecondaryReconciler, ctx context.
 }
 
 func updateRegistrationJSON(_ common.SecondaryReconciler, ctx context.Context, observed, generated *corev1.ConfigMap) (updated bool, err error) {
+	log := logf.FromContext(ctx)
 	observedJSON := &registrationJSONData{}
 	if err = json.Unmarshal([]byte(observed.Data["platform-oidc-registration.json"]), observedJSON); err != nil {
+		// If observed data doesn't unmarshal properly, set it to generated content
+		log.Error(err, "Observed JSON did not unmarshal properly; resetting to default")
+		observed.Data["platform-oidc-registration.json"] = generated.Data["platform-oidc-registration.json"]
+		updated = true
+		err = nil
+		if !reflect.DeepEqual(generated.GetOwnerReferences(), observed.GetOwnerReferences()) {
+			observed.OwnerReferences = generated.GetOwnerReferences()
+		}
 		return
 	}
 	generatedJSON := &registrationJSONData{}
 	if err = json.Unmarshal([]byte(generated.Data["platform-oidc-registration.json"]), generatedJSON); err != nil {
+		log.Error(err, "Generated JSON did not unmarshal properly")
 		return
 	}
-	if !reflect.DeepEqual(generatedJSON, observedJSON) {
+
+	// Helper function to check if a URI exists in a slice
+	containsURI := func(slice []string, uri string) bool {
+		for _, item := range slice {
+			if item == uri {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Check and append missing URIs in trusted_uri_prefixes
+	for _, uri := range generatedJSON.TrustedURIPrefixes {
+		if !containsURI(observedJSON.TrustedURIPrefixes, uri) {
+			observedJSON.TrustedURIPrefixes = append(observedJSON.TrustedURIPrefixes, uri)
+			updated = true
+		}
+	}
+
+	// Check and append missing URIs in redirect_uris
+	for _, uri := range generatedJSON.RedirectURIs {
+		if !containsURI(observedJSON.RedirectURIs, uri) {
+			observedJSON.RedirectURIs = append(observedJSON.RedirectURIs, uri)
+			updated = true
+		}
+	}
+
+	// Check and append missing URIs in post_logout_redirect_uris
+	for _, uri := range generatedJSON.PostLogoutRedirectURIs {
+		if !containsURI(observedJSON.PostLogoutRedirectURIs, uri) {
+			observedJSON.PostLogoutRedirectURIs = append(observedJSON.PostLogoutRedirectURIs, uri)
+			updated = true
+		}
+	}
+
+	// If any URIs were appended, marshal the updated observedJSON back to the ConfigMap
+	if updated {
 		var newJSON []byte
-		if newJSON, err = json.MarshalIndent(generatedJSON, "", "  "); err != nil {
+		if newJSON, err = json.MarshalIndent(observedJSON, "", "  "); err != nil {
+			log.Error(err, "Failed to indent updated JSON")
 			return
 		}
-
 		observed.Data["platform-oidc-registration.json"] = string(newJSON[:])
-		updated = true
 	}
+
 	if !reflect.DeepEqual(generated.GetOwnerReferences(), observed.GetOwnerReferences()) {
 		observed.OwnerReferences = generated.GetOwnerReferences()
 		updated = true

@@ -1,3 +1,16 @@
+// Copyright 2022 IBM Corporation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 package operator
 
 import (
@@ -1177,35 +1190,41 @@ var _ = Describe("Route handling", func() {
 		})
 	})
 
+	// Helper function to create Authentication CR and SecondaryReconciler for testing
+	createAuthCRAndSecondaryReconciler := func(cl client.Client, authCRLabels map[string]string) (*operatorv1alpha1.Authentication, ctrlcommon.SecondaryReconciler) {
+		authCR := &operatorv1alpha1.Authentication{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "operator.ibm.com/v1alpha1",
+				Kind:       "Authentication",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "example-authentication",
+				Namespace:       "data-ns",
+				ResourceVersion: trackerAddResourceVersion,
+			},
+			Spec: operatorv1alpha1.AuthenticationSpec{
+				Labels: authCRLabels,
+			},
+		}
+		s := ctrlcommon.NewSecondaryReconcilerBuilder[*routev1.Route]().
+			WithPrimary(authCR).
+			WithClient(cl).
+			MustBuild()
+		return authCR, s
+	}
+
 	Describe("modifyRoute", func() {
 		var ctx context.Context
-		var observed, generated *routev1.Route
-		var s ctrlcommon.SecondaryReconciler
+		var cb fakeclient.ClientBuilder
+		var cl client.WithWatch
 
-		BeforeEach(func() {
-			ctx = context.Background()
-			observed = &routev1.Route{
+		// Helper to create a fresh test route for each test
+		createTestRoute := func() *routev1.Route {
+			return &routev1.Route{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-route",
 					Annotations: map[string]string{
-						"custom-annotation":                          "custom-value",
-						"haproxy.router.openshift.io/rewrite-target": "/old",
-					},
-					Labels: map[string]string{
-						"custom-label":              "custom-value",
-						"app.kubernetes.io/part-of": "old-value",
-					},
-				},
-				Spec: routev1.RouteSpec{
-					Host: "test.example.com",
-				},
-			}
-			generated = &routev1.Route{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-route",
-					Annotations: map[string]string{
-						"haproxy.router.openshift.io/rewrite-target": "/new",
-						"generated-annotation":                       "generated-value",
+						"haproxy.router.openshift.io/rewrite-target": "/generated-path",
 					},
 					Labels: map[string]string{
 						"app":                          "im",
@@ -1217,87 +1236,334 @@ var _ = Describe("Route handling", func() {
 					Host: "test.example.com",
 				},
 			}
+		}
+
+		BeforeEach(func() {
+			ctx = context.Background()
+			cb = *fakeclient.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(authCR)
+			cl = cb.Build()
 		})
 
-		Context("when preserving custom annotations", func() {
+		Context("when merging annotations", func() {
 			It("should preserve custom annotations from observed route", func() {
-				// After merging, generated will have both custom and generated annotations
-				// but the rewrite-target from generated is preserved
+				observed := createTestRoute()
+				generated := createTestRoute()
+				// Add custom annotation to observed that's not in generated
+				observed.Annotations["custom-annotation"] = "custom-value"
+
+				_, s := createAuthCRAndSecondaryReconciler(cl, nil)
 				modified, err := modifyRoute(s, ctx, observed, generated)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(generated.Annotations).To(HaveKeyWithValue("custom-annotation", "custom-value"))
-				Expect(generated.Annotations).To(HaveKeyWithValue("generated-annotation", "generated-value"))
-				Expect(generated.Annotations).To(HaveKeyWithValue("haproxy.router.openshift.io/rewrite-target", "/new"))
-				// Since annotations differ after merge, it should be marked as modified
-				Expect(modified).To(BeTrue())
-			})
 
-			It("should not allow changes to rewrite-target annotation", func() {
-				_, err := modifyRoute(s, ctx, observed, generated)
 				Expect(err).ToNot(HaveOccurred())
-				// The generated rewrite-target should be preserved, not the observed one
-				Expect(generated.Annotations).To(HaveKeyWithValue("haproxy.router.openshift.io/rewrite-target", "/new"))
-			})
-
-			It("should keep generated annotations", func() {
-				_, err := modifyRoute(s, ctx, observed, generated)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(generated.Annotations).To(HaveKeyWithValue("generated-annotation", "generated-value"))
+				Expect(modified).To(BeFalse())
+				Expect(observed.Annotations).To(HaveKeyWithValue("custom-annotation", "custom-value"))
 			})
 		})
 
-		Context("when preserving and merging labels", func() {
-			It("should preserve custom labels from observed route", func() {
-				_, err := modifyRoute(s, ctx, observed, generated)
+		Context("when testing annotation precedence rules", func() {
+			It("should allow generated rewrite-target to override observed rewrite-target and return modified=true", func() {
+				observed := createTestRoute()
+				generated := createTestRoute()
+				// Set up conflicting rewrite-target value
+				observed.Annotations["haproxy.router.openshift.io/rewrite-target"] = "/observed-path"
+
+				_, s := createAuthCRAndSecondaryReconciler(cl, nil)
+				modified, err := modifyRoute(s, ctx, observed, generated)
+
 				Expect(err).ToNot(HaveOccurred())
+				Expect(modified).To(BeTrue())
+				// Generated value should win
+				Expect(observed.Annotations).To(HaveKeyWithValue("haproxy.router.openshift.io/rewrite-target", "/generated-path"))
+				Expect(observed.Annotations["haproxy.router.openshift.io/rewrite-target"]).ToNot(Equal("/observed-path"))
+			})
+
+			It("should preserve both custom and generated annotations when rewrite-target conflicts and return modified=true", func() {
+				observed := createTestRoute()
+				generated := createTestRoute()
+				// Set up conflicting rewrite-target values
+				observed.Annotations = map[string]string{
+					"haproxy.router.openshift.io/rewrite-target": "/observed-path",
+					"custom-annotation":                          "custom-value",
+				}
+				generated.Annotations["generated-annotation"] = "generated-value"
+
+				_, s := createAuthCRAndSecondaryReconciler(cl, nil)
+				modified, err := modifyRoute(s, ctx, observed, generated)
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(modified).To(BeTrue())
+				// Custom annotation from observed should be preserved
+				Expect(observed.Annotations).To(HaveKeyWithValue("custom-annotation", "custom-value"))
+				// Generated annotation should be present
+				Expect(observed.Annotations).To(HaveKeyWithValue("generated-annotation", "generated-value"))
+				// Generated rewrite-target should win
+				Expect(observed.Annotations).To(HaveKeyWithValue("haproxy.router.openshift.io/rewrite-target", "/generated-path"))
+			})
+		})
+
+		Context("when merging labels", func() {
+			It("should preserve custom labels from observed Route", func() {
+				observed := createTestRoute()
+				generated := createTestRoute()
+				// Add custom label to observed
+				observed.Labels["custom-label"] = "custom-value"
+
+				_, s := createAuthCRAndSecondaryReconciler(cl, nil)
+				modified, err := modifyRoute(s, ctx, observed, generated)
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(modified).To(BeFalse())
 				Expect(generated.Labels).To(HaveKeyWithValue("custom-label", "custom-value"))
 			})
 
 			It("should apply common labels from GetCommonLabels", func() {
-				_, err := modifyRoute(s, ctx, observed, generated)
+				observed := createTestRoute()
+				generated := createTestRoute()
+				// Add custom label to observed to create a difference
+				observed.Labels["custom-label"] = "custom-value"
+				// Remove labels added by GetCommonLabels
+				delete(observed.Labels, "app.kubernetes.io/part-of")
+				delete(observed.Labels, "app.kubernetes.io/managed-by")
+
+				_, s := createAuthCRAndSecondaryReconciler(cl, nil)
+				modified, err := modifyRoute(s, ctx, observed, generated)
+
 				Expect(err).ToNot(HaveOccurred())
-				// Common labels should override observed labels
-				Expect(generated.Labels).To(HaveKeyWithValue("app.kubernetes.io/part-of", "im"))
-				Expect(generated.Labels).To(HaveKeyWithValue("app.kubernetes.io/managed-by", "ibm-iam-operator"))
+				Expect(modified).To(BeTrue())
+				// Common labels should be present
+				Expect(observed.Labels).To(HaveKeyWithValue("app.kubernetes.io/part-of", "im"))
+				Expect(observed.Labels).To(HaveKeyWithValue("app.kubernetes.io/managed-by", "ibm-iam-operator"))
 			})
 
 			It("should override observed common labels with GetCommonLabels values", func() {
-				// Observed has old-value for part-of, but GetCommonLabels should override it
-				_, err := modifyRoute(s, ctx, observed, generated)
+				observed := createTestRoute()
+				generated := createTestRoute()
+				// Set up observed with old-value for part-of that should be overridden
+				observed.Labels["app.kubernetes.io/part-of"] = "old-value"
+				observed.Labels["app.kubernetes.io/managed-by"] = "old-value"
+
+				_, s := createAuthCRAndSecondaryReconciler(cl, nil)
+				modified, err := modifyRoute(s, ctx, observed, generated)
+
 				Expect(err).ToNot(HaveOccurred())
+				Expect(modified).To(BeTrue(), "should return modified=true when labels differ")
+				Expect(observed.Labels["app.kubernetes.io/part-of"]).To(Equal("im"))
+				Expect(observed.Labels["app.kubernetes.io/part-of"]).ToNot(Equal("old-value"))
+				Expect(observed.Labels["app.kubernetes.io/managed-by"]).To(Equal("ibm-iam-operator"))
+				Expect(observed.Labels["app.kubernetes.io/managed-by"]).ToNot(Equal("old-value"))
+			})
+
+			It("should have all three types of labels: custom, generated, and common and return modified=true", func() {
+				observed := createTestRoute()
+				generated := createTestRoute()
+				// Add custom label to observed
+				observed.Labels["custom-label"] = "custom-value"
+				delete(observed.Labels, "app.kubernetes.io/part-of")
+				delete(observed.Labels, "app.kubernetes.io/managed-by")
+				delete(observed.Labels, "app")
+
+				_, s := createAuthCRAndSecondaryReconciler(cl, nil)
+				modified, err := modifyRoute(s, ctx, observed, generated)
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(modified).To(BeTrue(), "should return modified=true when labels differ")
+				// Custom from observed
+				Expect(generated.Labels).To(HaveKeyWithValue("custom-label", "custom-value"))
+				// Common labels (overriding any conflicts)
+				Expect(observed.Labels).To(HaveKeyWithValue("app.kubernetes.io/part-of", "im"))
+				Expect(observed.Labels).To(HaveKeyWithValue("app.kubernetes.io/managed-by", "ibm-iam-operator"))
+				Expect(observed.Labels).To(HaveKeyWithValue("app", "im"))
+			})
+		})
+
+		Context("when testing label precedence rules", func() {
+			It("should allow common labels to override observed labels and return modified=true", func() {
+				observed := createTestRoute()
+				generated := createTestRoute()
+				// Set up observed with a common label that should be overridden
+				observed.Labels["custom-label"] = "custom-value"
+				observed.Labels["app.kubernetes.io/part-of"] = "old-value"
+
+				_, s := createAuthCRAndSecondaryReconciler(cl, nil)
+				modified, err := modifyRoute(s, ctx, observed, generated)
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(modified).To(BeTrue(), "should return modified=true when labels differ")
+				// Common label should override observed value
 				Expect(generated.Labels["app.kubernetes.io/part-of"]).To(Equal("im"))
 				Expect(generated.Labels["app.kubernetes.io/part-of"]).ToNot(Equal("old-value"))
 			})
 
-			It("should have all three types of labels: custom, generated, and common", func() {
-				_, err := modifyRoute(s, ctx, observed, generated)
+			It("should preserve custom labels while overriding common labels and return modified=true", func() {
+				observed := createTestRoute()
+				generated := createTestRoute()
+				// Set up observed with a common label that should be overridden
+				observed.Labels["custom-label"] = "custom-value"
+				observed.Labels["app.kubernetes.io/part-of"] = "old-value"
+
+				_, s := createAuthCRAndSecondaryReconciler(cl, nil)
+				modified, err := modifyRoute(s, ctx, observed, generated)
+
 				Expect(err).ToNot(HaveOccurred())
-				// Custom from observed
+				Expect(modified).To(BeTrue(), "should return modified=true when labels differ")
+				// Custom label should be preserved
 				Expect(generated.Labels).To(HaveKeyWithValue("custom-label", "custom-value"))
-				// Common labels (overriding any conflicts)
+				// Common label should be overridden
+				Expect(generated.Labels).To(HaveKeyWithValue("app.kubernetes.io/part-of", "im"))
+			})
+		})
+
+		Context("when Authentication CR has .spec.labels set", func() {
+			It("should apply labels from .spec.labels to the generated route and return modified=true", func() {
+				observed := createTestRoute()
+				generated := createTestRoute()
+				// Add custom label to observed
+				observed.Labels["custom-label"] = "custom-value"
+
+				customLabels := map[string]string{
+					"custom-label-1": "value-1",
+					"custom-label-2": "value-2",
+					"environment":    "production",
+				}
+				authCR, s := createAuthCRAndSecondaryReconciler(cl, customLabels)
+				// Simulate what generateRouteObject does with labels
+				commonLabel := map[string]string{"app": "im"}
+				testGenerated := generated.DeepCopy()
+				testGenerated.Labels = ctrlcommon.MergeMaps(nil, authCR.Spec.Labels, commonLabel, ctrlcommon.GetCommonLabels())
+
+				modified, err := modifyRoute(s, ctx, observed, testGenerated)
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(modified).To(BeTrue(), "should return modified=true when labels differ")
+				// Verify that labels from .spec.labels are present in generated route
+				Expect(testGenerated.Labels).To(HaveKeyWithValue("custom-label-1", "value-1"))
+				Expect(testGenerated.Labels).To(HaveKeyWithValue("custom-label-2", "value-2"))
+				Expect(testGenerated.Labels).To(HaveKeyWithValue("environment", "production"))
+				// Verify common labels are still present
+				Expect(testGenerated.Labels).To(HaveKeyWithValue("app", "im"))
+				Expect(testGenerated.Labels).To(HaveKeyWithValue("app.kubernetes.io/part-of", "im"))
+				Expect(testGenerated.Labels).To(HaveKeyWithValue("app.kubernetes.io/managed-by", "ibm-iam-operator"))
+				// Verify custom labels from observed are preserved
+				Expect(testGenerated.Labels).To(HaveKeyWithValue("custom-label", "custom-value"))
+			})
+
+			It("should allow .spec.labels to override observed custom labels and return modified=true", func() {
+				observed := createTestRoute()
+				generated := createTestRoute()
+				// Set up observed with labels that will be overridden
+				observed.Labels["custom-label"] = "custom-value"
+				observed.Labels["override-me"] = "old-value"
+
+				customLabels := map[string]string{
+					"override-me": "new-value",
+				}
+				authCR, s := createAuthCRAndSecondaryReconciler(cl, customLabels)
+				// Simulate what generateRouteObject does with labels
+				commonLabel := map[string]string{"app": "im"}
+				testGenerated := generated.DeepCopy()
+				testGenerated.Labels = ctrlcommon.MergeMaps(nil, authCR.Spec.Labels, commonLabel, ctrlcommon.GetCommonLabels())
+
+				modified, err := modifyRoute(s, ctx, observed, testGenerated)
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(modified).To(BeTrue(), "should return modified=true when labels differ")
+				// Verify that .spec.labels override observed custom labels
+				Expect(testGenerated.Labels).To(HaveKeyWithValue("override-me", "new-value"))
+				Expect(testGenerated.Labels["override-me"]).ToNot(Equal("old-value"))
+			})
+
+			It("should not allow .spec.labels to override common labels and return modified=true", func() {
+				observed := createTestRoute()
+				generated := createTestRoute()
+				// Add custom label to observed
+				observed.Labels["custom-label"] = "custom-value"
+
+				customLabels := map[string]string{
+					"app":                          "should-not-override",
+					"app.kubernetes.io/part-of":    "should-not-override",
+					"app.kubernetes.io/managed-by": "should-not-override",
+				}
+				_, s := createAuthCRAndSecondaryReconciler(cl, customLabels)
+				// Simulate what generateRouteObject does with labels
+
+				modified, err := modifyRoute(s, ctx, observed, generated)
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(modified).To(BeFalse())
+				// Verify that common labels are not overridden by .spec.labels
+				Expect(generated.Labels).To(HaveKeyWithValue("app", "im"))
 				Expect(generated.Labels).To(HaveKeyWithValue("app.kubernetes.io/part-of", "im"))
 				Expect(generated.Labels).To(HaveKeyWithValue("app.kubernetes.io/managed-by", "ibm-iam-operator"))
+			})
+
+			It("should preserve custom labels from observed route when .spec.labels is empty", func() {
+				observed := createTestRoute()
+				generated := createTestRoute()
+				// Add custom label to observed
+				observed.Labels["custom-label"] = "custom-value"
+
+				emptyLabels := map[string]string{}
+				_, s := createAuthCRAndSecondaryReconciler(cl, emptyLabels)
+
+				modified, err := modifyRoute(s, ctx, observed, generated)
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(modified).To(BeFalse())
+				// Verify common labels are present
+				Expect(generated.Labels).To(HaveKeyWithValue("app", "im"))
+				Expect(generated.Labels).To(HaveKeyWithValue("app.kubernetes.io/part-of", "im"))
+				Expect(generated.Labels).To(HaveKeyWithValue("app.kubernetes.io/managed-by", "ibm-iam-operator"))
+				// Verify custom labels from observed are preserved
+				Expect(generated.Labels).To(HaveKeyWithValue("custom-label", "custom-value"))
+			})
+
+			It("should preserve custom labels from observed route when .spec.labels is nil", func() {
+				observed := createTestRoute()
+				generated := createTestRoute()
+				// Add custom label to observed
+				observed.Labels["custom-label"] = "custom-value"
+
+				_, s := createAuthCRAndSecondaryReconciler(cl, nil)
+				modified, err := modifyRoute(s, ctx, observed, generated)
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(modified).To(BeFalse(), "should return modified=true when labels differ")
+				// Verify common labels are present
+				Expect(generated.Labels).To(HaveKeyWithValue("app", "im"))
+				Expect(generated.Labels).To(HaveKeyWithValue("app.kubernetes.io/part-of", "im"))
+				Expect(generated.Labels).To(HaveKeyWithValue("app.kubernetes.io/managed-by", "ibm-iam-operator"))
+				// Verify custom labels from observed are preserved
+				Expect(generated.Labels).To(HaveKeyWithValue("custom-label", "custom-value"))
 			})
 		})
 
 		Context("when routes differ", func() {
 			It("should mark as modified and update observed route", func() {
+				observed := createTestRoute()
+				generated := createTestRoute()
 				observed.Spec.Host = "different.example.com"
+
+				_, s := createAuthCRAndSecondaryReconciler(cl, nil)
 				modified, err := modifyRoute(s, ctx, observed, generated)
+
 				Expect(err).ToNot(HaveOccurred())
-				Expect(modified).To(BeTrue())
+				Expect(modified).To(BeTrue(), "should return modified=true when routes differ")
 				Expect(observed.Spec.Host).To(Equal(generated.Spec.Host))
 				Expect(observed.Labels).To(Equal(generated.Labels))
 			})
 		})
 
 		Context("when routes are equal after merging", func() {
-			It("should not mark as modified", func() {
+			It("should not modify cluster state when Routes are identical after merge", func() {
+				observed := createTestRoute()
+				generated := createTestRoute()
 				// Make observed match what generated will become after merging
 				// Note: observed also needs the "app" label that's in the generated route from generateRouteObject
 				observed.Annotations = map[string]string{
 					"custom-annotation":                          "custom-value",
-					"haproxy.router.openshift.io/rewrite-target": "/new",
+					"haproxy.router.openshift.io/rewrite-target": "/generated-path",
 					"generated-annotation":                       "generated-value",
 				}
 				observed.Labels = map[string]string{
@@ -1306,13 +1572,12 @@ var _ = Describe("Route handling", func() {
 					"app.kubernetes.io/part-of":    "im",
 					"app.kubernetes.io/managed-by": "ibm-iam-operator",
 				}
-				// Also update generated to have the custom label so they match after merge
-				generated.Labels["custom-label"] = "custom-value"
-				generated.Annotations["custom-annotation"] = "custom-value"
 
+				_, s := createAuthCRAndSecondaryReconciler(cl, nil)
 				modified, err := modifyRoute(s, ctx, observed, generated)
+
 				Expect(err).ToNot(HaveOccurred())
-				Expect(modified).To(BeFalse())
+				Expect(modified).To(BeFalse(), "should return modified=false when routes are identical after merge")
 			})
 		})
 	})

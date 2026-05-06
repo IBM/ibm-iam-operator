@@ -40,7 +40,7 @@ metadata:
               "resources": {
                 "limits": {
                   "cpu": "1000m",
-                  "ephemeral-storage": "600Mi",
+                  "ephemeral-storage": "1500Mi",
                   "memory": "1Gi"
                 },
                 "requests": {

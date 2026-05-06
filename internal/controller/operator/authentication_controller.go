@@ -81,6 +81,7 @@ var memory350 = resource.NewQuantity(350*1024*1024, resource.BinarySI)   // 350M
 var memory400 = resource.NewQuantity(400*1024*1024, resource.BinarySI)   // 400Mi
 var memory620 = resource.NewQuantity(620*1024*1024, resource.BinarySI)   // 620Mi
 var memory750 = resource.NewQuantity(750*1024*1024, resource.BinarySI)   // 750Mi
+var memory900 = resource.NewQuantity(900*1024*1024, resource.BinarySI)   // 900Mi
 var memory1024 = resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1024Mi
 
 // opreqWait is used for the resources that interact with and originate from OperandRequests

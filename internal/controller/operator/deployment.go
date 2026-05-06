@@ -1060,7 +1060,7 @@ func buildAuthSvcVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCN
 			Name: "liberty-logs-vol",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
-					SizeLimit: memory150,
+					SizeLimit: memory900,
 				},
 			},
 		},

@@ -20,3 +20,6 @@ rules:
   quoted-strings: disable
   trailing-spaces: disable
   truthy: disable
+ignore: |
+  **/templates/*.yaml
+  **/templates/*.yml

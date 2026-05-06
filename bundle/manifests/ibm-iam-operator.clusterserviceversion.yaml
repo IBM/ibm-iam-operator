@@ -156,7 +156,7 @@ metadata:
     categories: Security
     certified: "false"
     containerImage: icr.io/cpopen/ibm-iam-operator:4.18.0
-    createdAt: "2026-04-10T13:27:35Z"
+    createdAt: "2026-04-30T16:40:05Z"
     description: The IAM operator provides a simple Kubernetes CRD-Based API to manage the lifecycle of IAM services. With this operator, you can simply deploy and upgrade the IAM services
     features.operators.openshift.io/disconnected: "true"
     features.operators.openshift.io/fips-compliant: "true"
@@ -323,21 +323,19 @@ spec:
                     image: icr.io/cpopen/ibm-iam-operator:4.18.0
                     imagePullPolicy: IfNotPresent
                     livenessProbe:
-                      failureThreshold: 10
+                      failureThreshold: 3
                       httpGet:
                         path: /healthz
                         port: 8081
-                      initialDelaySeconds: 120
-                      periodSeconds: 60
-                      timeoutSeconds: 10
+                      periodSeconds: 20
+                      timeoutSeconds: 5
                     name: ibm-iam-operator
                     readinessProbe:
-                      failureThreshold: 10
+                      failureThreshold: 3
                       httpGet:
                         path: /readyz
                         port: 8081
-                      initialDelaySeconds: 3
-                      periodSeconds: 20
+                      periodSeconds: 10
                       timeoutSeconds: 3
                     resources:
                       limits:
@@ -356,6 +354,13 @@ spec:
                       readOnlyRootFilesystem: true
                       seccompProfile:
                         type: RuntimeDefault
+                    startupProbe:
+                      failureThreshold: 24
+                      httpGet:
+                        path: /readyz
+                        port: 8081
+                      periodSeconds: 10
+                      timeoutSeconds: 3
                 securityContext:
                   seccompProfile:
                     type: RuntimeDefault

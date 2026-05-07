@@ -274,22 +274,27 @@ spec:
         image: {{ .Values.cpfs.imagePullPrefix | default .Values.global.imagePullPrefix }}/{{ .Values.cpfs.imageRegistryNamespaceOperator }}/ibm-iam-operator:{{ .Values.operator.imageTag }}
         imagePullPolicy: {{ .Values.global.imagePullPolicy }}
         name: ibm-iam-operator
+        startupProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          failureThreshold: 24
+          periodSeconds: 10
+          timeoutSeconds: 3
         livenessProbe:
-            failureThreshold: 10
-            httpGet:
-              path: /healthz
-              port: 8081
-            initialDelaySeconds: 120
-            periodSeconds: 60
-            timeoutSeconds: 10
+          httpGet:
+            path: /healthz
+            port: 8081
+          failureThreshold: 3
+          periodSeconds: 20
+          timeoutSeconds: 5
         readinessProbe:
-            failureThreshold: 10
-            httpGet:
-              path: /readyz
-              port: 8081
-            initialDelaySeconds: 3
-            periodSeconds: 20
-            timeoutSeconds: 3
+          httpGet:
+            path: /readyz
+            port: 8081
+          failureThreshold: 3
+          periodSeconds: 10
+          timeoutSeconds: 3
         resources:
           limits:
             cpu: 25m

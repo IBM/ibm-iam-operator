@@ -2026,7 +2026,7 @@ var _ = Describe("ConfigMap handling", func() {
 			Expect(generated.Data["platform-oidc-registration.json"]).ToNot(BeEmpty())
 		})
 
-		It("replaces observed data with generated when observed JSON is malformed", func() {
+		It("returns error when observed JSON is malformed", func() {
 			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
 				WithName("registration-json").
 				WithNamespace(authCR.Namespace).
@@ -2044,9 +2044,9 @@ var _ = Describe("ConfigMap handling", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			updated, err := updateRegistrationJSON(resource, ctx, observed, generated)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(updated).To(BeTrue())
-			Expect(observed.Data["platform-oidc-registration.json"]).To(Equal(generated.Data["platform-oidc-registration.json"]))
+			Expect(err).To(HaveOccurred())
+			Expect(updated).To(BeFalse())
+			Expect(err.Error()).To(ContainSubstring("invalid character"))
 		})
 
 		It("appends missing URIs to trusted_uri_prefixes", func() {
@@ -2643,7 +2643,7 @@ var _ = Describe("ConfigMap handling", func() {
 			Expect(observed.Annotations[AnnotationSHA1Sum]).ToNot(BeEmpty())
 		})
 
-		It("updateRegistrationJSON handles malformed JSON and sets new checksum", func() {
+		It("updateRegistrationJSON returns error for malformed JSON", func() {
 			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
 				WithName("registration-json").
 				WithNamespace(authCR.Namespace).
@@ -2666,10 +2666,9 @@ var _ = Describe("ConfigMap handling", func() {
 			}
 
 			updated, err := updateRegistrationJSON(resource, ctx, observed, generated)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(updated).To(BeTrue())
-			Expect(observed.Data["platform-oidc-registration.json"]).To(Equal(generated.Data["platform-oidc-registration.json"]))
-			Expect(observed.Annotations[AnnotationSHA1Sum]).To(Equal(generated.Annotations[AnnotationSHA1Sum]))
+			Expect(err).To(HaveOccurred())
+			Expect(updated).To(BeFalse())
+			Expect(err.Error()).To(ContainSubstring("invalid character"))
 		})
 	})
 

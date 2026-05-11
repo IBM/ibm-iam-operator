@@ -337,17 +337,7 @@ func updateRegistrationJSON(_ common.SecondaryReconciler, ctx context.Context, o
 	observedJSON := &registrationJSONData{}
 	if err = json.Unmarshal([]byte(observed.Data["platform-oidc-registration.json"]), observedJSON); err != nil {
 		// If observed data doesn't unmarshal properly, set it to generated content
-		log.Error(err, "Observed JSON did not unmarshal properly; resetting to default")
-		observed.Data["platform-oidc-registration.json"] = generated.Data["platform-oidc-registration.json"]
-		if observed.Annotations == nil {
-			observed.Annotations = make(map[string]string)
-		}
-		observed.Annotations[AnnotationSHA1Sum] = generated.Annotations[AnnotationSHA1Sum]
-		updated = true
-		err = nil
-		if !reflect.DeepEqual(generated.GetOwnerReferences(), observed.GetOwnerReferences()) {
-			observed.OwnerReferences = generated.GetOwnerReferences()
-		}
+		log.Error(err, "Observed JSON did not unmarshal properly; blocking reconciliation until the JSON is fixed or the ConfigMap is deleted.")
 		return
 	}
 	generatedJSON := &registrationJSONData{}

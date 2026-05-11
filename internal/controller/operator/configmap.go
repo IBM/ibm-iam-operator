@@ -356,6 +356,18 @@ func updateRegistrationJSON(_ common.SecondaryReconciler, ctx context.Context, o
 		return
 	}
 
+	// Helper function to validate a URI
+	validateURI := func(uri string) error {
+		parsed, parseErr := url.Parse(uri)
+		if parseErr != nil {
+			return fmt.Errorf("invalid URI format: %w", parseErr)
+		}
+		if parsed.Scheme == "" || parsed.Host == "" {
+			return fmt.Errorf("URI must have a scheme and host")
+		}
+		return nil
+	}
+
 	// Helper function to check if a URI exists in a slice
 	containsURI := func(slice []string, uri string) bool {
 		for _, item := range slice {
@@ -366,9 +378,42 @@ func updateRegistrationJSON(_ common.SecondaryReconciler, ctx context.Context, o
 		return false
 	}
 
+	// Validate all URIs in observedJSON
+	var invalidURIs []string
+	for _, uri := range observedJSON.TrustedURIPrefixes {
+		if validateErr := validateURI(uri); validateErr != nil {
+			log.Error(validateErr, "Invalid URI in trusted_uri_prefixes", "uri", uri)
+			invalidURIs = append(invalidURIs, fmt.Sprintf("trusted_uri_prefixes: %q - %v", uri, validateErr))
+		}
+	}
+	for _, uri := range observedJSON.RedirectURIs {
+		if validateErr := validateURI(uri); validateErr != nil {
+			log.Error(validateErr, "Invalid URI in redirect_uris", "uri", uri)
+			invalidURIs = append(invalidURIs, fmt.Sprintf("redirect_uris: %q - %v", uri, validateErr))
+		}
+	}
+	for _, uri := range observedJSON.PostLogoutRedirectURIs {
+		if validateErr := validateURI(uri); validateErr != nil {
+			log.Error(validateErr, "Invalid URI in post_logout_redirect_uris", "uri", uri)
+			invalidURIs = append(invalidURIs, fmt.Sprintf("post_logout_redirect_uris: %q - %v", uri, validateErr))
+		}
+	}
+
+	// If there are invalid URIs, return an error
+	if len(invalidURIs) > 0 {
+		err = fmt.Errorf("invalid URIs found in registration JSON: %s", strings.Join(invalidURIs, "; "))
+		return false, err
+	}
+
 	// Check and append missing URIs in trusted_uri_prefixes
 	for _, uri := range generatedJSON.TrustedURIPrefixes {
 		if !containsURI(observedJSON.TrustedURIPrefixes, uri) {
+			// Validate the URI before adding
+			if validateErr := validateURI(uri); validateErr != nil {
+				log.Error(validateErr, "Invalid URI in generated trusted_uri_prefixes", "uri", uri)
+				err = fmt.Errorf("invalid URI in generated trusted_uri_prefixes: %q - %w", uri, validateErr)
+				return false, err
+			}
 			observedJSON.TrustedURIPrefixes = append(observedJSON.TrustedURIPrefixes, uri)
 			updated = true
 		}
@@ -377,6 +422,12 @@ func updateRegistrationJSON(_ common.SecondaryReconciler, ctx context.Context, o
 	// Check and append missing URIs in redirect_uris
 	for _, uri := range generatedJSON.RedirectURIs {
 		if !containsURI(observedJSON.RedirectURIs, uri) {
+			// Validate the URI before adding
+			if validateErr := validateURI(uri); validateErr != nil {
+				log.Error(validateErr, "Invalid URI in generated redirect_uris", "uri", uri)
+				err = fmt.Errorf("invalid URI in generated redirect_uris: %q - %w", uri, validateErr)
+				return false, err
+			}
 			observedJSON.RedirectURIs = append(observedJSON.RedirectURIs, uri)
 			updated = true
 		}
@@ -385,6 +436,12 @@ func updateRegistrationJSON(_ common.SecondaryReconciler, ctx context.Context, o
 	// Check and append missing URIs in post_logout_redirect_uris
 	for _, uri := range generatedJSON.PostLogoutRedirectURIs {
 		if !containsURI(observedJSON.PostLogoutRedirectURIs, uri) {
+			// Validate the URI before adding
+			if validateErr := validateURI(uri); validateErr != nil {
+				log.Error(validateErr, "Invalid URI in generated post_logout_redirect_uris", "uri", uri)
+				err = fmt.Errorf("invalid URI in generated post_logout_redirect_uris: %q - %w", uri, validateErr)
+				return false, err
+			}
 			observedJSON.PostLogoutRedirectURIs = append(observedJSON.PostLogoutRedirectURIs, uri)
 			updated = true
 		}

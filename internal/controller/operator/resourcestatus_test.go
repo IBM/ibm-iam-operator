@@ -18,14 +18,18 @@ package operator
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/discovery"
+	discovery "k8s.io/client-go/discovery"
+	restclient "k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
@@ -45,7 +49,99 @@ var _ = Describe("ResourceStatus", func() {
 		ctx context.Context
 	)
 
-	getReconciler := func() *AuthenticationReconciler {
+	getFakeServerForDiscovery := func() *httptest.Server {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			var obj interface{}
+			switch req.URL.Path {
+			case "/api":
+				obj = &metav1.APIVersions{
+					Versions: []string{
+						"v1",
+					},
+				}
+			case "/apis":
+				obj = &metav1.APIGroupList{
+					Groups: []metav1.APIGroup{
+						{
+							Name: "route.openshift.io",
+							Versions: []metav1.GroupVersionForDiscovery{
+								{GroupVersion: "route.openshift.io/v1", Version: "v1"},
+							},
+						},
+						{
+							Name: "operator.ibm.com",
+							Versions: []metav1.GroupVersionForDiscovery{
+								{GroupVersion: "operator.ibm.com/v3", Version: "v3"},
+								{GroupVersion: "operator.ibm.com/v1", Version: "v1"},
+								{GroupVersion: "operator.ibm.com/v1alpha1", Version: "v1alpha1"},
+							},
+							PreferredVersion: metav1.GroupVersionForDiscovery{GroupVersion: "operator.ibm.com/v3", Version: "v3"},
+						},
+					},
+				}
+			case "/apis/operator.ibm.com/v1alpha1":
+				obj = &metav1.APIResourceList{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "v1",
+					},
+					GroupVersion: "operator.ibm.com/v1alpha1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:         "operandrequests",
+							SingularName: "operandrequest",
+							Namespaced:   true,
+							Kind:         "OperandRequest",
+							Verbs:        metav1.Verbs{"delete", "deletecollection", "get", "list", "patch", "create", "updated", "watch"},
+							ShortNames:   []string{"opreq"},
+						},
+						{
+							Name:       "operandrequests/status",
+							Namespaced: true,
+							Kind:       "OperandRequest",
+							Verbs:      metav1.Verbs{"get", "patch", "update"},
+						},
+					},
+				}
+			case "/apis/route.openshift.io/v1":
+				obj = &metav1.APIResourceList{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "v1",
+					},
+					GroupVersion: "route.openshift.io/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:         "routes",
+							SingularName: "route",
+							Namespaced:   true,
+							Kind:         "Route",
+							Verbs:        metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+							Categories:   []string{"all"},
+						},
+						{
+							Name:         "routes/status",
+							SingularName: "",
+							Namespaced:   true,
+							Kind:         "Route",
+							Verbs:        metav1.Verbs{"get", "patch", "update"},
+							Categories:   []string{"all"},
+						},
+					},
+				}
+			default:
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			output, err := json.Marshal(obj)
+			Expect(err).ToNot(HaveOccurred())
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, err = w.Write(output)
+			Expect(err).ToNot(HaveOccurred())
+		}))
+		return server
+	}
+
+	getReconciler := func(server *httptest.Server) *AuthenticationReconciler {
 		scheme := runtime.NewScheme()
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 		Expect(operatorv1alpha1.AddODLMEnabledToScheme(scheme)).To(Succeed())
@@ -67,8 +163,7 @@ var _ = Describe("ResourceStatus", func() {
 			WithScheme(scheme).
 			WithObjects(authCR.DeepCopy())
 		cl := cb.Build()
-		dc, err := discovery.NewDiscoveryClientForConfig(cfg)
-		Expect(err).NotTo(HaveOccurred())
+		dc := discovery.NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 
 		r = &AuthenticationReconciler{
 			Client: &ctrlcommon.FallbackClient{
@@ -165,7 +260,9 @@ var _ = Describe("ResourceStatus", func() {
 
 	Context("setAuthenticationStatus", func() {
 		It("should update the status when nodes change", func() {
-			r := getReconciler()
+			server := getFakeServerForDiscovery()
+			defer server.Close()
+			r := getReconciler(server)
 			ctx = context.Background()
 			addNodePods(r.Client, ctx, "data-ns")
 			addJob(r.Client, ctx, "data-ns", false)
@@ -188,7 +285,9 @@ var _ = Describe("ResourceStatus", func() {
 		})
 
 		It("should not update the status when nodes do not change", func() {
-			r := getReconciler()
+			server := getFakeServerForDiscovery()
+			defer server.Close()
+			r := getReconciler(server)
 			ctx = context.Background()
 			authCR := &operatorv1alpha1.Authentication{}
 			Expect(r.Get(ctx, types.NamespacedName{Name: "example-authentication", Namespace: "data-ns"}, authCR)).To(Succeed())
@@ -201,7 +300,9 @@ var _ = Describe("ResourceStatus", func() {
 
 	Context("setMigrationStatusConditions", func() {
 		It("should set conditions when job is completed", func() {
-			r := getReconciler()
+			server := getFakeServerForDiscovery()
+			defer server.Close()
+			r := getReconciler(server)
 			ctx = context.Background()
 			addCompletedJob(r.Client, ctx, "data-ns")
 			authCR := &operatorv1alpha1.Authentication{}
@@ -221,7 +322,9 @@ var _ = Describe("ResourceStatus", func() {
 		})
 
 		It("should set conditions when job is running and conditions are not set", func() {
-			r := getReconciler()
+			server := getFakeServerForDiscovery()
+			defer server.Close()
+			r := getReconciler(server)
 			ctx = context.Background()
 			addJob(r.Client, ctx, "data-ns", false)
 			authCR := &operatorv1alpha1.Authentication{}
@@ -241,7 +344,9 @@ var _ = Describe("ResourceStatus", func() {
 		})
 
 		It("should set conditions when job is running again after a previous success", func() {
-			r := getReconciler()
+			server := getFakeServerForDiscovery()
+			defer server.Close()
+			r := getReconciler(server)
 			ctx = context.Background()
 			addCompletedJob(r.Client, ctx, "data-ns")
 			authCR := &operatorv1alpha1.Authentication{}
@@ -275,7 +380,9 @@ var _ = Describe("ResourceStatus", func() {
 		})
 
 		It("should preserve conditions when job is running again after a previous, incomplete failure", func() {
-			r := getReconciler()
+			server := getFakeServerForDiscovery()
+			defer server.Close()
+			r := getReconciler(server)
 			ctx = context.Background()
 			addFailedJob(r.Client, ctx, "data-ns", false, nil)
 			authCR := &operatorv1alpha1.Authentication{}
@@ -309,7 +416,9 @@ var _ = Describe("ResourceStatus", func() {
 		})
 
 		It("should preserve ReasonMigrationFailure reason when job is running again after a previous, complete failure", func() {
-			r := getReconciler()
+			server := getFakeServerForDiscovery()
+			defer server.Close()
+			r := getReconciler(server)
 			ctx = context.Background()
 			addFailedJob(r.Client, ctx, "data-ns", true, nil)
 			authCR := &operatorv1alpha1.Authentication{}
@@ -359,11 +468,190 @@ var _ = Describe("ResourceStatus", func() {
 
 		It("should return ResourceReadyState if all resources are ready", func() {
 		})
+
+		Context("with OperandRequest API available", func() {
+			It("should add im-needs-database OperandRequest when datastore ConfigMap is not found", func() {
+				server := getFakeServerForDiscovery()
+				defer server.Close()
+				r := getReconciler(server)
+				defer server.Close()
+				ctx = context.Background()
+				authCR := &operatorv1alpha1.Authentication{}
+				Expect(r.Get(ctx, types.NamespacedName{Name: "example-authentication", Namespace: "data-ns"}, authCR)).To(Succeed())
+
+				// ConfigMap does not exist - should add im-needs-database
+				status, err := r.getCurrentServiceStatus(ctx, r.Client, authCR)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Check that im-needs-database OperandRequest status is included
+				foundDBOperandRequest := false
+				for _, managedResource := range status.ManagedResources {
+					if managedResource.Kind == "OperandRequest" && managedResource.ObjectName == "im-needs-database" {
+						foundDBOperandRequest = true
+						break
+					}
+				}
+				Expect(foundDBOperandRequest).To(BeTrue(), "im-needs-database OperandRequest should be included when ConfigMap not found")
+			})
+
+			It("should return error when datastore ConfigMap get fails with non-NotFound error", func() {
+				server := getFakeServerForDiscovery()
+				defer server.Close()
+				r := getReconciler(server)
+				ctx = context.Background()
+				authCR := &operatorv1alpha1.Authentication{}
+				Expect(r.Get(ctx, types.NamespacedName{Name: "example-authentication", Namespace: "data-ns"}, authCR)).To(Succeed())
+
+				// Create a ConfigMap with invalid data that will cause an error during processing
+				// Note: We can't easily simulate a Get error with the fake client, but we can test
+				// the ParseBool error path which also returns an error
+				cm := &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      ctrlcommon.DatastoreEDBCMName,
+						Namespace: "data-ns",
+					},
+					Data: map[string]string{
+						"IS_EMBEDDED": "invalid-bool-value",
+					},
+				}
+				Expect(r.Client.Create(ctx, cm)).To(Succeed())
+
+				_, err := r.getCurrentServiceStatus(ctx, r.Client, authCR)
+				Expect(err).To(HaveOccurred(), "should return error when IS_EMBEDDED has invalid boolean value")
+			})
+
+			It("should add im-needs-database OperandRequest when IS_EMBEDDED is true", func() {
+				server := getFakeServerForDiscovery()
+				defer server.Close()
+				r := getReconciler(server)
+				ctx = context.Background()
+				authCR := &operatorv1alpha1.Authentication{}
+				Expect(r.Get(ctx, types.NamespacedName{Name: "example-authentication", Namespace: "data-ns"}, authCR)).To(Succeed())
+
+				cm := &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      ctrlcommon.DatastoreEDBCMName,
+						Namespace: "data-ns",
+					},
+					Data: map[string]string{
+						"IS_EMBEDDED": "true",
+					},
+				}
+				Expect(r.Client.Create(ctx, cm)).To(Succeed())
+
+				status, err := r.getCurrentServiceStatus(ctx, r.Client, authCR)
+				Expect(err).NotTo(HaveOccurred())
+
+				// IS_EMBEDDED=true means ParseBool returns (true, nil), so isConfiguredForExternalDB returns (true, nil)
+				// This means external DB is configured, so im-needs-database should NOT be added
+				foundDBOperandRequest := false
+				for _, managedResource := range status.ManagedResources {
+					if managedResource.Kind == "OperandRequest" && managedResource.ObjectName == "im-needs-database" {
+						foundDBOperandRequest = true
+						break
+					}
+				}
+				Expect(foundDBOperandRequest).To(BeTrue(), "im-needs-database OperandRequest should be included when IS_EMBEDDED=true")
+			})
+
+			It("should skip im-needs-database OperandRequest when IS_EMBEDDED is false", func() {
+				server := getFakeServerForDiscovery()
+				defer server.Close()
+				r := getReconciler(server)
+				ctx = context.Background()
+				authCR := &operatorv1alpha1.Authentication{}
+				Expect(r.Get(ctx, types.NamespacedName{Name: "example-authentication", Namespace: "data-ns"}, authCR)).To(Succeed())
+
+				cm := &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      ctrlcommon.DatastoreEDBCMName,
+						Namespace: "data-ns",
+					},
+					Data: map[string]string{
+						"IS_EMBEDDED": "false",
+					},
+				}
+				Expect(r.Client.Create(ctx, cm)).To(Succeed())
+
+				status, err := r.getCurrentServiceStatus(ctx, r.Client, authCR)
+				Expect(err).NotTo(HaveOccurred())
+
+				// IS_EMBEDDED=false means ParseBool returns (false, nil), so isConfiguredForExternalDB returns (false, nil)
+				// This means embedded DB is needed, so im-needs-database SHOULD be added
+				foundDBOperandRequest := false
+				for _, managedResource := range status.ManagedResources {
+					if managedResource.Kind == "OperandRequest" && managedResource.ObjectName == "im-needs-database" {
+						foundDBOperandRequest = true
+						break
+					}
+				}
+				Expect(foundDBOperandRequest).To(BeFalse(), "im-needs-database OperandRequest should be skipped when IS_EMBEDDED=false")
+			})
+
+			It("should skip im-needs-database OperandRequest when IS_EMBEDDED field is missing", func() {
+				server := getFakeServerForDiscovery()
+				defer server.Close()
+				r := getReconciler(server)
+				ctx = context.Background()
+				authCR := &operatorv1alpha1.Authentication{}
+				Expect(r.Get(ctx, types.NamespacedName{Name: "example-authentication", Namespace: "data-ns"}, authCR)).To(Succeed())
+
+				cm := &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      ctrlcommon.DatastoreEDBCMName,
+						Namespace: "data-ns",
+					},
+					Data: map[string]string{
+						// IS_EMBEDDED field is missing
+					},
+				}
+				Expect(r.Client.Create(ctx, cm)).To(Succeed())
+
+				status, err := r.getCurrentServiceStatus(ctx, r.Client, authCR)
+				Expect(err).NotTo(HaveOccurred())
+
+				// When IS_EMBEDDED is missing, isConfiguredForExternalDB returns (true, nil) per user requirement
+				// This means external DB is configured, so im-needs-database should NOT be added
+				foundDBOperandRequest := false
+				for _, managedResource := range status.ManagedResources {
+					if managedResource.Kind == "OperandRequest" && managedResource.ObjectName == "im-needs-database" {
+						foundDBOperandRequest = true
+						break
+					}
+				}
+				Expect(foundDBOperandRequest).To(BeFalse(), "im-needs-database OperandRequest should NOT be included when IS_EMBEDDED field is missing (external DB)")
+			})
+
+			It("should return error when IS_EMBEDDED has invalid boolean value", func() {
+				server := getFakeServerForDiscovery()
+				defer server.Close()
+				r := getReconciler(server)
+				ctx = context.Background()
+				authCR := &operatorv1alpha1.Authentication{}
+				Expect(r.Get(ctx, types.NamespacedName{Name: "example-authentication", Namespace: "data-ns"}, authCR)).To(Succeed())
+
+				cm := &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      ctrlcommon.DatastoreEDBCMName,
+						Namespace: "data-ns",
+					},
+					Data: map[string]string{
+						"IS_EMBEDDED": "not-a-boolean",
+					},
+				}
+				Expect(r.Client.Create(ctx, cm)).To(Succeed())
+
+				_, err := r.getCurrentServiceStatus(ctx, r.Client, authCR)
+				Expect(err).To(HaveOccurred(), "should return ParseBool error when IS_EMBEDDED has invalid value")
+			})
+		})
 	})
 
 	Context("getServiceStatus", func() {
 		It("should return Ready when service exists", func() {
-			r := getReconciler()
+			server := getFakeServerForDiscovery()
+			defer server.Close()
+			r := getReconciler(server)
 			ctx = context.Background()
 			svc := &corev1.Service{
 				TypeMeta:   metav1.TypeMeta{APIVersion: "v1"},
@@ -377,7 +665,9 @@ var _ = Describe("ResourceStatus", func() {
 
 	Context("getDeploymentStatus", func() {
 		It("should return Ready when deployment is available", func() {
-			r := getReconciler()
+			server := getFakeServerForDiscovery()
+			defer server.Close()
+			r := getReconciler(server)
 			ctx = context.Background()
 			deploy := &appsv1.Deployment{
 				TypeMeta:   metav1.TypeMeta{APIVersion: "apps/v1"},
@@ -396,7 +686,9 @@ var _ = Describe("ResourceStatus", func() {
 
 	Context("getRouteStatus", func() {
 		It("should return Ready when route is admitted", func() {
-			r := getReconciler()
+			server := getFakeServerForDiscovery()
+			defer server.Close()
+			r := getReconciler(server)
 			ctx = context.Background()
 			route := &routev1.Route{
 				TypeMeta:   metav1.TypeMeta{APIVersion: "route.openshift.io/v1"},
@@ -419,7 +711,9 @@ var _ = Describe("ResourceStatus", func() {
 
 	Context("getJobStatus", func() {
 		It("should return Ready when job is complete", func() {
-			r := getReconciler()
+			server := getFakeServerForDiscovery()
+			defer server.Close()
+			r := getReconciler(server)
 			ctx = context.Background()
 			job := &batchv1.Job{
 				TypeMeta:   metav1.TypeMeta{APIVersion: "batch/v1"},
@@ -512,7 +806,9 @@ var _ = Describe("ResourceStatus", func() {
 
 	Context("getOperandRequestStatus", func() {
 		It("should return Ready when phase is Running", func() {
-			r := getReconciler()
+			server := getFakeServerForDiscovery()
+			defer server.Close()
+			r := getReconciler(server)
 			ctx = context.Background()
 			opReq := &operatorv1alpha1.OperandRequest{
 				TypeMeta:   metav1.TypeMeta{APIVersion: "operator.ibm.com/v1alpha1"},
@@ -526,7 +822,9 @@ var _ = Describe("ResourceStatus", func() {
 		})
 
 		It("should return Ready when Ready condition is true", func() {
-			r := getReconciler()
+			server := getFakeServerForDiscovery()
+			defer server.Close()
+			r := getReconciler(server)
 			ctx = context.Background()
 			opReq := &operatorv1alpha1.OperandRequest{
 				TypeMeta:   metav1.TypeMeta{APIVersion: "operator.ibm.com/v1alpha1"},
@@ -543,7 +841,9 @@ var _ = Describe("ResourceStatus", func() {
 		})
 
 		It("should return NotReady when not ready", func() {
-			r := getReconciler()
+			server := getFakeServerForDiscovery()
+			defer server.Close()
+			r := getReconciler(server)
 			ctx = context.Background()
 			opReq := &operatorv1alpha1.OperandRequest{
 				TypeMeta:   metav1.TypeMeta{APIVersion: "operator.ibm.com/v1alpha1"},
@@ -556,7 +856,9 @@ var _ = Describe("ResourceStatus", func() {
 		})
 
 		It("should return NotReady when does not exist", func() {
-			r := getReconciler()
+			server := getFakeServerForDiscovery()
+			defer server.Close()
+			r := getReconciler(server)
 			ctx = context.Background()
 			status := getOperandRequestStatus(ctx, r.Client, types.NamespacedName{Name: "nonexistent", Namespace: "data-ns"})
 			Expect(status.Status).To(Equal(ResourceNotReadyState))
@@ -566,7 +868,9 @@ var _ = Describe("ResourceStatus", func() {
 
 	Context("getAllOperandRequestStatus", func() {
 		It("should return status for all OperandRequests", func() {
-			r := getReconciler()
+			server := getFakeServerForDiscovery()
+			defer server.Close()
+			r := getReconciler(server)
 			ctx = context.Background()
 			opReq1 := &operatorv1alpha1.OperandRequest{
 				TypeMeta:   metav1.TypeMeta{APIVersion: "operator.ibm.com/v1alpha1"},

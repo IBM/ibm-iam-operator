@@ -340,6 +340,54 @@ func getAllRouteStatus(ctx context.Context, k8sClient client.Client, names []str
 	return
 }
 
+func getOperandRequestStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
+	reqLogger := logf.FromContext(ctx).WithName("getOperandRequestStatus").V(1)
+	kind := "OperandRequest"
+	status = operatorv1alpha1.ManagedResourceStatus{
+		ObjectName: namespacedName.Name,
+		APIVersion: UnknownAPIVersion,
+		Namespace:  namespacedName.Namespace,
+		Kind:       kind,
+		Status:     ResourceNotReadyState,
+	}
+	operandRequest := &operatorv1alpha1.OperandRequest{}
+	err := k8sClient.Get(ctx, namespacedName, operandRequest)
+	if err != nil {
+		if k8sErrors.IsNotFound(err) {
+			reqLogger.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
+		} else {
+			reqLogger.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
+		}
+		return
+	}
+	status.APIVersion = operandRequest.APIVersion
+
+	// Check if OperandRequest is ready based on Phase
+	if operandRequest.Status.Phase == operatorv1alpha1.ClusterPhaseRunning {
+		status.Status = ResourceReadyState
+		return
+	}
+
+	// Also check conditions for Ready status
+	for _, condition := range operandRequest.Status.Conditions {
+		if condition.Type == operatorv1alpha1.ConditionReady && condition.Status == corev1.ConditionTrue {
+			status.Status = ResourceReadyState
+			return
+		}
+	}
+	return
+}
+
+func getAllOperandRequestStatus(ctx context.Context, k8sClient client.Client, names []string, namespace string) (statuses []operatorv1alpha1.ManagedResourceStatus) {
+	reqLogger := logf.FromContext(ctx).WithName("getAllOperandRequestStatus").V(1)
+	for _, name := range names {
+		nsn := types.NamespacedName{Name: name, Namespace: namespace}
+		statuses = append(statuses, getOperandRequestStatus(ctx, k8sClient, nsn))
+	}
+	reqLogger.Info("New statuses", "statuses", statuses)
+	return
+}
+
 func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, k8sClient client.Client, authentication *operatorv1alpha1.Authentication) (status operatorv1alpha1.ServiceStatus) {
 	reqLogger := logf.FromContext(ctx).WithName("getCurrentServiceStatus").V(1)
 	type statusRetrieval struct {
@@ -368,6 +416,21 @@ func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, 
 			names: []string{"oidc-client-registration", MigrationJobName},
 			f:     getAllJobStatus,
 		},
+		{
+			names: []string{"im-needs-ui", "im-needs-database"},
+			f:     getAllOperandRequestStatus,
+		},
+	}
+
+	opReqStatusRetrieval := statusRetrieval{
+		names: []string{"im-needs-ui", "im-needs-database"},
+		f:     getAllOperandRequestStatus,
+	}
+
+	if ctrlcommon.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
+		statusRetrievals = append(statusRetrievals, opReqStatusRetrieval)
+	} else {
+		reqLogger.Info("OperandRequests are not available; assuming these resources will be configured manually")
 	}
 
 	routeStatusRetrieval := statusRetrieval{

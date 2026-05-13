@@ -1,4 +1,18 @@
-// Assisted by watsonx Code Assistant
+//
+// Copyright 2020 IBM Corporation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 
 package operator
 
@@ -17,6 +31,7 @@ import (
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
 	ctrlcommon "github.com/IBM/ibm-iam-operator/internal/controller/common"
 	routev1 "github.com/openshift/api/route/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,7 +39,7 @@ import (
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-var _ = Describe("AuthenticationReconciler", func() {
+var _ = Describe("ResourceStatus", func() {
 	var (
 		r   *AuthenticationReconciler
 		ctx context.Context
@@ -33,8 +48,9 @@ var _ = Describe("AuthenticationReconciler", func() {
 	getReconciler := func() *AuthenticationReconciler {
 		scheme := runtime.NewScheme()
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
-		Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
+		Expect(operatorv1alpha1.AddODLMEnabledToScheme(scheme)).To(Succeed())
 		Expect(batchv1.AddToScheme(scheme)).To(Succeed())
+		Expect(appsv1.AddToScheme(scheme)).To(Succeed())
 		Expect(routev1.AddToScheme(scheme)).To(Succeed())
 		authCR := &operatorv1alpha1.Authentication{
 			TypeMeta: metav1.TypeMeta{
@@ -342,6 +358,233 @@ var _ = Describe("AuthenticationReconciler", func() {
 		})
 
 		It("should return ResourceReadyState if all resources are ready", func() {
+		})
+	})
+
+	Context("getServiceStatus", func() {
+		It("should return Ready when service exists", func() {
+			r := getReconciler()
+			ctx = context.Background()
+			svc := &corev1.Service{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "v1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "test-svc", Namespace: "data-ns"},
+			}
+			Expect(r.Client.Create(ctx, svc)).To(Succeed())
+			status := getServiceStatus(ctx, r.Client, types.NamespacedName{Name: "test-svc", Namespace: "data-ns"})
+			Expect(status.Status).To(Equal(ResourceReadyState))
+		})
+	})
+
+	Context("getDeploymentStatus", func() {
+		It("should return Ready when deployment is available", func() {
+			r := getReconciler()
+			ctx = context.Background()
+			deploy := &appsv1.Deployment{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "apps/v1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "test-deploy", Namespace: "data-ns"},
+				Status: appsv1.DeploymentStatus{
+					Conditions: []appsv1.DeploymentCondition{
+						{Type: appsv1.DeploymentAvailable, Status: corev1.ConditionTrue},
+					},
+				},
+			}
+			Expect(r.Client.Create(ctx, deploy)).To(Succeed())
+			status := getDeploymentStatus(ctx, r.Client, types.NamespacedName{Name: "test-deploy", Namespace: "data-ns"})
+			Expect(status.Status).To(Equal(ResourceReadyState))
+		})
+	})
+
+	Context("getRouteStatus", func() {
+		It("should return Ready when route is admitted", func() {
+			r := getReconciler()
+			ctx = context.Background()
+			route := &routev1.Route{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "route.openshift.io/v1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "test-route", Namespace: "data-ns"},
+				Status: routev1.RouteStatus{
+					Ingress: []routev1.RouteIngress{
+						{
+							Conditions: []routev1.RouteIngressCondition{
+								{Type: routev1.RouteAdmitted, Status: corev1.ConditionTrue},
+							},
+						},
+					},
+				},
+			}
+			Expect(r.Client.Create(ctx, route)).To(Succeed())
+			status := getRouteStatus(ctx, r.Client, types.NamespacedName{Name: "test-route", Namespace: "data-ns"})
+			Expect(status.Status).To(Equal(ResourceReadyState))
+		})
+	})
+
+	Context("getJobStatus", func() {
+		It("should return Ready when job is complete", func() {
+			r := getReconciler()
+			ctx = context.Background()
+			job := &batchv1.Job{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "batch/v1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: "data-ns"},
+				Status: batchv1.JobStatus{
+					Conditions: []batchv1.JobCondition{
+						{Type: batchv1.JobComplete, Status: corev1.ConditionTrue},
+					},
+				},
+			}
+			Expect(r.Client.Create(ctx, job)).To(Succeed())
+			status := getJobStatus(ctx, r.Client, types.NamespacedName{Name: "test-job", Namespace: "data-ns"})
+			Expect(status.Status).To(Equal(ResourceReadyState))
+		})
+	})
+
+	Context("jobHasCompleted", func() {
+		It("should return true when job has completion time", func() {
+			now := metav1.NewTime(time.Now())
+			job := &batchv1.Job{Status: batchv1.JobStatus{CompletionTime: &now}}
+			Expect(jobHasCompleted(job)).To(BeTrue())
+		})
+
+		It("should return false when job has no completion time", func() {
+			job := &batchv1.Job{}
+			Expect(jobHasCompleted(job)).To(BeFalse())
+		})
+	})
+
+	Context("jobHasFailed", func() {
+		It("should return true when job has failed pods", func() {
+			job := &batchv1.Job{Status: batchv1.JobStatus{Failed: 1}}
+			Expect(jobHasFailed(job)).To(BeTrue())
+		})
+
+		It("should return false when job has no failed pods", func() {
+			job := &batchv1.Job{}
+			Expect(jobHasFailed(job)).To(BeFalse())
+		})
+	})
+
+	Context("jobHasCompletelyFailed", func() {
+		It("should return true when failed count equals backoff limit", func() {
+			backoffLimit := int32(3)
+			job := &batchv1.Job{
+				Spec:   batchv1.JobSpec{BackoffLimit: &backoffLimit},
+				Status: batchv1.JobStatus{Failed: 3},
+			}
+			Expect(jobHasCompletelyFailed(job)).To(BeTrue())
+		})
+
+		It("should use default backoff limit of 6", func() {
+			job := &batchv1.Job{Status: batchv1.JobStatus{Failed: 6}}
+			Expect(jobHasCompletelyFailed(job)).To(BeTrue())
+		})
+	})
+
+	Context("setMigratedStatus", func() {
+		It("should set complete condition when job is completed", func() {
+			now := metav1.NewTime(time.Now())
+			job := &batchv1.Job{Status: batchv1.JobStatus{CompletionTime: &now}}
+			authCR := &operatorv1alpha1.Authentication{}
+			setMigratedStatus(authCR, job)
+			condition := meta.FindStatusCondition(authCR.Status.Conditions, operatorv1alpha1.ConditionMigrated)
+			Expect(condition).ToNot(BeNil())
+			Expect(condition.Status).To(Equal(metav1.ConditionTrue))
+		})
+
+		It("should set failure condition when job has failed", func() {
+			job := &batchv1.Job{Status: batchv1.JobStatus{Failed: 1}}
+			authCR := &operatorv1alpha1.Authentication{}
+			setMigratedStatus(authCR, job)
+			condition := meta.FindStatusCondition(authCR.Status.Conditions, operatorv1alpha1.ConditionMigrated)
+			Expect(condition).ToNot(BeNil())
+			Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+		})
+	})
+
+	Context("setMigrationsRunningStatus", func() {
+		It("should set finished condition when job is completed", func() {
+			now := metav1.NewTime(time.Now())
+			job := &batchv1.Job{Status: batchv1.JobStatus{CompletionTime: &now}}
+			authCR := &operatorv1alpha1.Authentication{}
+			setMigrationsRunningStatus(authCR, job)
+			condition := meta.FindStatusCondition(authCR.Status.Conditions, operatorv1alpha1.ConditionMigrationsRunning)
+			Expect(condition).ToNot(BeNil())
+			Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+		})
+	})
+
+	Context("getOperandRequestStatus", func() {
+		It("should return Ready when phase is Running", func() {
+			r := getReconciler()
+			ctx = context.Background()
+			opReq := &operatorv1alpha1.OperandRequest{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "operator.ibm.com/v1alpha1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "im-needs-ui", Namespace: "data-ns"},
+				Status:     operatorv1alpha1.OperandRequestStatus{Phase: operatorv1alpha1.ClusterPhaseRunning},
+			}
+			Expect(r.Client.Create(ctx, opReq)).To(Succeed())
+			status := getOperandRequestStatus(ctx, r.Client, types.NamespacedName{Name: "im-needs-ui", Namespace: "data-ns"})
+			Expect(status.Status).To(Equal(ResourceReadyState))
+			Expect(status.Kind).To(Equal("OperandRequest"))
+		})
+
+		It("should return Ready when Ready condition is true", func() {
+			r := getReconciler()
+			ctx = context.Background()
+			opReq := &operatorv1alpha1.OperandRequest{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "operator.ibm.com/v1alpha1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "im-needs-database", Namespace: "data-ns"},
+				Status: operatorv1alpha1.OperandRequestStatus{
+					Conditions: []operatorv1alpha1.Condition{
+						{Type: operatorv1alpha1.ConditionReady, Status: corev1.ConditionTrue},
+					},
+				},
+			}
+			Expect(r.Client.Create(ctx, opReq)).To(Succeed())
+			status := getOperandRequestStatus(ctx, r.Client, types.NamespacedName{Name: "im-needs-database", Namespace: "data-ns"})
+			Expect(status.Status).To(Equal(ResourceReadyState))
+		})
+
+		It("should return NotReady when not ready", func() {
+			r := getReconciler()
+			ctx = context.Background()
+			opReq := &operatorv1alpha1.OperandRequest{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "operator.ibm.com/v1alpha1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "im-needs-ui", Namespace: "data-ns"},
+				Status:     operatorv1alpha1.OperandRequestStatus{Phase: operatorv1alpha1.ClusterPhaseCreating},
+			}
+			Expect(r.Client.Create(ctx, opReq)).To(Succeed())
+			status := getOperandRequestStatus(ctx, r.Client, types.NamespacedName{Name: "im-needs-ui", Namespace: "data-ns"})
+			Expect(status.Status).To(Equal(ResourceNotReadyState))
+		})
+
+		It("should return NotReady when does not exist", func() {
+			r := getReconciler()
+			ctx = context.Background()
+			status := getOperandRequestStatus(ctx, r.Client, types.NamespacedName{Name: "nonexistent", Namespace: "data-ns"})
+			Expect(status.Status).To(Equal(ResourceNotReadyState))
+			Expect(status.APIVersion).To(Equal(UnknownAPIVersion))
+		})
+	})
+
+	Context("getAllOperandRequestStatus", func() {
+		It("should return status for all OperandRequests", func() {
+			r := getReconciler()
+			ctx = context.Background()
+			opReq1 := &operatorv1alpha1.OperandRequest{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "operator.ibm.com/v1alpha1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "im-needs-ui", Namespace: "data-ns"},
+				Status:     operatorv1alpha1.OperandRequestStatus{Phase: operatorv1alpha1.ClusterPhaseRunning},
+			}
+			opReq2 := &operatorv1alpha1.OperandRequest{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "operator.ibm.com/v1alpha1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "im-needs-database", Namespace: "data-ns"},
+				Status:     operatorv1alpha1.OperandRequestStatus{Phase: operatorv1alpha1.ClusterPhaseCreating},
+			}
+			Expect(r.Client.Create(ctx, opReq1)).To(Succeed())
+			Expect(r.Client.Create(ctx, opReq2)).To(Succeed())
+
+			statuses := getAllOperandRequestStatus(ctx, r.Client, []string{"im-needs-ui", "im-needs-database"}, "data-ns")
+			Expect(statuses).To(HaveLen(2))
+			Expect(statuses[0].Status).To(Equal(ResourceReadyState))
+			Expect(statuses[1].Status).To(Equal(ResourceNotReadyState))
 		})
 	})
 })

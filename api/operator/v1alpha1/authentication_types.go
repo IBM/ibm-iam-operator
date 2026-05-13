@@ -240,6 +240,17 @@ const ReasonMigrationsInProgress string = "InProgress"
 const ReasonMigrationsDone string = "Done"
 const ReasonMigrationFailure string = "Failed"
 
+// EDB to IBM PG migration condition constants
+const ConditionCSEdbToPGMigrationRunning = "CSEdbToPGMigrationRunning"
+const ConditionCSEdbToPGMigrationPerformed string = "CSEdbToPGMigrationPerformed"
+const MessageCSEdbToPGMigrationSuccess string = "EDB to IBM PG migration completed successfully"
+const MessageCSEdbToPGMigrationInProgress string = "EDB to IBM PG migration is currently being performed"
+const MessageCSEdbToPGMigrationFinished string = "EDB to IBM PG migration attempt finished"
+const ReasonCSEdbToPGMigrationComplete string = "Complete"
+const ReasonCSEdbToPGMigrationInProgress string = "InProgress"
+const ReasonCSEdbToPGMigrationDone string = "Done"
+const ReasonCSEdbToPGMigrationFailure string = "Failed"
+
 // Creates a new ConditionMigrationsRunning condition for when the migration Job
 // is still running.
 func NewMigrationInProgressCondition() *metav1.Condition {
@@ -293,6 +304,62 @@ func NewMigrationFailureCondition(name string) *metav1.Condition {
 		Type:    ConditionMigrated,
 		Status:  metav1.ConditionFalse,
 		Reason:  ReasonMigrationFailure,
+		Message: message,
+	}
+}
+
+// Creates a new ConditionCSEdbToPGMigrationRunning condition for when the EDB to IBM PG migration Job
+// is still running.
+func NewCSEdbToPGMigrationInProgressCondition() *metav1.Condition {
+	return &metav1.Condition{
+		Type:    ConditionCSEdbToPGMigrationRunning,
+		Status:  metav1.ConditionTrue,
+		Reason:  ReasonCSEdbToPGMigrationInProgress,
+		Message: MessageCSEdbToPGMigrationInProgress,
+	}
+}
+
+// Creates a new ConditionCSEdbToPGMigrationRunning condition for when the EDB to IBM PG migration Job
+// has stopped running.
+func NewCSEdbToPGMigrationFinishedCondition() *metav1.Condition {
+	return &metav1.Condition{
+		Type:    ConditionCSEdbToPGMigrationRunning,
+		Status:  metav1.ConditionFalse,
+		Reason:  ReasonCSEdbToPGMigrationDone,
+		Message: MessageCSEdbToPGMigrationFinished,
+	}
+}
+
+// Creates a new ConditionCSEdbToPGMigrationPerformed condition for when the EDB to IBM PG migration Job has
+// succeeded.
+func NewCSEdbToPGMigrationCompleteCondition() *metav1.Condition {
+	return &metav1.Condition{
+		Type:    ConditionCSEdbToPGMigrationPerformed,
+		Status:  metav1.ConditionTrue,
+		Reason:  ReasonCSEdbToPGMigrationComplete,
+		Message: MessageCSEdbToPGMigrationSuccess,
+	}
+}
+
+// Creates a new ConditionCSEdbToPGMigrationPerformed condition for when the EDB to IBM PG migration Job has yet
+// to run at all; should not be set unless the previous status is `metav1.ConditionTrue`.
+func NewCSEdbToPGMigrationYetToBeCompleteCondition(name string) *metav1.Condition {
+	message := fmt.Sprintf("The %q Job is not yet complete", name)
+	return &metav1.Condition{
+		Type:    ConditionCSEdbToPGMigrationPerformed,
+		Status:  metav1.ConditionFalse,
+		Reason:  ReasonCSEdbToPGMigrationInProgress,
+		Message: message,
+	}
+}
+
+// Creates a new ConditionCSEdbToPGMigrationPerformed condition for when the EDB to IBM PG migration Job fails.
+func NewCSEdbToPGMigrationFailureCondition(name string) *metav1.Condition {
+	message := fmt.Sprintf("EDB to IBM PG migration failed; review the %q Job logs for more information", name)
+	return &metav1.Condition{
+		Type:    ConditionCSEdbToPGMigrationPerformed,
+		Status:  metav1.ConditionFalse,
+		Reason:  ReasonCSEdbToPGMigrationFailure,
 		Message: message,
 	}
 }

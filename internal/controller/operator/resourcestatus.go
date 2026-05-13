@@ -66,6 +66,12 @@ func (r *AuthenticationReconciler) setAuthenticationStatus(ctx context.Context, 
 		return
 	}
 
+	debugLog.Info("Set EDB to IBM PG migration status")
+	err = r.setCSEdbToPGMigrationStatusConditions(debugCtx, authCR)
+	if err != nil {
+		return
+	}
+
 	debugLog.Info("Set service status")
 	authCR.Status.Service = r.getCurrentServiceStatus(debugCtx, r.Client, authCR)
 	expectedPodCount := int(authCR.Spec.Replicas) * 3
@@ -94,6 +100,24 @@ func (r *AuthenticationReconciler) setMigrationStatusConditions(ctx context.Cont
 	}
 	setMigratedStatus(authCR, job)
 	setMigrationsRunningStatus(authCR, job)
+	return
+}
+
+// setCSEdbToPGMigrationStatusConditions sets the appropriate CSEdbToPGMigrationPerformed and
+// CSEdbToPGMigrationRunning metav1.Condition values within the Authentication CR's
+// status conditions for the EDB to IBM PG migration job.
+func (r *AuthenticationReconciler) setCSEdbToPGMigrationStatusConditions(ctx context.Context, authCR *operatorv1alpha1.Authentication) (err error) {
+	csEdbToPGMigrationJobName := "common-service-db-pg-migration-job"
+	objKey := types.NamespacedName{Name: csEdbToPGMigrationJobName, Namespace: authCR.Namespace}
+	job := &batchv1.Job{}
+	err = r.Client.Get(ctx, objKey, job)
+	if k8sErrors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	setCSEdbToPGMigratedStatus(authCR, job, csEdbToPGMigrationJobName)
+	setCSEdbToPGMigrationsRunningStatus(authCR, job)
 	return
 }
 
@@ -150,6 +174,44 @@ func setMigratedStatus(authCR *operatorv1alpha1.Authentication, job *batchv1.Job
 		operatorv1alpha1.ConditionMigrated)
 	if currentCondition == nil || currentCondition.Status == metav1.ConditionTrue {
 		meta.SetStatusCondition(&authCR.Status.Conditions, *operatorv1alpha1.NewMigrationYetToBeCompleteCondition(MigrationJobName))
+		return
+	}
+}
+
+// setCSEdbToPGMigrationsRunningStatus sets the appropriate metav1.Condition of type
+// CSEdbToPGMigrationRunning given the current state of the EDB to IBM PG migration Job and the
+// Authentication CR.
+func setCSEdbToPGMigrationsRunningStatus(authCR *operatorv1alpha1.Authentication, job *batchv1.Job) {
+	if jobHasCompletelyFailed(job) || jobHasCompleted(job) {
+		meta.SetStatusCondition(&authCR.Status.Conditions, *operatorv1alpha1.NewCSEdbToPGMigrationFinishedCondition())
+		return
+	}
+	currentCondition := meta.FindStatusCondition(
+		authCR.Status.Conditions,
+		operatorv1alpha1.ConditionCSEdbToPGMigrationRunning)
+	if currentCondition == nil || currentCondition.Status == metav1.ConditionFalse {
+		meta.SetStatusCondition(&authCR.Status.Conditions, *operatorv1alpha1.NewCSEdbToPGMigrationInProgressCondition())
+		return
+	}
+}
+
+// setCSEdbToPGMigratedStatus sets the appropriate metav1.Condition of type
+// CSEdbToPGMigrationPerformed given the current state of the EDB to IBM PG migration Job and the
+// Authentication CR.
+func setCSEdbToPGMigratedStatus(authCR *operatorv1alpha1.Authentication, job *batchv1.Job, jobName string) {
+	if jobHasCompleted(job) {
+		meta.SetStatusCondition(&authCR.Status.Conditions, *operatorv1alpha1.NewCSEdbToPGMigrationCompleteCondition())
+		return
+	}
+	if jobHasFailed(job) {
+		meta.SetStatusCondition(&authCR.Status.Conditions, *operatorv1alpha1.NewCSEdbToPGMigrationFailureCondition(jobName))
+		return
+	}
+	currentCondition := meta.FindStatusCondition(
+		authCR.Status.Conditions,
+		operatorv1alpha1.ConditionCSEdbToPGMigrationPerformed)
+	if currentCondition == nil || currentCondition.Status == metav1.ConditionTrue {
+		meta.SetStatusCondition(&authCR.Status.Conditions, *operatorv1alpha1.NewCSEdbToPGMigrationYetToBeCompleteCondition(jobName))
 		return
 	}
 }
@@ -424,6 +486,16 @@ func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, 
 	if meta.IsStatusConditionFalse(authentication.Status.Conditions, operatorv1alpha1.ConditionMigrated) {
 		return
 	}
+
+	// If EDB to IBM PG migration has failed, return Authentication as not ready
+	if meta.IsStatusConditionFalse(authentication.Status.Conditions, operatorv1alpha1.ConditionCSEdbToPGMigrationPerformed) {
+		csEdbToPGCondition := meta.FindStatusCondition(authentication.Status.Conditions, operatorv1alpha1.ConditionCSEdbToPGMigrationPerformed)
+		if csEdbToPGCondition != nil && csEdbToPGCondition.Reason == operatorv1alpha1.ReasonCSEdbToPGMigrationFailure {
+			reqLogger.Info("EDB to IBM PG migration has failed; marking Authentication as NotReady")
+			return
+		}
+	}
+
 	status.Status = ResourceReadyState
 	return
 }

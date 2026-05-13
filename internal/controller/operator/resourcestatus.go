@@ -416,10 +416,6 @@ func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, 
 			names: []string{"oidc-client-registration", MigrationJobName},
 			f:     getAllJobStatus,
 		},
-		{
-			names: []string{"im-needs-ui", "im-needs-database"},
-			f:     getAllOperandRequestStatus,
-		},
 	}
 
 	opReqStatusRetrieval := statusRetrieval{

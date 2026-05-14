@@ -25,9 +25,18 @@ rules:
   - rbac.authorization.k8s.io
   resources:
   - clusterroles
+  verbs:
+  - create
+  - delete
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
   - clusterrolebindings
   verbs:
   - create
+  - get
+  - list
+  - watch
   - delete
 - apiGroups:
   - user.openshift.io

@@ -67,7 +67,12 @@ func (r *AuthenticationReconciler) setAuthenticationStatus(ctx context.Context, 
 	}
 
 	debugLog.Info("Set service status")
-	authCR.Status.Service = r.getCurrentServiceStatus(debugCtx, r.Client, authCR)
+	calculatedStatus, err := r.getCurrentServiceStatus(debugCtx, r.Client, authCR)
+	if err != nil {
+		log.Error(err, "Failed to get service status")
+		return
+	}
+	authCR.Status.Service = calculatedStatus
 	expectedPodCount := int(authCR.Spec.Replicas) * 3
 	if len(nodes) != expectedPodCount {
 		debugLog.Info("Number of nodes did not match expected count", "expected", expectedPodCount)
@@ -176,17 +181,17 @@ func (r *AuthenticationReconciler) getNodesStatus(ctx context.Context, authCR *o
 }
 
 func getPodNames(ctx context.Context, pods []corev1.Pod) []string {
-	reqLogger := logf.FromContext(ctx)
+	log := logf.FromContext(ctx)
 	var podNames []string
 	for _, pod := range pods {
 		podNames = append(podNames, pod.Name)
-		reqLogger.Info("Found Pod", "Pod.Name", pod.Name)
+		log.Info("Found Pod", "Pod.Name", pod.Name)
 	}
 	return podNames
 }
 
 func getServiceStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx)
+	log := logf.FromContext(ctx)
 	kind := "Service"
 	status = operatorv1alpha1.ManagedResourceStatus{
 		ObjectName: namespacedName.Name,
@@ -202,25 +207,25 @@ func getServiceStatus(ctx context.Context, k8sClient client.Client, namespacedNa
 		status.Status = ResourceReadyState
 		return
 	} else if k8sErrors.IsNotFound(err) {
-		reqLogger.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
+		log.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
 	} else {
-		reqLogger.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
+		log.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
 	}
 	return
 }
 
 func getAllServiceStatus(ctx context.Context, k8sClient client.Client, names []string, namespace string) (statuses []operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getAllServiceStatus").V(1)
+	log := logf.FromContext(ctx).WithName("getAllServiceStatus")
 	for _, name := range names {
 		nsn := types.NamespacedName{Name: name, Namespace: namespace}
 		statuses = append(statuses, getServiceStatus(ctx, k8sClient, nsn))
 	}
-	reqLogger.Info("New statuses", "statuses", statuses)
+	log.Info("New statuses", "statuses", statuses)
 	return
 }
 
 func getDeploymentStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getDeploymentStatus").V(1)
+	log := logf.FromContext(ctx).WithName("getDeploymentStatus")
 	kind := "Deployment"
 	status = operatorv1alpha1.ManagedResourceStatus{
 		ObjectName: namespacedName.Name,
@@ -232,10 +237,10 @@ func getDeploymentStatus(ctx context.Context, k8sClient client.Client, namespace
 	deployment := &appsv1.Deployment{}
 	err := k8sClient.Get(ctx, namespacedName, deployment)
 	if k8sErrors.IsNotFound(err) {
-		reqLogger.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
+		log.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
 		return
 	} else if err != nil {
-		reqLogger.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
+		log.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
 		return
 	}
 	status.APIVersion = deployment.APIVersion
@@ -249,17 +254,17 @@ func getDeploymentStatus(ctx context.Context, k8sClient client.Client, namespace
 }
 
 func getAllDeploymentStatus(ctx context.Context, k8sClient client.Client, names []string, namespace string) (statuses []operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getAllDeploymentStatus").V(1)
+	log := logf.FromContext(ctx).WithName("getAllDeploymentStatus")
 	for _, name := range names {
 		nsn := types.NamespacedName{Name: name, Namespace: namespace}
 		statuses = append(statuses, getDeploymentStatus(ctx, k8sClient, nsn))
 	}
-	reqLogger.Info("New statuses", "statuses", statuses)
+	log.Info("New statuses", "statuses", statuses)
 	return
 }
 
 func getJobStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getJobStatus").V(1)
+	log := logf.FromContext(ctx).WithName("getJobStatus")
 	kind := "Job"
 	status = operatorv1alpha1.ManagedResourceStatus{
 		ObjectName: namespacedName.Name,
@@ -272,9 +277,9 @@ func getJobStatus(ctx context.Context, k8sClient client.Client, namespacedName t
 	err := k8sClient.Get(ctx, namespacedName, job)
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
-			reqLogger.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
+			log.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
 		} else {
-			reqLogger.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
+			log.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
 		}
 		return
 	}
@@ -289,17 +294,17 @@ func getJobStatus(ctx context.Context, k8sClient client.Client, namespacedName t
 }
 
 func getAllJobStatus(ctx context.Context, k8sClient client.Client, names []string, namespace string) (statuses []operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getAllJobStatus").V(1)
+	log := logf.FromContext(ctx).WithName("getAllJobStatus")
 	for _, name := range names {
 		nsn := types.NamespacedName{Name: name, Namespace: namespace}
 		statuses = append(statuses, getJobStatus(ctx, k8sClient, nsn))
 	}
-	reqLogger.Info("New statuses", "statuses", statuses)
+	log.Info("New statuses", "statuses", statuses)
 	return
 }
 
 func getRouteStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getRouteStatus").V(1)
+	log := logf.FromContext(ctx).WithName("getRouteStatus")
 	kind := "Route"
 	status = operatorv1alpha1.ManagedResourceStatus{
 		ObjectName: namespacedName.Name,
@@ -312,9 +317,9 @@ func getRouteStatus(ctx context.Context, k8sClient client.Client, namespacedName
 	err := k8sClient.Get(ctx, namespacedName, route)
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
-			reqLogger.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
+			log.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
 		} else {
-			reqLogger.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
+			log.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
 		}
 		return
 	}
@@ -331,17 +336,65 @@ func getRouteStatus(ctx context.Context, k8sClient client.Client, namespacedName
 }
 
 func getAllRouteStatus(ctx context.Context, k8sClient client.Client, names []string, namespace string) (statuses []operatorv1alpha1.ManagedResourceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getAllRouteStatus").V(1)
+	log := logf.FromContext(ctx).WithName("getAllRouteStatus")
 	for _, name := range names {
 		nsn := types.NamespacedName{Name: name, Namespace: namespace}
 		statuses = append(statuses, getRouteStatus(ctx, k8sClient, nsn))
 	}
-	reqLogger.Info("New statuses", "statuses", statuses)
+	log.Info("New statuses", "statuses", statuses)
 	return
 }
 
-func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, k8sClient client.Client, authentication *operatorv1alpha1.Authentication) (status operatorv1alpha1.ServiceStatus) {
-	reqLogger := logf.FromContext(ctx).WithName("getCurrentServiceStatus").V(1)
+func getOperandRequestStatus(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (status operatorv1alpha1.ManagedResourceStatus) {
+	log := logf.FromContext(ctx).WithName("getOperandRequestStatus")
+	kind := "OperandRequest"
+	status = operatorv1alpha1.ManagedResourceStatus{
+		ObjectName: namespacedName.Name,
+		APIVersion: UnknownAPIVersion,
+		Namespace:  namespacedName.Namespace,
+		Kind:       kind,
+		Status:     ResourceNotReadyState,
+	}
+	operandRequest := &operatorv1alpha1.OperandRequest{}
+	err := k8sClient.Get(ctx, namespacedName, operandRequest)
+	if err != nil {
+		if k8sErrors.IsNotFound(err) {
+			log.Info("Could not find resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
+		} else {
+			log.Error(err, "Error reading resource for status update", "kind", kind, "name", namespacedName.Name, "namespace", namespacedName.Namespace)
+		}
+		return
+	}
+	status.APIVersion = operandRequest.APIVersion
+
+	// Check if OperandRequest is ready based on Phase
+	if operandRequest.Status.Phase == operatorv1alpha1.ClusterPhaseRunning {
+		status.Status = ResourceReadyState
+		return
+	}
+
+	// Also check conditions for Ready status
+	for _, condition := range operandRequest.Status.Conditions {
+		if condition.Type == operatorv1alpha1.ConditionReady && condition.Status == corev1.ConditionTrue {
+			status.Status = ResourceReadyState
+			return
+		}
+	}
+	return
+}
+
+func getAllOperandRequestStatus(ctx context.Context, k8sClient client.Client, names []string, namespace string) (statuses []operatorv1alpha1.ManagedResourceStatus) {
+	log := logf.FromContext(ctx).WithName("getAllOperandRequestStatus")
+	for _, name := range names {
+		nsn := types.NamespacedName{Name: name, Namespace: namespace}
+		statuses = append(statuses, getOperandRequestStatus(ctx, k8sClient, nsn))
+	}
+	log.Info("New statuses", "statuses", statuses)
+	return
+}
+
+func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, k8sClient client.Client, authentication *operatorv1alpha1.Authentication) (status operatorv1alpha1.ServiceStatus, err error) {
+	log := logf.FromContext(ctx).WithName("getCurrentServiceStatus")
 	type statusRetrieval struct {
 		names []string
 		f     statusRetrievalFunc
@@ -370,33 +423,53 @@ func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, 
 		},
 	}
 
-	routeStatusRetrieval := statusRetrieval{
-		names: []string{
-			"id-mgmt",
-			"platform-auth",
-			"platform-id-auth",
-			"platform-id-provider",
-			"platform-login",
-			"platform-oidc",
-			"saml-ui-callback",
-			"social-login-callback",
-			IMCrtAuthRouteName,
-		},
-		f: getAllRouteStatus,
+	if ctrlcommon.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
+		opReqStatusRetrieval := statusRetrieval{
+			names: []string{"im-needs-ui"},
+			f:     getAllOperandRequestStatus,
+		}
+
+		if isUsingExternalDatabase, err := r.isConfiguredForExternalDB(ctx, authentication); err == nil && isUsingExternalDatabase {
+			log.Info("Datastore ConfigMap found and indicates no need for embedded database; skipping database OperandRequest", "ConfigMap.Name", ctrlcommon.DatastoreEDBCMName, "OperandRequest.Name", "im-needs-database")
+		} else if err != nil {
+			log.Error(err, "Failed to determine whether embedded database needed", "ConfigMap.Name", ctrlcommon.DatastoreEDBCMName, "OperandRequest.Name", "im-needs-database")
+			return status, err
+		} else {
+			log.Info("Datastore ConfigMap found and indicates a need for embedded Postgres; adding database OperandRequest", "ConfigMap.Name", ctrlcommon.DatastoreEDBCMName, "OperandRequest.Name", "im-needs-database")
+			opReqStatusRetrieval.names = append(opReqStatusRetrieval.names, "im-needs-database")
+		}
+		statusRetrievals = append(statusRetrievals, opReqStatusRetrieval)
+	} else {
+		log.Info("OperandRequests are not available; assuming these resources will be configured manually")
 	}
 
 	// Only check Route status if:
 	// 1. Cluster has Route API available, AND
 	// 2. .spec.config.ingress.gvk is not set to "none"
 	if ctrlcommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient) {
+		routeStatusRetrieval := statusRetrieval{
+			names: []string{
+				"id-mgmt",
+				"platform-auth",
+				"platform-id-auth",
+				"platform-id-provider",
+				"platform-login",
+				"platform-oidc",
+				"saml-ui-callback",
+				"social-login-callback",
+				IMCrtAuthRouteName,
+			},
+			f: getAllRouteStatus,
+		}
+
 		if authentication.ShouldRemoveRoutes() {
-			reqLogger.Info("Routes are disabled via .spec.config.ingress.gvk=none; skipping Route status check")
+			log.Info("Routes are disabled via .spec.config.ingress.gvk=none; skipping Route status check")
 		} else {
-			reqLogger.Info("Is running on OpenShift; will check Route status")
+			log.Info("Is running on OpenShift; will check Route status")
 			statusRetrievals = append(statusRetrievals, routeStatusRetrieval)
 		}
 	} else {
-		reqLogger.Info("Routes are not available; assuming ingress will be configured manually")
+		log.Info("Routes are not available; assuming ingress will be configured manually")
 	}
 
 	kind := "Authentication"
@@ -409,7 +482,7 @@ func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, 
 		Status:           ResourceNotReadyState,
 	}
 
-	reqLogger.Info("Getting statuses")
+	log.Info("Getting statuses")
 	for _, getStatuses := range statusRetrievals {
 		status.ManagedResources = append(status.ManagedResources, getStatuses.f(ctx, k8sClient, getStatuses.names, status.Namespace)...)
 	}

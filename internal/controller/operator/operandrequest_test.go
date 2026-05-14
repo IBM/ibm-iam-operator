@@ -126,10 +126,8 @@ var _ = Describe("OperandRequest handling", func() {
 
 				By("seeing the value of IS_EMBEDDED field is empty")
 				err = r.addEmbeddedDBIfNeeded(context.Background(), authCR, operands)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(len(*operands)).To(Equal(1))
-				Expect((*operands)[0]).ToNot(BeNil())
-				Expect((*operands)[0].Name).To(Equal("common-service-cnpg"))
+				Expect(err).To(HaveOccurred())
+				Expect(len(*operands)).To(Equal(0))
 			})
 
 			It("should add the embedded EDB entry to the list of Operands", func() {
@@ -313,8 +311,21 @@ var _ = Describe("OperandRequest handling", func() {
 	})
 
 	Describe("isConfiguredForExternalDB", func() {
-		var cm *corev1.ConfigMap
-		BeforeEach(func() {
+		getDatastoreConfigMap := func() *corev1.ConfigMap {
+			return &corev1.ConfigMap{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "ConfigMap",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "im-datastore-edb-cm",
+					Namespace: "data-ns",
+				},
+				Data: map[string]string{},
+			}
+		}
+
+		getTestReconciler := func(cm *corev1.ConfigMap) *AuthenticationReconciler {
 			authCR = &operatorv1alpha1.Authentication{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "operator.ibm.com/v1alpha1",
@@ -326,61 +337,55 @@ var _ = Describe("OperandRequest handling", func() {
 					ResourceVersion: trackerAddResourceVersion,
 				},
 			}
-			cm = &corev1.ConfigMap{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: "v1",
-					Kind:       "ConfigMap",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "im-datastore-edb-cm",
-					Namespace: "data-ns",
-				},
-				Data: map[string]string{},
-			}
 			scheme := runtime.NewScheme()
 			Expect(corev1.AddToScheme(scheme)).To(Succeed())
 			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
 			cb = *fakeclient.NewClientBuilder().
 				WithScheme(scheme).
-				WithRuntimeObjects(cm, authCR)
+				WithRuntimeObjects(authCR, cm)
 			cl = cb.Build()
-			r = &AuthenticationReconciler{
+			return &AuthenticationReconciler{
 				Client: &ctrlcommon.FallbackClient{
 					Client: cl,
 					Reader: cl,
 				},
 			}
-		})
-		It("returns false when IS_EMBEDDED is not set", func() {
+		}
+
+		It("returns true when IS_EMBEDDED is not set", func() {
+			cm := getDatastoreConfigMap()
+			r := getTestReconciler(cm)
 			isExternal, err := r.isConfiguredForExternalDB(context.Background(), authCR)
-			Expect(isExternal).To(BeFalse())
+			Expect(isExternal).To(BeTrue())
 			Expect(err).ToNot(HaveOccurred())
 		})
-		It("returns false when IS_EMBEDDED is an empty string", func() {
+		It("returns an error when IS_EMBEDDED is an empty string", func() {
+			cm := getDatastoreConfigMap()
 			cm.Data["IS_EMBEDDED"] = ""
-			err := r.Update(context.Background(), cm)
-			Expect(err).ToNot(HaveOccurred())
+			r := getTestReconciler(cm)
 			isExternal, err := r.isConfiguredForExternalDB(context.Background(), authCR)
 			Expect(isExternal).To(BeFalse())
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(HaveOccurred())
 		})
 		It("returns false when IS_EMBEDDED is \"true\"", func() {
+			cm := getDatastoreConfigMap()
 			cm.Data["IS_EMBEDDED"] = "true"
-			err := r.Update(context.Background(), cm)
-			Expect(err).ToNot(HaveOccurred())
+			r := getTestReconciler(cm)
 			isExternal, err := r.isConfiguredForExternalDB(context.Background(), authCR)
 			Expect(isExternal).To(BeFalse())
 			Expect(err).ToNot(HaveOccurred())
 		})
 		It("returns true and no error when IS_EMBEDDED is \"false\"", func() {
+			cm := getDatastoreConfigMap()
 			cm.Data["IS_EMBEDDED"] = "false"
-			err := r.Update(context.Background(), cm)
-			Expect(err).ToNot(HaveOccurred())
+			r := getTestReconciler(cm)
 			isExternal, err := r.isConfiguredForExternalDB(context.Background(), authCR)
 			Expect(isExternal).To(BeTrue())
 			Expect(err).ToNot(HaveOccurred())
 		})
 		It("returns false when the ConfigMap can't be found", func() {
+			cm := getDatastoreConfigMap()
+			r := getTestReconciler(cm)
 			err := r.Delete(context.Background(), cm)
 			Expect(err).ToNot(HaveOccurred())
 			isExternal, err := r.isConfiguredForExternalDB(context.Background(), authCR)

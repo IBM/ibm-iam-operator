@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
 	"time"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
@@ -218,20 +219,30 @@ func operandsAreEqual(operandsA, operandsB []operatorv1alpha1.Operand) bool {
 // This is determined by obtaining the `im-datastore-edb-cm` ConfigMap and reading its `IS_EMBEDDED` field.
 // If this value is set to "false", then the IM instance needs to use the connection details contained within this
 // ConfigMap.
-func (r *AuthenticationReconciler) isConfiguredForExternalDB(ctx context.Context, authCR *operatorv1alpha1.Authentication) (isConfigured bool, err error) {
+func (r *AuthenticationReconciler) isConfiguredForExternalDB(ctx context.Context, authCR *operatorv1alpha1.Authentication) (isExternal bool, err error) {
 	// stubbed until external EDB is supported
 	log := logf.FromContext(ctx)
 	cm := &corev1.ConfigMap{}
 
 	err = r.Get(ctx, types.NamespacedName{Name: ctrlcommon.DatastoreEDBCMName, Namespace: authCR.Namespace}, cm)
-	if err != nil && k8sErrors.IsNotFound(err) {
+	if k8sErrors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
 		log.Error(err, "Failed to get ConfigMap from services namespace", "name", ctrlcommon.DatastoreEDBCMName)
 		return false, err
 	}
 
-	return cm.Data["IS_EMBEDDED"] == "false", nil
+	isEmbeddedValue, ok := cm.Data["IS_EMBEDDED"]
+	if !ok {
+		return true, nil
+	}
+
+	isEmbedded, err := strconv.ParseBool(isEmbeddedValue)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse IS_EMBEDDED value: %w", err)
+	}
+
+	return !isEmbedded, nil
 }
 
 // needsExternalEDB returns whether the IM install needs an external EDB configured.

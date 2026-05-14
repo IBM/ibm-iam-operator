@@ -118,19 +118,27 @@ func (r *AuthenticationReconciler) cleanupOldRBAC(ctx context.Context, req ctrl.
 			for _, crb := range crbList.Items {
 				if crb.RoleRef.Kind == "ClusterRole" && crb.RoleRef.Name == "ibm-iam-operand-restricted" {
 					count++
+					// Early exit if we've found more than one
+					if count > 1 {
+						break
+					}
 				}
 			}
 
-			// Only delete ClusterRole if there's one or fewer ClusterRoleBindings
-			// (the one being deleted or none)
-			if count > 1 {
+			// Only delete ClusterRole if there's exactly one ClusterRoleBinding
+			// (the one being deleted in this reconciliation)
+			if count == 1 {
+				log.Info("Single ClusterRoleBinding references the ClusterRole, proceeding with ClusterRole deletion", "count", count)
+			} else if count > 1 {
 				log.Info("Multiple ClusterRoleBindings reference the ClusterRole, skipping ClusterRole deletion", "count", count)
 				shouldDeleteClusterRole = false
 			} else {
-				log.Info("Single or no ClusterRoleBinding references the ClusterRole, proceeding with ClusterRole deletion", "count", count)
+				log.Info("No ClusterRoleBindings reference the ClusterRole, it may already be deleted or orphaned, skipping ClusterRole deletion", "count", count)
+				shouldDeleteClusterRole = false
 			}
 		} else {
-			log.Info("Operator does not have permission to list ClusterRoleBindings, proceeding with ClusterRole deletion")
+			log.Info("Operator does not have permission to list ClusterRoleBindings, skipping ClusterRole deletion to avoid potential conflicts")
+			shouldDeleteClusterRole = false
 		}
 
 		if shouldDeleteClusterRole {

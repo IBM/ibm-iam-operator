@@ -191,6 +191,28 @@ func getConfigMapDataSHA1Sum(cm *corev1.ConfigMap) (sha string, err error) {
 	return fmt.Sprintf("%x", dataSHA[:]), nil
 }
 
+// ensureConfigMapChecksumAnnotation ensures the ConfigMap has a checksum annotation based on its data
+func ensureConfigMapChecksumAnnotation(s common.SecondaryReconciler, ctx context.Context, observed, generated *corev1.ConfigMap) (modified bool, err error) {
+	beforeSum := observed.Annotations[AnnotationSHA1Sum]
+	afterSum, err := getConfigMapDataSHA1Sum(observed)
+	if err != nil {
+		return false, err
+	}
+
+	if observed.Annotations == nil {
+		observed.Annotations = map[string]string{
+			AnnotationSHA1Sum: afterSum,
+		}
+		return true, nil
+	}
+
+	if beforeSum != afterSum {
+		observed.Annotations[AnnotationSHA1Sum] = afterSum
+		return true, nil
+	}
+	return
+}
+
 // GetCNCFDomain returns the CNCF domain name set in the global ConfigMap, if
 // present. Returns an error when the ConfigMap is not found and returns an
 // empty string whenever the ConfigMap is found but the CNCF domain name is not
@@ -311,23 +333,164 @@ func replaceOIDCClientRegistrationJob(s common.SecondaryReconciler, ctx context.
 }
 
 func updateRegistrationJSON(_ common.SecondaryReconciler, ctx context.Context, observed, generated *corev1.ConfigMap) (updated bool, err error) {
+	log := logf.FromContext(ctx)
 	observedJSON := &registrationJSONData{}
 	if err = json.Unmarshal([]byte(observed.Data["platform-oidc-registration.json"]), observedJSON); err != nil {
+		// If observed data doesn't unmarshal properly, set it to generated content
+		log.Error(err, "Observed JSON did not unmarshal properly; blocking reconciliation until the JSON is fixed or the ConfigMap is deleted.")
 		return
 	}
 	generatedJSON := &registrationJSONData{}
 	if err = json.Unmarshal([]byte(generated.Data["platform-oidc-registration.json"]), generatedJSON); err != nil {
+		log.Error(err, "Generated JSON did not unmarshal properly")
 		return
 	}
-	if !reflect.DeepEqual(generatedJSON, observedJSON) {
+
+	// Helper function to validate a URI
+	validateURI := func(uri string) error {
+		parsed, parseErr := url.Parse(uri)
+		if parseErr != nil {
+			return fmt.Errorf("invalid URI format: %w", parseErr)
+		}
+		if parsed.Scheme == "" || parsed.Host == "" {
+			return fmt.Errorf("URI must have a scheme and host")
+		}
+		return nil
+	}
+
+	// Helper function to check if a URI exists in a slice
+	containsURI := func(slice []string, uri string) bool {
+		for _, item := range slice {
+			if item == uri {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Validate all URIs in observedJSON
+	var invalidURIs []string
+	for _, uri := range observedJSON.TrustedURIPrefixes {
+		if validateErr := validateURI(uri); validateErr != nil {
+			log.Error(validateErr, "Invalid URI in trusted_uri_prefixes", "uri", uri)
+			invalidURIs = append(invalidURIs, fmt.Sprintf("trusted_uri_prefixes: %q - %v", uri, validateErr))
+		}
+	}
+	for _, uri := range observedJSON.RedirectURIs {
+		if validateErr := validateURI(uri); validateErr != nil {
+			log.Error(validateErr, "Invalid URI in redirect_uris", "uri", uri)
+			invalidURIs = append(invalidURIs, fmt.Sprintf("redirect_uris: %q - %v", uri, validateErr))
+		}
+	}
+	for _, uri := range observedJSON.PostLogoutRedirectURIs {
+		if validateErr := validateURI(uri); validateErr != nil {
+			log.Error(validateErr, "Invalid URI in post_logout_redirect_uris", "uri", uri)
+			invalidURIs = append(invalidURIs, fmt.Sprintf("post_logout_redirect_uris: %q - %v", uri, validateErr))
+		}
+	}
+
+	// If there are invalid URIs, return an error
+	if len(invalidURIs) > 0 {
+		err = fmt.Errorf("invalid URIs found in registration JSON: %s", strings.Join(invalidURIs, "; "))
+		return false, err
+	}
+
+	// Check and append missing URIs in trusted_uri_prefixes
+	for _, uri := range generatedJSON.TrustedURIPrefixes {
+		if !containsURI(observedJSON.TrustedURIPrefixes, uri) {
+			// Validate the URI before adding
+			if validateErr := validateURI(uri); validateErr != nil {
+				log.Error(validateErr, "Invalid URI in generated trusted_uri_prefixes", "uri", uri)
+				err = fmt.Errorf("invalid URI in generated trusted_uri_prefixes: %q - %w", uri, validateErr)
+				return false, err
+			}
+			observedJSON.TrustedURIPrefixes = append(observedJSON.TrustedURIPrefixes, uri)
+			updated = true
+		}
+	}
+
+	// Check and append missing URIs in redirect_uris
+	for _, uri := range generatedJSON.RedirectURIs {
+		if !containsURI(observedJSON.RedirectURIs, uri) {
+			// Validate the URI before adding
+			if validateErr := validateURI(uri); validateErr != nil {
+				log.Error(validateErr, "Invalid URI in generated redirect_uris", "uri", uri)
+				err = fmt.Errorf("invalid URI in generated redirect_uris: %q - %w", uri, validateErr)
+				return false, err
+			}
+			observedJSON.RedirectURIs = append(observedJSON.RedirectURIs, uri)
+			updated = true
+		}
+	}
+
+	// Check and append missing URIs in post_logout_redirect_uris
+	for _, uri := range generatedJSON.PostLogoutRedirectURIs {
+		if !containsURI(observedJSON.PostLogoutRedirectURIs, uri) {
+			// Validate the URI before adding
+			if validateErr := validateURI(uri); validateErr != nil {
+				log.Error(validateErr, "Invalid URI in generated post_logout_redirect_uris", "uri", uri)
+				err = fmt.Errorf("invalid URI in generated post_logout_redirect_uris: %q - %w", uri, validateErr)
+				return false, err
+			}
+			observedJSON.PostLogoutRedirectURIs = append(observedJSON.PostLogoutRedirectURIs, uri)
+			updated = true
+		}
+	}
+
+	// If any URIs were appended, marshal the updated observedJSON back to the ConfigMap
+	if updated {
 		var newJSON []byte
-		if newJSON, err = json.MarshalIndent(generatedJSON, "", "  "); err != nil {
+		if newJSON, err = json.MarshalIndent(observedJSON, "", "  "); err != nil {
+			log.Error(err, "Failed to indent updated JSON")
+			return
+		}
+		observed.Data["platform-oidc-registration.json"] = string(newJSON[:])
+
+		// Create a copy of generated with observed's URI arrays to calculate the expected checksum
+		generatedCopy := &registrationJSONData{
+			TokenEndpointAuthMethod: generatedJSON.TokenEndpointAuthMethod,
+			ClientID:                generatedJSON.ClientID,
+			ClientSecret:            generatedJSON.ClientSecret,
+			Scope:                   generatedJSON.Scope,
+			GrantTypes:              generatedJSON.GrantTypes,
+			ResponseTypes:           generatedJSON.ResponseTypes,
+			ApplicationType:         generatedJSON.ApplicationType,
+			SubjectType:             generatedJSON.SubjectType,
+			PreauthorizedScope:      generatedJSON.PreauthorizedScope,
+			IntrospectTokens:        generatedJSON.IntrospectTokens,
+			FunctionalUserGroupIDs:  generatedJSON.FunctionalUserGroupIDs,
+			TrustedURIPrefixes:      observedJSON.TrustedURIPrefixes,
+			RedirectURIs:            observedJSON.RedirectURIs,
+			PostLogoutRedirectURIs:  observedJSON.PostLogoutRedirectURIs,
+		}
+
+		// Marshal the updated generated copy to calculate new checksum
+		var generatedCopyBytes []byte
+		if generatedCopyBytes, err = json.MarshalIndent(generatedCopy, "", "  "); err != nil {
+			log.Error(err, "Failed to marshal generated copy for checksum")
 			return
 		}
 
-		observed.Data["platform-oidc-registration.json"] = string(newJSON[:])
-		updated = true
+		// Create a temporary ConfigMap with the updated data to calculate checksum
+		tempCM := &corev1.ConfigMap{
+			Data: map[string]string{
+				"platform-oidc-registration.json": string(generatedCopyBytes),
+			},
+		}
+
+		var newChecksum string
+		if newChecksum, err = getConfigMapDataSHA1Sum(tempCM); err != nil {
+			log.Error(err, "Failed to calculate new checksum")
+			return
+		}
+
+		// Update the checksum annotation
+		if observed.Annotations == nil {
+			observed.Annotations = make(map[string]string)
+		}
+		observed.Annotations[AnnotationSHA1Sum] = newChecksum
 	}
+
 	if !reflect.DeepEqual(generated.GetOwnerReferences(), observed.GetOwnerReferences()) {
 		observed.OwnerReferences = generated.GetOwnerReferences()
 		updated = true
@@ -802,7 +965,11 @@ func generateRegistrationJsonConfigMap(clusterInfo *corev1.ConfigMap) common.Gen
 		// Set Authentication authCR as the owner and controller of the ConfigMap
 		if err = controllerutil.SetControllerReference(authCR, generated, s.GetClient().Scheme()); err != nil {
 			reqLogger.Error(err, "Failed to set owner for ConfigMap")
+			return
 		}
+
+		// Generate checksum annotation for the ConfigMap data
+		_, err = ensureConfigMapChecksumAnnotation(s, ctx, generated, generated)
 		return
 	}
 }

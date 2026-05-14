@@ -1,7 +1,24 @@
+//
+// Copyright 2024 IBM Corporation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
 package operator
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -1940,4 +1957,1129 @@ var _ = Describe("ConfigMap handling", func() {
 				},
 			}, true, true, false),
 	)
+
+	Describe("registration-json handling", func() {
+		var authCR *operatorv1alpha1.Authentication
+		var cb fakeclient.ClientBuilder
+		var cl client.WithWatch
+		var scheme *runtime.Scheme
+		var ctx context.Context
+		var ibmcloudClusterInfo *corev1.ConfigMap
+		var platformOIDCCredentials *corev1.Secret
+
+		BeforeEach(func() {
+			authCR = &operatorv1alpha1.Authentication{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "operator.ibm.com/v1alpha1",
+					Kind:       "Authentication",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "example-authentication",
+					Namespace:       "data-ns",
+					ResourceVersion: trackerAddResourceVersion,
+				},
+				Spec: operatorv1alpha1.AuthenticationSpec{
+					Config: operatorv1alpha1.ConfigSpec{
+						ClusterName: "mycluster",
+					},
+				},
+			}
+			ibmcloudClusterInfo = &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ibmcloud-cluster-info",
+					Namespace: "data-ns",
+				},
+				Data: map[string]string{
+					"cluster_address": "cp-console.example.com",
+				},
+			}
+			platformOIDCCredentials = &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "platform-oidc-credentials",
+					Namespace: "data-ns",
+				},
+				Data: map[string][]byte{
+					"WLP_CLIENT_ID":     []byte("test-client-id"),
+					"WLP_CLIENT_SECRET": []byte("test-client-secret"),
+				},
+			}
+			scheme = runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).To(Succeed())
+			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
+			cb = *fakeclient.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(ibmcloudClusterInfo, authCR, platformOIDCCredentials)
+			cl = cb.Build()
+			ctx = context.Background()
+		})
+
+		It("generates a ConfigMap with registration JSON", func() {
+			generated := &corev1.ConfigMap{}
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(generated.Data).ToNot(BeNil())
+			Expect(generated.Data["platform-oidc-registration.json"]).ToNot(BeEmpty())
+		})
+
+		It("returns error when observed JSON is malformed", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": "invalid json {{{",
+				},
+			}
+
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			updated, err := updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).To(HaveOccurred())
+			Expect(updated).To(BeFalse())
+			Expect(err.Error()).To(ContainSubstring("invalid character"))
+		})
+
+		It("appends missing URIs to trusted_uri_prefixes", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			observedData := `{
+  "token_endpoint_auth_method": "client_secret_basic",
+  "client_id": "test-client-id",
+  "client_secret": "test-client-secret",
+  "scope": "openid profile email",
+  "grant_types": ["authorization_code", "client_credentials", "password", "implicit", "refresh_token", "urn:ietf:params:oauth:grant-type:jwt-bearer"],
+  "response_types": ["code", "token", "id_token token"],
+  "application_type": "web",
+  "subject_type": "public",
+  "post_logout_redirect_uris": ["https://cp-console.example.com"],
+  "preauthorized_scope": "openid profile email general",
+  "introspect_tokens": true,
+  "functional_user_groupIds": [],
+  "trusted_uri_prefixes": ["https://existing-uri.example.com"],
+  "redirect_uris": ["https://cp-console.example.com/auth/liberty/callback"]
+}`
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": observedData,
+				},
+			}
+
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			updated, err := updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updated).To(BeTrue())
+
+			// Verify the observed data now contains both old and new URIs
+			var updatedJSON registrationJSONData
+			err = json.Unmarshal([]byte(observed.Data["platform-oidc-registration.json"]), &updatedJSON)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updatedJSON.TrustedURIPrefixes).To(ContainElement("https://existing-uri.example.com"))
+			Expect(len(updatedJSON.TrustedURIPrefixes)).To(BeNumerically(">", 1))
+		})
+
+		It("appends missing URIs to redirect_uris", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			observedData := `{
+  "token_endpoint_auth_method": "client_secret_basic",
+  "client_id": "test-client-id",
+  "client_secret": "test-client-secret",
+  "scope": "openid profile email",
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "application_type": "web",
+  "subject_type": "public",
+  "post_logout_redirect_uris": ["https://cp-console.example.com"],
+  "preauthorized_scope": "openid profile email general",
+  "introspect_tokens": true,
+  "functional_user_groupIds": [],
+  "trusted_uri_prefixes": ["https://cp-console.example.com"],
+  "redirect_uris": ["https://old-redirect.example.com/callback"]
+}`
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": observedData,
+				},
+			}
+
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			updated, err := updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updated).To(BeTrue())
+
+			var updatedJSON registrationJSONData
+			err = json.Unmarshal([]byte(observed.Data["platform-oidc-registration.json"]), &updatedJSON)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updatedJSON.RedirectURIs).To(ContainElement("https://old-redirect.example.com/callback"))
+			Expect(len(updatedJSON.RedirectURIs)).To(BeNumerically(">", 1))
+		})
+
+		It("appends missing URIs to post_logout_redirect_uris", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			observedData := `{
+  "token_endpoint_auth_method": "client_secret_basic",
+  "client_id": "test-client-id",
+  "client_secret": "test-client-secret",
+  "scope": "openid profile email",
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "application_type": "web",
+  "subject_type": "public",
+  "post_logout_redirect_uris": ["https://old-logout.example.com"],
+  "preauthorized_scope": "openid profile email general",
+  "introspect_tokens": true,
+  "functional_user_groupIds": [],
+  "trusted_uri_prefixes": ["https://cp-console.example.com"],
+  "redirect_uris": ["https://cp-console.example.com/auth/liberty/callback"]
+}`
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": observedData,
+				},
+			}
+
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			updated, err := updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updated).To(BeTrue())
+
+			var updatedJSON registrationJSONData
+			err = json.Unmarshal([]byte(observed.Data["platform-oidc-registration.json"]), &updatedJSON)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updatedJSON.PostLogoutRedirectURIs).To(ContainElement("https://old-logout.example.com"))
+			Expect(len(updatedJSON.PostLogoutRedirectURIs)).To(BeNumerically(">", 1))
+		})
+
+		It("does not update when all URIs are already present", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Use the same data for observed as generated
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": generated.Data["platform-oidc-registration.json"],
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					OwnerReferences: generated.GetOwnerReferences(),
+				},
+			}
+
+			updated, err := updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updated).To(BeFalse())
+		})
+
+		It("appends multiple missing URIs across all three fields", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			observedData := `{
+  "token_endpoint_auth_method": "client_secret_basic",
+  "client_id": "test-client-id",
+  "client_secret": "test-client-secret",
+  "scope": "openid profile email",
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "application_type": "web",
+  "subject_type": "public",
+  "post_logout_redirect_uris": ["https://old-logout1.example.com", "https://old-logout2.example.com"],
+  "preauthorized_scope": "openid profile email general",
+  "introspect_tokens": true,
+  "functional_user_groupIds": [],
+  "trusted_uri_prefixes": ["https://old-trusted1.example.com"],
+  "redirect_uris": ["https://old-redirect1.example.com"]
+}`
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": observedData,
+				},
+			}
+
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			updated, err := updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updated).To(BeTrue())
+
+			var updatedJSON registrationJSONData
+			err = json.Unmarshal([]byte(observed.Data["platform-oidc-registration.json"]), &updatedJSON)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify old URIs are preserved
+			Expect(updatedJSON.TrustedURIPrefixes).To(ContainElement("https://old-trusted1.example.com"))
+			Expect(updatedJSON.RedirectURIs).To(ContainElement("https://old-redirect1.example.com"))
+			Expect(updatedJSON.PostLogoutRedirectURIs).To(ContainElement("https://old-logout1.example.com"))
+			Expect(updatedJSON.PostLogoutRedirectURIs).To(ContainElement("https://old-logout2.example.com"))
+
+			// Verify new URIs are added
+			Expect(len(updatedJSON.TrustedURIPrefixes)).To(BeNumerically(">", 1))
+			Expect(len(updatedJSON.RedirectURIs)).To(BeNumerically(">", 1))
+			Expect(len(updatedJSON.PostLogoutRedirectURIs)).To(BeNumerically(">", 2))
+		})
+
+		It("handles empty URI arrays in observed data", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			observedData := `{
+  "token_endpoint_auth_method": "client_secret_basic",
+  "client_id": "test-client-id",
+  "client_secret": "test-client-secret",
+  "scope": "openid profile email",
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "application_type": "web",
+  "subject_type": "public",
+  "post_logout_redirect_uris": [],
+  "preauthorized_scope": "openid profile email general",
+  "introspect_tokens": true,
+  "functional_user_groupIds": [],
+  "trusted_uri_prefixes": [],
+  "redirect_uris": []
+}`
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": observedData,
+				},
+			}
+
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			updated, err := updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updated).To(BeTrue())
+
+			var updatedJSON registrationJSONData
+			err = json.Unmarshal([]byte(observed.Data["platform-oidc-registration.json"]), &updatedJSON)
+			Expect(err).ToNot(HaveOccurred())
+
+			// All URIs from generated should be added
+			Expect(len(updatedJSON.TrustedURIPrefixes)).To(BeNumerically(">", 0))
+			Expect(len(updatedJSON.RedirectURIs)).To(BeNumerically(">", 0))
+			Expect(len(updatedJSON.PostLogoutRedirectURIs)).To(BeNumerically(">", 0))
+		})
+
+		It("updates owner references when they differ", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": generated.Data["platform-oidc-registration.json"],
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					OwnerReferences: []metav1.OwnerReference{}, // Different from generated
+				},
+			}
+
+			updated, err := updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updated).To(BeTrue())
+			Expect(observed.GetOwnerReferences()).To(Equal(generated.GetOwnerReferences()))
+		})
+	})
+
+	Describe("ConfigMap checksum annotation handling", func() {
+		var authCR *operatorv1alpha1.Authentication
+		var cb fakeclient.ClientBuilder
+		var cl client.WithWatch
+		var scheme *runtime.Scheme
+		var ctx context.Context
+		var ibmcloudClusterInfo *corev1.ConfigMap
+		var platformOIDCCredentials *corev1.Secret
+
+		BeforeEach(func() {
+			authCR = &operatorv1alpha1.Authentication{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "operator.ibm.com/v1alpha1",
+					Kind:       "Authentication",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "example-authentication",
+					Namespace:       "data-ns",
+					ResourceVersion: trackerAddResourceVersion,
+				},
+				Spec: operatorv1alpha1.AuthenticationSpec{
+					Config: operatorv1alpha1.ConfigSpec{
+						ClusterName: "mycluster",
+					},
+				},
+			}
+			ibmcloudClusterInfo = &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ibmcloud-cluster-info",
+					Namespace: "data-ns",
+				},
+				Data: map[string]string{
+					"cluster_address": "cp-console.example.com",
+				},
+			}
+			platformOIDCCredentials = &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "platform-oidc-credentials",
+					Namespace: "data-ns",
+				},
+				Data: map[string][]byte{
+					"WLP_CLIENT_ID":     []byte("test-client-id"),
+					"WLP_CLIENT_SECRET": []byte("test-client-secret"),
+				},
+			}
+			scheme = runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).To(Succeed())
+			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
+			cb = *fakeclient.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(ibmcloudClusterInfo, authCR, platformOIDCCredentials)
+			cl = cb.Build()
+			ctx = context.Background()
+		})
+
+		It("ensureConfigMapChecksumAnnotation sets annotation when missing", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("test-configmap").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			cm := &corev1.ConfigMap{
+				Data: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+				},
+			}
+
+			modified, err := ensureConfigMapChecksumAnnotation(resource, ctx, cm, cm)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(modified).To(BeTrue())
+			Expect(cm.Annotations).ToNot(BeNil())
+			Expect(cm.Annotations[AnnotationSHA1Sum]).ToNot(BeEmpty())
+		})
+
+		It("ensureConfigMapChecksumAnnotation updates annotation when data changes", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("test-configmap").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			cm := &corev1.ConfigMap{
+				Data: map[string]string{
+					"key1": "value1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationSHA1Sum: "old-checksum",
+					},
+				},
+			}
+
+			modified, err := ensureConfigMapChecksumAnnotation(resource, ctx, cm, cm)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(modified).To(BeTrue())
+			Expect(cm.Annotations[AnnotationSHA1Sum]).ToNot(Equal("old-checksum"))
+		})
+
+		It("ensureConfigMapChecksumAnnotation does not modify when checksum matches", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("test-configmap").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			cm := &corev1.ConfigMap{
+				Data: map[string]string{
+					"key1": "value1",
+				},
+			}
+
+			// First call to set the checksum
+			modified, err := ensureConfigMapChecksumAnnotation(resource, ctx, cm, cm)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(modified).To(BeTrue())
+			originalChecksum := cm.Annotations[AnnotationSHA1Sum]
+
+			// Second call should not modify
+			modified, err = ensureConfigMapChecksumAnnotation(resource, ctx, cm, cm)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(modified).To(BeFalse())
+			Expect(cm.Annotations[AnnotationSHA1Sum]).To(Equal(originalChecksum))
+		})
+
+		It("generateRegistrationJsonConfigMap sets checksum annotation", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(generated.Annotations).ToNot(BeNil())
+			Expect(generated.Annotations[AnnotationSHA1Sum]).ToNot(BeEmpty())
+		})
+
+		It("updateRegistrationJSON updates checksum when URIs change", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			// Generate initial ConfigMap with checksum
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+			originalChecksum := generated.Annotations[AnnotationSHA1Sum]
+
+			// Create observed with additional URIs
+			observedData := `{
+  "token_endpoint_auth_method": "client_secret_basic",
+  "client_id": "test-client-id",
+  "client_secret": "test-client-secret",
+  "scope": "openid profile email",
+  "grant_types": ["authorization_code", "client_credentials", "password", "implicit", "refresh_token", "urn:ietf:params:oauth:grant-type:jwt-bearer"],
+  "response_types": ["code", "token", "id_token token"],
+  "application_type": "web",
+  "subject_type": "public",
+  "post_logout_redirect_uris": ["https://cp-console.example.com", "https://custom-logout.example.com"],
+  "preauthorized_scope": "openid profile email general",
+  "introspect_tokens": true,
+  "functional_user_groupIds": [],
+  "trusted_uri_prefixes": ["https://cp-console.example.com", "https://custom-trusted.example.com"],
+  "redirect_uris": ["https://cp-console.example.com/auth/liberty/callback", "https://custom-redirect.example.com/callback"]
+}`
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": observedData,
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationSHA1Sum: originalChecksum,
+					},
+				},
+			}
+
+			updated, err := updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updated).To(BeTrue())
+			Expect(observed.Annotations[AnnotationSHA1Sum]).ToNot(Equal(originalChecksum))
+		})
+
+		It("updateRegistrationJSON does not update checksum when URIs match", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			// Generate ConfigMap
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Create observed with same data
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": generated.Data["platform-oidc-registration.json"],
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationSHA1Sum: generated.Annotations[AnnotationSHA1Sum],
+					},
+					OwnerReferences: generated.GetOwnerReferences(),
+				},
+			}
+
+			updated, err := updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updated).To(BeFalse())
+		})
+
+		It("updateRegistrationJSON calculates correct checksum with observed URIs", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			// Generate initial ConfigMap
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Parse generated JSON to get base URIs
+			var generatedJSON registrationJSONData
+			err = json.Unmarshal([]byte(generated.Data["platform-oidc-registration.json"]), &generatedJSON)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Create observed with ONLY custom URIs (not including generated ones)
+			// This will trigger the update logic to append the generated URIs
+			customTrusted := "https://custom-trusted.example.com"
+			customRedirect := "https://custom-redirect.example.com/callback"
+			customLogout := "https://custom-logout.example.com"
+
+			observedJSON := registrationJSONData{
+				TokenEndpointAuthMethod: generatedJSON.TokenEndpointAuthMethod,
+				ClientID:                generatedJSON.ClientID,
+				ClientSecret:            generatedJSON.ClientSecret,
+				Scope:                   generatedJSON.Scope,
+				GrantTypes:              generatedJSON.GrantTypes,
+				ResponseTypes:           generatedJSON.ResponseTypes,
+				ApplicationType:         generatedJSON.ApplicationType,
+				SubjectType:             generatedJSON.SubjectType,
+				PreauthorizedScope:      generatedJSON.PreauthorizedScope,
+				IntrospectTokens:        generatedJSON.IntrospectTokens,
+				FunctionalUserGroupIDs:  generatedJSON.FunctionalUserGroupIDs,
+				TrustedURIPrefixes:      []string{customTrusted},
+				RedirectURIs:            []string{customRedirect},
+				PostLogoutRedirectURIs:  []string{customLogout},
+			}
+
+			observedBytes, err := json.MarshalIndent(observedJSON, "", "  ")
+			Expect(err).ToNot(HaveOccurred())
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": string(observedBytes),
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationSHA1Sum: "old-checksum",
+					},
+				},
+			}
+
+			// Update should append generated URIs and calculate new checksum
+			updated, err := updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updated).To(BeTrue())
+
+			// Parse the updated observed JSON
+			var updatedObservedJSON registrationJSONData
+			err = json.Unmarshal([]byte(observed.Data["platform-oidc-registration.json"]), &updatedObservedJSON)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify custom URIs are preserved
+			Expect(updatedObservedJSON.TrustedURIPrefixes).To(ContainElement(customTrusted))
+			Expect(updatedObservedJSON.RedirectURIs).To(ContainElement(customRedirect))
+			Expect(updatedObservedJSON.PostLogoutRedirectURIs).To(ContainElement(customLogout))
+
+			// Verify generated URIs were appended
+			for _, uri := range generatedJSON.TrustedURIPrefixes {
+				Expect(updatedObservedJSON.TrustedURIPrefixes).To(ContainElement(uri))
+			}
+			for _, uri := range generatedJSON.RedirectURIs {
+				Expect(updatedObservedJSON.RedirectURIs).To(ContainElement(uri))
+			}
+			for _, uri := range generatedJSON.PostLogoutRedirectURIs {
+				Expect(updatedObservedJSON.PostLogoutRedirectURIs).To(ContainElement(uri))
+			}
+
+			// Verify the checksum was updated and is not the old value
+			Expect(observed.Annotations[AnnotationSHA1Sum]).ToNot(Equal("old-checksum"))
+			Expect(observed.Annotations[AnnotationSHA1Sum]).ToNot(BeEmpty())
+		})
+
+		It("updateRegistrationJSON returns error for malformed JSON", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": "invalid json {{{",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationSHA1Sum: "old-checksum",
+					},
+				},
+			}
+
+			updated, err := updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).To(HaveOccurred())
+			Expect(updated).To(BeFalse())
+			Expect(err.Error()).To(ContainSubstring("invalid character"))
+		})
+	})
+
+	Describe("registration-json URI validation", func() {
+		var authCR *operatorv1alpha1.Authentication
+		var cb fakeclient.ClientBuilder
+		var cl client.WithWatch
+		var scheme *runtime.Scheme
+		var ctx context.Context
+		var ibmcloudClusterInfo *corev1.ConfigMap
+		var platformOIDCCredentials *corev1.Secret
+
+		BeforeEach(func() {
+			authCR = &operatorv1alpha1.Authentication{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "operator.ibm.com/v1alpha1",
+					Kind:       "Authentication",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "example-authentication",
+					Namespace:       "data-ns",
+					ResourceVersion: trackerAddResourceVersion,
+				},
+				Spec: operatorv1alpha1.AuthenticationSpec{
+					Config: operatorv1alpha1.ConfigSpec{
+						ClusterName: "mycluster",
+					},
+				},
+			}
+			ibmcloudClusterInfo = &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ibmcloud-cluster-info",
+					Namespace: "data-ns",
+				},
+				Data: map[string]string{
+					"cluster_address": "cp-console.example.com",
+				},
+			}
+			platformOIDCCredentials = &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "platform-oidc-credentials",
+					Namespace: "data-ns",
+				},
+				Data: map[string][]byte{
+					"WLP_CLIENT_ID":     []byte("test-client-id"),
+					"WLP_CLIENT_SECRET": []byte("test-client-secret"),
+				},
+			}
+			scheme = runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).To(Succeed())
+			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
+			cb = *fakeclient.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(ibmcloudClusterInfo, authCR, platformOIDCCredentials)
+			cl = cb.Build()
+			ctx = context.Background()
+		})
+
+		It("accepts valid URIs with https scheme", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			observedData := `{
+  "token_endpoint_auth_method": "client_secret_basic",
+  "client_id": "test-client-id",
+  "client_secret": "test-client-secret",
+  "scope": "openid profile email",
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "application_type": "web",
+  "subject_type": "public",
+  "post_logout_redirect_uris": ["https://valid-logout.example.com/logout"],
+  "preauthorized_scope": "openid profile email general",
+  "introspect_tokens": true,
+  "functional_user_groupIds": [],
+  "trusted_uri_prefixes": ["https://valid-trusted.example.com"],
+  "redirect_uris": ["https://valid-redirect.example.com/callback"]
+}`
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": observedData,
+				},
+			}
+
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("accepts valid URIs with http scheme", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			observedData := `{
+  "token_endpoint_auth_method": "client_secret_basic",
+  "client_id": "test-client-id",
+  "client_secret": "test-client-secret",
+  "scope": "openid profile email",
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "application_type": "web",
+  "subject_type": "public",
+  "post_logout_redirect_uris": ["http://localhost:8080/logout"],
+  "preauthorized_scope": "openid profile email general",
+  "introspect_tokens": true,
+  "functional_user_groupIds": [],
+  "trusted_uri_prefixes": ["http://localhost:8080"],
+  "redirect_uris": ["http://localhost:8080/callback"]
+}`
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": observedData,
+				},
+			}
+
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("rejects URIs without scheme in trusted_uri_prefixes", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			observedData := `{
+  "token_endpoint_auth_method": "client_secret_basic",
+  "client_id": "test-client-id",
+  "client_secret": "test-client-secret",
+  "scope": "openid profile email",
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "application_type": "web",
+  "subject_type": "public",
+  "post_logout_redirect_uris": ["https://cp-console.example.com"],
+  "preauthorized_scope": "openid profile email general",
+  "introspect_tokens": true,
+  "functional_user_groupIds": [],
+  "trusted_uri_prefixes": ["invalid-uri-without-scheme"],
+  "redirect_uris": ["https://cp-console.example.com/auth/liberty/callback"]
+}`
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": observedData,
+				},
+			}
+
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid URIs found"))
+			Expect(err.Error()).To(ContainSubstring("trusted_uri_prefixes"))
+			Expect(err.Error()).To(ContainSubstring("invalid-uri-without-scheme"))
+		})
+
+		It("rejects URIs without host in redirect_uris", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			observedData := `{
+  "token_endpoint_auth_method": "client_secret_basic",
+  "client_id": "test-client-id",
+  "client_secret": "test-client-secret",
+  "scope": "openid profile email",
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "application_type": "web",
+  "subject_type": "public",
+  "post_logout_redirect_uris": ["https://cp-console.example.com"],
+  "preauthorized_scope": "openid profile email general",
+  "introspect_tokens": true,
+  "functional_user_groupIds": [],
+  "trusted_uri_prefixes": ["https://cp-console.example.com"],
+  "redirect_uris": ["https://"]
+}`
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": observedData,
+				},
+			}
+
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid URIs found"))
+			Expect(err.Error()).To(ContainSubstring("redirect_uris"))
+		})
+
+		It("rejects completely malformed URIs in post_logout_redirect_uris", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			observedData := `{
+  "token_endpoint_auth_method": "client_secret_basic",
+  "client_id": "test-client-id",
+  "client_secret": "test-client-secret",
+  "scope": "openid profile email",
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "application_type": "web",
+  "subject_type": "public",
+  "post_logout_redirect_uris": ["ht!tp://invalid url with spaces"],
+  "preauthorized_scope": "openid profile email general",
+  "introspect_tokens": true,
+  "functional_user_groupIds": [],
+  "trusted_uri_prefixes": ["https://cp-console.example.com"],
+  "redirect_uris": ["https://cp-console.example.com/auth/liberty/callback"]
+}`
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": observedData,
+				},
+			}
+
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid URIs found"))
+			Expect(err.Error()).To(ContainSubstring("post_logout_redirect_uris"))
+		})
+
+		It("rejects multiple invalid URIs across different fields", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			observedData := `{
+  "token_endpoint_auth_method": "client_secret_basic",
+  "client_id": "test-client-id",
+  "client_secret": "test-client-secret",
+  "scope": "openid profile email",
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "application_type": "web",
+  "subject_type": "public",
+  "post_logout_redirect_uris": ["not-a-valid-uri", "https://valid.example.com"],
+  "preauthorized_scope": "openid profile email general",
+  "introspect_tokens": true,
+  "functional_user_groupIds": [],
+  "trusted_uri_prefixes": ["missing-scheme.example.com"],
+  "redirect_uris": ["https://", "https://valid-redirect.example.com/callback"]
+}`
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": observedData,
+				},
+			}
+
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid URIs found"))
+			Expect(err.Error()).To(ContainSubstring("trusted_uri_prefixes"))
+			Expect(err.Error()).To(ContainSubstring("redirect_uris"))
+			Expect(err.Error()).To(ContainSubstring("post_logout_redirect_uris"))
+		})
+
+		It("accepts URIs with ports", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			observedData := `{
+  "token_endpoint_auth_method": "client_secret_basic",
+  "client_id": "test-client-id",
+  "client_secret": "test-client-secret",
+  "scope": "openid profile email",
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "application_type": "web",
+  "subject_type": "public",
+  "post_logout_redirect_uris": ["https://example.com:8443/logout"],
+  "preauthorized_scope": "openid profile email general",
+  "introspect_tokens": true,
+  "functional_user_groupIds": [],
+  "trusted_uri_prefixes": ["https://example.com:8443"],
+  "redirect_uris": ["https://example.com:8443/callback"]
+}`
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": observedData,
+				},
+			}
+
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("accepts URIs with paths and query parameters", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			observedData := `{
+  "token_endpoint_auth_method": "client_secret_basic",
+  "client_id": "test-client-id",
+  "client_secret": "test-client-secret",
+  "scope": "openid profile email",
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "application_type": "web",
+  "subject_type": "public",
+  "post_logout_redirect_uris": ["https://example.com/path/to/logout?param=value"],
+  "preauthorized_scope": "openid profile email general",
+  "introspect_tokens": true,
+  "functional_user_groupIds": [],
+  "trusted_uri_prefixes": ["https://example.com/path"],
+  "redirect_uris": ["https://example.com/auth/callback?state=xyz"]
+}`
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": observedData,
+				},
+			}
+
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("rejects empty string URIs", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("registration-json").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			observedData := `{
+  "token_endpoint_auth_method": "client_secret_basic",
+  "client_id": "test-client-id",
+  "client_secret": "test-client-secret",
+  "scope": "openid profile email",
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "application_type": "web",
+  "subject_type": "public",
+  "post_logout_redirect_uris": [""],
+  "preauthorized_scope": "openid profile email general",
+  "introspect_tokens": true,
+  "functional_user_groupIds": [],
+  "trusted_uri_prefixes": ["https://cp-console.example.com"],
+  "redirect_uris": ["https://cp-console.example.com/auth/liberty/callback"]
+}`
+
+			observed := &corev1.ConfigMap{
+				Data: map[string]string{
+					"platform-oidc-registration.json": observedData,
+				},
+			}
+
+			generated := &corev1.ConfigMap{}
+			err := generateRegistrationJsonConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = updateRegistrationJSON(resource, ctx, observed, generated)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid URIs found"))
+			Expect(err.Error()).To(ContainSubstring("post_logout_redirect_uris"))
+		})
+	})
 })

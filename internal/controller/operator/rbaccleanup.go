@@ -114,10 +114,16 @@ func (r *AuthenticationReconciler) cleanupOldRBAC(ctx context.Context, req ctrl.
 			}
 
 			// Count ClusterRoleBindings that reference the ibm-iam-operand-restricted ClusterRole
+			// and check if the single one found matches the one we're deleting
 			count := 0
+			matchesCurrentCRB := false
 			for _, crb := range crbList.Items {
 				if crb.RoleRef.Kind == "ClusterRole" && crb.RoleRef.Name == "ibm-iam-operand-restricted" {
 					count++
+					// Check if this is the ClusterRoleBinding we're about to delete
+					if crb.Name == crbname {
+						matchesCurrentCRB = true
+					}
 					// Early exit if we've found more than one
 					if count > 1 {
 						break
@@ -126,9 +132,12 @@ func (r *AuthenticationReconciler) cleanupOldRBAC(ctx context.Context, req ctrl.
 			}
 
 			// Only delete ClusterRole if there's exactly one ClusterRoleBinding
-			// (the one being deleted in this reconciliation)
-			if count == 1 {
-				log.Info("Single ClusterRoleBinding references the ClusterRole, proceeding with ClusterRole deletion", "count", count)
+			// AND it matches the one being deleted in this reconciliation
+			if count == 1 && matchesCurrentCRB {
+				log.Info("Single ClusterRoleBinding references the ClusterRole and matches current namespace, proceeding with ClusterRole deletion", "count", count, "clusterRoleBinding", crbname)
+			} else if count == 1 && !matchesCurrentCRB {
+				log.Info("Single ClusterRoleBinding references the ClusterRole but belongs to different namespace, skipping ClusterRole deletion", "count", count, "found", crbList.Items[0].Name, "expected", crbname)
+				shouldDeleteClusterRole = false
 			} else if count > 1 {
 				log.Info("Multiple ClusterRoleBindings reference the ClusterRole, skipping ClusterRole deletion", "count", count)
 				shouldDeleteClusterRole = false

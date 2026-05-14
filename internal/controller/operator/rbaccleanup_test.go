@@ -323,6 +323,54 @@ func TestCleanupOldRBAC_MultipleClusterRoleBindings(t *testing.T) {
 	}
 }
 
+func TestCleanupOldRBAC_SingleClusterRoleBindingDifferentNamespace(t *testing.T) {
+	// Only one ClusterRoleBinding exists, but it's for a different namespace
+	existingObjs := []client.Object{
+		&rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "ibm-iam-operand-restricted-other-namespace",
+				Labels: map[string]string{
+					"app.kubernetes.io/managed-by": "ibm-iam-operator",
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				Kind: "ClusterRole",
+				Name: "ibm-iam-operand-restricted",
+			},
+		},
+		&rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "ibm-iam-operand-restricted",
+			},
+		},
+	}
+
+	r, req, _ := setupTest(t, existingObjs, nil)
+	ctx := context.Background()
+
+	result, err := r.cleanupOldRBAC(ctx, req)
+	if err != nil {
+		t.Fatalf("cleanupOldRBAC failed: %v", err)
+	}
+	if result != nil {
+		t.Fatalf("Expected nil result, got: %v", result)
+	}
+
+	// Verify ClusterRole still exists (not deleted because the single CRB doesn't match our namespace)
+	cr := &rbacv1.ClusterRole{}
+	err = r.Client.Get(ctx, types.NamespacedName{Name: "ibm-iam-operand-restricted"}, cr)
+	if err != nil {
+		t.Errorf("Expected ClusterRole to still exist, but got error: %v", err)
+	}
+
+	// Verify the other namespace's ClusterRoleBinding still exists
+	otherCrb := &rbacv1.ClusterRoleBinding{}
+	err = r.Client.Get(ctx, types.NamespacedName{Name: "ibm-iam-operand-restricted-other-namespace"}, otherCrb)
+	if err != nil {
+		t.Errorf("Expected other ClusterRoleBinding to still exist, but got error: %v", err)
+	}
+}
+
 func TestCleanupOldRBAC_NoListPermission(t *testing.T) {
 	existingObjs := []client.Object{
 		&rbacv1.ClusterRole{

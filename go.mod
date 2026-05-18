@@ -1,6 +1,6 @@
 module github.com/IBM/ibm-iam-operator
 
-go 1.26.2
+go 1.26.3
 
 require (
 	github.com/go-logr/logr v1.4.3

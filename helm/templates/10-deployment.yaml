@@ -83,6 +83,11 @@ metadata:
               "fipsEnabled": true,
               "ibmCloudSaas": false,
               "icpPort": 8443,
+              {{- if not .Values.cpfs.manageNetworking }}
+              "ingress": {
+                "gvk": "none"
+              },
+              {{- end }}
               "installType": "fresh",
               "isOpenshiftEnv": true,
               "nonceEnabled": true,

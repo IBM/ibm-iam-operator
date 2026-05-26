@@ -1,6 +1,6 @@
 module github.com/IBM/ibm-iam-operator
 
-go 1.26.1
+go 1.26.3
 
 require (
 	github.com/google/uuid v1.6.0

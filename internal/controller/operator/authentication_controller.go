@@ -445,11 +445,19 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		hasRouteAccess, err := r.hasAPIAccess(ctx, "", "route.openshift.io", "routes", routeVerbs)
 		if err != nil {
 			setupLog.Error(err, "Failed to check Route permissions for watch setup")
-		} else if hasRouteAccess {
-			setupLog.V(1).Info("Route API present with required permissions; setting up Route watch")
-			authCtrl.Watches(&routev1.Route{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
-		} else {
+		} else if !hasRouteAccess {
 			setupLog.Info("Route API present but missing required permissions; skipping Route watch")
+		} else {
+			// Also check routes/custom-host subresource permission
+			hasCustomHostAccess, err := r.hasAPIAccess(ctx, "", "route.openshift.io", "routes/custom-host", []string{"create"})
+			if err != nil {
+				setupLog.Error(err, "Failed to check routes/custom-host permissions for watch setup")
+			} else if hasCustomHostAccess {
+				setupLog.V(1).Info("Route API present with all required permissions including routes/custom-host; setting up Route watch")
+				authCtrl.Watches(&routev1.Route{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+			} else {
+				setupLog.Info("Route API present but missing routes/custom-host create permission; skipping Route watch")
+			}
 		}
 	}
 

@@ -104,17 +104,25 @@ func init() {
 		utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
 	}
 
-	// Check Route permissions
+	// Check Route permissions (including routes/custom-host subresource)
 	routeVerbs := []string{"get", "list", "watch", "create", "delete", "update", "patch"}
 	if controllercommon.ClusterHasRouteGroupVersion(dc) {
 		hasRouteAccess, err := hasNamespacedAPIAccess(ctx, tempClient, "", "route.openshift.io", "routes", routeVerbs)
 		if err != nil {
 			setupLog.Error(err, "Failed to check Route permissions")
-		} else if hasRouteAccess {
-			setupLog.V(1).Info("Route API present with required permissions; adding Routes to scheme")
-			utilruntime.Must(routev1.AddToScheme(scheme))
-		} else {
+		} else if !hasRouteAccess {
 			setupLog.Info("Route API present but missing required permissions; skipping Routes scheme")
+		} else {
+			// Also check routes/custom-host subresource permission
+			hasCustomHostAccess, err := hasNamespacedAPIAccess(ctx, tempClient, "", "route.openshift.io", "routes/custom-host", []string{"create"})
+			if err != nil {
+				setupLog.Error(err, "Failed to check routes/custom-host permissions")
+			} else if hasCustomHostAccess {
+				setupLog.V(1).Info("Route API present with all required permissions including routes/custom-host; adding Routes to scheme")
+				utilruntime.Must(routev1.AddToScheme(scheme))
+			} else {
+				setupLog.Info("Route API present but missing routes/custom-host create permission; skipping Routes scheme")
+			}
 		}
 	}
 

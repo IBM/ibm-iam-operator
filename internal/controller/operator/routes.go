@@ -88,6 +88,17 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Re
 		return subreconciler.ContinueReconciling()
 	}
 
+	// Also check routes/custom-host subresource permission
+	hasCustomHostAccess, err := r.hasAPIAccess(ctx, "", "route.openshift.io", "routes/custom-host", []string{"create"})
+	if err != nil {
+		log.Error(err, "Failed to check routes/custom-host permissions")
+		return subreconciler.RequeueWithError(err)
+	}
+	if !hasCustomHostAccess {
+		log.Info("Operator does not have routes/custom-host create permission; skipping Route reconciliation")
+		return subreconciler.ContinueReconciling()
+	}
+
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return

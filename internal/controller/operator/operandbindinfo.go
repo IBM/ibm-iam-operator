@@ -45,6 +45,18 @@ func (r *AuthenticationReconciler) handleOperandBindInfo(ctx context.Context, re
 		return subreconciler.ContinueReconciling()
 	}
 
+	// Check if operator has required OperandBindInfo permissions
+	operandBindInfoVerbs := []string{"create", "get", "list", "patch", "watch", "update", "delete"}
+	hasOperandBindInfoAccess, err := r.hasAPIAccess(ctx, "", "operator.ibm.com", "operandbindinfos", operandBindInfoVerbs)
+	if err != nil {
+		log.Error(err, "Failed to check OperandBindInfo permissions")
+		return subreconciler.RequeueWithError(err)
+	}
+	if !hasOperandBindInfoAccess {
+		log.Info("Operator does not have required OperandBindInfo permissions; skipping OperandBindInfo reconciliation")
+		return subreconciler.ContinueReconciling()
+	}
+
 	log = log.WithValues("OperandBindInfo.Name", bindInfoName)
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {

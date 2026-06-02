@@ -426,6 +426,9 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	setupLog := ctrl.Log.WithName("setup")
+	ctx := context.Background()
+
 	authCtrl := ctrl.NewControllerManagedBy(mgr).
 		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&corev1.Secret{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
@@ -436,50 +439,92 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&appsv1.Deployment{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&autoscalingv2.HorizontalPodAutoscaler{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
 
-	//Add routes
+	// Add Routes watch if API is present and operator has required permissions
 	if common.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
-		authCtrl.Watches(&routev1.Route{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
-	}
-	if common.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
-		authCtrl.Watches(&operatorv1alpha1.OperandRequest{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
-	}
-	if common.ClusterHasOperandBindInfoAPIResource(&r.DiscoveryClient) {
-		authCtrl.Watches(&operatorv1alpha1.OperandBindInfo{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
-	}
-	if common.ClusterHasCSIGroupVersion(&r.DiscoveryClient) {
-		authCtrl.Watches(&sscsidriverv1.SecretProviderClass{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
-		spcLabelSelector := metav1.LabelSelector{
-			MatchExpressions: []metav1.LabelSelectorRequirement{
-				{
-					Key:      "app.kubernetes.io/part-of",
-					Operator: metav1.LabelSelectorOpIn,
-					Values:   []string{"im"},
-				},
-				{
-					Key:      SecretProviderClassAsVolumeLabel,
-					Operator: metav1.LabelSelectorOpExists,
-				},
-			},
-		}
-		spcLabelPredicate, err := predicate.LabelSelectorPredicate(spcLabelSelector)
+		routeVerbs := []string{"get", "list", "watch", "create", "delete", "update", "patch"}
+		hasRouteAccess, err := r.hasAPIAccess(ctx, "", "route.openshift.io", "routes", routeVerbs)
 		if err != nil {
-			return err
+			setupLog.Error(err, "Failed to check Route permissions for watch setup")
+		} else if hasRouteAccess {
+			setupLog.V(1).Info("Route API present with required permissions; setting up Route watch")
+			authCtrl.Watches(&routev1.Route{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+		} else {
+			setupLog.Info("Route API present but missing required permissions; skipping Route watch")
 		}
-		authCtrl.Watches(&sscsidriverv1.SecretProviderClass{},
+	}
 
-			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
-				authCR, _ := common.GetAuthentication(ctx, r.Client)
-				if authCR == nil {
-					return
-				}
-				return []reconcile.Request{
-					{NamespacedName: types.NamespacedName{
-						Name:      authCR.Name,
-						Namespace: authCR.Namespace,
-					}},
-				}
-			}), builder.WithPredicates(spcLabelPredicate),
-		)
+	// Add OperandRequest watch if API is present and operator has required permissions
+	if common.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
+		operandRequestVerbs := []string{"create", "get", "list", "patch", "watch", "update", "delete"}
+		hasOperandRequestAccess, err := r.hasAPIAccess(ctx, "", "operator.ibm.com", "operandrequests", operandRequestVerbs)
+		if err != nil {
+			setupLog.Error(err, "Failed to check OperandRequest permissions for watch setup")
+		} else if hasOperandRequestAccess {
+			setupLog.V(1).Info("OperandRequest API present with required permissions; setting up OperandRequest watch")
+			authCtrl.Watches(&operatorv1alpha1.OperandRequest{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+		} else {
+			setupLog.Info("OperandRequest API present but missing required permissions; skipping OperandRequest watch")
+		}
+	}
+
+	// Add OperandBindInfo watch if API is present and operator has required permissions
+	if common.ClusterHasOperandBindInfoAPIResource(&r.DiscoveryClient) {
+		operandBindInfoVerbs := []string{"create", "get", "list", "patch", "watch", "update", "delete"}
+		hasOperandBindInfoAccess, err := r.hasAPIAccess(ctx, "", "operator.ibm.com", "operandbindinfos", operandBindInfoVerbs)
+		if err != nil {
+			setupLog.Error(err, "Failed to check OperandBindInfo permissions for watch setup")
+		} else if hasOperandBindInfoAccess {
+			setupLog.V(1).Info("OperandBindInfo API present with required permissions; setting up OperandBindInfo watch")
+			authCtrl.Watches(&operatorv1alpha1.OperandBindInfo{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+		} else {
+			setupLog.Info("OperandBindInfo API present but missing required permissions; skipping OperandBindInfo watch")
+		}
+	}
+
+	// Add SecretProviderClass watches if API is present and operator has required permissions
+	if common.ClusterHasCSIGroupVersion(&r.DiscoveryClient) {
+		spcVerbs := []string{"get", "list", "watch"}
+		hasSPCAccess, err := r.hasAPIAccess(ctx, "", "secrets-store.csi.x-k8s.io", "secretproviderclasses", spcVerbs)
+		if err != nil {
+			setupLog.Error(err, "Failed to check SecretProviderClass permissions for watch setup")
+		} else if hasSPCAccess {
+			setupLog.V(1).Info("SecretProviderClass API present with required permissions; setting up SecretProviderClass watches")
+			authCtrl.Watches(&sscsidriverv1.SecretProviderClass{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+			spcLabelSelector := metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "app.kubernetes.io/part-of",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"im"},
+					},
+					{
+						Key:      SecretProviderClassAsVolumeLabel,
+						Operator: metav1.LabelSelectorOpExists,
+					},
+				},
+			}
+			spcLabelPredicate, err := predicate.LabelSelectorPredicate(spcLabelSelector)
+			if err != nil {
+				return err
+			}
+			authCtrl.Watches(&sscsidriverv1.SecretProviderClass{},
+
+				handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
+					authCR, _ := common.GetAuthentication(ctx, r.Client)
+					if authCR == nil {
+						return
+					}
+					return []reconcile.Request{
+						{NamespacedName: types.NamespacedName{
+							Name:      authCR.Name,
+							Namespace: authCR.Namespace,
+						}},
+					}
+				}), builder.WithPredicates(spcLabelPredicate),
+			)
+		} else {
+			setupLog.Info("SecretProviderClass API present but missing required permissions; skipping SecretProviderClass watches")
+		}
 	}
 
 	productCMPred := predicate.Funcs{

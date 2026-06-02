@@ -66,7 +66,7 @@ func init() {
 	utilruntime.Must(certmgrv1.AddToScheme(scheme))
 	utilruntime.Must(zenv1.AddToScheme(scheme))
 
-	// Add the Route scheme if found on the cluster
+	// Get config and create clients for SSAR checks
 	cfg, err := config.GetConfig()
 	if err != nil {
 		return
@@ -77,24 +77,85 @@ func init() {
 		return
 	}
 
+	// Create a temporary client for SSAR checks during init
+	tempClient, err := client.New(cfg, client.Options{Scheme: scheme})
+	if err != nil {
+		setupLog.Error(err, "Failed to create temporary client for SSAR checks")
+		return
+	}
+
+	ctx := context.Background()
+
+	// Check OperandRequest permissions
+	operandRequestVerbs := []string{"create", "get", "list", "patch", "watch", "update", "delete"}
 	if controllercommon.ClusterHasOperandRequestAPIResource(dc) {
-		setupLog.V(1).Info("OperandRequest API present; adding ODLM-enabled operator.ibm.com scheme")
-		utilruntime.Must(operatorv1alpha1.AddODLMEnabledToScheme(scheme))
+		hasOperandRequestAccess, err := hasNamespacedAPIAccess(ctx, tempClient, "", "operator.ibm.com", "operandrequests", operandRequestVerbs)
+		if err != nil {
+			setupLog.Error(err, "Failed to check OperandRequest permissions")
+		} else if hasOperandRequestAccess {
+			setupLog.V(1).Info("OperandRequest API present with required permissions; adding ODLM-enabled operator.ibm.com scheme")
+			utilruntime.Must(operatorv1alpha1.AddODLMEnabledToScheme(scheme))
+		} else {
+			setupLog.Info("OperandRequest API present but missing required permissions; adding base operator.ibm.com scheme")
+			utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
+		}
 	} else {
-		setupLog.V(1).Info("OperandRequest not API present; adding base operator.ibm.com scheme")
+		setupLog.V(1).Info("OperandRequest API not present; adding base operator.ibm.com scheme")
 		utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
 	}
 
+	// Check Route permissions
+	routeVerbs := []string{"get", "list", "watch", "create", "delete", "update", "patch"}
 	if controllercommon.ClusterHasRouteGroupVersion(dc) {
-		setupLog.V(1).Info("Route API present; adding Routes to scheme")
-		utilruntime.Must(routev1.AddToScheme(scheme))
+		hasRouteAccess, err := hasNamespacedAPIAccess(ctx, tempClient, "", "route.openshift.io", "routes", routeVerbs)
+		if err != nil {
+			setupLog.Error(err, "Failed to check Route permissions")
+		} else if hasRouteAccess {
+			setupLog.V(1).Info("Route API present with required permissions; adding Routes to scheme")
+			utilruntime.Must(routev1.AddToScheme(scheme))
+		} else {
+			setupLog.Info("Route API present but missing required permissions; skipping Routes scheme")
+		}
 	}
 
+	// Check SecretProviderClass permissions
+	spcVerbs := []string{"get", "list", "watch"}
 	if controllercommon.ClusterHasCSIGroupVersion(dc) {
-		setupLog.V(1).Info("SSCSI API present; adding SSCSI driver to scheme")
-		utilruntime.Must(sscsidriverv1.AddToScheme(scheme))
+		hasSPCAccess, err := hasNamespacedAPIAccess(ctx, tempClient, "", "secrets-store.csi.x-k8s.io", "secretproviderclasses", spcVerbs)
+		if err != nil {
+			setupLog.Error(err, "Failed to check SecretProviderClass permissions")
+		} else if hasSPCAccess {
+			setupLog.V(1).Info("SSCSI API present with required permissions; adding SSCSI driver to scheme")
+			utilruntime.Must(sscsidriverv1.AddToScheme(scheme))
+		} else {
+			setupLog.Info("SSCSI API present but missing required permissions; skipping SSCSI driver scheme")
+		}
 	}
 	//+kubebuilder:scaffold:scheme
+}
+
+// hasNamespacedAPIAccess uses SelfSubjectAccessReviews to check if the operator has all required permissions
+// for a given namespaced resource. Empty namespace means check without namespace scope.
+func hasNamespacedAPIAccess(ctx context.Context, c client.Client, namespace string, group string, resource string, verbs []string) (bool, error) {
+	for _, verb := range verbs {
+		ssar := &authorizationv1.SelfSubjectAccessReview{
+			Spec: authorizationv1.SelfSubjectAccessReviewSpec{
+				ResourceAttributes: &authorizationv1.ResourceAttributes{
+					Namespace: namespace,
+					Verb:      verb,
+					Group:     group,
+					Resource:  resource,
+				},
+			},
+		}
+		if err := c.Create(ctx, ssar); err != nil {
+			return false, fmt.Errorf("failed to create SSAR for %s.%s verb %s: %w", resource, group, verb, err)
+		}
+		if !ssar.Status.Allowed {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 func main() {

@@ -76,6 +76,18 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Re
 		return subreconciler.ContinueReconciling()
 	}
 
+	// Check if operator has required Route permissions
+	routeVerbs := []string{"get", "list", "watch", "create", "delete", "update", "patch"}
+	hasRouteAccess, err := r.hasAPIAccess(ctx, "", "route.openshift.io", "routes", routeVerbs)
+	if err != nil {
+		log.Error(err, "Failed to check Route permissions")
+		return subreconciler.RequeueWithError(err)
+	}
+	if !hasRouteAccess {
+		log.Info("Operator does not have required Route permissions; skipping Route reconciliation")
+		return subreconciler.ContinueReconciling()
+	}
+
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return

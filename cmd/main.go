@@ -29,6 +29,7 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -100,19 +101,10 @@ func init() {
 	// Check OperandRequest permissions across all watch namespaces
 	operandRequestVerbs := []string{"create", "get", "list", "patch", "watch", "update", "delete"}
 	if controllercommon.ClusterHasOperandRequestAPIResource(dc) {
-		hasOperandRequestAccess := true
-		for _, ns := range namespacesToCheck {
-			hasAccess, err := hasNamespacedAPIAccess(ctx, tempClient, ns, "operator.ibm.com", "operandrequests", operandRequestVerbs)
-			if err != nil {
-				setupLog.Error(err, "Failed to check OperandRequest permissions", "namespace", ns)
-				hasOperandRequestAccess = false
-				break
-			}
-			if !hasAccess {
-				setupLog.Info("OperandRequest API present but missing required permissions in namespace", "namespace", ns)
-				hasOperandRequestAccess = false
-				break
-			}
+		hasOperandRequestAccess, err := hasNamespacedAPIAccessForNamespaces(ctx, tempClient, namespacesToCheck, "operator.ibm.com", "operandrequests", operandRequestVerbs)
+		if err != nil {
+			setupLog.Error(err, "Failed to check OperandRequest permissions")
+			hasOperandRequestAccess = false
 		}
 		if hasOperandRequestAccess {
 			setupLog.V(1).Info("OperandRequest API present with required permissions in all watch namespaces; adding ODLM-enabled operator.ibm.com scheme")
@@ -129,36 +121,21 @@ func init() {
 	// Check Route permissions (including routes/custom-host subresource) across all watch namespaces
 	routeVerbs := []string{"get", "list", "watch", "create", "delete", "update", "patch"}
 	if controllercommon.ClusterHasRouteGroupVersion(dc) {
-		hasRouteAccess := true
-		for _, ns := range namespacesToCheck {
-			hasAccess, err := hasNamespacedAPIAccess(ctx, tempClient, ns, "route.openshift.io", "routes", routeVerbs)
-			if err != nil {
-				setupLog.Error(err, "Failed to check Route permissions", "namespace", ns)
-				hasRouteAccess = false
-				break
-			}
-			if !hasAccess {
-				setupLog.Info("Route API present but missing required permissions in namespace", "namespace", ns)
-				hasRouteAccess = false
-				break
-			}
+		hasRouteAccess, err := hasNamespacedAPIAccessForNamespaces(ctx, tempClient, namespacesToCheck, "route.openshift.io", "routes", routeVerbs)
+		if err != nil {
+			setupLog.Error(err, "Failed to check Route permissions")
+			hasRouteAccess = false
 		}
 
 		if hasRouteAccess {
 			// Also check routes/custom-host subresource permission across all namespaces
-			hasCustomHostAccess := true
-			for _, ns := range namespacesToCheck {
-				hasAccess, err := hasNamespacedAPIAccess(ctx, tempClient, ns, "route.openshift.io", "routes/custom-host", []string{"create"})
-				if err != nil {
-					setupLog.Error(err, "Failed to check routes/custom-host permissions", "namespace", ns)
-					hasCustomHostAccess = false
-					break
-				}
-				if !hasAccess {
-					setupLog.Info("Route API present but missing routes/custom-host create permission in namespace", "namespace", ns)
-					hasCustomHostAccess = false
-					break
-				}
+			hasCustomHostAccess, err := hasNamespacedAPIAccessForNamespaces(ctx, tempClient, namespacesToCheck, "route.openshift.io", "routes/custom-host", []string{"create"})
+			if err != nil {
+				setupLog.Error(err, "Failed to check routes/custom-host permissions")
+				hasCustomHostAccess = false
+			}
+			if !hasCustomHostAccess {
+				setupLog.Info("Route API present but missing routes/custom-host create permission in one or more namespaces")
 			}
 
 			if hasCustomHostAccess {
@@ -175,19 +152,10 @@ func init() {
 	// Check SecretProviderClass permissions across all watch namespaces
 	spcVerbs := []string{"get", "list", "watch"}
 	if controllercommon.ClusterHasCSIGroupVersion(dc) {
-		hasSPCAccess := true
-		for _, ns := range namespacesToCheck {
-			hasAccess, err := hasNamespacedAPIAccess(ctx, tempClient, ns, "secrets-store.csi.x-k8s.io", "secretproviderclasses", spcVerbs)
-			if err != nil {
-				setupLog.Error(err, "Failed to check SecretProviderClass permissions", "namespace", ns)
-				hasSPCAccess = false
-				break
-			}
-			if !hasAccess {
-				setupLog.Info("SecretProviderClass API present but missing required permissions in namespace", "namespace", ns)
-				hasSPCAccess = false
-				break
-			}
+		hasSPCAccess, err := hasNamespacedAPIAccessForNamespaces(ctx, tempClient, namespacesToCheck, "secrets-store.csi.x-k8s.io", "secretproviderclasses", spcVerbs)
+		if err != nil {
+			setupLog.Error(err, "Failed to check SecretProviderClass permissions")
+			hasSPCAccess = false
 		}
 		if hasSPCAccess {
 			setupLog.V(1).Info("SSCSI API present with required permissions in all watch namespaces; adding SSCSI driver to scheme")
@@ -217,6 +185,22 @@ func hasNamespacedAPIAccess(ctx context.Context, c client.Client, namespace stri
 			return false, fmt.Errorf("failed to create SSAR for %s.%s verb %s: %w", resource, group, verb, err)
 		}
 		if !ssar.Status.Allowed {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// hasNamespacedAPIAccessForNamespaces checks if the operator has all required permissions
+// for a given namespaced resource across multiple namespaces. It fails fast, returning
+// an error or false as soon as any namespace check fails.
+func hasNamespacedAPIAccessForNamespaces(ctx context.Context, c client.Client, namespaces []string, group string, resource string, verbs []string) (bool, error) {
+	for _, ns := range namespaces {
+		hasAccess, err := hasNamespacedAPIAccess(ctx, c, ns, group, resource, verbs)
+		if err != nil {
+			return false, err
+		}
+		if !hasAccess {
 			return false, nil
 		}
 	}

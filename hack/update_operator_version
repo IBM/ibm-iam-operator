@@ -39,6 +39,7 @@ $LOCALBIN/yq -i 'with(.[] | select(.path == "/metadata/annotations/containerImag
   "${REPO_ROOT}/config/manifests/overlays/prod/annotations_patch.yaml"
 $LOCALBIN/yq -i 'with(.[] | select(.path == "/metadata/annotations/olm.skipRange") ; .value |= "<" + env(VERSION))' \
   "${REPO_ROOT}/config/manifests/overlays/prod/annotations_patch.yaml"
+mkdir -p ${REPO_ROOT}/config/manifests/overlays/dev
 cp "${REPO_ROOT}/config/manifests/overlays/prod/annotations_patch.yaml" "${REPO_ROOT}/config/manifests/overlays/dev/annotations_patch.yaml"
 
 
@@ -52,6 +53,7 @@ $LOCALBIN/yq -i 'with(.[] | select(.name == "IBM_IAM_OPERATOR_IMAGE"); .image |=
 echo "Update all image-related environment variables' tags"
 $LOCALBIN/yq -i 'with(.[].value ; .value |= sub("([a-zA-Z0-9-./]+):([a-zA-Z0-9-.]+)", "${1}:"+env(VERSION)))' \
   "${REPO_ROOT}/config/manager/overlays/prod/image_env_vars_patch.yaml"
+mkdir -p ${REPO_ROOT}/config/manager/overlays/dev
 cp "${REPO_ROOT}/config/manager/overlays/prod/image_env_vars_patch.yaml" "${REPO_ROOT}/config/manager/overlays/dev/image_env_vars_patch.yaml"
 
 
@@ -62,6 +64,7 @@ cp "${REPO_ROOT}/config/manager/overlays/prod/kustomization.yaml" "${REPO_ROOT}/
 echo "Update sample image tags"
 $LOCALBIN/yq -i '.spec.*.imageTag = env(VERSION)' \
   "${REPO_ROOT}/config/samples/overlays/prod/authentication_image_patch.yaml"
+mkdir -p ${REPO_ROOT}/config/samples/overlays/dev
 cp "${REPO_ROOT}/config/samples/overlays/prod/authentication_image_patch.yaml" "${REPO_ROOT}/config/samples/overlays/dev/authentication_image_patch.yaml"
 
 echo "Making the bundle"

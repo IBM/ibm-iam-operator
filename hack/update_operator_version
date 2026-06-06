@@ -39,7 +39,6 @@ $LOCALBIN/yq -i 'with(.[] | select(.path == "/metadata/annotations/containerImag
   "${REPO_ROOT}/config/manifests/overlays/prod/annotations_patch.yaml"
 $LOCALBIN/yq -i 'with(.[] | select(.path == "/metadata/annotations/olm.skipRange") ; .value |= "<" + env(VERSION))' \
   "${REPO_ROOT}/config/manifests/overlays/prod/annotations_patch.yaml"
-mkdir -p ${REPO_ROOT}/config/manifests/overlays/dev
 cp "${REPO_ROOT}/config/manifests/overlays/prod/annotations_patch.yaml" "${REPO_ROOT}/config/manifests/overlays/dev/annotations_patch.yaml"
 
 

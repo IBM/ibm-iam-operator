@@ -435,7 +435,6 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&certmgr.Certificate{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&batchv1.Job{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&corev1.Service{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
-		Watches(&netv1.Ingress{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&appsv1.Deployment{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&autoscalingv2.HorizontalPodAutoscaler{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
 
@@ -459,6 +458,26 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				setupLog.Info("Route API present but missing routes/custom-host create permission; skipping Route watch")
 			}
 		}
+	}
+
+	// Add Ingress watch if API is present and operator has required permissions
+	if common.ClusterHasIngressGroupVersion(&r.DiscoveryClient) {
+		setupLog.Info("Ingress API detected in cluster; checking permissions")
+		ingressVerbs := []string{"delete", "get", "list", "watch"}
+		hasIngressAccess, err := r.hasAPIAccess(ctx, "", "networking.k8s.io", "ingresses", ingressVerbs)
+		if err != nil {
+			setupLog.Error(err, "Failed to check Ingress permissions for watch setup; skipping Ingress watch")
+			hasIngressAccess = false
+		}
+
+		if hasIngressAccess {
+			setupLog.Info("Ingress API present with required permissions; setting up Ingress watch")
+			authCtrl.Watches(&netv1.Ingress{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+		} else {
+			setupLog.Info("Ingress API present but missing required permissions; skipping Ingress watch")
+		}
+	} else {
+		setupLog.Info("Ingress API not detected in cluster; skipping Ingress watch")
 	}
 
 	// Add OperandRequest watch if API is present and operator has required permissions

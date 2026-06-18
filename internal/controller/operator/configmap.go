@@ -40,7 +40,9 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
@@ -907,14 +909,27 @@ func GetAppsDomain(cl client.Client, ctx context.Context, authCR *operatorv1alph
 		client.MatchingLabels(routeLabels),
 	}
 
-	if err = cl.List(ctx, imRoutes, listOpts...); err != nil && !k8sErrors.IsNotFound(err) {
-		reqLogger.Error(err, "Failed to list Routes")
-		return
+	if err = cl.List(ctx, imRoutes, listOpts...); err != nil {
+		if k8sErrors.IsNotFound(err) {
+			// Route not found, continue to try dummy route
+		} else if meta.IsNoMatchError(err) || runtime.IsNotRegisteredError(err) {
+			// Route API not available in scheme (no permissions or not OpenShift)
+			reqLogger.V(1).Info("Route API not available; cannot determine apps domain from Routes")
+			return "", nil
+		} else {
+			reqLogger.Error(err, "Failed to list Routes")
+			return
+		}
 	}
 
 	var host string
 	if len(imRoutes.Items) == 0 {
 		if host, err = getHostFromDummyRoute(ctx, cl, authCR); err != nil {
+			if meta.IsNoMatchError(err) || runtime.IsNotRegisteredError(err) {
+				// Route API not available in scheme
+				reqLogger.V(1).Info("Route API not available; cannot create dummy Route to determine apps domain")
+				return "", nil
+			}
 			reqLogger.Error(err, "Could not get host name from dummy Route")
 			return
 		}
@@ -1017,6 +1032,13 @@ func GenerateOCPClusterInfo(cl client.Client, dc *discovery.DiscoveryClient, ctx
 	domainName, err := GetAppsDomain(cl, ctx, authCR)
 	if err != nil {
 		return
+	}
+
+	// If domainName is empty (Route API not available), use a placeholder
+	// The actual hostname should be configured via custom ingress hostname
+	if domainName == "" {
+		reqLogger.Info("Apps domain could not be determined (Route API not available); cluster address will need to be configured via custom ingress hostname")
+		domainName = "cluster.local"
 	}
 
 	zenHost := ""

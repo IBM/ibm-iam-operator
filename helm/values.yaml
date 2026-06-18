@@ -1,8 +1,13 @@
 cpfs:
-  # Set to true to manage OpenShift Routes and Ingress resources
-  # When false, Route and Ingress API permissions are excluded from RBAC
-  # and ingress.gvk is set to "none" in the Authentication CR example
-  manageNetworking: false
+  # IM Networking configuration
+  imNetworking:
+    # Set to false to disable IM Route management
+    # When false, Route and Ingress API permissions are excluded from RBAC
+    # and ingress.gvk is set to "none" in the Authentication CR
+    manageNetworking: true
+    # Hostname for ingress configuration (optional)
+    # When set, this will be used in ingress.hostname
+    hostname: ""
   imageRegistryNamespaceOperator: cpopen
   imageRegistryNamespaceOperand: cpopen/cpfs
   labels: {}

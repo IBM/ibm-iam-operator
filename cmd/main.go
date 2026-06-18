@@ -51,6 +51,7 @@ import (
 	oidcsecuritycontrollers "github.com/IBM/ibm-iam-operator/internal/controller/oidc.security"
 	operatorcontrollers "github.com/IBM/ibm-iam-operator/internal/controller/operator"
 	routev1 "github.com/openshift/api/route/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	discovery "k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	//+kubebuilder:scaffold:imports
@@ -146,6 +147,23 @@ func init() {
 			}
 		} else {
 			setupLog.Info("Route API present but missing required permissions; skipping Routes scheme")
+		}
+	}
+
+	// Check Ingress permissions across all watch namespaces
+	ingressVerbs := []string{"delete", "get", "list", "watch"}
+	if controllercommon.ClusterHasIngressGroupVersion(dc) {
+		hasIngressAccess, err := hasNamespacedAPIAccessForNamespaces(ctx, tempClient, namespacesToCheck, "networking.k8s.io", "ingresses", ingressVerbs)
+		if err != nil {
+			setupLog.Error(err, "Failed to check Ingress permissions")
+			hasIngressAccess = false
+		}
+
+		if hasIngressAccess {
+			setupLog.V(1).Info("Ingress API present with required permissions in all watch namespaces; adding Ingress to scheme")
+			utilruntime.Must(networkingv1.AddToScheme(scheme))
+		} else {
+			setupLog.Info("Ingress API present but missing required permissions; skipping Ingress scheme")
 		}
 	}
 

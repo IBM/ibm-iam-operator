@@ -539,6 +539,14 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		},
 	}
 
+	// Add PRVDR_CPU_LIMIT environment variable with the CPU limit value
+	cpuLimit := resources.Limits[corev1.ResourceCPU]
+	cpuLimitVar := corev1.EnvVar{
+		Name:  "PRVDR_CPU_LIMIT",
+		Value: cpuLimit.String(),
+	}
+	envVars = append(envVars, cpuLimitVar)
+
 	idpEnvVarList := []string{"NODE_ENV", "LOG_LEVEL_IDPROVIDER", "LOG_LEVEL_MW", "PROVIDER_ISSUER_URL", "MASTER_HOST", "MASTER_PATH",
 		"PREFERRED_LOGIN", "DEFAULT_LOGIN", "IDTOKEN_LIFETIME", "SAAS_CLIENT_REDIRECT_URL", "IBM_CLOUD_SAAS", "ROKS_ENABLED", "ROKS_URL",
 		"ROKS_USER_PREFIX", "OS_TOKEN_LENGTH", "LIBERTY_TOKEN_LENGTH", "IDENTITY_PROVIDER_URL", "BASE_AUTH_URL",
@@ -872,6 +880,14 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			},
 		},
 	}
+
+	// Add MGMT_CPU_LIMIT environment variable with the CPU limit value
+	cpuLimit := resources.Limits[corev1.ResourceCPU]
+	cpuLimitVar := corev1.EnvVar{
+		Name:  "MGMT_CPU_LIMIT",
+		Value: cpuLimit.String(),
+	}
+	envVars = append(envVars, cpuLimitVar)
 
 	idpEnvVarList := []string{"NODE_ENV", "LOG_LEVEL_IDMGMT", "LOG_LEVEL_MW", "IBM_CLOUD_SAAS", "MASTER_HOST", "AUDIT_DETAIL",
 		"ROKS_ENABLED", "ROKS_USER_PREFIX", "IDENTITY_AUTH_DIRECTORY_URL", "OIDC_ISSUER_URL", "BOOTSTRAP_USERID", "CLUSTER_NAME", "HTTP_ONLY", "LDAP_SEARCH_SIZE_LIMIT", "LDAP_SEARCH_TIME_LIMIT",

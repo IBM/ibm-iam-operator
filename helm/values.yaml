@@ -13,7 +13,7 @@ global:
 #   - tenant1
 #   - tenant2
 operator:
-  imageTag: "4.17.1"
+  imageTag: "4.17.2"
 operands:
   platformIdentityProvider:
     imageTag: "4.17.0"

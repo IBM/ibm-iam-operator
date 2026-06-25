@@ -45,9 +45,15 @@ func (r *AuthenticationReconciler) handleOperandBindInfo(ctx context.Context, re
 		return subreconciler.ContinueReconciling()
 	}
 
-	// Check if operator has required OperandBindInfo permissions
+	// Get the Authentication CR to know which namespace to check permissions in
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+
+	// Check if operator has required OperandBindInfo permissions in the Authentication CR's namespace
 	operandBindInfoVerbs := []string{"create", "get", "list", "patch", "watch", "update", "delete"}
-	hasOperandBindInfoAccess, err := r.hasAPIAccess(ctx, "", "operator.ibm.com", "operandbindinfos", operandBindInfoVerbs)
+	hasOperandBindInfoAccess, err := r.hasAPIAccess(ctx, authCR.Namespace, "operator.ibm.com", "operandbindinfos", operandBindInfoVerbs)
 	if err != nil {
 		log.Error(err, "Failed to check OperandBindInfo permissions")
 		return subreconciler.RequeueWithError(err)
@@ -58,10 +64,6 @@ func (r *AuthenticationReconciler) handleOperandBindInfo(ctx context.Context, re
 	}
 
 	log = log.WithValues("OperandBindInfo.Name", bindInfoName)
-	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return
-	}
 
 	generated := &operatorv1alpha1.OperandBindInfo{}
 	if err = generateOperandBindInfo(authCR, r.Client.Scheme(), generated); err != nil {

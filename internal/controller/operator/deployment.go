@@ -68,7 +68,7 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 	// Check if operator has required SecretProviderClass permissions when CSI is enabled
 	if authCR.SecretsStoreCSIEnabled() && common.ClusterHasCSIGroupVersion(&r.DiscoveryClient) {
 		spcVerbs := []string{"get", "list", "watch"}
-		hasSPCAccess, err := r.hasAPIAccess(ctx, "", "secrets-store.csi.x-k8s.io", "secretproviderclasses", spcVerbs)
+		hasSPCAccess, err := r.hasAPIAccess(ctx, authCR.Namespace, "secrets-store.csi.x-k8s.io", "secretproviderclasses", spcVerbs)
 		if err != nil {
 			log.Error(err, "Failed to check SecretProviderClass permissions")
 			return subreconciler.RequeueWithError(err)

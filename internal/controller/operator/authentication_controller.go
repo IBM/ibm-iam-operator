@@ -18,6 +18,7 @@ package operator
 
 import (
 	"context"
+	"strings"
 
 	"fmt"
 	"sync"
@@ -429,6 +430,23 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	setupLog := ctrl.Log.WithName("setup")
 	ctx := context.Background()
 
+	// Get the watch namespace(s) for permission checks
+	watchNamespace, err := common.GetWatchNamespace()
+	if err != nil {
+		setupLog.Error(err, "Failed to get watch namespace")
+		return err
+	}
+	// Split into individual namespaces if multiple are specified
+	var namespacesToCheck []string
+	if watchNamespace == "" {
+		// Empty means cluster-wide, but we have namespace-scoped permissions
+		setupLog.Info("WATCH_NAMESPACE is empty (cluster-wide), but operator has namespace-scoped permissions")
+		namespacesToCheck = []string{""}
+	} else {
+		namespacesToCheck = strings.Split(watchNamespace, ",")
+	}
+	setupLog.Info("Checking permissions in namespaces", "namespaces", namespacesToCheck)
+
 	authCtrl := ctrl.NewControllerManagedBy(mgr).
 		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&corev1.Secret{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
@@ -441,14 +459,14 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Add Routes watch if API is present and operator has required permissions
 	if common.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
 		routeVerbs := []string{"get", "list", "watch", "create", "delete", "update", "patch"}
-		hasRouteAccess, err := r.hasAPIAccess(ctx, "", "route.openshift.io", "routes", routeVerbs)
+		hasRouteAccess, err := r.hasAPIAccessInNamespaces(ctx, namespacesToCheck, "route.openshift.io", "routes", routeVerbs)
 		if err != nil {
 			setupLog.Error(err, "Failed to check Route permissions for watch setup")
 		} else if !hasRouteAccess {
 			setupLog.Info("Route API present but missing required permissions; skipping Route watch")
 		} else {
 			// Also check routes/custom-host subresource permission
-			hasCustomHostAccess, err := r.hasAPIAccess(ctx, "", "route.openshift.io", "routes/custom-host", []string{"create"})
+			hasCustomHostAccess, err := r.hasAPIAccessInNamespaces(ctx, namespacesToCheck, "route.openshift.io", "routes/custom-host", []string{"create"})
 			if err != nil {
 				setupLog.Error(err, "Failed to check routes/custom-host permissions for watch setup")
 			} else if hasCustomHostAccess {
@@ -464,7 +482,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if common.ClusterHasIngressGroupVersion(&r.DiscoveryClient) {
 		setupLog.Info("Ingress API detected in cluster; checking permissions")
 		ingressVerbs := []string{"delete", "get", "list", "watch"}
-		hasIngressAccess, err := r.hasAPIAccess(ctx, "", "networking.k8s.io", "ingresses", ingressVerbs)
+		hasIngressAccess, err := r.hasAPIAccessInNamespaces(ctx, namespacesToCheck, "networking.k8s.io", "ingresses", ingressVerbs)
 		if err != nil {
 			setupLog.Error(err, "Failed to check Ingress permissions for watch setup; skipping Ingress watch")
 			hasIngressAccess = false
@@ -483,7 +501,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Add OperandRequest watch if API is present and operator has required permissions
 	if common.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
 		operandRequestVerbs := []string{"create", "get", "list", "patch", "watch", "update", "delete"}
-		hasOperandRequestAccess, err := r.hasAPIAccess(ctx, "", "operator.ibm.com", "operandrequests", operandRequestVerbs)
+		hasOperandRequestAccess, err := r.hasAPIAccessInNamespaces(ctx, namespacesToCheck, "operator.ibm.com", "operandrequests", operandRequestVerbs)
 		if err != nil {
 			setupLog.Error(err, "Failed to check OperandRequest permissions for watch setup")
 		} else if hasOperandRequestAccess {
@@ -497,7 +515,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Add OperandBindInfo watch if API is present and operator has required permissions
 	if common.ClusterHasOperandBindInfoAPIResource(&r.DiscoveryClient) {
 		operandBindInfoVerbs := []string{"create", "get", "list", "patch", "watch", "update", "delete"}
-		hasOperandBindInfoAccess, err := r.hasAPIAccess(ctx, "", "operator.ibm.com", "operandbindinfos", operandBindInfoVerbs)
+		hasOperandBindInfoAccess, err := r.hasAPIAccessInNamespaces(ctx, namespacesToCheck, "operator.ibm.com", "operandbindinfos", operandBindInfoVerbs)
 		if err != nil {
 			setupLog.Error(err, "Failed to check OperandBindInfo permissions for watch setup")
 		} else if hasOperandBindInfoAccess {
@@ -511,7 +529,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Add SecretProviderClass watches if API is present and operator has required permissions
 	if common.ClusterHasCSIGroupVersion(&r.DiscoveryClient) {
 		spcVerbs := []string{"get", "list", "watch"}
-		hasSPCAccess, err := r.hasAPIAccess(ctx, "", "secrets-store.csi.x-k8s.io", "secretproviderclasses", spcVerbs)
+		hasSPCAccess, err := r.hasAPIAccessInNamespaces(ctx, namespacesToCheck, "secrets-store.csi.x-k8s.io", "secretproviderclasses", spcVerbs)
 		if err != nil {
 			setupLog.Error(err, "Failed to check SecretProviderClass permissions for watch setup")
 		} else if hasSPCAccess {
@@ -721,5 +739,16 @@ func (r *AuthenticationReconciler) hasAPIAccess(ctx context.Context, namespace s
 	}
 
 	reqLogger.Info("Operator ServiceAccount is authorized")
+	return true, nil
+}
+
+// hasAPIAccessInNamespaces checks if the operator has the required permissions across all specified namespaces
+func (r *AuthenticationReconciler) hasAPIAccessInNamespaces(ctx context.Context, namespaces []string, group string, resource string, verbs []string) (hasAccess bool, err error) {
+	for _, ns := range namespaces {
+		hasAccess, err = r.hasAPIAccess(ctx, ns, group, resource, verbs)
+		if err != nil || !hasAccess {
+			return false, err
+		}
+	}
 	return true, nil
 }

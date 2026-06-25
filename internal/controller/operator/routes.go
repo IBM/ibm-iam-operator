@@ -76,9 +76,15 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Re
 		return subreconciler.ContinueReconciling()
 	}
 
-	// Check if operator has required Route permissions
+	// Get the Authentication CR first to know which namespace to check permissions in
+	authCR := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
+		return
+	}
+
+	// Check if operator has required Route permissions in the Authentication CR's namespace
 	routeVerbs := []string{"get", "list", "watch", "create", "delete", "update", "patch"}
-	hasRouteAccess, err := r.hasAPIAccess(ctx, "", "route.openshift.io", "routes", routeVerbs)
+	hasRouteAccess, err := r.hasAPIAccess(ctx, authCR.Namespace, "route.openshift.io", "routes", routeVerbs)
 	if err != nil {
 		log.Error(err, "Failed to check Route permissions")
 		return subreconciler.RequeueWithError(err)
@@ -89,7 +95,7 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Re
 	}
 
 	// Also check routes/custom-host subresource permission
-	hasCustomHostAccess, err := r.hasAPIAccess(ctx, "", "route.openshift.io", "routes/custom-host", []string{"create"})
+	hasCustomHostAccess, err := r.hasAPIAccess(ctx, authCR.Namespace, "route.openshift.io", "routes/custom-host", []string{"create"})
 	if err != nil {
 		log.Error(err, "Failed to check routes/custom-host permissions")
 		return subreconciler.RequeueWithError(err)
@@ -97,11 +103,6 @@ func (r *AuthenticationReconciler) handleRoutes(ctx context.Context, req ctrl.Re
 	if !hasCustomHostAccess {
 		log.Info("Operator does not have routes/custom-host create permission; skipping Route reconciliation")
 		return subreconciler.ContinueReconciling()
-	}
-
-	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		return
 	}
 
 	// Check if Routes should be removed based on .spec.config.ingress.gvk setting

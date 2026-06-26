@@ -54,18 +54,25 @@ var _ = Describe("Deployment handling", func() {
 	DescribeTable("preserveObservedFields",
 		func(observed, generated *appsv1.Deployment) {
 			preserveObservedFields(observed, generated)
+			// Verify only TerminationMessage fields are preserved, not probes
 			for _, observedContainer := range observed.Spec.Template.Spec.Containers {
 				for _, generatedContainer := range generated.Spec.Template.Spec.Containers {
-					Expect(generatedContainer).To(Equal(observedContainer))
+					if observedContainer.Name == generatedContainer.Name {
+						Expect(generatedContainer.TerminationMessagePath).To(Equal(observedContainer.TerminationMessagePath))
+						Expect(generatedContainer.TerminationMessagePolicy).To(Equal(observedContainer.TerminationMessagePolicy))
+					}
 				}
 			}
 			for _, observedContainer := range observed.Spec.Template.Spec.InitContainers {
 				for _, generatedContainer := range generated.Spec.Template.Spec.InitContainers {
-					Expect(generatedContainer).To(Equal(observedContainer))
+					if observedContainer.Name == generatedContainer.Name {
+						Expect(generatedContainer.TerminationMessagePath).To(Equal(observedContainer.TerminationMessagePath))
+						Expect(generatedContainer.TerminationMessagePolicy).To(Equal(observedContainer.TerminationMessagePolicy))
+					}
 				}
 			}
 		},
-		Entry("copies containers and initcontainers to generated from observed successfully",
+		Entry("preserves only TerminationMessage fields from observed deployment",
 			&appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
 					Template: v1.PodTemplateSpec{

@@ -780,12 +780,29 @@ func preserveObservedFields(observed, generated *appsv1.Deployment) {
 	generated.Spec.Template.Spec.RestartPolicy = observed.Spec.Template.Spec.RestartPolicy
 	generated.Spec.Template.Spec.SchedulerName = observed.Spec.Template.Spec.SchedulerName
 	generated.Spec.Template.Spec.DeprecatedServiceAccount = observed.Spec.Template.Spec.DeprecatedServiceAccount
+	generated.Spec.Template.Spec.SecurityContext = observed.Spec.Template.Spec.SecurityContext
 	for _, observedContainer := range observed.Spec.Template.Spec.Containers {
 		for i, generatedContainer := range generated.Spec.Template.Spec.Containers {
 			if observedContainer.Name != generatedContainer.Name {
 				continue
 			}
 
+			if generatedContainer.LivenessProbe == nil {
+				generated.Spec.Template.Spec.Containers[i].LivenessProbe = &corev1.Probe{}
+			}
+			if observedContainer.LivenessProbe != nil {
+				generated.Spec.Template.Spec.Containers[i].LivenessProbe.FailureThreshold = observedContainer.LivenessProbe.FailureThreshold
+				generated.Spec.Template.Spec.Containers[i].LivenessProbe.PeriodSeconds = observedContainer.LivenessProbe.PeriodSeconds
+				generated.Spec.Template.Spec.Containers[i].LivenessProbe.SuccessThreshold = observedContainer.LivenessProbe.SuccessThreshold
+			}
+
+			if generatedContainer.ReadinessProbe == nil {
+				generated.Spec.Template.Spec.Containers[i].ReadinessProbe = &corev1.Probe{}
+			}
+			if observedContainer.ReadinessProbe != nil {
+				generated.Spec.Template.Spec.Containers[i].ReadinessProbe.SuccessThreshold = observedContainer.ReadinessProbe.SuccessThreshold
+			}
+			
 			generated.Spec.Template.Spec.Containers[i].TerminationMessagePath = observedContainer.TerminationMessagePath
 			generated.Spec.Template.Spec.Containers[i].TerminationMessagePolicy = observedContainer.TerminationMessagePolicy
 		}

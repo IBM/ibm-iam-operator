@@ -780,7 +780,6 @@ func preserveObservedFields(observed, generated *appsv1.Deployment) {
 	generated.Spec.Template.Spec.RestartPolicy = observed.Spec.Template.Spec.RestartPolicy
 	generated.Spec.Template.Spec.SchedulerName = observed.Spec.Template.Spec.SchedulerName
 	generated.Spec.Template.Spec.DeprecatedServiceAccount = observed.Spec.Template.Spec.DeprecatedServiceAccount
-	generated.Spec.Template.Spec.SecurityContext = observed.Spec.Template.Spec.SecurityContext
 	for _, observedContainer := range observed.Spec.Template.Spec.Containers {
 		for i, generatedContainer := range generated.Spec.Template.Spec.Containers {
 			if observedContainer.Name != generatedContainer.Name {

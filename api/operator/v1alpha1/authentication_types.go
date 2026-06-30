@@ -49,6 +49,7 @@ type AuthenticationSpec struct {
 	Config                        ConfigSpec             `json:"config"`
 	EnableInstanaMetricCollection bool                   `json:"enableInstanaMetricCollection,omitempty"`
 	AutoScaleConfig               bool                   `json:"autoScaleConfig,omitempty"`
+	CpuRateLimit                  *int32                 `json:"cpuRateLimit,omitempty"`
 }
 
 type AuditServiceSpec struct {

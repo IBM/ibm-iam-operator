@@ -800,9 +800,10 @@ func preserveObservedFields(observed, generated *appsv1.Deployment) {
 			}
 			if observedContainer.ReadinessProbe != nil {
 				generated.Spec.Template.Spec.Containers[i].ReadinessProbe.SuccessThreshold = observedContainer.ReadinessProbe.SuccessThreshold
-				generated.Spec.Template.Spec.Containers[i].TerminationMessagePath = observedContainer.TerminationMessagePath
-				generated.Spec.Template.Spec.Containers[i].TerminationMessagePolicy = observedContainer.TerminationMessagePolicy
 			}
+			
+			generated.Spec.Template.Spec.Containers[i].TerminationMessagePath = observedContainer.TerminationMessagePath
+			generated.Spec.Template.Spec.Containers[i].TerminationMessagePolicy = observedContainer.TerminationMessagePolicy
 		}
 	}
 	for _, observedContainer := range observed.Spec.Template.Spec.InitContainers {

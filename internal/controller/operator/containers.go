@@ -598,12 +598,11 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		}
 		envVars = append(envVars, instanaAgentEnabledVar...)
 	}
-	if instance.Spec.Config.CpuRateLimit {
-		envVars = append(envVars, corev1.EnvVar{
-			Name:  "CPU_RATE_LIMIT",
-			Value: strconv.Itoa(int(*instance.Spec.Config.CpuRateLimit)),
-		})
-	}
+
+	envVars = append(envVars, corev1.EnvVar{
+		Name:  "CPU_RATE_LIMIT",
+		Value: strconv.Itoa(int(*instance.Spec.Config.CpuRateLimit)),
+	})
 
 	return corev1.Container{
 		Name:            "platform-identity-provider",
@@ -941,12 +940,11 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		}
 		envVars = append(envVars, instanaAgentEnabledVar...)
 	}
-	if instance.Spec.Config.CpuRateLimit {
-		envVars = append(envVars, corev1.EnvVar{
-			Name:  "CPU_RATE_LIMIT",
-			Value: strconv.Itoa(int(*instance.Spec.Config.CpuRateLimit)),
-		})
-	}
+
+	envVars = append(envVars, corev1.EnvVar{
+		Name:  "CPU_RATE_LIMIT",
+		Value: strconv.Itoa(int(*instance.Spec.Config.CpuRateLimit)),
+	})
 
 	return corev1.Container{
 		Name:            "platform-identity-management",

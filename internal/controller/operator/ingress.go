@@ -46,6 +46,18 @@ func (r *AuthenticationReconciler) removeIngresses(ctx context.Context, req ctrl
 		return subreconciler.ContinueReconciling()
 	}
 
+	// Check if operator has Ingress permissions before attempting to remove them
+	ingressVerbs := []string{"delete", "get", "list"}
+	hasIngressAccess, err := r.hasAPIAccess(ctx, req.Namespace, "networking.k8s.io", "ingresses", ingressVerbs)
+	if err != nil {
+		log.Error(err, "Failed to check Ingress permissions; skipping Ingress removal")
+		return subreconciler.ContinueReconciling()
+	}
+	if !hasIngressAccess {
+		log.Info("Operator does not have Ingress permissions; skipping Ingress removal")
+		return subreconciler.ContinueReconciling()
+	}
+
 	subRec := common.NewLazySubreconcilers(
 		r.removeIngress("ibmid-ui-callback", req.Namespace),
 		r.removeIngress("id-mgmt", req.Namespace),

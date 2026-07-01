@@ -32,6 +32,7 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	userv1 "github.com/openshift/api/user/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	discovery "k8s.io/client-go/discovery"
@@ -192,6 +193,11 @@ func ClusterHasZenExtensionGroupVersion(dc *discovery.DiscoveryClient) (found bo
 
 func ClusterHasCSIGroupVersion(dc *discovery.DiscoveryClient) (found bool) {
 	found, _ = clusterHasGroupVersion(dc, sscsidriverv1.SchemeGroupVersion)
+	return
+}
+
+func ClusterHasIngressGroupVersion(dc *discovery.DiscoveryClient) (found bool) {
+	found, _ = clusterHasGroupVersion(dc, networkingv1.SchemeGroupVersion)
 	return
 }
 

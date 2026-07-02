@@ -332,7 +332,7 @@ func (in *ConfigSpec) DeepCopyInto(out *ConfigSpec) {
 	}
 	if in.CpuRateLimit != nil {
 		in, out := &in.CpuRateLimit, &out.CpuRateLimit
-		*out = new(int32)
+		*out = new(string)
 		**out = **in
 	}
 }

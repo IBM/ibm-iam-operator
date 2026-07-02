@@ -218,7 +218,7 @@ spec:
                       to IAM service containers. Valid values are "1"-"100" or
                       "disable" (case-insensitive). Leave unset to apply no rate
                       limit.
-                    pattern: ^([1-9][0-9]?|100|[Dd][Ii][Ss][Aa][Bb][Ll][Ee])$
+                    pattern: ^([1-9][0-9]?|100|[Dd][Ii][Ss][Aa][Bb][Ll][Ee])?$
                     type: string
                   defaultAdminPassword:
                     type: string

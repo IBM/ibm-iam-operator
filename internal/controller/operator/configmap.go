@@ -448,10 +448,6 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"LDAP_CTX_POOL_PREFERREDSIZE"),
 		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("MASTER_PATH")),
 			"MASTER_PATH"),
-		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("PRVDR_WORKER_COUNT")),
-			"PRVDR_WORKER_COUNT"),
-		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("MGMT_WORKER_COUNT")),
-			"MGMT_WORKER_COUNT"),
 	}
 
 	if v, ok := generated.Data["IS_OPENSHIFT_ENV"]; ok {
@@ -709,8 +705,6 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"SCIM_AUTH_CACHE_MAX_SIZE":           "1000",
 				"SCIM_AUTH_CACHE_TTL_VALUE":          "60",
 				"SCIM_LDAP_ATTRIBUTES_MAPPING":       scimLdapAttributesMapping,
-				"PRVDR_WORKER_COUNT":                 "",
-				"MGMT_WORKER_COUNT":                  "",
 				"IS_OPENSHIFT_ENV":                   strconv.FormatBool(isOSEnv),
 				"LIBERTY_SAMESITE_COOKIE":            libertySSCookie,
 				"OAUTH_21_ENABLED":                   strconv.FormatBool(oauth21Enabled),

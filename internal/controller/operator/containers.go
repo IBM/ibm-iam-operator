@@ -558,10 +558,18 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		"LDAP_CTX_POOL_TIMEOUT", "LDAP_CTX_POOL_WAITTIME", "LDAP_CTX_POOL_PREFERREDSIZE", "LDAP_SEARCH_CACHE_ENABLED",
 		"LDAP_SEARCH_CACHE_SIZELIMIT", "LDAP_SEARCH_EXCLUDE_WILDCARD_CHARS", "LDAP_SEARCH_SIZE_LIMIT", "IAM_UM",
 		"LDAP_SEARCH_TIME_LIMIT", "LDAP_SEARCH_CN_ATTR_ONLY", "LDAP_SEARCH_ID_ATTR_ONLY", "AUDIT_URL", "OAUTH_21_ENABLED",
-		"DB_CONNECT_TIMEOUT", "DB_IDLE_TIMEOUT", "DB_CONNECT_MAX_RETRIES", "DB_POOL_MIN_SIZE", "DB_POOL_MAX_SIZE", "DB_SSL_MODE", "SEQL_LOGGING", "ACCOUNT_IAM_URL", "EXPOSE_ADDITIONAL_PATHS", "CSP_FRAME_ANCESTORS", "CSP_CONNECT_SRC", "PRVDR_WORKER_COUNT"}
+		"DB_CONNECT_TIMEOUT", "DB_IDLE_TIMEOUT", "DB_CONNECT_MAX_RETRIES", "DB_POOL_MIN_SIZE", "DB_POOL_MAX_SIZE", "DB_SSL_MODE", "SEQL_LOGGING", "ACCOUNT_IAM_URL", "EXPOSE_ADDITIONAL_PATHS", "CSP_FRAME_ANCESTORS", "CSP_CONNECT_SRC"}
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
 
 	envVars = append(envVars, idpEnvVars...)
+
+	// Add PRVDR_WORKER_COUNT from CR spec if provided
+	if instance.Spec.Config.IdPrvdrWorkerCount != nil {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "PRVDR_WORKER_COUNT",
+			Value: *instance.Spec.Config.IdPrvdrWorkerCount,
+		})
+	}
 
 	if instance.Spec.Config.EnableImpersonation {
 		impersonationVars := []corev1.EnvVar{
@@ -898,11 +906,19 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		"LDAP_SEARCH_CN_ATTR_ONLY", "LDAP_SEARCH_ID_ATTR_ONLY", "LDAP_SEARCH_EXCLUDE_WILDCARD_CHARS", "IGNORE_LDAP_FILTERS_VALIDATION", "AUTH_SVC_LDAP_CONFIG_TIMEOUT",
 		"SCIM_LDAP_SEARCH_SIZE_LIMIT", "SCIM_LDAP_SEARCH_TIME_LIMIT", "SCIM_ASYNC_PARALLEL_LIMIT", "SCIM_GET_DISPLAY_FOR_GROUP_USERS", "ATTR_MAPPING_FROM_CONFIG", "SCIM_AUTH_CACHE_MAX_SIZE", "SCIM_AUTH_CACHE_TTL_VALUE",
 		"DB_CONNECT_TIMEOUT", "DB_IDLE_TIMEOUT", "DB_CONNECT_MAX_RETRIES", "DB_POOL_MIN_SIZE", "DB_POOL_MAX_SIZE", "DB_SSL_MODE", "SEQL_LOGGING", "AUDIT_URL", "IAM_UM", "OAUTH_21_ENABLED",
-		"ACCOUNT_IAM_URL", "EXPOSE_ADDITIONAL_PATHS", "LDAP_CLIENT_CONNECT_TIMEOUT", "MGMT_WORKER_COUNT"}
+		"ACCOUNT_IAM_URL", "EXPOSE_ADDITIONAL_PATHS", "LDAP_CLIENT_CONNECT_TIMEOUT"}
 
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
 
 	envVars = append(envVars, idpEnvVars...)
+
+	// Add MGMT_WORKER_COUNT from CR spec if provided
+	if instance.Spec.Config.IdMgmtWorkerCount != nil {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "MGMT_WORKER_COUNT",
+			Value: *instance.Spec.Config.IdMgmtWorkerCount,
+		})
+	}
 
 	if instance.Spec.Config.EnableImpersonation {
 		impersonationVars := []corev1.EnvVar{

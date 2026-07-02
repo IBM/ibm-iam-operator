@@ -180,10 +180,6 @@ type ConfigSpec struct {
 	LibertyAuthCacheTimeout     *string             `json:"libertyAuthCacheTimeout,omitempty"`
 	LdapClientConnectTimeout    *string             `json:"ldapClientConnectTimeout,omitempty"`
 	LDAPAllowlistEnabled        *bool               `json:"ldapAllowlistEnabled,omitempty"`
-	// CpuRateLimit sets a CPU usage rate limit (0–100) applied to IAM service containers.
-	// Leave unset to apply no rate limit.
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=100
 	CpuRateLimit                *int32              `json:"cpuRateLimit,omitempty"`
 }
 

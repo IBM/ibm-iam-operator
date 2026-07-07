@@ -317,6 +317,16 @@ func generatePlatformAuthService(imagePullSecret, samlCertSecret, ldapSPCName, e
 						TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 							{
 								MaxSkew:           1,
+								TopologyKey:       "kubernetes.io/hostname",
+								WhenUnsatisfiable: corev1.ScheduleAnyway,
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"app": s.GetName(),
+									},
+								},
+							},
+							{
+								MaxSkew:           1,
 								TopologyKey:       "topology.kubernetes.io/zone",
 								WhenUnsatisfiable: corev1.ScheduleAnyway,
 								LabelSelector: &metav1.LabelSelector{
@@ -494,6 +504,16 @@ func generatePlatformIdentityManagement(imagePullSecret, samlCertSecret, auditSe
 						TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 							{
 								MaxSkew:           1,
+								TopologyKey:       "kubernetes.io/hostname",
+								WhenUnsatisfiable: corev1.ScheduleAnyway,
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"app": s.GetName(),
+									},
+								},
+							},
+							{
+								MaxSkew:           1,
 								TopologyKey:       "topology.kubernetes.io/zone",
 								WhenUnsatisfiable: corev1.ScheduleAnyway,
 								LabelSelector: &metav1.LabelSelector{
@@ -666,6 +686,16 @@ func generatePlatformIdentityProvider(imagePullSecret, samlCertSecret, saasServi
 							},
 						},
 						TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+							{
+								MaxSkew:           1,
+								TopologyKey:       "kubernetes.io/hostname",
+								WhenUnsatisfiable: corev1.ScheduleAnyway,
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"app": s.GetName(),
+									},
+								},
+							},
 							{
 								MaxSkew:           1,
 								TopologyKey:       "topology.kubernetes.io/zone",

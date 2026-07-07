@@ -277,12 +277,12 @@ spec:
                     type: string
                   zenFrontDoor:
                     type: boolean
-                  idPrvdrWorkerCount:
-                    description: 'IdPrvdrWorkerCount specifies the number of nodejs worker threads for platform-identity-provider pods. Must be either "auto" or a numeric string from "1" to "100".'
+                  idPrvdrNodejsWorkers:
+                    description: 'IdPrvdrNodejsWorkers specifies the number of nodejs worker threads for platform-identity-provider pods. Must be either "auto" or a numeric string from "1" to "100".'
                     type: string
                     pattern: '^(auto|([1-9][0-9]?|100))$'
-                  idMgmtWorkerCount:
-                    description: 'IdMgmtWorkerCount specifies the number of nodejs worker threads for platform-identity-management pods. Must be either "auto" or a numeric string from "1" to "100".'
+                  idMgmtNodejsWorkers:
+                    description: 'IdMgmtNodejsWorkers specifies the number of nodejs worker threads for platform-identity-management pods. Must be either "auto" or a numeric string from "1" to "100".'
                     type: string
                     pattern: '^(auto|([1-9][0-9]?|100))$'
                 required:

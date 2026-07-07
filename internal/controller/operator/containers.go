@@ -541,13 +541,12 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 	}
 
 	// Add PRVDR_CPU_LIMIT environment variable using ResourceFieldRef
-	// Using Divisor "1000m" to get the value in CPU cores (e.g., 0.75, 2.5)
 	envVars = append(envVars, corev1.EnvVar{
 		Name: "PRVDR_CPU_LIMIT",
 		ValueFrom: &corev1.EnvVarSource{
 			ResourceFieldRef: &corev1.ResourceFieldSelector{
 				Resource: "limits.cpu",
-				Divisor:  resource.MustParse("1000m"),
+				Divisor:  resource.MustParse("1m"),
 			},
 		},
 	})
@@ -899,13 +898,12 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 	}
 
 	// Add MGMT_CPU_LIMIT environment variable using ResourceFieldRef
-	// Using Divisor "1000m" to get the value in CPU cores (e.g., 0.75, 2.5)
 	envVars = append(envVars, corev1.EnvVar{
 		Name: "MGMT_CPU_LIMIT",
 		ValueFrom: &corev1.EnvVarSource{
 			ResourceFieldRef: &corev1.ResourceFieldSelector{
 				Resource: "limits.cpu",
-				Divisor:  resource.MustParse("1000m"),
+				Divisor:  resource.MustParse("1m"),
 			},
 		},
 	})

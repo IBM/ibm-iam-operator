@@ -305,6 +305,23 @@ func (r *BootstrapReconciler) setIngressSecretIfCustomized(ctx context.Context, 
 		log.Error(err, "Unexpected error occurred while trying to retrieve custom TLS certificate Secret")
 		return
 	}
+
+	// Check if Route API is available and registered in scheme before attempting to access Routes
+	if !common.ClusterHasRouteGroupVersion(r.DiscoveryClient) {
+		log.Info("Route API not available in cluster; skipping Route-based TLS customization")
+		return nil
+	}
+
+	// Also check if Route type is registered in the client's scheme
+	// (it won't be if Route permissions are missing)
+	gvk := routev1.GroupVersion.WithKind("Route")
+	if !r.Client.Scheme().Recognizes(gvk) {
+		log.Info("Route type not registered in scheme (likely due to missing permissions); skipping Route-based TLS customization")
+		return nil
+	}
+
+	log.V(1).Info("Route API available and registered in scheme; proceeding with Route-based TLS customization check")
+
 	consoleRoute := &routev1.Route{}
 	consoleName := "cp-console"
 	if authCR.Spec.Config.ZenFrontDoor {

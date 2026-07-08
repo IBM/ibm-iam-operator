@@ -65,6 +65,19 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 		return
 	}
 
+	// Check if operator has required SecretProviderClass permissions when CSI is enabled
+	if authCR.SecretsStoreCSIEnabled() && common.ClusterHasCSIGroupVersion(&r.DiscoveryClient) {
+		spcVerbs := []string{"get", "list", "watch"}
+		hasSPCAccess, err := r.hasAPIAccess(ctx, authCR.Namespace, "secrets-store.csi.x-k8s.io", "secretproviderclasses", spcVerbs)
+		if err != nil {
+			log.Error(err, "Failed to check SecretProviderClass permissions")
+			return subreconciler.RequeueWithError(err)
+		}
+		if !hasSPCAccess {
+			log.Info("Operator does not have required SecretProviderClass permissions; CSI features will be unavailable")
+		}
+	}
+
 	// Check for the presence of dependencies
 	consoleConfigMap := &corev1.ConfigMap{}
 	ibmCloudClusterInfoKey := types.NamespacedName{Name: common.IBMCloudClusterInfoCMName, Namespace: req.Namespace}
@@ -304,6 +317,16 @@ func generatePlatformAuthService(imagePullSecret, samlCertSecret, ldapSPCName, e
 						TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 							{
 								MaxSkew:           1,
+								TopologyKey:       "kubernetes.io/hostname",
+								WhenUnsatisfiable: corev1.ScheduleAnyway,
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"app": s.GetName(),
+									},
+								},
+							},
+							{
+								MaxSkew:           1,
 								TopologyKey:       "topology.kubernetes.io/zone",
 								WhenUnsatisfiable: corev1.ScheduleAnyway,
 								LabelSelector: &metav1.LabelSelector{
@@ -481,6 +504,16 @@ func generatePlatformIdentityManagement(imagePullSecret, samlCertSecret, auditSe
 						TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 							{
 								MaxSkew:           1,
+								TopologyKey:       "kubernetes.io/hostname",
+								WhenUnsatisfiable: corev1.ScheduleAnyway,
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"app": s.GetName(),
+									},
+								},
+							},
+							{
+								MaxSkew:           1,
 								TopologyKey:       "topology.kubernetes.io/zone",
 								WhenUnsatisfiable: corev1.ScheduleAnyway,
 								LabelSelector: &metav1.LabelSelector{
@@ -655,6 +688,16 @@ func generatePlatformIdentityProvider(imagePullSecret, samlCertSecret, saasServi
 						TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 							{
 								MaxSkew:           1,
+								TopologyKey:       "kubernetes.io/hostname",
+								WhenUnsatisfiable: corev1.ScheduleAnyway,
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"app": s.GetName(),
+									},
+								},
+							},
+							{
+								MaxSkew:           1,
 								TopologyKey:       "topology.kubernetes.io/zone",
 								WhenUnsatisfiable: corev1.ScheduleAnyway,
 								LabelSelector: &metav1.LabelSelector{
@@ -800,9 +843,10 @@ func preserveObservedFields(observed, generated *appsv1.Deployment) {
 			}
 			if observedContainer.ReadinessProbe != nil {
 				generated.Spec.Template.Spec.Containers[i].ReadinessProbe.SuccessThreshold = observedContainer.ReadinessProbe.SuccessThreshold
-				generated.Spec.Template.Spec.Containers[i].TerminationMessagePath = observedContainer.TerminationMessagePath
-				generated.Spec.Template.Spec.Containers[i].TerminationMessagePolicy = observedContainer.TerminationMessagePolicy
 			}
+			
+			generated.Spec.Template.Spec.Containers[i].TerminationMessagePath = observedContainer.TerminationMessagePath
+			generated.Spec.Template.Spec.Containers[i].TerminationMessagePolicy = observedContainer.TerminationMessagePolicy
 		}
 	}
 	for _, observedContainer := range observed.Spec.Template.Spec.InitContainers {

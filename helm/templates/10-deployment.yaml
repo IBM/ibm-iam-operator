@@ -83,6 +83,18 @@ metadata:
               "fipsEnabled": true,
               "ibmCloudSaas": false,
               "icpPort": 8443,
+              {{- $hasGvk := not .Values.cpfs.imNetworking.manageNetworking }}
+              {{- $hasHostname := .Values.cpfs.imNetworking.hostname }}
+              {{- if or $hasGvk $hasHostname }}
+              "ingress": {
+                {{- if $hasGvk }}
+                "gvk": "none"{{- if $hasHostname }},{{- end }}
+                {{- end }}
+                {{- if $hasHostname }}
+                "hostname": "{{ .Values.cpfs.imNetworking.hostname }}"
+                {{- end }}
+              },
+              {{- end }}
               "installType": "fresh",
               "isOpenshiftEnv": true,
               "nonceEnabled": true,
@@ -312,8 +324,6 @@ spec:
           readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
-      imagePullSecrets:
-      - name: {{ .Values.global.imagePullSecret }}
       securityContext:
         seccompProfile:
           type: RuntimeDefault

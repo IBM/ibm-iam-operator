@@ -37,6 +37,7 @@ metadata:
   name: ibm-iam-operator
   namespace: {{ $namespace }}
 rules:
+{{- if $.Values.cpfs.imNetworking.manageNetworking }}
 - apiGroups:
   - route.openshift.io
   resources:
@@ -55,6 +56,7 @@ rules:
   - routes/custom-host
   verbs:
   - create
+{{- end }}
 - apiGroups:
   - ""
   resources:
@@ -225,6 +227,7 @@ rules:
   - get
   - list
   - watch
+{{- if $.Values.cpfs.imNetworking.manageNetworking }}
 - apiGroups:
   - networking.k8s.io
   resources:
@@ -234,6 +237,7 @@ rules:
   - get
   - list
   - watch
+{{- end }}
 - apiGroups:
   - batch
   resources:

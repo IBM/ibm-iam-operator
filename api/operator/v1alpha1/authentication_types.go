@@ -180,8 +180,8 @@ type ConfigSpec struct {
 	LibertyAuthCacheTimeout     *string             `json:"libertyAuthCacheTimeout,omitempty"`
 	LdapClientConnectTimeout    *string             `json:"ldapClientConnectTimeout,omitempty"`
 	LDAPAllowlistEnabled        *bool               `json:"ldapAllowlistEnabled,omitempty"`
-	IdPrvdrWorkerCount         *string             `json:"idPrvdrNodejsWorkers,omitempty"`
-	IdMgmtWorkerCount          *string             `json:"idMgmtNodejsWorkers,omitempty"`
+	IdPrvdrWorkerCount         *string             `json:"idPrvdrWorkers,omitempty"`
+	IdMgmtWorkerCount          *string             `json:"idMgmtWorkers,omitempty"`
 }
 
 type ManagedResourceStatus struct {

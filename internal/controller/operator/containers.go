@@ -566,10 +566,10 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 	envVars = append(envVars, idpEnvVars...)
 
 	// Add PRVDR_WORKER_COUNT from CR spec if provided
-	if instance.Spec.Config.IdPrvdrWorkerCount != nil {
+	if instance.Spec.Config.IdPrvdrWorkers != nil {
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "PRVDR_WORKER_COUNT",
-			Value: *instance.Spec.Config.IdPrvdrWorkerCount,
+			Value: *instance.Spec.Config.IdPrvdrWorkers,
 		})
 	}
 
@@ -920,10 +920,10 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 	envVars = append(envVars, idpEnvVars...)
 
 	// Add MGMT_WORKER_COUNT from CR spec if provided
-	if instance.Spec.Config.IdMgmtWorkerCount != nil {
+	if instance.Spec.Config.IdMgmtWorkers != nil {
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "MGMT_WORKER_COUNT",
-			Value: *instance.Spec.Config.IdMgmtWorkerCount,
+			Value: *instance.Spec.Config.IdMgmtWorkers,
 		})
 	}
 

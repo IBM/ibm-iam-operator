@@ -99,25 +99,15 @@ func init() {
 		namespacesToCheck = strings.Split(watchNamespaceEnv, ",")
 	}
 
-	// Check OperandRequest permissions across all watch namespaces
-	operandRequestVerbs := []string{"create", "get", "list", "patch", "watch", "update", "delete"}
-	if controllercommon.ClusterHasOperandRequestAPIResource(dc) {
-		hasOperandRequestAccess, err := hasNamespacedAPIAccessForNamespaces(ctx, tempClient, namespacesToCheck, "operator.ibm.com", "operandrequests", operandRequestVerbs)
-		if err != nil {
-			setupLog.Error(err, "Failed to check OperandRequest permissions")
-			hasOperandRequestAccess = false
-		}
-		if hasOperandRequestAccess {
-			setupLog.V(1).Info("OperandRequest API present with required permissions in all watch namespaces; adding ODLM-enabled operator.ibm.com scheme")
-			utilruntime.Must(operatorv1alpha1.AddODLMEnabledToScheme(scheme))
-		} else {
-			setupLog.Info("OperandRequest API present but missing required permissions; adding base operator.ibm.com scheme")
-			utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
-		}
-	} else {
-		setupLog.V(1).Info("OperandRequest API not present; adding base operator.ibm.com scheme")
-		utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
-	}
+	// Always register the full ODLM-enabled scheme (Authentication + OperandRequest +
+	// OperandBindInfo). Scheme registration must never be gated on a runtime RBAC
+	// check: init() runs once at process start — before ibm-namespace-scope-operator
+	// has projected permissions into watched namespaces. If the SSAR fails here the
+	// type is permanently absent from the scheme, causing a "no kind is registered
+	// for OperandRequest" panic on every reconcile even after RBAC is later granted.
+	// Scheme registration has no security implication; it only maps Go types to GVKs.
+	// Access-gating (whether to *watch* a resource) is done in SetupWithManager.
+	utilruntime.Must(operatorv1alpha1.AddODLMEnabledToScheme(scheme))
 
 	// Check Route permissions (including routes/custom-host subresource) across all watch namespaces
 	routeVerbs := []string{"get", "list", "watch", "create", "delete", "update", "patch"}

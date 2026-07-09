@@ -981,14 +981,14 @@ func buildMigratorVolumes(needsMongoDBMigration bool, edbSPCName string, zenInst
 		})
 	} else {
 		volumes = append(volumes, corev1.Volume{
-				Name: "pgsql-certs",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName:  common.DatastoreEDBSecretName,
-						DefaultMode: ptr.To(int32(420)),
-					},
+			Name: "pgsql-certs",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  common.DatastoreEDBSecretName,
+					DefaultMode: ptr.To(int32(420)),
 				},
-			})
+			},
+		})
 	}
 
 	if !needsMongoDBMigration {

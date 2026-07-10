@@ -27,6 +27,7 @@ import (
 	certmgr "github.com/IBM/ibm-iam-operator/internal/api/certmanager/v1"
 	"github.com/IBM/ibm-iam-operator/internal/controller/common"
 	"github.com/IBM/ibm-iam-operator/internal/version"
+	"github.com/go-logr/logr"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -498,31 +499,36 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		setupLog.Info("Ingress API not detected in cluster; skipping Ingress watch")
 	}
 
-	// Add OperandRequest watch if API is present and operator has required permissions
+	// Add OperandRequest watch if API is present and operator has required permissions.
+	// Unlike Route/Ingress (which are intentionally optional), OperandRequest permissions
+	// are always expected when the ODLM API is present: they are projected by
+	// ibm-namespace-scope-operator shortly after pod start. Retry with a timeout to
+	// tolerate the race between pod start and RBAC projection.
 	if common.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
 		operandRequestVerbs := []string{"create", "get", "list", "patch", "watch", "update", "delete"}
-		hasOperandRequestAccess, err := r.hasAPIAccessInNamespaces(ctx, namespacesToCheck, "operator.ibm.com", "operandrequests", operandRequestVerbs)
+		hasOperandRequestAccess, err := r.waitForODLMAccess(ctx, setupLog, namespacesToCheck, "operandrequests", operandRequestVerbs)
 		if err != nil {
 			setupLog.Error(err, "Failed to check OperandRequest permissions for watch setup")
 		} else if hasOperandRequestAccess {
 			setupLog.V(1).Info("OperandRequest API present with required permissions; setting up OperandRequest watch")
 			authCtrl.Watches(&operatorv1alpha1.OperandRequest{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
 		} else {
-			setupLog.Info("OperandRequest API present but missing required permissions; skipping OperandRequest watch")
+			setupLog.Info("OperandRequest API present but missing required permissions after waiting; skipping OperandRequest watch")
 		}
 	}
 
-	// Add OperandBindInfo watch if API is present and operator has required permissions
+	// Add OperandBindInfo watch if API is present and operator has required permissions.
+	// Same rationale as OperandRequest above — retry to tolerate RBAC projection race.
 	if common.ClusterHasOperandBindInfoAPIResource(&r.DiscoveryClient) {
 		operandBindInfoVerbs := []string{"create", "get", "list", "patch", "watch", "update", "delete"}
-		hasOperandBindInfoAccess, err := r.hasAPIAccessInNamespaces(ctx, namespacesToCheck, "operator.ibm.com", "operandbindinfos", operandBindInfoVerbs)
+		hasOperandBindInfoAccess, err := r.waitForODLMAccess(ctx, setupLog, namespacesToCheck, "operandbindinfos", operandBindInfoVerbs)
 		if err != nil {
 			setupLog.Error(err, "Failed to check OperandBindInfo permissions for watch setup")
 		} else if hasOperandBindInfoAccess {
 			setupLog.V(1).Info("OperandBindInfo API present with required permissions; setting up OperandBindInfo watch")
 			authCtrl.Watches(&operatorv1alpha1.OperandBindInfo{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
 		} else {
-			setupLog.Info("OperandBindInfo API present but missing required permissions; skipping OperandBindInfo watch")
+			setupLog.Info("OperandBindInfo API present but missing required permissions after waiting; skipping OperandBindInfo watch")
 		}
 	}
 
@@ -710,6 +716,41 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	authCtrl.Watches(&operatorv1alpha1.Authentication{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(bootstrappedPred))
 	return authCtrl.Named("controller_authentication").
 		Complete(r)
+}
+
+// odlmAccessRetryInterval is the wait between SSAR retries for ODLM resources.
+const odlmAccessRetryInterval = 2 * time.Second
+
+// odlmAccessRetryTimeout is the maximum time to wait for ibm-namespace-scope-operator
+// to project ODLM (OperandRequest/OperandBindInfo) RBAC into watched namespaces.
+// Route, Ingress, and SPC permissions are intentionally optional and are never
+// retried — a denied SSAR for those means "don't watch" by design.
+const odlmAccessRetryTimeout = 5 * time.Minute
+
+// waitForODLMAccess retries hasAPIAccessInNamespaces for ODLM resources until
+// permissions are granted or odlmAccessRetryTimeout elapses.
+// It returns (true, nil) on success and (false, nil) on timeout.
+// Real API errors are returned immediately without retrying.
+func (r *AuthenticationReconciler) waitForODLMAccess(ctx context.Context, log logr.Logger, namespaces []string, resource string, verbs []string) (bool, error) {
+	deadline := time.Now().Add(odlmAccessRetryTimeout)
+	for {
+		ok, err := r.hasAPIAccessInNamespaces(ctx, namespaces, "operator.ibm.com", resource, verbs)
+		if err != nil {
+			return false, err
+		}
+		if ok {
+			return true, nil
+		}
+		if time.Now().After(deadline) {
+			return false, nil
+		}
+		log.Info("ODLM permissions not yet available; retrying", "resource", resource, "namespaces", namespaces)
+		select {
+		case <-ctx.Done():
+			return false, nil
+		case <-time.After(odlmAccessRetryInterval):
+		}
+	}
 }
 
 // hasAPIAccess uses SelfSubjectAccessReviews to confirm whether the Opertor's ServiceAccount has authorization to use a

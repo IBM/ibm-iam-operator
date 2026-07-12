@@ -457,7 +457,40 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&appsv1.Deployment{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&autoscalingv2.HorizontalPodAutoscaler{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
 
-	// Add Routes watch if API is present and operator has required permissions
+	// Add OperandRequest watch first: permissions are always expected when the ODLM API
+	// is present (projected by ibm-namespace-scope-operator). Retry with a timeout to
+	// tolerate the race between pod start and RBAC projection.
+	// This is checked first so the manager blocks here until ODLM RBAC is ready before
+	// proceeding to the intentionally-optional Route/Ingress checks.
+	if common.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
+		operandRequestVerbs := []string{"create", "get", "list", "patch", "watch", "update", "delete"}
+		hasOperandRequestAccess, err := r.waitForODLMAccess(ctx, setupLog, namespacesToCheck, "operandrequests", operandRequestVerbs)
+		if err != nil {
+			setupLog.Error(err, "Failed to check OperandRequest permissions for watch setup")
+		} else if hasOperandRequestAccess {
+			setupLog.V(1).Info("OperandRequest API present with required permissions; setting up OperandRequest watch")
+			authCtrl.Watches(&operatorv1alpha1.OperandRequest{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+		} else {
+			setupLog.Info("OperandRequest API present but missing required permissions after waiting; skipping OperandRequest watch")
+		}
+	}
+
+	// Add OperandBindInfo watch — same rationale as OperandRequest above.
+	if common.ClusterHasOperandBindInfoAPIResource(&r.DiscoveryClient) {
+		operandBindInfoVerbs := []string{"create", "get", "list", "patch", "watch", "update", "delete"}
+		hasOperandBindInfoAccess, err := r.waitForODLMAccess(ctx, setupLog, namespacesToCheck, "operandbindinfos", operandBindInfoVerbs)
+		if err != nil {
+			setupLog.Error(err, "Failed to check OperandBindInfo permissions for watch setup")
+		} else if hasOperandBindInfoAccess {
+			setupLog.V(1).Info("OperandBindInfo API present with required permissions; setting up OperandBindInfo watch")
+			authCtrl.Watches(&operatorv1alpha1.OperandBindInfo{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+		} else {
+			setupLog.Info("OperandBindInfo API present but missing required permissions after waiting; skipping OperandBindInfo watch")
+		}
+	}
+
+	// Add Routes watch if API is present and operator has required permissions.
+	// Route permissions are intentionally optional — no retry.
 	if common.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
 		routeVerbs := []string{"get", "list", "watch", "create", "delete", "update", "patch"}
 		hasRouteAccess, err := r.hasAPIAccessInNamespaces(ctx, namespacesToCheck, "route.openshift.io", "routes", routeVerbs)
@@ -479,7 +512,8 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}
 	}
 
-	// Add Ingress watch if API is present and operator has required permissions
+	// Add Ingress watch if API is present and operator has required permissions.
+	// Ingress permissions are intentionally optional — no retry.
 	if common.ClusterHasIngressGroupVersion(&r.DiscoveryClient) {
 		setupLog.Info("Ingress API detected in cluster; checking permissions")
 		ingressVerbs := []string{"delete", "get", "list", "watch"}
@@ -497,39 +531,6 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}
 	} else {
 		setupLog.Info("Ingress API not detected in cluster; skipping Ingress watch")
-	}
-
-	// Add OperandRequest watch if API is present and operator has required permissions.
-	// Unlike Route/Ingress (which are intentionally optional), OperandRequest permissions
-	// are always expected when the ODLM API is present: they are projected by
-	// ibm-namespace-scope-operator shortly after pod start. Retry with a timeout to
-	// tolerate the race between pod start and RBAC projection.
-	if common.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
-		operandRequestVerbs := []string{"create", "get", "list", "patch", "watch", "update", "delete"}
-		hasOperandRequestAccess, err := r.waitForODLMAccess(ctx, setupLog, namespacesToCheck, "operandrequests", operandRequestVerbs)
-		if err != nil {
-			setupLog.Error(err, "Failed to check OperandRequest permissions for watch setup")
-		} else if hasOperandRequestAccess {
-			setupLog.V(1).Info("OperandRequest API present with required permissions; setting up OperandRequest watch")
-			authCtrl.Watches(&operatorv1alpha1.OperandRequest{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
-		} else {
-			setupLog.Info("OperandRequest API present but missing required permissions after waiting; skipping OperandRequest watch")
-		}
-	}
-
-	// Add OperandBindInfo watch if API is present and operator has required permissions.
-	// Same rationale as OperandRequest above — retry to tolerate RBAC projection race.
-	if common.ClusterHasOperandBindInfoAPIResource(&r.DiscoveryClient) {
-		operandBindInfoVerbs := []string{"create", "get", "list", "patch", "watch", "update", "delete"}
-		hasOperandBindInfoAccess, err := r.waitForODLMAccess(ctx, setupLog, namespacesToCheck, "operandbindinfos", operandBindInfoVerbs)
-		if err != nil {
-			setupLog.Error(err, "Failed to check OperandBindInfo permissions for watch setup")
-		} else if hasOperandBindInfoAccess {
-			setupLog.V(1).Info("OperandBindInfo API present with required permissions; setting up OperandBindInfo watch")
-			authCtrl.Watches(&operatorv1alpha1.OperandBindInfo{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
-		} else {
-			setupLog.Info("OperandBindInfo API present but missing required permissions after waiting; skipping OperandBindInfo watch")
-		}
 	}
 
 	// Add SecretProviderClass watches if API is present and operator has required permissions

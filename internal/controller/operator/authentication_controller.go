@@ -491,7 +491,7 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	// Add Routes watch if API is present and operator has required permissions.
 	// Route permissions are intentionally optional — no retry.
-	if common.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
+	if common.ClusterHasRouteGroupVersion(&r.DiscoveryClient) {
 		routeVerbs := []string{"get", "list", "watch", "create", "delete", "update", "patch"}
 		hasRouteAccess, err := r.hasAPIAccessInNamespaces(ctx, namespacesToCheck, "route.openshift.io", "routes", routeVerbs)
 		if err != nil {

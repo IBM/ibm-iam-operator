@@ -1,6 +1,6 @@
 module github.com/IBM/ibm-iam-operator
 
-go 1.26.3
+go 1.26.5
 
 require (
 	github.com/go-logr/logr v1.4.3
@@ -87,6 +87,6 @@ require (
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
-replace golang.org/x/crypto => golang.org/x/crypto v0.47.0
+replace golang.org/x/crypto => golang.org/x/crypto v0.52.0
 
 replace golang.org/x/net => golang.org/x/net v0.55.0

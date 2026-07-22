@@ -3,7 +3,7 @@ module github.com/IBM/ibm-iam-operator
 go 1.26.5
 
 require (
-	github.com/go-logr/logr v1.4.3
+	github.com/go-logr/logr v1.4.4
 	github.com/onsi/ginkgo/v2 v2.27.5
 	github.com/onsi/gomega v1.39.0
 	github.com/opdev/subreconciler v0.0.3

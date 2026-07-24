@@ -291,6 +291,7 @@ func main() {
 			Client: mgr.GetClient(),
 			Reader: mgr.GetAPIReader(),
 		},
+		Reader:        mgr.GetAPIReader(),
 		Scheme:        mgr.GetScheme(),
 		Recorder:      mgr.GetEventRecorderFor(clientControllerName),
 		ByteGenerator: &common.RandomByteGenerator{},

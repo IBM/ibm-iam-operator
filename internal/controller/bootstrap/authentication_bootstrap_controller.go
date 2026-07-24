@@ -51,11 +51,6 @@ import (
 // edge cases that are encountered during upgrades.
 type BootstrapReconciler struct {
 	client.Client
-	// Reader is the uncached API reader (mgr.GetAPIReader()). Route reads must
-	// go through this so the cached client never starts a background informer
-	// for Route objects — which would fail with a 403 when the operator has no
-	// route list/watch permissions.
-	Reader          client.Reader
 	DiscoveryClient *discovery.DiscoveryClient
 }
 
@@ -252,7 +247,7 @@ func (r *BootstrapReconciler) generateClusterInfo(ctx context.Context, authCR *o
 		err = authctrl.GenerateCNCFClusterInfo(r.Client, r.DiscoveryClient, ctx, authCR, domainName, generated)
 	} else {
 		log.Info("Env Type is OCP")
-		err = authctrl.GenerateOCPClusterInfo(r.Client, r.Reader, r.DiscoveryClient, ctx, authCR, generated)
+		err = authctrl.GenerateOCPClusterInfo(r.Client, r.DiscoveryClient, ctx, authCR, generated)
 	}
 
 	if err != nil {
@@ -323,18 +318,19 @@ func (r *BootstrapReconciler) setIngressSecretIfCustomized(ctx context.Context, 
 		consoleName = "cpd"
 	}
 	log.Info("Did not find Secret containing custom TLS; check the console Route for current TLS configuration", "Route.Name", consoleName)
-	// Use the uncached Reader so the cached client never starts a background
-	// informer for Route objects.  A cached List/Get would prime the informer
-	// and cause a 403 UnhandledError when the operator has no route permissions.
-	if err = r.Reader.Get(ctx, types.NamespacedName{Name: consoleName, Namespace: authCR.Namespace}, consoleRoute); k8sErrors.IsNotFound(err) {
+	// Guard: check get permission before touching the Route API.
+	var canGet bool
+	if canGet, err = authctrl.CanAccessRoute(ctx, r.Client, authCR.Namespace, "get"); err != nil {
+		log.V(1).Info("Could not determine Route get permission; skipping Route-based TLS customization", "reason", err.Error())
+		return nil
+	}
+	if !canGet {
+		log.V(1).Info("Operator does not have permission to get Routes; skipping Route-based TLS customization", "Route.Name", consoleName)
+		return nil
+	}
+	if err = r.Get(ctx, types.NamespacedName{Name: consoleName, Namespace: authCR.Namespace}, consoleRoute); k8sErrors.IsNotFound(err) {
 		err = nil
 		log.Info("Did not find Route, so no TLS customization will be performed", "Route.Name", consoleName)
-		return
-	} else if k8sErrors.IsForbidden(err) {
-		// Operator has no get permission on Routes — this is intentionally
-		// optional; skip TLS customization without propagating the error.
-		err = nil
-		log.Info("Operator does not have permission to get Routes; skipping Route-based TLS customization", "Route.Name", consoleName)
 		return
 	} else if err != nil {
 		log.Error(err, "Unexpected error occurred while trying to retrieve console Route", "Route.Name", consoleName)

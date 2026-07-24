@@ -151,6 +151,10 @@ func (r *AuthenticationReconciler) removeFinalizer(ctx context.Context, finalize
 // AuthenticationReconciler reconciles a Authentication object
 type AuthenticationReconciler struct {
 	client.Client
+	// Reader is the uncached API reader (mgr.GetAPIReader()). Route/Ingress
+	// List calls must go through this to avoid priming cache informers for
+	// resource types the SA may not have list/watch permissions on.
+	Reader          client.Reader
 	Scheme          *k8sRuntime.Scheme
 	DiscoveryClient discovery.DiscoveryClient
 	Mutex           sync.Mutex

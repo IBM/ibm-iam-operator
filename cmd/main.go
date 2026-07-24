@@ -278,6 +278,7 @@ func main() {
 			Client: mgr.GetClient(),
 			Reader: mgr.GetAPIReader(),
 		},
+		Reader:          mgr.GetAPIReader(),
 		DiscoveryClient: dc,
 	}).SetupWithManager(mgr, ctrlLog); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Authentication")
@@ -310,6 +311,7 @@ func main() {
 			Client: mgr.GetClient(),
 			Reader: mgr.GetAPIReader(),
 		},
+		Reader:          mgr.GetAPIReader(),
 		DiscoveryClient: *dc,
 		Scheme:          mgr.GetScheme(),
 		ByteGenerator:   &common.RandomByteGenerator{},

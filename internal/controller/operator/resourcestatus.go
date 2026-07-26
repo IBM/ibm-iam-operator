@@ -465,8 +465,15 @@ func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, 
 		if authentication.ShouldRemoveRoutes() {
 			log.Info("Routes are disabled via .spec.config.ingress.gvk=none; skipping Route status check")
 		} else {
-			log.Info("Is running on OpenShift; will check Route status")
-			statusRetrievals = append(statusRetrievals, routeStatusRetrieval)
+			canGet, ssarErr := CanAccessRoute(ctx, k8sClient, authentication.Namespace, "get")
+			if ssarErr != nil {
+				log.V(1).Info("Could not determine Route get permission; skipping Route status check", "reason", ssarErr.Error())
+			} else if !canGet {
+				log.V(1).Info("Operator does not have permission to get Routes; skipping Route status check")
+			} else {
+				log.Info("Is running on OpenShift; will check Route status")
+				statusRetrievals = append(statusRetrievals, routeStatusRetrieval)
+			}
 		}
 	} else {
 		log.Info("Routes are not available; assuming ingress will be configured manually")

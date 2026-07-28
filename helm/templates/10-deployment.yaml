@@ -324,6 +324,8 @@ spec:
           readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
+      imagePullSecrets:
+      - name: {{ .Values.global.imagePullSecret }}
       securityContext:
         seccompProfile:
           type: RuntimeDefault

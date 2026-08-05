@@ -285,6 +285,9 @@ spec:
                     description: 'IdMgmtWorkers specifies the number of nodejs worker threads for platform-identity-management pods. Must be either "auto" or a numeric string from "1" to "100".'
                     type: string
                     pattern: '^(auto|([1-9][0-9]?|100))$'
+                  disableCertAuthRoute:
+                    description: 'DisableCertAuthRoute when set to true disables the creation of the im-certauth-passthrough Route. Defaults to false.'
+                    type: boolean
                 required:
                 - authUniqueHosts
                 - clusterCADomain

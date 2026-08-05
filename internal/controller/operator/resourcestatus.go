@@ -447,19 +447,22 @@ func (r *AuthenticationReconciler) getCurrentServiceStatus(ctx context.Context, 
 	// 1. Cluster has Route API available, AND
 	// 2. .spec.config.ingress.gvk is not set to "none"
 	if ctrlcommon.ClusterHasRouteGroupVersion(&r.DiscoveryClient) {
+		routeNames := []string{
+			"id-mgmt",
+			"platform-auth",
+			"platform-id-auth",
+			"platform-id-provider",
+			"platform-login",
+			"platform-oidc",
+			"saml-ui-callback",
+			"social-login-callback",
+		}
+		if !authentication.ShouldDisableCertAuthRoute() {
+			routeNames = append(routeNames, IMCrtAuthRouteName)
+		}
 		routeStatusRetrieval := statusRetrieval{
-			names: []string{
-				"id-mgmt",
-				"platform-auth",
-				"platform-id-auth",
-				"platform-id-provider",
-				"platform-login",
-				"platform-oidc",
-				"saml-ui-callback",
-				"social-login-callback",
-				IMCrtAuthRouteName,
-			},
-			f: getAllRouteStatus,
+			names: routeNames,
+			f:     getAllRouteStatus,
 		}
 
 		if authentication.ShouldRemoveRoutes() {

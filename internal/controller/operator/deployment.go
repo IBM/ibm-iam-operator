@@ -844,7 +844,7 @@ func preserveObservedFields(observed, generated *appsv1.Deployment) {
 			if observedContainer.ReadinessProbe != nil {
 				generated.Spec.Template.Spec.Containers[i].ReadinessProbe.SuccessThreshold = observedContainer.ReadinessProbe.SuccessThreshold
 			}
-			
+
 			generated.Spec.Template.Spec.Containers[i].TerminationMessagePath = observedContainer.TerminationMessagePath
 			generated.Spec.Template.Spec.Containers[i].TerminationMessagePolicy = observedContainer.TerminationMessagePolicy
 		}
@@ -1078,6 +1078,33 @@ func buildAuthSvcVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCN
 						{
 							Key:  "scim_admin_password",
 							Path: "scim_admin_password",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		},
+		{
+			Name: "oidc-auth",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-oidc-credentials",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "OAUTH2_CLIENT_REGISTRATION_SECRET",
+							Path: "OAUTH2_CLIENT_REGISTRATION_SECRET",
+						},
+						{
+							Key:  "WLP_CLIENT_ID",
+							Path: "WLP_CLIENT_ID",
+						},
+						{
+							Key:  "WLP_CLIENT_SECRET",
+							Path: "WLP_CLIENT_SECRET",
+						},
+						{
+							Key:  "WLP_SCOPE",
+							Path: "WLP_SCOPE",
 						},
 					},
 					DefaultMode: &partialAccess,

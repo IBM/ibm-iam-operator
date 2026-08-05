@@ -1105,6 +1105,10 @@ func buildAuthSvcVolumeMounts(ldapSpcExist bool) []corev1.VolumeMount {
 			Name:      "scim-admin-auth",
 			MountPath: "/auth/scim-admin-auth",
 		},
+		{
+			Name:      "oidc-auth",
+			MountPath: "/auth/oidc-auth",
+		},
 	}
 	if ldapSpcExist {
 		volumeMounts = EnsureVolumeMountPresent(volumeMounts, GetLdapBindPwdVolumeMount())

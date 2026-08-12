@@ -417,74 +417,8 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			Value: "system:serviceaccount:" + instance.Namespace + ":" + providerSA,
 		},
 		{
-			Name: "roksClientSecret",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_SECRET",
-				},
-			},
-		},
-		{
-			Name: "wlpClientId",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_ID",
-				},
-			},
-		},
-		{
-			Name: "wlpClientSecret",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_SECRET",
-				},
-			},
-		},
-		{
 			Name:  "IDMGMT_KUBEDNS_NAME",
 			Value: "platform-identity-management",
-		},
-		{
-			Name: "OAUTH2_CLIENT_REGISTRATION_SECRET",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "OAUTH2_CLIENT_REGISTRATION_SECRET",
-				},
-			},
-		},
-		{
-			Name: "DEFAULT_ADMIN_USER",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp-credentials",
-					},
-					Key: "admin_username",
-				},
-			},
-		},
-		{
-			Name: "DEFAULT_ADMIN_PASSWORD",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp-credentials",
-					},
-					Key: "admin_password",
-				},
-			},
 		},
 		{
 			Name:  "IAM_PAP_URL",
@@ -699,17 +633,6 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			},
 		},
 		{
-			Name: "OAUTH2_CLIENT_REGISTRATION_SECRET",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "OAUTH2_CLIENT_REGISTRATION_SECRET",
-				},
-			},
-		},
-		{
 			Name:  "AUTHZ_DISABLED",
 			Value: "true",
 		},
@@ -732,61 +655,6 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		{
 			Name:  "roksClientId",
 			Value: "system:serviceaccount:" + instance.Namespace + ":" + providerSA,
-		},
-		{
-			Name: "roksClientSecret",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_SECRET",
-				},
-			},
-		},
-		{
-			Name: "DEFAULT_ADMIN_USER",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp-credentials",
-					},
-					Key: "admin_username",
-				},
-			},
-		},
-		{
-			Name: "DEFAULT_ADMIN_PASSWORD",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp-credentials",
-					},
-					Key: "admin_password",
-				},
-			},
-		},
-		{
-			Name: "SCIM_ADMIN_USER",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-scim-credentials",
-					},
-					Key: "scim_admin_username",
-				},
-			},
-		},
-		{
-			Name: "SCIM_ADMIN_PASSWORD",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-scim-credentials",
-					},
-					Key: "scim_admin_password",
-				},
-			},
 		},
 		{
 			Name:  "IDPROVIDER_KUBEDNS_NAME",
@@ -815,39 +683,6 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 				FieldRef: &corev1.ObjectFieldSelector{
 					APIVersion: "v1",
 					FieldPath:  "status.podIP",
-				},
-			},
-		},
-		{
-			Name: "WLP_CLIENT_ID",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_ID",
-				},
-			},
-		},
-		{
-			Name: "WLP_CLIENT_SECRET",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_SECRET",
-				},
-			},
-		},
-		{
-			Name: "WLP_SCOPE",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_SCOPE",
 				},
 			},
 		},
@@ -1144,6 +979,18 @@ func buildIdentityManagerVolumeMounts(auditSecretName *string, ldapSpcExist bool
 			Name:      "tmp-vol",
 			MountPath: "/tmp",
 		},
+		{
+			Name:      "oidc-auth",
+			MountPath: "/auth/oidc-auth",
+		},
+		{
+			Name:      "scim-admin-auth",
+			MountPath: "/auth/scim-admin-auth",
+		},
+		{
+			Name:      "platform-admin-auth",
+			MountPath: "/auth/platform-admin-auth",
+		},
 	}
 
 	if auditSecretName != nil && *auditSecretName != "" {
@@ -1193,6 +1040,14 @@ func buildIdentityProviderVolumeMounts(auditSecretName *string, ldapSpcExist boo
 		{
 			Name:      "tmp-vol",
 			MountPath: "/tmp",
+		},
+		{
+			Name:      "oidc-auth",
+			MountPath: "/auth/oidc-auth",
+		},
+		{
+			Name:      "platform-admin-auth",
+			MountPath: "/auth/platform-admin-auth",
 		},
 	}
 	if auditSecretName != nil && *auditSecretName != "" {

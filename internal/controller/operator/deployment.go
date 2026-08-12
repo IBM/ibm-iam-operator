@@ -1085,33 +1085,6 @@ func buildAuthSvcVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCN
 			},
 		},
 		{
-			Name: "oidc-auth",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: "platform-oidc-credentials",
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "OAUTH2_CLIENT_REGISTRATION_SECRET",
-							Path: "OAUTH2_CLIENT_REGISTRATION_SECRET",
-						},
-						{
-							Key:  "WLP_CLIENT_ID",
-							Path: "WLP_CLIENT_ID",
-						},
-						{
-							Key:  "WLP_CLIENT_SECRET",
-							Path: "WLP_CLIENT_SECRET",
-						},
-						{
-							Key:  "WLP_SCOPE",
-							Path: "WLP_SCOPE",
-						},
-					},
-					DefaultMode: &partialAccess,
-				},
-			},
-		},
-		{
 			Name: "liberty-serverdir-vol",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
@@ -1148,6 +1121,33 @@ func buildAuthSvcVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCN
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
 					SizeLimit: memory50,
+				},
+			},
+		},
+		{
+			Name: "oidc-auth",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-oidc-credentials",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "OAUTH2_CLIENT_REGISTRATION_SECRET",
+							Path: "OAUTH2_CLIENT_REGISTRATION_SECRET",
+						},
+						{
+							Key:  "WLP_CLIENT_ID",
+							Path: "WLP_CLIENT_ID",
+						},
+						{
+							Key:  "WLP_CLIENT_SECRET",
+							Path: "WLP_CLIENT_SECRET",
+						},
+						{
+							Key:  "WLP_SCOPE",
+							Path: "WLP_SCOPE",
+						},
+					},
+					DefaultMode: &partialAccess,
 				},
 			},
 		},
@@ -1292,6 +1292,71 @@ func buildMgmtVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
 					SizeLimit: memory50,
+				},
+			},
+		},
+		{
+			Name: "oidc-auth",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-oidc-credentials",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "OAUTH2_CLIENT_REGISTRATION_SECRET",
+							Path: "OAUTH2_CLIENT_REGISTRATION_SECRET",
+						},
+						{
+							Key:  "WLP_CLIENT_ID",
+							Path: "WLP_CLIENT_ID",
+						},
+						{
+							Key:  "WLP_CLIENT_SECRET",
+							Path: "WLP_CLIENT_SECRET",
+						},
+						{
+							Key:  "WLP_SCOPE",
+							Path: "WLP_SCOPE",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		},
+		{
+			Name: "scim-admin-auth",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-auth-scim-credentials",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "scim_admin_username",
+							Path: "scim_admin_username",
+						},
+						{
+							Key:  "scim_admin_password",
+							Path: "scim_admin_password",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		},
+		{
+			Name: "platform-admin-auth",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-auth-idp-credentials",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "admin_username",
+							Path: "admin_username",
+						},
+						{
+							Key:  "admin_password",
+							Path: "admin_password",
+						},
+					},
+					DefaultMode: &partialAccess,
 				},
 			},
 		},
@@ -1465,6 +1530,52 @@ func buildProviderVolumes(ldapCACert, samlCertSecret, auditSecretName, ldapSPCNa
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
 					SizeLimit: memory150,
+				},
+			},
+		},
+		{
+			Name: "oidc-auth",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-oidc-credentials",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "OAUTH2_CLIENT_REGISTRATION_SECRET",
+							Path: "OAUTH2_CLIENT_REGISTRATION_SECRET",
+						},
+						{
+							Key:  "WLP_CLIENT_ID",
+							Path: "WLP_CLIENT_ID",
+						},
+						{
+							Key:  "WLP_CLIENT_SECRET",
+							Path: "WLP_CLIENT_SECRET",
+						},
+						{
+							Key:  "WLP_SCOPE",
+							Path: "WLP_SCOPE",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		},
+		{
+			Name: "platform-admin-auth",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-auth-idp-credentials",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "admin_username",
+							Path: "admin_username",
+						},
+						{
+							Key:  "admin_password",
+							Path: "admin_password",
+						},
+					},
+					DefaultMode: &partialAccess,
 				},
 			},
 		},

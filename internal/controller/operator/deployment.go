@@ -1579,6 +1579,37 @@ func buildProviderVolumes(ldapCACert, samlCertSecret, auditSecretName, ldapSPCNa
 				},
 			},
 		},
+		{
+			Name: "platform-encryption",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-auth-idp-encryption",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "ENCRYPTION_IV",
+							Path: "ENCRYPTION_IV",
+						},
+						{
+							Key:  "ENCRYPTION_KEY",
+							Path: "ENCRYPTION_KEY",
+						},
+						{
+							Key:  "algorithm",
+							Path: "algorithm",
+						},
+						{
+							Key:  "inputEncoding",
+							Path: "inputEncoding",
+						},
+						{
+							Key:  "outputEncoding",
+							Path: "outputEncoding",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		},
 	}
 	if auditSecretName != "" {
 		auditVolume := corev1.Volume{

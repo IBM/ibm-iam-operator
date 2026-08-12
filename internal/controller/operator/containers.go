@@ -338,61 +338,6 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			},
 		},
 		{
-			Name: "ENCRYPTION_KEY",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp-encryption",
-					},
-					Key: "ENCRYPTION_KEY",
-				},
-			},
-		},
-		{
-			Name: "ENCRYPTION_IV",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp-encryption",
-					},
-					Key: "ENCRYPTION_IV",
-				},
-			},
-		},
-		{
-			Name: "algorithm",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp-encryption",
-					},
-					Key: "algorithm",
-				},
-			},
-		},
-		{
-			Name: "inputEncoding",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp-encryption",
-					},
-					Key: "inputEncoding",
-				},
-			},
-		},
-		{
-			Name: "outputEncoding",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp-encryption",
-					},
-					Key: "outputEncoding",
-				},
-			},
-		},
-		{
 			Name:  "service_crn_id",
 			Value: saasCRNId,
 		},
@@ -1048,6 +993,10 @@ func buildIdentityProviderVolumeMounts(auditSecretName *string, ldapSpcExist boo
 		{
 			Name:      "platform-admin-auth",
 			MountPath: "/auth/platform-admin-auth",
+		},
+		{
+			Name:      "platform-encryption",
+			MountPath: "/encryption/platform-encryption",
 		},
 	}
 	if auditSecretName != nil && *auditSecretName != "" {

@@ -1305,18 +1305,6 @@ func buildMgmtVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName
 							Key:  "OAUTH2_CLIENT_REGISTRATION_SECRET",
 							Path: "OAUTH2_CLIENT_REGISTRATION_SECRET",
 						},
-						{
-							Key:  "WLP_CLIENT_ID",
-							Path: "WLP_CLIENT_ID",
-						},
-						{
-							Key:  "WLP_CLIENT_SECRET",
-							Path: "WLP_CLIENT_SECRET",
-						},
-						{
-							Key:  "WLP_SCOPE",
-							Path: "WLP_SCOPE",
-						},
 					},
 					DefaultMode: &partialAccess,
 				},
@@ -1332,10 +1320,6 @@ func buildMgmtVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName
 							Key:  "scim_admin_username",
 							Path: "scim_admin_username",
 						},
-						{
-							Key:  "scim_admin_password",
-							Path: "scim_admin_password",
-						},
 					},
 					DefaultMode: &partialAccess,
 				},
@@ -1350,10 +1334,6 @@ func buildMgmtVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName
 						{
 							Key:  "admin_username",
 							Path: "admin_username",
-						},
-						{
-							Key:  "admin_password",
-							Path: "admin_password",
 						},
 					},
 					DefaultMode: &partialAccess,
@@ -1550,10 +1530,6 @@ func buildProviderVolumes(ldapCACert, samlCertSecret, auditSecretName, ldapSPCNa
 						{
 							Key:  "WLP_CLIENT_SECRET",
 							Path: "WLP_CLIENT_SECRET",
-						},
-						{
-							Key:  "WLP_SCOPE",
-							Path: "WLP_SCOPE",
 						},
 					},
 					DefaultMode: &partialAccess,

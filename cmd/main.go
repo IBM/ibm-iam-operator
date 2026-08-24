@@ -99,72 +99,29 @@ func init() {
 		namespacesToCheck = strings.Split(watchNamespaceEnv, ",")
 	}
 
-	// Check OperandRequest permissions across all watch namespaces
-	operandRequestVerbs := []string{"create", "get", "list", "patch", "watch", "update", "delete"}
-	if controllercommon.ClusterHasOperandRequestAPIResource(dc) {
-		hasOperandRequestAccess, err := hasNamespacedAPIAccessForNamespaces(ctx, tempClient, namespacesToCheck, "operator.ibm.com", "operandrequests", operandRequestVerbs)
-		if err != nil {
-			setupLog.Error(err, "Failed to check OperandRequest permissions")
-			hasOperandRequestAccess = false
-		}
-		if hasOperandRequestAccess {
-			setupLog.V(1).Info("OperandRequest API present with required permissions in all watch namespaces; adding ODLM-enabled operator.ibm.com scheme")
-			utilruntime.Must(operatorv1alpha1.AddODLMEnabledToScheme(scheme))
-		} else {
-			setupLog.Info("OperandRequest API present but missing required permissions; adding base operator.ibm.com scheme")
-			utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
-		}
-	} else {
-		setupLog.V(1).Info("OperandRequest API not present; adding base operator.ibm.com scheme")
-		utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
-	}
+	// Always register the full ODLM-enabled scheme (Authentication + OperandRequest +
+	// OperandBindInfo). Scheme registration must never be gated on a runtime RBAC
+	// check: init() runs once at process start — before ibm-namespace-scope-operator
+	// has projected permissions into watched namespaces. If the SSAR fails here the
+	// type is permanently absent from the scheme, causing a "no kind is registered
+	// for OperandRequest" panic on every reconcile even after RBAC is later granted.
+	// Scheme registration has no security implication; it only maps Go types to GVKs.
+	// Access-gating (whether to *watch* a resource) is done in SetupWithManager.
+	utilruntime.Must(operatorv1alpha1.AddODLMEnabledToScheme(scheme))
 
-	// Check Route permissions (including routes/custom-host subresource) across all watch namespaces
-	routeVerbs := []string{"get", "list", "watch", "create", "delete", "update", "patch"}
+	// Route: register whenever the Route API is present on the cluster, regardless of
+	// whether the operator has Route permissions. The reconciler unconditionally builds
+	// SecondaryReconcilerBuilder[*routev1.Route] at runtime (routes.go), so the type
+	// must always be in the scheme on OCP clusters. Whether the operator actually
+	// *watches* or manages routes is gated by RBAC checks in SetupWithManager.
 	if controllercommon.ClusterHasRouteGroupVersion(dc) {
-		hasRouteAccess, err := hasNamespacedAPIAccessForNamespaces(ctx, tempClient, namespacesToCheck, "route.openshift.io", "routes", routeVerbs)
-		if err != nil {
-			setupLog.Error(err, "Failed to check Route permissions")
-			hasRouteAccess = false
-		}
-
-		if hasRouteAccess {
-			// Also check routes/custom-host subresource permission across all namespaces
-			hasCustomHostAccess, err := hasNamespacedAPIAccessForNamespaces(ctx, tempClient, namespacesToCheck, "route.openshift.io", "routes/custom-host", []string{"create"})
-			if err != nil {
-				setupLog.Error(err, "Failed to check routes/custom-host permissions")
-				hasCustomHostAccess = false
-			}
-			if !hasCustomHostAccess {
-				setupLog.Info("Route API present but missing routes/custom-host create permission in one or more namespaces")
-			}
-
-			if hasCustomHostAccess {
-				setupLog.V(1).Info("Route API present with all required permissions including routes/custom-host in all watch namespaces; adding Routes to scheme")
-				utilruntime.Must(routev1.AddToScheme(scheme))
-			} else {
-				setupLog.Info("Route API present but missing routes/custom-host create permission; skipping Routes scheme")
-			}
-		} else {
-			setupLog.Info("Route API present but missing required permissions; skipping Routes scheme")
-		}
+		utilruntime.Must(routev1.AddToScheme(scheme))
 	}
 
-	// Check Ingress permissions across all watch namespaces
-	ingressVerbs := []string{"delete", "get", "list", "watch"}
+	// Ingress: same rationale — register whenever the API is present; watch gating
+	// is handled in SetupWithManager.
 	if controllercommon.ClusterHasIngressGroupVersion(dc) {
-		hasIngressAccess, err := hasNamespacedAPIAccessForNamespaces(ctx, tempClient, namespacesToCheck, "networking.k8s.io", "ingresses", ingressVerbs)
-		if err != nil {
-			setupLog.Error(err, "Failed to check Ingress permissions")
-			hasIngressAccess = false
-		}
-
-		if hasIngressAccess {
-			setupLog.V(1).Info("Ingress API present with required permissions in all watch namespaces; adding Ingress to scheme")
-			utilruntime.Must(networkingv1.AddToScheme(scheme))
-		} else {
-			setupLog.Info("Ingress API present but missing required permissions; skipping Ingress scheme")
-		}
+		utilruntime.Must(networkingv1.AddToScheme(scheme))
 	}
 
 	// Check SecretProviderClass permissions across all watch namespaces

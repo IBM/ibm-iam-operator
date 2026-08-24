@@ -228,6 +228,18 @@ spec:
                   icpPort:
                     format: int32
                     type: integer
+                  idMgmtWorkers:
+                    description: IdMgmtWorkers specifies the number of nodejs worker
+                      threads for platform-identity-management pods. Must be either
+                      "auto" or a numeric string from "1" to "100".
+                    pattern: ^(auto|([1-9][0-9]?|100))$
+                    type: string
+                  idPrvdrWorkers:
+                    description: IdPrvdrWorkers specifies the number of nodejs worker
+                      threads for platform-identity-provider pods. Must be either
+                      "auto" or a numeric string from "1" to "100".
+                    pattern: ^(auto|([1-9][0-9]?|100))$
+                    type: string
                   ingress:
                     properties:
                       gvk:

@@ -306,21 +306,11 @@ func (r *BootstrapReconciler) setIngressSecretIfCustomized(ctx context.Context, 
 		return
 	}
 
-	// Check if Route API is available and registered in scheme before attempting to access Routes
+	// Check if Route API is available before attempting to access Routes.
 	if !common.ClusterHasRouteGroupVersion(r.DiscoveryClient) {
 		log.Info("Route API not available in cluster; skipping Route-based TLS customization")
 		return nil
 	}
-
-	// Also check if Route type is registered in the client's scheme
-	// (it won't be if Route permissions are missing)
-	gvk := routev1.GroupVersion.WithKind("Route")
-	if !r.Client.Scheme().Recognizes(gvk) {
-		log.Info("Route type not registered in scheme (likely due to missing permissions); skipping Route-based TLS customization")
-		return nil
-	}
-
-	log.V(1).Info("Route API available and registered in scheme; proceeding with Route-based TLS customization check")
 
 	consoleRoute := &routev1.Route{}
 	consoleName := "cp-console"
@@ -328,6 +318,16 @@ func (r *BootstrapReconciler) setIngressSecretIfCustomized(ctx context.Context, 
 		consoleName = "cpd"
 	}
 	log.Info("Did not find Secret containing custom TLS; check the console Route for current TLS configuration", "Route.Name", consoleName)
+	// Guard: check get permission before touching the Route API.
+	var canGet bool
+	if canGet, err = authctrl.CanAccessRoute(ctx, r.Client, authCR.Namespace, "get"); err != nil {
+		log.V(1).Info("Could not determine Route get permission; skipping Route-based TLS customization", "reason", err.Error())
+		return nil
+	}
+	if !canGet {
+		log.V(1).Info("Operator does not have permission to get Routes; skipping Route-based TLS customization", "Route.Name", consoleName)
+		return nil
+	}
 	if err = r.Get(ctx, types.NamespacedName{Name: consoleName, Namespace: authCR.Namespace}, consoleRoute); k8sErrors.IsNotFound(err) {
 		err = nil
 		log.Info("Did not find Route, so no TLS customization will be performed", "Route.Name", consoleName)

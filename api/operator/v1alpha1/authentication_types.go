@@ -181,6 +181,8 @@ type ConfigSpec struct {
 	LdapClientConnectTimeout    *string             `json:"ldapClientConnectTimeout,omitempty"`
 	LDAPAllowlistEnabled        *bool               `json:"ldapAllowlistEnabled,omitempty"`
 	CpuRateLimit                *string             `json:"cpuRateLimit,omitempty"`
+	IdPrvdrWorkers              *string             `json:"idPrvdrWorkers,omitempty"`
+	IdMgmtWorkers               *string             `json:"idMgmtWorkers,omitempty"`
 }
 
 type ManagedResourceStatus struct {

@@ -23,9 +23,12 @@ import (
 	"github.com/IBM/ibm-iam-operator/internal/controller/common"
 	"github.com/opdev/subreconciler"
 	corev1 "k8s.io/api/core/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -41,6 +44,8 @@ func (r *AuthenticationReconciler) handleServices(ctx context.Context, req ctrl.
 		return
 	}
 
+	// platform-auth-service is always a regular ClusterIP service with session
+	// affinity. It is never made headless regardless of zenFrontDoor or gvk settings.
 	builders := []*common.SecondaryReconcilerBuilder[*corev1.Service]{
 		common.NewSecondaryReconcilerBuilder[*corev1.Service]().
 			WithName("platform-auth-service").
@@ -86,6 +91,31 @@ func (r *AuthenticationReconciler) handleServices(ctx context.Context, req ctrl.
 			WithModifyFns(validateCP3PodSelectorAndLabel, updateSessionAffinity),
 	}
 
+	// platform-auth-service-headless is an additional headless service required
+	// only when BOTH conditions hold simultaneously:
+	//   - spec.config.zenFrontDoor: true
+	//   - spec.config.ingress.gvk: "none"  (i.e. ShouldRemoveRoutes() == true)
+	//
+	// In all other cases (any one condition is absent or toggled off) the headless
+	// service must be removed if it exists:
+	//   Case 2: zenFrontDoor=true  but gvk removed/changed → delete
+	//   Case 3: zenFrontDoor=false and gvk=none             → delete
+	//   Case 4: zenFrontDoor=false and gvk=ocp-route        → delete
+	if authCR.Spec.Config.ZenFrontDoor && authCR.ShouldRemoveRoutes() {
+		// Case 1: both conditions met → add the headless service to the builders list
+		// so it is reconciled through the same loop as all other services.
+		builders = append(builders, common.NewSecondaryReconcilerBuilder[*corev1.Service]().
+			WithName("platform-auth-service-headless").
+			WithGenerateFns(generateHeadlessService(
+				"platform-auth-service", // selector: target pods of platform-auth-service
+				corev1.ServicePort{
+					Name: "p9443",
+					Port: 9443,
+				},
+			)).
+			WithModifyFns(validateCP3PodSelectorAndLabel))
+	}
+
 	subRecs := []common.SecondaryReconciler{}
 	for i := range builders {
 		subRecs = append(subRecs, builders[i].
@@ -101,6 +131,14 @@ func (r *AuthenticationReconciler) handleServices(ctx context.Context, req ctrl.
 		result, err = reconciler.Reconcile(debugCtx)
 		results = append(results, result)
 		errs = append(errs, err)
+	}
+
+	// Cases 2, 3, 4: condition no longer holds → delete headless service if present.
+	if !authCR.Spec.Config.ZenFrontDoor || !authCR.ShouldRemoveRoutes() {
+		if cleanupErr := deleteHeadlessAuthServiceIfExists(debugCtx, r.Client, authCR.Namespace); cleanupErr != nil {
+			log.Error(cleanupErr, "Failed to delete platform-auth-service-headless during cleanup")
+			errs = append(errs, cleanupErr)
+		}
 	}
 
 	return common.ReduceSubreconcilerResultsAndErrors(results, errs)
@@ -143,6 +181,56 @@ func generateService(useSessionAffinity bool, ports ...corev1.ServicePort) commo
 		err = controllerutil.SetControllerReference(s.GetPrimary(), service, s.GetClient().Scheme())
 		return
 	}
+}
+
+// generateHeadlessService returns a GenerateFn that creates a headless ClusterIP
+// service (ClusterIP: "None"). The selector is set to the provided podSelectorName
+// rather than the service's own name, allowing the headless service to target a
+// different set of pods (e.g. platform-auth-service-headless targeting the pods
+// of platform-auth-service). Takes a variable number of corev1.ServicePort structs.
+func generateHeadlessService(podSelectorName string, ports ...corev1.ServicePort) common.GenerateFn[*corev1.Service] {
+	return func(s common.SecondaryReconciler, ctx context.Context, service *corev1.Service) (err error) {
+		*service = corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      s.GetName(),
+				Namespace: s.GetNamespace(),
+				Labels:    map[string]string{"app": s.GetName()},
+			},
+			Spec: corev1.ServiceSpec{
+				Ports: ports,
+				Selector: map[string]string{
+					"k8s-app": podSelectorName,
+				},
+				Type:      "ClusterIP",
+				ClusterIP: "None", // headless: no virtual IP, DNS returns individual pod IPs
+			},
+		}
+
+		// Set Authentication instance as the owner and controller of the Service
+		err = controllerutil.SetControllerReference(s.GetPrimary(), service, s.GetClient().Scheme())
+		return
+	}
+}
+
+// deleteHeadlessAuthServiceIfExists deletes platform-auth-service-headless when
+// the condition that requires it (zenFrontDoor=true AND gvk=none) no longer holds.
+// It is safe to call when the service does not exist.
+func deleteHeadlessAuthServiceIfExists(ctx context.Context, cl client.Client, namespace string) error {
+	log := logf.FromContext(ctx)
+	svc := &corev1.Service{}
+	objKey := types.NamespacedName{Name: "platform-auth-service-headless", Namespace: namespace}
+	if err := cl.Get(ctx, objKey, svc); k8sErrors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	log.Info("Deleting platform-auth-service-headless: condition (zenFrontDoor=true AND gvk=none) no longer holds")
+	if err := cl.Delete(ctx, svc); k8sErrors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	return nil
 }
 
 // validateCP3ServicePodSelectorAndLabel is a ModifyFn that ensures that the

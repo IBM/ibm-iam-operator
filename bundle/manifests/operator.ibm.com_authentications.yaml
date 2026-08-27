@@ -212,6 +212,10 @@ spec:
                     type: string
                   defaultLogin:
                     type: string
+                  disableCertAuthRoute:
+                    description: DisableCertAuthRoute when set to true disables the
+                      creation of the im-certauth-passthrough Route. Defaults to false.
+                    type: boolean
                   enableImpersonation:
                     type: boolean
                   fipsEnabled:

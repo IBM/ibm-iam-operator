@@ -543,10 +543,6 @@ spec:
                 - cert-manager.io
               resources:
                 - certificates
-                - certificaterequests
-                - orders
-                - challenges
-                - issuers
               verbs:
                 - create
                 - delete

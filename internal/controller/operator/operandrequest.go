@@ -639,11 +639,20 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 		return subreconciler.RequeueWithError(err)
 	}
 
+	const dbDep = "im-embedded-db"
+
 	opReqName := "im-needs-database"
 	// Get the OperandRequest
 	opReq := &operatorv1alpha1.OperandRequest{}
 	if err = r.Get(debugCtx, types.NamespacedName{Name: opReqName, Namespace: authCR.Namespace}, opReq); k8sErrors.IsNotFound(err) {
 		log.Info("Database OperandRequest not found; waiting for it to be created")
+		// Record that we are now waiting for the embedded DB (only on the first
+		// requeue — RecordDependencyWaitStart is a no-op when state is nil).
+		if r.currentOpState != nil {
+			if _, alreadyWaiting := r.currentOpState.depStartTimes[dbDep]; !alreadyWaiting {
+				r.RecordDependencyWaitStart(ctx, authCR, r.currentOpState, dbDep)
+			}
+		}
 		return subreconciler.RequeueWithDelay(30 * time.Second)
 	} else if err != nil {
 		log.Error(err, "Failed to get database OperandRequest")
@@ -655,13 +664,29 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 		log.Info("Database OperandRequest not yet in Running phase; waiting",
 			"currentPhase", opReq.Status.Phase,
 			"desiredPhase", operatorv1alpha1.ClusterPhaseRunning)
+		if r.currentOpState != nil {
+			if _, alreadyWaiting := r.currentOpState.depStartTimes[dbDep]; !alreadyWaiting {
+				r.RecordDependencyWaitStart(ctx, authCR, r.currentOpState, dbDep)
+			}
+		}
 		return subreconciler.RequeueWithDelay(30 * time.Second)
 	}
 
 	log.Info("Database OperandRequest is in Running phase")
 
-	// Log current phase and requeue
-	return r.checkIBMPGClusterHealth(debugCtx, req.Namespace)
+	// Record dependency wait start before checking cluster health (once only).
+	if r.currentOpState != nil {
+		if _, alreadyWaiting := r.currentOpState.depStartTimes[dbDep]; !alreadyWaiting {
+			r.RecordDependencyWaitStart(ctx, authCR, r.currentOpState, dbDep)
+		}
+	}
+
+	// Check IBM PG Cluster health; record ready when it passes.
+	result, err = r.checkIBMPGClusterHealth(debugCtx, req.Namespace)
+	if subreconciler.ShouldContinue(result, err) {
+		r.RecordDependencyReady(ctx, authCR, r.currentOpState, dbDep)
+	}
+	return
 }
 
 // handleUIOperandRequest manages the UI OperandRequest using a SecondaryReconciler

@@ -163,6 +163,11 @@ type AuthenticationReconciler struct {
 	// EnforceLeastPrivilege, when true, disables event emission so the operator
 	// can run without the events RBAC permission.
 	EnforceLeastPrivilege bool
+	// currentOpState holds the in-flight timing state for the active reconcile
+	// pass. It is set at the top of Reconcile and consumed at the bottom.
+	// Access is serialised by the controller-runtime single-threaded reconcile
+	// loop; the field is not shared across concurrent goroutines.
+	currentOpState *operationState
 }
 
 func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
@@ -413,7 +418,9 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 	}
 
 	// Record operation start time and emit OperationStarted event.
-	opState := r.RecordOperationStart(ctx, authCR,
+	// Store on the struct so subreconcilers can record dependency wait/ready
+	// without needing the state threaded through their signatures.
+	r.currentOpState = r.RecordOperationStart(ctx, authCR,
 		fmt.Sprintf("Reconcile operation started for %s/%s", authCR.Namespace, authCR.Name))
 
 	// Evaluate the secondary resources and the primary's status, then
@@ -433,10 +440,11 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 			phase = "Failed"
 		}
 		endMessage := fmt.Sprintf("Reconcile operation ended with phase %s", phase)
-		if _, writeErr := r.WriteOperationTiming(ctx, req, opState, phase, endMessage); writeErr != nil {
+		if _, writeErr := r.WriteOperationTiming(ctx, req, r.currentOpState, phase, endMessage); writeErr != nil {
 			log.Error(writeErr, "Failed to write operationTiming")
 		}
 	}
+	r.currentOpState = nil
 
 	if subreconciler.ShouldRequeue(finalResult, err) {
 		log.Info("Reconciliation for Authentication CR incomplete; requeueing")

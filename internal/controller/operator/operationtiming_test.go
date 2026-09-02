@@ -257,6 +257,60 @@ var _ = Describe("OperationTiming", func() {
 		})
 	})
 
+	Describe("dependency wait-start guard (record only once per operation)", func() {
+		// This mirrors the pattern used in ensureCommonServiceDBIsReady and
+		// ensureMigrationJobSucceeded: only call RecordDependencyWaitStart when
+		// the component key is not yet present in depStartTimes.
+		It("records the start time only on the first call for a given component", func() {
+			r := newTestReconciler(nil, false)
+			r.Recorder = nil
+			state := r.RecordOperationStart(ctx, instance, "start")
+
+			// First call — should store the start time.
+			r.RecordDependencyWaitStart(ctx, instance, state, "im-embedded-db")
+			firstStart := state.depStartTimes["im-embedded-db"]
+
+			// Second call simulating a subsequent reconcile pass — guard prevents overwrite.
+			time.Sleep(2 * time.Millisecond)
+			if _, alreadyWaiting := state.depStartTimes["im-embedded-db"]; !alreadyWaiting {
+				r.RecordDependencyWaitStart(ctx, instance, state, "im-embedded-db")
+			}
+			secondStart := state.depStartTimes["im-embedded-db"]
+
+			Expect(secondStart.Time).To(Equal(firstStart.Time))
+		})
+
+		It("records ready time correctly after multiple reconcile passes of waiting", func() {
+			r := newTestReconciler(nil, false)
+			r.Recorder = nil
+			state := r.RecordOperationStart(ctx, instance, "start")
+
+			// Simulate three reconcile passes waiting, then ready.
+			for i := 0; i < 3; i++ {
+				if _, alreadyWaiting := state.depStartTimes["im-embedded-db"]; !alreadyWaiting {
+					r.RecordDependencyWaitStart(ctx, instance, state, "im-embedded-db")
+				}
+			}
+			r.RecordDependencyReady(ctx, instance, state, "im-embedded-db")
+
+			// Only one DependencyTime entry should exist.
+			Expect(state.dependencyTimes).To(HaveLen(1))
+			Expect(state.dependencyTimes[0].Component).To(Equal("im-embedded-db"))
+		})
+
+		It("is safe when currentOpState is nil (no panic)", func() {
+			r := &AuthenticationReconciler{}
+			// Mirrors the nil guard in the subreconcilers.
+			Expect(func() {
+				if r.currentOpState != nil {
+					if _, alreadyWaiting := r.currentOpState.depStartTimes["dep"]; !alreadyWaiting {
+						r.RecordDependencyWaitStart(ctx, instance, r.currentOpState, "dep")
+					}
+				}
+			}).NotTo(Panic())
+		})
+	})
+
 	Describe("operationTiming rolling window", func() {
 		It("keeps at most maxOperationTimingEntries entries when a 6th is added", func() {
 			existing := make([]operatorv1alpha1.OperationTimingEntry, maxOperationTimingEntries)

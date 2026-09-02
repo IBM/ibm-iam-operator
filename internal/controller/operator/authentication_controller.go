@@ -42,6 +42,7 @@ import (
 	k8sRuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -151,12 +152,17 @@ func (r *AuthenticationReconciler) removeFinalizer(ctx context.Context, finalize
 // AuthenticationReconciler reconciles a Authentication object
 type AuthenticationReconciler struct {
 	client.Client
-	Scheme          *k8sRuntime.Scheme
-	DiscoveryClient discovery.DiscoveryClient
-	Mutex           sync.Mutex
-	clusterType     common.ClusterType
-	needsRollout    bool
+	Scheme                *k8sRuntime.Scheme
+	DiscoveryClient       discovery.DiscoveryClient
+	Mutex                 sync.Mutex
+	clusterType           common.ClusterType
+	needsRollout          bool
 	common.ByteGenerator
+	// Recorder is used to emit Kubernetes Events for operation timing checkpoints.
+	Recorder record.EventRecorder
+	// EnforceLeastPrivilege, when true, disables event emission so the operator
+	// can run without the events RBAC permission.
+	EnforceLeastPrivilege bool
 }
 
 func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
@@ -406,11 +412,31 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 		log.Info("useSecretsStoreCSI is enabled, but the API is not available on this cluster. Ignoring setting until Secrets Store CSI driver is installed.")
 	}
 
+	// Record operation start time and emit OperationStarted event.
+	opState := r.RecordOperationStart(ctx, authCR,
+		fmt.Sprintf("Reconcile operation started for %s/%s", authCR.Namespace, authCR.Name))
+
 	// Evaluate the secondary resources and the primary's status, then
 	// requeue if any changes or issues were encountered in either
 	finalResult, err := common.NewLazySubreconcilers(common.NewSubreconcilers(req,
 		r.runNonStatusSubreconcilers,
 		r.updateAuthenticationStatus)).Reconcile(ctx)
+
+	// Determine phase from final service status and write operationTiming.
+	latestAuthCR := &operatorv1alpha1.Authentication{}
+	if getErr := r.Get(ctx, req.NamespacedName, latestAuthCR); getErr == nil {
+		phase := latestAuthCR.Status.Service.Status
+		if phase == "" {
+			phase = "Unknown"
+		}
+		if err != nil {
+			phase = "Failed"
+		}
+		endMessage := fmt.Sprintf("Reconcile operation ended with phase %s", phase)
+		if _, writeErr := r.WriteOperationTiming(ctx, req, opState, phase, endMessage); writeErr != nil {
+			log.Error(writeErr, "Failed to write operationTiming")
+		}
+	}
 
 	if subreconciler.ShouldRequeue(finalResult, err) {
 		log.Info("Reconciliation for Authentication CR incomplete; requeueing")

@@ -305,14 +305,18 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Client")
 		os.Exit(1)
 	}
+	const authControllerName = "controller_authentication"
+	enforceLeastPrivilege := os.Getenv("ENFORCE_LEAST_PRIVILEGE") == "true"
 	if err = (&operatorcontrollers.AuthenticationReconciler{
 		Client: &controllercommon.FallbackClient{
 			Client: mgr.GetClient(),
 			Reader: mgr.GetAPIReader(),
 		},
-		DiscoveryClient: *dc,
-		Scheme:          mgr.GetScheme(),
-		ByteGenerator:   &common.RandomByteGenerator{},
+		DiscoveryClient:       *dc,
+		Scheme:                mgr.GetScheme(),
+		ByteGenerator:         &common.RandomByteGenerator{},
+		Recorder:              mgr.GetEventRecorderFor(authControllerName),
+		EnforceLeastPrivilege: enforceLeastPrivilege,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Authentication")
 		os.Exit(1)

@@ -225,11 +225,44 @@ func (a *Authentication) SetService(ctx context.Context, service ServiceStatus, 
 	return nil
 }
 
+// DependencyTime records the wait time for a single immediate dependency.
+type DependencyTime struct {
+	// Component is the name of the dependency component.
+	Component string `json:"component"`
+	// StartTime is when the operator began waiting for this dependency.
+	StartTime metav1.Time `json:"startTime"`
+	// ReadyTime is when the dependency reached a ready state.
+	ReadyTime metav1.Time `json:"readyTime"`
+	// DependencyDuration is computed as readyTime - startTime.
+	DependencyDuration string `json:"dependencyDuration"`
+}
+
+// OperationTimingEntry records timing for a single end-to-end operation
+// (install, upgrade, or patch).
+type OperationTimingEntry struct {
+	// StartTime is when the operation began.
+	StartTime metav1.Time `json:"startTime"`
+	// EndTime is when the operation ended.
+	EndTime metav1.Time `json:"endTime"`
+	// TotalDuration is computed as endTime - startTime (e.g. "22m30s").
+	TotalDuration string `json:"totalDuration"`
+	// Phase is the final phase of the operation (e.g. "Completed", "Failed").
+	Phase string `json:"phase"`
+	// DependencyTime records wait times for each immediate dependency.
+	// Omitted when the service has no dependencies.
+	// +optional
+	DependencyTime []DependencyTime `json:"dependencyTime,omitempty"`
+}
+
 // AuthenticationStatus defines the observed state of Authentication
 type AuthenticationStatus struct {
 	Nodes      []string           `json:"nodes"`
 	Service    ServiceStatus      `json:"service,omitempty"`
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	// OperationTiming stores the latest five operation timing entries, most
+	// recent first. A sixth entry causes the oldest to be dropped.
+	// +optional
+	OperationTiming []OperationTimingEntry `json:"operationTiming,omitempty"`
 }
 
 const ConditionMigrationsRunning = "MigrationsRunning"

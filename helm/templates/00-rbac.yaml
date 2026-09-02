@@ -74,6 +74,7 @@ rules:
   - patch
   - update
   - watch
+{{- if not ($.Values.global.enforceLeastPrivilege | default false) }}
 - apiGroups:
   - ""
   resources:
@@ -81,6 +82,8 @@ rules:
   verbs:
   - create
   - patch
+  - update
+{{- end }}
 - apiGroups:
   - ""
   resources:

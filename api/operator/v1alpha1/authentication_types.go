@@ -263,6 +263,17 @@ type AuthenticationStatus struct {
 	// recent first. A sixth entry causes the oldest to be dropped.
 	// +optional
 	OperationTiming []OperationTimingEntry `json:"operationTiming,omitempty"`
+	// Progress is the percentage completion of the current operation (e.g. "42%").
+	// +optional
+	Progress string `json:"progress,omitempty"`
+	// ProgressMessage is a brief description of what is currently being executed.
+	// +optional
+	ProgressMessage string `json:"progressMessage,omitempty"`
+	// ReconcileHistory is a list of up to three recent reconcile messages, most
+	// recent first. It is cleared (or its first entry updated) after a successful
+	// reconcile loop.
+	// +optional
+	ReconcileHistory []string `json:"reconcileHistory,omitempty"`
 }
 
 const ConditionMigrationsRunning = "MigrationsRunning"

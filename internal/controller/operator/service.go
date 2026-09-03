@@ -112,8 +112,7 @@ func (r *AuthenticationReconciler) handleServices(ctx context.Context, req ctrl.
 					Name: "p9443",
 					Port: 9443,
 				},
-			)).
-			WithModifyFns(validateCP3PodSelectorAndLabel))
+			)))
 	}
 
 	subRecs := []common.SecondaryReconciler{}

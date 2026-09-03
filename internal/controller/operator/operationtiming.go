@@ -150,21 +150,26 @@ func (r *AuthenticationReconciler) WriteOperationTiming(ctx context.Context, req
 		entry.DependencyTime = state.dependencyTimes
 	}
 
-	// Emit OperationEnded event before updating status.
+	// Fetch the latest Authentication CR first so we have a valid object to
+	// attach the event to and a current resourceVersion for the status update.
+	observed := &operatorv1alpha1.Authentication{}
+	if result, err = r.getLatestAuthentication(ctx, req, observed); subreconciler.ShouldHaltOrRequeue(result, err) {
+		// ShouldHaltOrRequeue is true for both errors and pure requeues (err==nil).
+		if err != nil {
+			log.Error(err, "Could not fetch Authentication before writing operationTiming")
+		}
+		return
+	}
+
+	// Emit OperationEnded event against the fetched CR so involvedObject is
+	// correctly populated with Name, Namespace, and UID.
 	if !r.EnforceLeastPrivilege && r.Recorder != nil {
 		eventType := corev1.EventTypeNormal
 		if phase != "Completed" {
 			eventType = corev1.EventTypeWarning
 		}
-		r.Recorder.Event(&operatorv1alpha1.Authentication{}, eventType, EventReasonOperationEnded,
+		r.Recorder.Event(observed, eventType, EventReasonOperationEnded,
 			fmt.Sprintf("phase=%s: %s", phase, message))
-	}
-
-	// Fetch the latest Authentication CR and prepend the new entry.
-	observed := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, observed); subreconciler.ShouldHaltOrRequeue(result, err) {
-		log.Error(err, "Could not fetch Authentication before writing operationTiming")
-		return
 	}
 
 	updated := append([]operatorv1alpha1.OperationTimingEntry{entry}, observed.Status.OperationTiming...)

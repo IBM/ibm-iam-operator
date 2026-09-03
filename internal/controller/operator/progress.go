@@ -98,7 +98,8 @@ func parseProgress(s string) (int, bool) {
 // SetProgress updates .status.progress and .status.progressMessage on authCR
 // according to the spec rules:
 //   - Only advance if incoming % >= current %; never go backwards mid-operation.
-//   - Reset to 0% when current is 100% (new operation starting) or blank (first run).
+//   - Reset to 0% when current is 100% (new operation starting).
+//   - Accept any checkpoint when the field is blank (first run / recovery).
 //
 // Returns true when the field was actually changed, false when the call was a
 // no-op. The caller is responsible for persisting the CR after calling this.
@@ -106,15 +107,23 @@ func SetProgress(authCR *operatorv1alpha1.Authentication, c checkpoint) bool {
 	incoming := c.pct
 	current, ok := parseProgress(authCR.Status.Progress)
 
-	// Reset condition: current is 100% or not yet set (blank / unparseable).
-	// In either case only a 0% incoming is accepted — this enforces the spec
-	// requirement that every new loop starts at 0 before advancing.
-	if !ok || current == progressCompleteValue {
+	// Completed case: the previous operation finished at 100%. Only a 0%
+	// incoming (fresh loop reset) is accepted; any other value is rejected so
+	// we never overwrite a completed state with a mid-operation percentage.
+	if ok && current == progressCompleteValue {
 		if incoming != 0 {
-			// Non-zero checkpoint arrived before the loop reset to 0%; no-op.
 			return false
 		}
 		authCR.Status.Progress = "0%"
+		authCR.Status.ProgressMessage = c.msg
+		return true
+	}
+
+	// Blank / unparseable case: the field has never been written or is corrupt.
+	// Accept any checkpoint so the operator recovers gracefully even if the
+	// initial 0% write was skipped or failed.
+	if !ok {
+		authCR.Status.Progress = fmt.Sprintf("%d%%", incoming)
 		authCR.Status.ProgressMessage = c.msg
 		return true
 	}

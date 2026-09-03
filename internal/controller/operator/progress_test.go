@@ -61,11 +61,12 @@ var _ = Describe("SetProgress", func() {
 			Expect(authCR.Status.ProgressMessage).To(Equal(progressCheckpoints.Start.msg))
 		})
 
-		It("returns false and leaves status blank when a non-zero checkpoint arrives before reset", func() {
-			// Blank status is treated as a reset condition; only 0% is accepted.
+		It("writes the checkpoint and returns true when a non-zero checkpoint arrives on blank status (recovery)", func() {
+			// Blank status is the first-run / recovery case — any checkpoint is
+			// accepted so progress is never silently lost.
 			changed := SetProgress(authCR, progressCheckpoints.RBACDone)
-			Expect(changed).To(BeFalse())
-			Expect(authCR.Status.Progress).To(BeEmpty())
+			Expect(changed).To(BeTrue())
+			Expect(authCR.Status.Progress).To(Equal("10%"))
 		})
 	})
 

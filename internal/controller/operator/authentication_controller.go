@@ -164,10 +164,20 @@ type AuthenticationReconciler struct {
 	// can run without the events RBAC permission.
 	EnforceLeastPrivilege bool
 	// currentOpState holds the in-flight timing state for the active reconcile
-	// pass. It is set at the top of Reconcile and consumed at the bottom.
-	// Access is serialised by the controller-runtime single-threaded reconcile
-	// loop; the field is not shared across concurrent goroutines.
+	// pass. Set at the top of Reconcile, cleared at the bottom.
+	//
+	// WARNING: this field is only safe because controller-runtime runs a single
+	// reconcile goroutine per controller by default (MaxConcurrentReconciles=1).
+	// If MaxConcurrentReconciles is ever increased, this must be replaced with a
+	// context.WithValue approach to keep state per-goroutine.
 	currentOpState *operationState
+	// pendingProgress holds the highest checkpoint reached so far in the current
+	// reconcile pass. It is set in-memory by advanceProgress and flushed in a
+	// single Status().Update inside updateAuthenticationStatus, avoiding one
+	// extra API call per checkpoint.
+	//
+	// Same concurrency caveat as currentOpState above.
+	pendingProgress *checkpoint
 }
 
 func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
@@ -178,6 +188,8 @@ func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Contex
 		log.Info("Could not get Authentication before service status update")
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
+
+	previousServiceStatus := observed.Status.Service.Status
 
 	modified, err = r.setAuthenticationStatus(ctx, observed)
 	if err != nil {
@@ -193,8 +205,18 @@ func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Contex
 		return subreconciler.Requeue()
 	}
 
-	// When the service has just become Ready, set 100% and record success.
-	if observed.Status.Service.Status == ResourceReadyState {
+	// Flush the highest progress checkpoint reached this pass.
+	if r.pendingProgress != nil {
+		SetProgress(observed, *r.pendingProgress)
+		r.pendingProgress = nil
+	}
+
+	// When the service transitions into Ready for the first time in this pass,
+	// advance to 100% and record a single success history entry. Gating on the
+	// previous status prevents filling all history slots with duplicate success
+	// entries on every subsequent steady-state reconcile.
+	if observed.Status.Service.Status == ResourceReadyState &&
+		previousServiceStatus != ResourceReadyState {
 		SetProgress(observed, progressCheckpoints.Complete)
 		MarkReconcileSuccess(observed)
 	}
@@ -368,12 +390,20 @@ func (r *AuthenticationReconciler) ensureBootstrapIsComplete(ctx context.Context
 	return subreconciler.ContinueReconciling()
 }
 
-// progressSubreconciler returns a subreconciler function that writes a progress
-// checkpoint to the CR status and then immediately continues. It is inserted
-// between substantive subreconcilers in the chain to record milestone progress.
+// advanceProgress records a progress checkpoint in-memory. The value is flushed
+// to the CR in a single Status().Update inside updateAuthenticationStatus,
+// avoiding one extra API call per checkpoint.
+func (r *AuthenticationReconciler) advanceProgress(c checkpoint) {
+	r.pendingProgress = &c
+}
+
+// progressSubreconciler returns a subreconciler function that advances the
+// in-memory progress checkpoint and immediately continues. No API call is made
+// here; the value is flushed by updateAuthenticationStatus.
 func (r *AuthenticationReconciler) progressSubreconciler(c checkpoint) func(context.Context, ctrl.Request) (*ctrl.Result, error) {
 	return func(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-		return r.WriteProgress(ctx, req, c)
+		r.advanceProgress(c)
+		return subreconciler.ContinueReconciling()
 	}
 }
 
@@ -448,11 +478,10 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 		log.Info("useSecretsStoreCSI is enabled, but the API is not available on this cluster. Ignoring setting until Secrets Store CSI driver is installed.")
 	}
 
-	// Reset progress to 0% for this fresh reconcile pass (spec §1.3: reset when
-	// current is 100% or not available).
-	if _, writeErr := r.WriteProgress(ctx, req, progressCheckpoints.Start); writeErr != nil {
-		log.Error(writeErr, "Failed to write initial progress")
-	}
+	// Seed progress at 0% for this fresh reconcile pass (spec §1.3: reset when
+	// current is 100% or not available). Done in-memory here; flushed to the CR
+	// by the single Status().Update inside updateAuthenticationStatus.
+	r.advanceProgress(progressCheckpoints.Start)
 
 	// Record operation start time and emit OperationStarted event.
 	// Store on the struct so subreconcilers can record dependency wait/ready
@@ -461,27 +490,33 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 		fmt.Sprintf("Reconcile operation started for %s/%s", authCR.Namespace, authCR.Name))
 
 	// Evaluate the secondary resources and the primary's status, then
-	// requeue if any changes or issues were encountered in either
+	// requeue if any changes or issues were encountered in either.
 	finalResult, err := common.NewLazySubreconcilers(common.NewSubreconcilers(req,
 		r.runNonStatusSubreconcilers,
 		r.updateAuthenticationStatus)).Reconcile(ctx)
 
-	// Determine phase from final service status and write operationTiming.
-	latestAuthCR := &operatorv1alpha1.Authentication{}
-	if getErr := r.Get(ctx, req.NamespacedName, latestAuthCR); getErr == nil {
-		phase := latestAuthCR.Status.Service.Status
-		if phase == "" {
-			phase = "Unknown"
-		}
-		if err != nil {
-			phase = "Failed"
-		}
-		endMessage := fmt.Sprintf("Reconcile operation ended with phase %s", phase)
-		if _, writeErr := r.WriteOperationTiming(ctx, req, r.currentOpState, phase, endMessage); writeErr != nil {
-			log.Error(writeErr, "Failed to write operationTiming")
+	// Write operationTiming only when this pass represents a concluded operation
+	// (no further requeue). Spec §5.1: "one operation maps to one entry in
+	// operationTiming"; writing on every requeue would create one entry per
+	// polling cycle instead of one per install/upgrade/patch.
+	if !subreconciler.ShouldRequeue(finalResult, err) {
+		latestAuthCR := &operatorv1alpha1.Authentication{}
+		if getErr := r.Get(ctx, req.NamespacedName, latestAuthCR); getErr == nil {
+			phase := latestAuthCR.Status.Service.Status
+			if phase == "" {
+				phase = "Unknown"
+			}
+			if err != nil {
+				phase = "Failed"
+			}
+			endMessage := fmt.Sprintf("Reconcile operation ended with phase %s", phase)
+			if _, writeErr := r.WriteOperationTiming(ctx, req, r.currentOpState, phase, endMessage); writeErr != nil {
+				log.Error(writeErr, "Failed to write operationTiming")
+			}
 		}
 	}
 	r.currentOpState = nil
+	r.pendingProgress = nil
 
 	if subreconciler.ShouldRequeue(finalResult, err) {
 		log.Info("Reconciliation for Authentication CR incomplete; requeueing")

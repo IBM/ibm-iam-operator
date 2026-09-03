@@ -1,0 +1,3 @@
+{"id":"b0310437-2ac1-4ef4-8b93-7a22544417e0","ts":"2026-06-02T19:52:51.867Z","path":"/Users/rwhundle/go/src/github.com/IBM/ibm-iam-operator/cmd/main.go","version":"1.0.0","taskID":"16d6a8eb-2d2a-4ff7-bfe9-3404b8cf917f"}
+{"id":"6f6f6b42-e5ba-4b10-814b-2e637e0b5752","ts":"2026-06-02T19:53:02.185Z","path":"/Users/rwhundle/go/src/github.com/IBM/ibm-iam-operator/internal/controller/operator/authentication_controller.go","version":"1.0.0","taskID":"16d6a8eb-2d2a-4ff7-bfe9-3404b8cf917f"}
+{"id":"1eb4486e-3e0c-4caa-a88d-35ef99b1c7ab","ts":"2026-06-02T19:53:11.295Z","path":"/Users/rwhundle/go/src/github.com/IBM/ibm-iam-operator/internal/controller/operator/routes.go","version":"1.0.0","taskID":"16d6a8eb-2d2a-4ff7-bfe9-3404b8cf917f"}

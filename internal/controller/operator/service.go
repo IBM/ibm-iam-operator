@@ -112,7 +112,8 @@ func (r *AuthenticationReconciler) handleServices(ctx context.Context, req ctrl.
 					Name: "p9443",
 					Port: 9443,
 				},
-			)))
+			)).
+			WithModifyFns(validateCP3PodSelectorAndLabel))
 	}
 
 	subRecs := []common.SecondaryReconciler{}
@@ -237,9 +238,13 @@ func deleteHeadlessAuthServiceIfExists(ctx context.Context, cl client.Client, na
 func validateCP3PodSelectorAndLabel(s common.SecondaryReconciler, _ context.Context, observed, _ *corev1.Service) (modified bool, err error) {
 	podSelector := observed.Spec.Selector
 	value, ok := podSelector["k8s-app"]
+	isHeadless := observed.Spec.ClusterIP == corev1.ClusterIPNone ||
+		observed.Spec.ClusterIP == ""
 	if ok && value != observed.Name {
-		observed.Spec.Selector = map[string]string{"k8s-app": s.GetName()}
-		modified = true
+		if !isHeadless {
+			observed.Spec.Selector = map[string]string{"k8s-app": s.GetName()}
+			modified = true
+		}
 	}
 	// Going to validate label for CP3 upgrade
 	label := observed.Labels

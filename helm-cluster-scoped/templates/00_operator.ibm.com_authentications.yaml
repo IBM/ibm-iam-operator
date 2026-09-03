@@ -213,6 +213,13 @@ spec:
                           type: string
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
+                  cpuRateLimit:
+                    description: CpuRateLimit sets a CPU usage rate limit applied
+                      to IAM service containers. Valid values are "1"-"100" or
+                      "disable" (case-insensitive). Leave unset to apply no rate
+                      limit.
+                    pattern: ^([1-9][0-9]?|100|[Dd][Ii][Ss][Aa][Bb][Ll][Ee])?$
+                    type: string
                   defaultAdminPassword:
                     type: string
                   defaultAdminUser:

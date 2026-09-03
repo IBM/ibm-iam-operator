@@ -31,18 +31,14 @@ import (
 )
 
 const (
-	// maxOperationTimingEntries is the maximum number of operationTiming entries retained.
 	maxOperationTimingEntries = 5
 
-	// Event reasons as specified in section 5.5 of the standardized-status spec.
 	EventReasonOperationStarted      = "OperationStarted"
 	EventReasonDependencyWaitStarted = "DependencyWaitStarted"
 	EventReasonDependencyReady       = "DependencyReady"
 	EventReasonOperationEnded        = "OperationEnded"
 )
 
-// formatDuration formats a time.Duration as a human-readable string matching
-// the spec examples (e.g. "22m30s", "45s", "8m45s").
 func formatDuration(d time.Duration) string {
 	d = d.Round(time.Second)
 	h := int(d.Hours())
@@ -57,20 +53,12 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%ds", s)
 }
 
-// operationState holds the in-flight timing data for the current reconcile
-// pass. It is populated by RecordOperationStart and consumed by
-// WriteOperationTiming. Each AuthenticationReconciler instance owns one.
 type operationState struct {
 	startTime       metav1.Time
 	dependencyTimes []operatorv1alpha1.DependencyTime
-	// depStartTimes tracks the start time keyed by component name while the
-	// dependency is still being waited on.
-	depStartTimes map[string]metav1.Time
+	depStartTimes   map[string]metav1.Time
 }
 
-// RecordOperationStart captures the operation start time, emits the
-// OperationStarted event, and initialises per-dependency tracking state.
-// Call this at the very top of a reconcile pass, before any dependency checks.
 func (r *AuthenticationReconciler) RecordOperationStart(ctx context.Context, instance *operatorv1alpha1.Authentication, message string) *operationState {
 	log := logf.FromContext(ctx)
 	state := &operationState{
@@ -84,8 +72,6 @@ func (r *AuthenticationReconciler) RecordOperationStart(ctx context.Context, ins
 	return state
 }
 
-// RecordDependencyWaitStart marks the moment the operator begins waiting for a
-// named dependency. Call this immediately before entering any wait loop.
 func (r *AuthenticationReconciler) RecordDependencyWaitStart(ctx context.Context, instance *operatorv1alpha1.Authentication, state *operationState, component string) {
 	if state == nil {
 		return
@@ -100,8 +86,6 @@ func (r *AuthenticationReconciler) RecordDependencyWaitStart(ctx context.Context
 	}
 }
 
-// RecordDependencyReady marks the moment a named dependency became ready.
-// Call this immediately after a dependency transitions to the ready state.
 func (r *AuthenticationReconciler) RecordDependencyReady(ctx context.Context, instance *operatorv1alpha1.Authentication, state *operationState, component string) {
 	if state == nil {
 		return
@@ -116,6 +100,7 @@ func (r *AuthenticationReconciler) RecordDependencyReady(ctx context.Context, in
 		depEntry.StartTime = start
 		depEntry.DependencyDuration = formatDuration(readyTime.Sub(start.Time))
 	} else {
+		// No matching WaitStart was recorded; treat duration as zero.
 		depEntry.StartTime = readyTime
 		depEntry.DependencyDuration = "0s"
 	}
@@ -127,10 +112,6 @@ func (r *AuthenticationReconciler) RecordDependencyReady(ctx context.Context, in
 	}
 }
 
-// WriteOperationTiming finalises the current operation's timing entry, prepends
-// it to .status.operationTiming (keeping at most maxOperationTimingEntries),
-// emits the OperationEnded event, and persists the status update to the API
-// server. Returns a subreconciler result; callers should propagate it.
 func (r *AuthenticationReconciler) WriteOperationTiming(ctx context.Context, req ctrl.Request, state *operationState, phase string, message string) (result *ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
 	if state == nil {
@@ -138,20 +119,17 @@ func (r *AuthenticationReconciler) WriteOperationTiming(ctx context.Context, req
 	}
 
 	endTime := metav1.Now()
-	totalDuration := formatDuration(endTime.Sub(state.startTime.Time))
-
 	entry := operatorv1alpha1.OperationTimingEntry{
 		StartTime:     state.startTime,
 		EndTime:       endTime,
-		TotalDuration: totalDuration,
+		TotalDuration: formatDuration(endTime.Sub(state.startTime.Time)),
 		Phase:         phase,
 	}
 	if len(state.dependencyTimes) > 0 {
 		entry.DependencyTime = state.dependencyTimes
 	}
 
-	// Fetch the latest Authentication CR first so we have a valid object to
-	// attach the event to and a current resourceVersion for the status update.
+	// Fetch before emitting the event so involvedObject has Name/Namespace/UID.
 	observed := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, observed); subreconciler.ShouldHaltOrRequeue(result, err) {
 		// ShouldHaltOrRequeue is true for both errors and pure requeues (err==nil).
@@ -161,8 +139,6 @@ func (r *AuthenticationReconciler) WriteOperationTiming(ctx context.Context, req
 		return
 	}
 
-	// Emit OperationEnded event against the fetched CR so involvedObject is
-	// correctly populated with Name, Namespace, and UID.
 	if !r.EnforceLeastPrivilege && r.Recorder != nil {
 		eventType := corev1.EventTypeNormal
 		if phase != "Completed" {
@@ -182,6 +158,6 @@ func (r *AuthenticationReconciler) WriteOperationTiming(ctx context.Context, req
 		log.Error(err, "Failed to update operationTiming status")
 		return subreconciler.RequeueWithError(err)
 	}
-	log.Info("Updated operationTiming", "phase", phase, "totalDuration", totalDuration)
+	log.Info("Updated operationTiming", "phase", phase, "totalDuration", entry.TotalDuration)
 	return subreconciler.ContinueReconciling()
 }

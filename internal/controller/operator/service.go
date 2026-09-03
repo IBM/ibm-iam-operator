@@ -112,7 +112,8 @@ func (r *AuthenticationReconciler) handleServices(ctx context.Context, req ctrl.
 					Name: "p9443",
 					Port: 9443,
 				},
-			)))
+			)).
+			WithModifyFns(validateCP3PodSelectorAndLabel))
 	}
 
 	subRecs := []common.SecondaryReconciler{}
@@ -232,13 +233,23 @@ func deleteHeadlessAuthServiceIfExists(ctx context.Context, cl client.Client, na
 	return nil
 }
 
+var headlessServiceSelectorMap = map[string]string{
+	"platform-auth-service-headless": "platform-auth-service",
+}
+
 // validateCP3ServicePodSelectorAndLabel is a ModifyFn that ensures that the
 // Selector for the Service as well as its label match the values for CP3.
 func validateCP3PodSelectorAndLabel(s common.SecondaryReconciler, _ context.Context, observed, _ *corev1.Service) (modified bool, err error) {
 	podSelector := observed.Spec.Selector
 	value, ok := podSelector["k8s-app"]
-	if ok && value != observed.Name {
-		observed.Spec.Selector = map[string]string{"k8s-app": s.GetName()}
+
+	expectedK8sAppValue, isHeadlessService := headlessServiceSelectorMap[observed.Name]
+	if !isHeadlessService {
+		expectedK8sAppValue = s.GetName()
+	}
+
+	if ok && value != expectedK8sAppValue {
+		observed.Spec.Selector = map[string]string{"k8s-app": expectedK8sAppValue}
 		modified = true
 	}
 	// Going to validate label for CP3 upgrade

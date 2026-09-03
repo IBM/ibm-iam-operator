@@ -248,7 +248,7 @@ func validateCP3PodSelectorAndLabel(s common.SecondaryReconciler, _ context.Cont
 		expectedK8sAppValue = s.GetName()
 	}
 
-	if ok && value != expectedK8sAppValue {
+	if ok && value != observed.Name {
 		observed.Spec.Selector = map[string]string{"k8s-app": expectedK8sAppValue}
 		modified = true
 	}

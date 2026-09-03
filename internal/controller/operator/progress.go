@@ -37,28 +37,13 @@ const (
 	progressCompleteMessage = "The Current Operation Is Completed"
 )
 
-// checkpoint defines a single progress percentage and its associated message.
 type checkpoint struct {
 	pct int
 	msg string
 }
 
-// progressCheckpoints lists the ordered checkpoints for an Authentication
-// reconcile pass. The percentages are pre-defined; each one is only written to
-// the CR when the reconciler actually reaches that point in the chain.
-//
-// Mapping to runNonStatusSubreconcilers positions:
-//
-//	 0%  — fresh reconcile loop begins
-//	10%  — RBAC (SA, Roles, RoleBindings, ClusterRoles, ClusterRoleBindings) complete
-//	20%  — database OperandRequest created / EDB migration steps initiated
-//	40%  — embedded DB ready (ensureCommonServiceDBIsReady passed)
-//	55%  — DB schema migration Job has succeeded
-//	70%  — core resources (Certs, Services, Secrets, ConfigMaps, Deployments) applied
-//	85%  — OIDC client registration Job complete
-//	95%  — Zen front-door and UI OperandRequest handled; Routes/HPAs applied
-//
-// 100%  — all resources Ready (set in updateAuthenticationStatus)
+// Checkpoint percentages and messages for each stage of a reconcile pass.
+// 100% is set separately in updateAuthenticationStatus on Ready transition.
 var progressCheckpoints = struct {
 	Start          checkpoint
 	RBACDone       checkpoint
@@ -81,8 +66,6 @@ var progressCheckpoints = struct {
 	Complete:       checkpoint{progressCompleteValue, progressCompleteMessage},
 }
 
-// parseProgress extracts the integer percentage from a string like "42%".
-// Returns 0 and false if the string is empty, missing, or not parseable.
 func parseProgress(s string) (int, bool) {
 	s = strings.TrimSuffix(strings.TrimSpace(s), "%")
 	if s == "" {
@@ -95,21 +78,17 @@ func parseProgress(s string) (int, bool) {
 	return v, true
 }
 
-// SetProgress updates .status.progress and .status.progressMessage on authCR
-// according to the spec rules:
-//   - Only advance if incoming % >= current %; never go backwards mid-operation.
-//   - Reset to 0% when current is 100% (new operation starting).
-//   - Accept any checkpoint when the field is blank (first run / recovery).
-//
-// Returns true when the field was actually changed, false when the call was a
-// no-op. The caller is responsible for persisting the CR after calling this.
+// SetProgress returns true when the field changed, false when it was a no-op.
+// Three cases:
+//   - current == 100%: only 0% (loop reset) is accepted to avoid overwriting a
+//     completed state with a mid-operation value from the new pass.
+//   - blank/unparseable: accept any checkpoint so progress recovers if the
+//     initial 0% write was ever missed.
+//   - otherwise: only advance, never retreat.
 func SetProgress(authCR *operatorv1alpha1.Authentication, c checkpoint) bool {
 	incoming := c.pct
 	current, ok := parseProgress(authCR.Status.Progress)
 
-	// Completed case: the previous operation finished at 100%. Only a 0%
-	// incoming (fresh loop reset) is accepted; any other value is rejected so
-	// we never overwrite a completed state with a mid-operation percentage.
 	if ok && current == progressCompleteValue {
 		if incoming != 0 {
 			return false
@@ -119,16 +98,12 @@ func SetProgress(authCR *operatorv1alpha1.Authentication, c checkpoint) bool {
 		return true
 	}
 
-	// Blank / unparseable case: the field has never been written or is corrupt.
-	// Accept any checkpoint so the operator recovers gracefully even if the
-	// initial 0% write was skipped or failed.
 	if !ok {
 		authCR.Status.Progress = fmt.Sprintf("%d%%", incoming)
 		authCR.Status.ProgressMessage = c.msg
 		return true
 	}
 
-	// Normal mid-operation case: only advance, never retreat.
 	if incoming < current {
 		return false
 	}
@@ -138,9 +113,6 @@ func SetProgress(authCR *operatorv1alpha1.Authentication, c checkpoint) bool {
 	return true
 }
 
-// AppendReconcileHistory prepends a timestamped message to
-// .status.reconcileHistory, keeping at most maxReconcileHistoryEntries entries.
-// The caller is responsible for persisting the CR.
 func AppendReconcileHistory(authCR *operatorv1alpha1.Authentication, message string) {
 	ts := time.Now().UTC().Format("2006-01-02T15:04:05Z")
 	entry := fmt.Sprintf("%s %s", ts, message)
@@ -151,30 +123,21 @@ func AppendReconcileHistory(authCR *operatorv1alpha1.Authentication, message str
 	authCR.Status.ReconcileHistory = updated
 }
 
-// MarkReconcileSuccess updates .status.reconcileHistory after a successful
-// reconcile loop. It prepends a success entry (capped at maxReconcileHistoryEntries)
-// so that recent failures remain visible below it, giving operators a clear
-// history of the last few outcomes.
 func MarkReconcileSuccess(authCR *operatorv1alpha1.Authentication) {
 	AppendReconcileHistory(authCR, "The last reconciliation was completed successfully.")
 }
 
-// WriteProgress fetches the latest Authentication CR, applies the given
-// checkpoint, and — only if the progress value actually changed — persists the
-// status update. Returns a subreconciler result; callers must propagate it.
 func (r *AuthenticationReconciler) WriteProgress(ctx context.Context, req ctrl.Request, c checkpoint) (result *ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
 	authCR := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		// ShouldHaltOrRequeue is true for pure requeues (err == nil) as well as
-		// real errors; only log when there is an actual error to report.
+		// ShouldHaltOrRequeue is true for both errors and pure requeues (err==nil).
 		if err != nil {
 			log.Error(err, "Could not fetch Authentication before writing progress")
 		}
 		return
 	}
 	if !SetProgress(authCR, c) {
-		// Progress did not change — skip the status write entirely.
 		return subreconciler.ContinueReconciling()
 	}
 	if err = r.Client.Status().Update(ctx, authCR); err != nil {

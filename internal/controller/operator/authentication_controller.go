@@ -182,6 +182,8 @@ func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Contex
 	modified, err = r.setAuthenticationStatus(ctx, observed)
 	if err != nil {
 		log.Error(err, "Failed to set Authentication status")
+		AppendReconcileHistory(observed, fmt.Sprintf("Reconciliation failed: %s", err.Error()))
+		_ = r.Client.Status().Update(ctx, observed)
 		return subreconciler.RequeueWithError(err)
 	} else if !modified && observed.Status.Service.Status == ResourceReadyState {
 		log.Info("No new status changes needed")
@@ -189,6 +191,12 @@ func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Contex
 	} else if !modified {
 		log.Info("Not ready yet; requeue")
 		return subreconciler.Requeue()
+	}
+
+	// When the service has just become Ready, set 100% and record success.
+	if observed.Status.Service.Status == ResourceReadyState {
+		SetProgress(observed, progressCheckpoints.Complete)
+		MarkReconcileSuccess(observed)
 	}
 
 	log.Info("Status updates found; update status before finishing loop.")
@@ -360,6 +368,15 @@ func (r *AuthenticationReconciler) ensureBootstrapIsComplete(ctx context.Context
 	return subreconciler.ContinueReconciling()
 }
 
+// progressSubreconciler returns a subreconciler function that writes a progress
+// checkpoint to the CR status and then immediately continues. It is inserted
+// between substantive subreconcilers in the chain to record milestone progress.
+func (r *AuthenticationReconciler) progressSubreconciler(c checkpoint) func(context.Context, ctrl.Request) (*ctrl.Result, error) {
+	return func(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+		return r.WriteProgress(ctx, req, c)
+	}
+}
+
 // runNonStatusSubreconcilers runs all of the non-status reconciliation behavior.
 func (r *AuthenticationReconciler) runNonStatusSubreconcilers(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	return common.NewStrictSubreconcilers(common.NewSubreconcilersWithResultLog(req,
@@ -370,13 +387,19 @@ func (r *AuthenticationReconciler) runNonStatusSubreconcilers(ctx context.Contex
 		r.createRoleBinding,
 		r.handleClusterRoles,
 		r.handleClusterRoleBindings,
+		// Checkpoint: RBAC complete (~10%)
+		r.progressSubreconciler(progressCheckpoints.RBACDone),
 		r.addMongoMigrationFinalizers,
 		r.overrideMongoDBBootstrap,
 		r.handleEDBToIBMPGMigration,
 		r.handleDatabaseOperandRequest,
 		r.createEDBShareClaim,
 		r.ensureDatastoreSecretAndCM,
+		// Checkpoint: DB OperandRequest created / EDB steps initiated (~20%)
+		r.progressSubreconciler(progressCheckpoints.DBRequested),
 		r.ensureCommonServiceDBIsReady,
+		// Checkpoint: embedded DB ready (~40%)
+		r.progressSubreconciler(progressCheckpoints.DBReady),
 		r.ensureMigrationJobRuns,
 		r.checkSAMLPresence,
 		r.handleCertificates,
@@ -387,14 +410,22 @@ func (r *AuthenticationReconciler) runNonStatusSubreconcilers(ctx context.Contex
 		r.removeIngresses,
 		r.handleServiceAccount,
 		r.ensureMigrationJobSucceeded,
+		// Checkpoint: DB schema migration done (~55%)
+		r.progressSubreconciler(progressCheckpoints.MigrationDone),
 		r.handleDeployments,
+		// Checkpoint: core resources deployed (~70%)
+		r.progressSubreconciler(progressCheckpoints.ResourcesDone),
 		r.ensureOIDCClientRegistrationJobRuns,
+		// Checkpoint: OIDC registration done (~85%)
+		r.progressSubreconciler(progressCheckpoints.OIDCDone),
 		r.handleZenFrontDoor,
 		r.handleUIOperandRequest,
 		r.handleRoutes,
 		r.handleHPAs,
 		r.handleMongoDBCleanup,
-		r.cleanupOldRBAC)...).Reconcile(ctx)
+		r.cleanupOldRBAC,
+		// Checkpoint: routes and HPAs applied (~95%)
+		r.progressSubreconciler(progressCheckpoints.RoutesHPAsDone))...).Reconcile(ctx)
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -415,6 +446,12 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 
 	if !common.ClusterHasCSIGroupVersion(&r.DiscoveryClient) && authCR.SecretsStoreCSIEnabled() {
 		log.Info("useSecretsStoreCSI is enabled, but the API is not available on this cluster. Ignoring setting until Secrets Store CSI driver is installed.")
+	}
+
+	// Reset progress to 0% for this fresh reconcile pass (spec §1.3: reset when
+	// current is 100% or not available).
+	if _, writeErr := r.WriteProgress(ctx, req, progressCheckpoints.Start); writeErr != nil {
+		log.Error(writeErr, "Failed to write initial progress")
 	}
 
 	// Record operation start time and emit OperationStarted event.

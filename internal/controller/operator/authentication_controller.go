@@ -42,6 +42,7 @@ import (
 	k8sRuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -151,12 +152,18 @@ func (r *AuthenticationReconciler) removeFinalizer(ctx context.Context, finalize
 // AuthenticationReconciler reconciles a Authentication object
 type AuthenticationReconciler struct {
 	client.Client
-	Scheme          *k8sRuntime.Scheme
-	DiscoveryClient discovery.DiscoveryClient
-	Mutex           sync.Mutex
-	clusterType     common.ClusterType
-	needsRollout    bool
+	Scheme                *k8sRuntime.Scheme
+	DiscoveryClient       discovery.DiscoveryClient
+	Mutex                 sync.Mutex
+	clusterType           common.ClusterType
+	needsRollout          bool
 	common.ByteGenerator
+	Recorder              record.EventRecorder
+	EnforceLeastPrivilege bool
+	// WARNING: safe only with MaxConcurrentReconciles=1 (controller-runtime default).
+	// If concurrency is ever increased, replace with context.WithValue per-goroutine state.
+	currentOpState  *operationState
+	pendingProgress *checkpoint
 }
 
 func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
@@ -168,9 +175,13 @@ func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Contex
 		return subreconciler.RequeueWithDelay(defaultLowerWait)
 	}
 
+	previousServiceStatus := observed.Status.Service.Status
+
 	modified, err = r.setAuthenticationStatus(ctx, observed)
 	if err != nil {
 		log.Error(err, "Failed to set Authentication status")
+		AppendReconcileHistory(observed, fmt.Sprintf("Reconciliation failed: %s", err.Error()))
+		_ = r.Client.Status().Update(ctx, observed)
 		return subreconciler.RequeueWithError(err)
 	} else if !modified && observed.Status.Service.Status == ResourceReadyState {
 		log.Info("No new status changes needed")
@@ -178,6 +189,18 @@ func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Contex
 	} else if !modified {
 		log.Info("Not ready yet; requeue")
 		return subreconciler.Requeue()
+	}
+
+	if r.pendingProgress != nil {
+		SetProgress(observed, *r.pendingProgress)
+		r.pendingProgress = nil
+	}
+
+	// Only on the Ready transition (not every steady-state reconcile).
+	if observed.Status.Service.Status == ResourceReadyState &&
+		previousServiceStatus != ResourceReadyState {
+		SetProgress(observed, progressCheckpoints.Complete)
+		MarkReconcileSuccess(observed)
 	}
 
 	log.Info("Status updates found; update status before finishing loop.")
@@ -349,6 +372,17 @@ func (r *AuthenticationReconciler) ensureBootstrapIsComplete(ctx context.Context
 	return subreconciler.ContinueReconciling()
 }
 
+func (r *AuthenticationReconciler) advanceProgress(c checkpoint) {
+	r.pendingProgress = &c
+}
+
+func (r *AuthenticationReconciler) progressSubreconciler(c checkpoint) func(context.Context, ctrl.Request) (*ctrl.Result, error) {
+	return func(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+		r.advanceProgress(c)
+		return subreconciler.ContinueReconciling()
+	}
+}
+
 // runNonStatusSubreconcilers runs all of the non-status reconciliation behavior.
 func (r *AuthenticationReconciler) runNonStatusSubreconcilers(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	return common.NewStrictSubreconcilers(common.NewSubreconcilersWithResultLog(req,
@@ -359,13 +393,19 @@ func (r *AuthenticationReconciler) runNonStatusSubreconcilers(ctx context.Contex
 		r.createRoleBinding,
 		r.handleClusterRoles,
 		r.handleClusterRoleBindings,
+		// Checkpoint: RBAC complete (~10%)
+		r.progressSubreconciler(progressCheckpoints.RBACDone),
 		r.addMongoMigrationFinalizers,
 		r.overrideMongoDBBootstrap,
 		r.handleEDBToIBMPGMigration,
 		r.handleDatabaseOperandRequest,
 		r.createEDBShareClaim,
 		r.ensureDatastoreSecretAndCM,
+		// Checkpoint: DB OperandRequest created / EDB steps initiated (~20%)
+		r.progressSubreconciler(progressCheckpoints.DBRequested),
 		r.ensureCommonServiceDBIsReady,
+		// Checkpoint: embedded DB ready (~40%)
+		r.progressSubreconciler(progressCheckpoints.DBReady),
 		r.ensureMigrationJobRuns,
 		r.checkSAMLPresence,
 		r.handleCertificates,
@@ -376,14 +416,22 @@ func (r *AuthenticationReconciler) runNonStatusSubreconcilers(ctx context.Contex
 		r.removeIngresses,
 		r.handleServiceAccount,
 		r.ensureMigrationJobSucceeded,
+		// Checkpoint: DB schema migration done (~55%)
+		r.progressSubreconciler(progressCheckpoints.MigrationDone),
 		r.handleDeployments,
+		// Checkpoint: core resources deployed (~70%)
+		r.progressSubreconciler(progressCheckpoints.ResourcesDone),
 		r.ensureOIDCClientRegistrationJobRuns,
+		// Checkpoint: OIDC registration done (~85%)
+		r.progressSubreconciler(progressCheckpoints.OIDCDone),
 		r.handleZenFrontDoor,
 		r.handleUIOperandRequest,
 		r.handleRoutes,
 		r.handleHPAs,
 		r.handleMongoDBCleanup,
-		r.cleanupOldRBAC)...).Reconcile(ctx)
+		r.cleanupOldRBAC,
+		// Checkpoint: routes and HPAs applied (~95%)
+		r.progressSubreconciler(progressCheckpoints.RoutesHPAsDone))...).Reconcile(ctx)
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -406,11 +454,35 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 		log.Info("useSecretsStoreCSI is enabled, but the API is not available on this cluster. Ignoring setting until Secrets Store CSI driver is installed.")
 	}
 
-	// Evaluate the secondary resources and the primary's status, then
-	// requeue if any changes or issues were encountered in either
+	r.advanceProgress(progressCheckpoints.Start)
+
+	r.currentOpState = r.RecordOperationStart(ctx, authCR,
+		fmt.Sprintf("Reconcile operation started for %s/%s", authCR.Namespace, authCR.Name))
+
 	finalResult, err := common.NewLazySubreconcilers(common.NewSubreconcilers(req,
 		r.runNonStatusSubreconcilers,
 		r.updateAuthenticationStatus)).Reconcile(ctx)
+
+	// Only write operationTiming when the operation concludes (no requeue), so
+	// each install/upgrade produces one entry rather than one per polling cycle.
+	if !subreconciler.ShouldRequeue(finalResult, err) {
+		latestAuthCR := &operatorv1alpha1.Authentication{}
+		if getErr := r.Get(ctx, req.NamespacedName, latestAuthCR); getErr == nil {
+			phase := latestAuthCR.Status.Service.Status
+			if phase == "" {
+				phase = "Unknown"
+			}
+			if err != nil {
+				phase = "Failed"
+			}
+			endMessage := fmt.Sprintf("Reconcile operation ended with phase %s", phase)
+			if _, writeErr := r.WriteOperationTiming(ctx, req, r.currentOpState, phase, endMessage); writeErr != nil {
+				log.Error(writeErr, "Failed to write operationTiming")
+			}
+		}
+	}
+	r.currentOpState = nil
+	r.pendingProgress = nil
 
 	if subreconciler.ShouldRequeue(finalResult, err) {
 		log.Info("Reconciliation for Authentication CR incomplete; requeueing")

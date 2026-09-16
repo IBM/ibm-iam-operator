@@ -57,6 +57,7 @@ type operationState struct {
 	startTime       metav1.Time
 	dependencyTimes []operatorv1alpha1.DependencyTime
 	depStartTimes   map[string]metav1.Time
+	depReady        map[string]bool
 }
 
 func (r *AuthenticationReconciler) RecordOperationStart(ctx context.Context, instance *operatorv1alpha1.Authentication, message string) *operationState {
@@ -64,6 +65,7 @@ func (r *AuthenticationReconciler) RecordOperationStart(ctx context.Context, ins
 	state := &operationState{
 		startTime:     metav1.Now(),
 		depStartTimes: make(map[string]metav1.Time),
+		depReady:      make(map[string]bool),
 	}
 	log.Info("Operation started", "message", message)
 	if !r.EnforceLeastPrivilege && r.Recorder != nil {
@@ -87,7 +89,7 @@ func (r *AuthenticationReconciler) RecordDependencyWaitStart(ctx context.Context
 }
 
 func (r *AuthenticationReconciler) RecordDependencyReady(ctx context.Context, instance *operatorv1alpha1.Authentication, state *operationState, component string) {
-	if state == nil {
+	if state == nil || state.depReady[component] {
 		return
 	}
 	log := logf.FromContext(ctx)
@@ -105,6 +107,7 @@ func (r *AuthenticationReconciler) RecordDependencyReady(ctx context.Context, in
 		depEntry.DependencyDuration = "0s"
 	}
 	state.dependencyTimes = append(state.dependencyTimes, depEntry)
+	state.depReady[component] = true
 	log.Info("Dependency ready", "component", component, "duration", depEntry.DependencyDuration)
 	if !r.EnforceLeastPrivilege && r.Recorder != nil {
 		r.Recorder.Event(instance, corev1.EventTypeNormal, EventReasonDependencyReady,

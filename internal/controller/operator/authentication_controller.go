@@ -152,11 +152,11 @@ func (r *AuthenticationReconciler) removeFinalizer(ctx context.Context, finalize
 // AuthenticationReconciler reconciles a Authentication object
 type AuthenticationReconciler struct {
 	client.Client
-	Scheme                *k8sRuntime.Scheme
-	DiscoveryClient       discovery.DiscoveryClient
-	Mutex                 sync.Mutex
-	clusterType           common.ClusterType
-	needsRollout          bool
+	Scheme          *k8sRuntime.Scheme
+	DiscoveryClient discovery.DiscoveryClient
+	Mutex           sync.Mutex
+	clusterType     common.ClusterType
+	needsRollout    bool
 	common.ByteGenerator
 	Recorder              record.EventRecorder
 	EnforceLeastPrivilege bool
@@ -456,20 +456,23 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 
 	r.advanceProgress(progressCheckpoints.Start)
 
-	r.currentOpState = r.RecordOperationStart(ctx, authCR,
-		fmt.Sprintf("Reconcile operation started for %s/%s", authCR.Namespace, authCR.Name))
+	if r.currentOpState == nil && authCR.Status.Service.Status != ResourceReadyState {
+		r.currentOpState = r.RecordOperationStart(ctx, authCR,
+			fmt.Sprintf("Reconcile operation started for %s/%s", authCR.Namespace, authCR.Name))
+	}
 
 	finalResult, err := common.NewLazySubreconcilers(common.NewSubreconcilers(req,
 		r.runNonStatusSubreconcilers,
 		r.updateAuthenticationStatus)).Reconcile(ctx)
 
-	// Only write operationTiming when the operation concludes (no requeue), so
-	// each install/upgrade produces one entry rather than one per polling cycle.
-	if !subreconciler.ShouldRequeue(finalResult, err) {
+	// Write one entry when the operation concludes; retain state across requeues.
+	if !subreconciler.ShouldRequeue(finalResult, err) && r.currentOpState != nil {
 		latestAuthCR := &operatorv1alpha1.Authentication{}
 		if getErr := r.Get(ctx, req.NamespacedName, latestAuthCR); getErr == nil {
 			phase := latestAuthCR.Status.Service.Status
-			if phase == "" {
+			if phase == ResourceReadyState {
+				phase = "Completed"
+			} else if phase == "" {
 				phase = "Unknown"
 			}
 			if err != nil {
@@ -479,9 +482,14 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 			if _, writeErr := r.WriteOperationTiming(ctx, req, r.currentOpState, phase, endMessage); writeErr != nil {
 				log.Error(writeErr, "Failed to write operationTiming")
 			}
+			r.currentOpState = nil
 		}
 	}
-	r.currentOpState = nil
+	if subreconciler.ShouldRequeue(finalResult, err) {
+		// Keep operation state across requeues so dependency waits span passes.
+	} else {
+		r.currentOpState = nil
+	}
 	r.pendingProgress = nil
 
 	if subreconciler.ShouldRequeue(finalResult, err) {

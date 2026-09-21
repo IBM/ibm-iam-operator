@@ -185,6 +185,15 @@ func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Contex
 		return subreconciler.RequeueWithError(err)
 	}
 
+	// Start an operation if the service just became non-Ready. This handles
+	// the case where the cached status at the top of Reconcile still showed
+	// Ready (stale etcd read), but setAuthenticationStatus now computes
+	// non-Ready because a managed resource changed.
+	if r.currentOpState == nil && observed.Status.Service.Status != ResourceReadyState {
+		r.currentOpState = r.RecordOperationStart(ctx, observed,
+			fmt.Sprintf("Reconcile operation started for %s/%s", observed.Namespace, observed.Name))
+	}
+
 	// Flush progress regardless of whether setAuthenticationStatus found other
 	// changes — a checkpoint may have been reached even on a requeue pass where
 	// nothing else changed (e.g. waiting for DB).

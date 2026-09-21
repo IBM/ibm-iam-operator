@@ -115,14 +115,16 @@ func (r *AuthenticationReconciler) RecordDependencyReady(ctx context.Context, in
 	}
 }
 
-func (r *AuthenticationReconciler) WriteOperationTiming(ctx context.Context, req ctrl.Request, state *operationState, phase string, message string) (result *ctrl.Result, err error) {
-	log := logf.FromContext(ctx)
+// BuildOperationTimingEntry constructs the OperationTimingEntry and emits the
+// OperationEnded event. It does NOT write to the API server — the caller is
+// responsible for appending the returned entry to the CR and calling
+// Status().Update exactly once.
+func (r *AuthenticationReconciler) BuildOperationTimingEntry(ctx context.Context, instance *operatorv1alpha1.Authentication, state *operationState, phase string, message string) *operatorv1alpha1.OperationTimingEntry {
 	if state == nil {
-		return subreconciler.ContinueReconciling()
+		return nil
 	}
-
 	endTime := metav1.Now()
-	entry := operatorv1alpha1.OperationTimingEntry{
+	entry := &operatorv1alpha1.OperationTimingEntry{
 		StartTime:     state.startTime,
 		EndTime:       endTime,
 		TotalDuration: formatDuration(endTime.Sub(state.startTime.Time)),
@@ -131,27 +133,36 @@ func (r *AuthenticationReconciler) WriteOperationTiming(ctx context.Context, req
 	if len(state.dependencyTimes) > 0 {
 		entry.DependencyTime = state.dependencyTimes
 	}
+	if !r.EnforceLeastPrivilege && r.Recorder != nil {
+		eventType := corev1.EventTypeNormal
+		if phase != "Completed" {
+			eventType = corev1.EventTypeWarning
+		}
+		r.Recorder.Event(instance, eventType, EventReasonOperationEnded,
+			fmt.Sprintf("phase=%s: %s", phase, message))
+	}
+	return entry
+}
 
-	// Fetch before emitting the event so involvedObject has Name/Namespace/UID.
+// WriteOperationTiming is used when operationTiming must be written in a
+// standalone Status().Update (e.g. the Failed path in Reconcile).
+func (r *AuthenticationReconciler) WriteOperationTiming(ctx context.Context, req ctrl.Request, state *operationState, phase string, message string) (result *ctrl.Result, err error) {
+	log := logf.FromContext(ctx)
+	if state == nil {
+		return subreconciler.ContinueReconciling()
+	}
+
+	// Fetch a fresh copy so the update has the latest resourceVersion.
 	observed := &operatorv1alpha1.Authentication{}
 	if result, err = r.getLatestAuthentication(ctx, req, observed); subreconciler.ShouldHaltOrRequeue(result, err) {
-		// ShouldHaltOrRequeue is true for both errors and pure requeues (err==nil).
 		if err != nil {
 			log.Error(err, "Could not fetch Authentication before writing operationTiming")
 		}
 		return
 	}
 
-	if !r.EnforceLeastPrivilege && r.Recorder != nil {
-		eventType := corev1.EventTypeNormal
-		if phase != "Completed" {
-			eventType = corev1.EventTypeWarning
-		}
-		r.Recorder.Event(observed, eventType, EventReasonOperationEnded,
-			fmt.Sprintf("phase=%s: %s", phase, message))
-	}
-
-	updated := append([]operatorv1alpha1.OperationTimingEntry{entry}, observed.Status.OperationTiming...)
+	entry := r.BuildOperationTimingEntry(ctx, observed, state, phase, message)
+	updated := append([]operatorv1alpha1.OperationTimingEntry{*entry}, observed.Status.OperationTiming...)
 	if len(updated) > maxOperationTimingEntries {
 		updated = updated[:maxOperationTimingEntries]
 	}

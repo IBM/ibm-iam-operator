@@ -183,16 +183,15 @@ func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Contex
 		AppendReconcileHistory(observed, fmt.Sprintf("Reconciliation failed: %s", err.Error()))
 		_ = r.Client.Status().Update(ctx, observed)
 		return subreconciler.RequeueWithError(err)
-	} else if !modified && observed.Status.Service.Status == ResourceReadyState {
-		log.Info("No new status changes needed")
-		return subreconciler.DoNotRequeue()
-	} else if !modified {
-		log.Info("Not ready yet; requeue")
-		return subreconciler.Requeue()
 	}
 
+	// Flush progress regardless of whether setAuthenticationStatus found other
+	// changes — a checkpoint may have been reached even on a requeue pass where
+	// nothing else changed (e.g. waiting for DB).
 	if r.pendingProgress != nil {
-		SetProgress(observed, *r.pendingProgress)
+		if SetProgress(observed, *r.pendingProgress) {
+			modified = true
+		}
 		r.pendingProgress = nil
 	}
 
@@ -201,6 +200,26 @@ func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Contex
 		previousServiceStatus != ResourceReadyState {
 		SetProgress(observed, progressCheckpoints.Complete)
 		MarkReconcileSuccess(observed)
+		modified = true
+		if r.currentOpState != nil {
+			entry := r.BuildOperationTimingEntry(ctx, observed, r.currentOpState, "Completed",
+				fmt.Sprintf("Reconcile operation completed for %s/%s", observed.Namespace, observed.Name))
+			updated := append([]operatorv1alpha1.OperationTimingEntry{*entry}, observed.Status.OperationTiming...)
+			if len(updated) > maxOperationTimingEntries {
+				updated = updated[:maxOperationTimingEntries]
+			}
+			observed.Status.OperationTiming = updated
+			log.Info("Built operationTiming entry", "phase", entry.Phase, "totalDuration", entry.TotalDuration)
+			r.currentOpState = nil
+		}
+	}
+
+	if !modified && observed.Status.Service.Status == ResourceReadyState {
+		log.Info("No new status changes needed")
+		return subreconciler.DoNotRequeue()
+	} else if !modified {
+		log.Info("Not ready yet; requeue")
+		return subreconciler.Requeue()
 	}
 
 	log.Info("Status updates found; update status before finishing loop.")
@@ -465,29 +484,17 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 		r.runNonStatusSubreconcilers,
 		r.updateAuthenticationStatus)).Reconcile(ctx)
 
-	// Write one entry when the operation concludes; retain state across requeues.
-	if !subreconciler.ShouldRequeue(finalResult, err) && r.currentOpState != nil {
+	// Retain currentOpState across requeues so dependency waits span passes.
+	// It is cleared inside updateAuthenticationStatus on the Ready transition,
+	// or here on a terminal error (err != nil, no requeue).
+	if err != nil && !subreconciler.ShouldRequeue(finalResult, err) && r.currentOpState != nil {
 		latestAuthCR := &operatorv1alpha1.Authentication{}
 		if getErr := r.Get(ctx, req.NamespacedName, latestAuthCR); getErr == nil {
-			phase := latestAuthCR.Status.Service.Status
-			if phase == ResourceReadyState {
-				phase = "Completed"
-			} else if phase == "" {
-				phase = "Unknown"
-			}
-			if err != nil {
-				phase = "Failed"
-			}
-			endMessage := fmt.Sprintf("Reconcile operation ended with phase %s", phase)
-			if _, writeErr := r.WriteOperationTiming(ctx, req, r.currentOpState, phase, endMessage); writeErr != nil {
+			endMessage := fmt.Sprintf("Reconcile operation failed for %s/%s", latestAuthCR.Namespace, latestAuthCR.Name)
+			if _, writeErr := r.WriteOperationTiming(ctx, req, r.currentOpState, "Failed", endMessage); writeErr != nil {
 				log.Error(writeErr, "Failed to write operationTiming")
 			}
-			r.currentOpState = nil
 		}
-	}
-	if subreconciler.ShouldRequeue(finalResult, err) {
-		// Keep operation state across requeues so dependency waits span passes.
-	} else {
 		r.currentOpState = nil
 	}
 	r.pendingProgress = nil

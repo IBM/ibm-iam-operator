@@ -342,11 +342,6 @@ func (in *ConfigSpec) DeepCopyInto(out *ConfigSpec) {
 		*out = new(bool)
 		**out = **in
 	}
-	if in.CpuRateLimit != nil {
-		in, out := &in.CpuRateLimit, &out.CpuRateLimit
-		*out = new(string)
-		**out = **in
-	}
 	if in.IdPrvdrWorkers != nil {
 		in, out := &in.IdPrvdrWorkers, &out.IdPrvdrWorkers
 		*out = new(string)
@@ -354,6 +349,11 @@ func (in *ConfigSpec) DeepCopyInto(out *ConfigSpec) {
 	}
 	if in.IdMgmtWorkers != nil {
 		in, out := &in.IdMgmtWorkers, &out.IdMgmtWorkers
+		*out = new(string)
+		**out = **in
+	}
+	if in.CpuRateLimit != nil {
+		in, out := &in.CpuRateLimit, &out.CpuRateLimit
 		*out = new(string)
 		**out = **in
 	}

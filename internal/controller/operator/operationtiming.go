@@ -23,15 +23,16 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	ctrl "sigs.k8s.io/controller-runtime"
+	"k8s.io/apimachinery/pkg/types"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
-	"github.com/opdev/subreconciler"
 )
 
 const (
 	maxOperationTimingEntries = 5
+
+	operationPhaseCompleted = "Completed"
 
 	EventReasonOperationStarted      = "OperationStarted"
 	EventReasonDependencyWaitStarted = "DependencyWaitStarted"
@@ -60,6 +61,29 @@ type operationState struct {
 	depReady        map[string]bool
 }
 
+// getOperationState returns the in-flight operation for the given
+// Authentication CR, or nil if none is being tracked
+func (r *AuthenticationReconciler) getOperationState(key types.NamespacedName) *operationState {
+	r.opStatesMu.Lock()
+	defer r.opStatesMu.Unlock()
+	return r.opStates[key]
+}
+
+func (r *AuthenticationReconciler) setOperationState(key types.NamespacedName, state *operationState) {
+	r.opStatesMu.Lock()
+	defer r.opStatesMu.Unlock()
+	if r.opStates == nil {
+		r.opStates = make(map[types.NamespacedName]*operationState)
+	}
+	r.opStates[key] = state
+}
+
+func (r *AuthenticationReconciler) clearOperationState(key types.NamespacedName) {
+	r.opStatesMu.Lock()
+	defer r.opStatesMu.Unlock()
+	delete(r.opStates, key)
+}
+
 func (r *AuthenticationReconciler) RecordOperationStart(ctx context.Context, instance *operatorv1alpha1.Authentication, message string) *operationState {
 	log := logf.FromContext(ctx)
 	state := &operationState{
@@ -68,9 +92,7 @@ func (r *AuthenticationReconciler) RecordOperationStart(ctx context.Context, ins
 		depReady:      make(map[string]bool),
 	}
 	log.Info("Operation started", "message", message)
-	if !r.EnforceLeastPrivilege && r.Recorder != nil {
-		r.Recorder.Event(instance, corev1.EventTypeNormal, EventReasonOperationStarted, message)
-	}
+	r.event(instance, corev1.EventTypeNormal, EventReasonOperationStarted, message)
 	return state
 }
 
@@ -78,14 +100,13 @@ func (r *AuthenticationReconciler) RecordDependencyWaitStart(ctx context.Context
 	if state == nil {
 		return
 	}
-	log := logf.FromContext(ctx)
-	now := metav1.Now()
-	state.depStartTimes[component] = now
-	log.Info("Waiting for dependency", "component", component)
-	if !r.EnforceLeastPrivilege && r.Recorder != nil {
-		r.Recorder.Event(instance, corev1.EventTypeNormal, EventReasonDependencyWaitStarted,
-			fmt.Sprintf("Waiting for dependency: %s", component))
+	if _, alreadyWaiting := state.depStartTimes[component]; alreadyWaiting {
+		return
 	}
+	log := logf.FromContext(ctx)
+	state.depStartTimes[component] = metav1.Now()
+	log.Info("Waiting for dependency", "component", component)
+	r.event(instance, corev1.EventTypeNormal, EventReasonDependencyWaitStarted, fmt.Sprintf("Waiting for dependency: %s", component))
 }
 
 func (r *AuthenticationReconciler) RecordDependencyReady(ctx context.Context, instance *operatorv1alpha1.Authentication, state *operationState, component string) {
@@ -109,16 +130,12 @@ func (r *AuthenticationReconciler) RecordDependencyReady(ctx context.Context, in
 	state.dependencyTimes = append(state.dependencyTimes, depEntry)
 	state.depReady[component] = true
 	log.Info("Dependency ready", "component", component, "duration", depEntry.DependencyDuration)
-	if !r.EnforceLeastPrivilege && r.Recorder != nil {
-		r.Recorder.Event(instance, corev1.EventTypeNormal, EventReasonDependencyReady,
-			fmt.Sprintf("Dependency %s is ready", component))
-	}
+	r.event(instance, corev1.EventTypeNormal, EventReasonDependencyReady, fmt.Sprintf("Dependency %s is ready", component))
 }
 
-// BuildOperationTimingEntry constructs the OperationTimingEntry and emits the
-// OperationEnded event. It does NOT write to the API server — the caller is
-// responsible for appending the returned entry to the CR and calling
-// Status().Update exactly once.
+// BuildOperationTimingEntry constructs the OperationTimingEntry for a finished
+// operation. It neither writes to the API server nor emits an event; call
+// RecordOperationEnded once the status update carrying the entry is succeeds.
 func (r *AuthenticationReconciler) BuildOperationTimingEntry(ctx context.Context, instance *operatorv1alpha1.Authentication, state *operationState, phase string, message string) *operatorv1alpha1.OperationTimingEntry {
 	if state == nil {
 		return nil
@@ -133,45 +150,27 @@ func (r *AuthenticationReconciler) BuildOperationTimingEntry(ctx context.Context
 	if len(state.dependencyTimes) > 0 {
 		entry.DependencyTime = state.dependencyTimes
 	}
-	if !r.EnforceLeastPrivilege && r.Recorder != nil {
-		eventType := corev1.EventTypeNormal
-		if phase != "Completed" {
-			eventType = corev1.EventTypeWarning
-		}
-		r.Recorder.Event(instance, eventType, EventReasonOperationEnded,
-			fmt.Sprintf("phase=%s: %s", phase, message))
-	}
 	return entry
 }
 
-// WriteOperationTiming is used when operationTiming must be written in a
-// standalone Status().Update (e.g. the Failed path in Reconcile).
-func (r *AuthenticationReconciler) WriteOperationTiming(ctx context.Context, req ctrl.Request, state *operationState, phase string, message string) (result *ctrl.Result, err error) {
-	log := logf.FromContext(ctx)
-	if state == nil {
-		return subreconciler.ContinueReconciling()
+func (r *AuthenticationReconciler) RecordOperationEnded(instance *operatorv1alpha1.Authentication, phase string, message string) {
+	eventType := corev1.EventTypeNormal
+	if phase != operationPhaseCompleted {
+		eventType = corev1.EventTypeWarning
 	}
+	r.event(instance, eventType, EventReasonOperationEnded, fmt.Sprintf("phase=%s: $s", phase, message))
+}
 
-	// Fetch a fresh copy so the update has the latest resourceVersion.
-	observed := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, observed); subreconciler.ShouldHaltOrRequeue(result, err) {
-		if err != nil {
-			log.Error(err, "Could not fetch Authentication before writing operationTiming")
-		}
-		return
+func (r *AuthenticationReconciler) event(instance *operatorv1alpha1.Authentication, eventType, reason, message string) {
+	if r.Recorder != nil {
+		r.Recorder.Event(instance, eventType, reason, message)
 	}
+}
 
-	entry := r.BuildOperationTimingEntry(ctx, observed, state, phase, message)
-	updated := append([]operatorv1alpha1.OperationTimingEntry{*entry}, observed.Status.OperationTiming...)
+func prependOperationTiming(authCR *operatorv1alpha1.Authentication, entry operatorv1alpha1.OperationTimingEntry) {
+	updated := append([]operatorv1alpha1.OperationTimingEntry{entry}, authCR.Status.OperationTiming...)
 	if len(updated) > maxOperationTimingEntries {
 		updated = updated[:maxOperationTimingEntries]
 	}
-	observed.Status.OperationTiming = updated
-
-	if err = r.Client.Status().Update(ctx, observed); err != nil {
-		log.Error(err, "Failed to update operationTiming status")
-		return subreconciler.RequeueWithError(err)
-	}
-	log.Info("Updated operationTiming", "phase", phase, "totalDuration", entry.TotalDuration)
-	return subreconciler.ContinueReconciling()
+	authCR.Status.OperationTiming = updated
 }

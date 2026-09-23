@@ -43,18 +43,9 @@ const (
 	EventReasonOperationEnded        = "OperationEnded"
 )
 
+// formatDuration formats d to whole seconds, e.g. 45s, 22m30s or 1h5m3s.
 func formatDuration(d time.Duration) string {
-	d = d.Round(time.Second)
-	h := int(d.Hours())
-	m := int(d.Minutes()) % 60
-	s := int(d.Seconds()) % 60
-	if h > 0 {
-		return fmt.Sprintf("%dh%dm%ds", h, m, s)
-	}
-	if m > 0 {
-		return fmt.Sprintf("%dm%ds", m, s)
-	}
-	return fmt.Sprintf("%ds", s)
+	return d.Round(time.Second).String()
 }
 
 // operation is an in-flight operation for one Authentication CR: when it
@@ -176,26 +167,34 @@ func (t *operationTracker) remove(key types.NamespacedName) {
 	delete(t.ops, key)
 }
 
-// dependencyWaiting records that component is not ready for authCR, starting
-// an operation for it if none is in flight. It is safe to call on every
-// reconcile pass while waiting; only the first call per operation counts.
-func (r *AuthenticationReconciler) dependencyWaiting(ctx context.Context, authCR *operatorv1alpha1.Authentication, component string) {
-	log := logf.FromContext(ctx)
-	now := metav1.Now()
-	start := now
-	// A CR that has never had a service status is a fresh install, which began
-	// when the CR was created rather than when the wait was noticed.
-	if authCR.Status.Service.Status == "" && !authCR.CreationTimestamp.IsZero() {
+// startOperation returns authCR's in-flight operation, starting one if none
+// exists. freshInstall marks a CR that has never had a service status; its
+// operation began when the CR was created rather than when it was noticed.
+func (r *AuthenticationReconciler) startOperation(ctx context.Context, authCR *operatorv1alpha1.Authentication, freshInstall bool) *operation {
+	start := metav1.Now()
+	if freshInstall && !authCR.CreationTimestamp.IsZero() {
 		start = authCR.CreationTimestamp
 	}
 	op, started := r.operations.getOrStart(client.ObjectKeyFromObject(authCR), start)
 	if started {
-		log.Info("Operation started", "startTime", start)
+		logf.FromContext(ctx).Info("Operation started", "startTime", start)
 		r.event(authCR, corev1.EventTypeNormal, EventReasonOperationStarted,
-			fmt.Sprintf("Waiting on external dependencies for %s/%s", authCR.Namespace, authCR.Name))
+			fmt.Sprintf("Operation started for %s/%s", authCR.Namespace, authCR.Name))
 	}
-	if op.waitStarted(component, now) {
-		log.Info("Waiting for dependency", "component", component)
+	return op
+}
+
+// dependencyWaiting records that component is not ready for authCR, starting
+// an operation for it if none is in flight. A wait can begin before the CR's
+// status turns non-Ready, e.g. on the first pass of a fresh install. It is
+// safe to call on every reconcile pass while waiting; only the first call per
+// operation counts.
+func (r *AuthenticationReconciler) dependencyWaiting(ctx context.Context, authCR *operatorv1alpha1.Authentication, component string) {
+	// authCR is as fetched this pass, so an empty service status means the CR
+	// has never had one: a fresh install.
+	op := r.startOperation(ctx, authCR, authCR.Status.Service.Status == "")
+	if op.waitStarted(component, metav1.Now()) {
+		logf.FromContext(ctx).Info("Waiting for dependency", "component", component)
 		r.event(authCR, corev1.EventTypeNormal, EventReasonDependencyWaitStarted,
 			fmt.Sprintf("Waiting for dependency: %s", component))
 	}

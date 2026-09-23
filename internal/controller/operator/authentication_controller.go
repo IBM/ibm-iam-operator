@@ -210,6 +210,12 @@ func (r *AuthenticationReconciler) applyOperationStatus(ctx context.Context, obs
 	isReady := observed.Status.Service.Status == ResourceReadyState
 
 	if !isReady {
+		// Not Ready means an operation is in progress, whether or not it waits on
+		// a dependency. The computed status is used rather than the cached CR at
+		// the top of Reconcile, which can be stale around our own status writes.
+		// observed's status was just overwritten, so the status from before this
+		// pass tells whether the CR has never had one: a fresh install.
+		r.startOperation(ctx, observed, previousServiceStatus == "")
 		// Not Ready after a completion means a new operation has begun.
 		if startProgress(observed) {
 			modified = true
@@ -231,7 +237,8 @@ func (r *AuthenticationReconciler) applyOperationStatus(ctx context.Context, obs
 		modified = true
 	}
 
-	// An operation exists only if an external dependency had to be waited on.
+	// The operation ends once the CR is Ready and no dependency it waited on is
+	// still pending; dependencyTime lists only dependencies that were waited on.
 	finished, onPersisted := r.finishOperation(ctx, observed)
 	return modified || finished, onPersisted
 }

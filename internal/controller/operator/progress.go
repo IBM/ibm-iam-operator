@@ -118,6 +118,16 @@ func AppendReconcileHistory(authCR *operatorv1alpha1.Authentication, message str
 	authCR.Status.ReconcileHistory = updated
 }
 
+func AppendReconcileHistoryIfNew(authCR *operatorv1alpha1.Authentication, message string) bool {
+	if len(authCR.Status.ReconcileHistory) > 0 {
+		if _, latest, ok := strings.Cut(authCR.Status.ReconcileHistory[0], " "); ok && latest == message {
+			return false
+		}
+	}
+	AppendReconcileHistory(authCR, message)
+	return true
+}
+
 func MarkReconcileSuccess(authCR *operatorv1alpha1.Authentication) {
 	AppendReconcileHistory(authCR, "The last reconciliation was completed successfully.")
 }

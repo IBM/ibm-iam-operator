@@ -30,6 +30,7 @@ const (
 	maxReconcileHistoryEntries = 3
 
 	reconcileSuccessMessage = "The last reconciliation was completed successfully."
+	reconcileFailurePrefix  = "Reconciliation failed: "
 )
 
 type checkpoint struct {
@@ -138,6 +139,13 @@ func reachedCheckpoint(ctx context.Context) *checkpoint {
 	return nil
 }
 
+// passCompleted reports whether the current pass got through every
+// non-status step, i.e. reached the last checkpoint without halting.
+func passCompleted(ctx context.Context) bool {
+	c := reachedCheckpoint(ctx)
+	return c != nil && *c == progressCheckpoints.RoutesHPAsDone
+}
+
 func appendReconcileHistory(authCR *operatorv1alpha1.Authentication, message string, now time.Time) {
 	entry := fmt.Sprintf("%s %s", now.UTC().Format(time.RFC3339), message)
 	updated := append([]string{entry}, authCR.Status.ReconcileHistory...)
@@ -161,4 +169,20 @@ func appendReconcileHistoryIfNew(authCR *operatorv1alpha1.Authentication, messag
 
 func markReconcileSuccess(authCR *operatorv1alpha1.Authentication, now time.Time) {
 	appendReconcileHistory(authCR, reconcileSuccessMessage, now)
+}
+
+// reconcileFailureMessage is the reconcileHistory message for err, on one line
+// even when err joins several errors.
+func reconcileFailureMessage(err error) string {
+	return reconcileFailurePrefix + strings.ReplaceAll(err.Error(), "\n", "; ")
+}
+
+// lastReconcileFailed reports whether the most recent reconcileHistory entry
+// records a failure.
+func lastReconcileFailed(authCR *operatorv1alpha1.Authentication) bool {
+	if len(authCR.Status.ReconcileHistory) == 0 {
+		return false
+	}
+	_, latest, _ := strings.Cut(authCR.Status.ReconcileHistory[0], " ")
+	return strings.HasPrefix(latest, reconcileFailurePrefix)
 }

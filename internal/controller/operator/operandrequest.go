@@ -613,6 +613,10 @@ func (r *AuthenticationReconciler) checkIBMPGClusterHealth(ctx context.Context, 
 	return subreconciler.RequeueWithDelay(30 * time.Second)
 }
 
+// embeddedDBDependency is the operationTiming component for the embedded
+// database requested through the im-needs-database OperandRequest.
+const embeddedDBDependency = "im-embedded-db"
+
 func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
 	debugLog := log.V(1)
@@ -628,24 +632,24 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 	// Skip if cluster doesn't support OperandRequest API
 	if !ctrlcommon.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
 		log.Info("The OperandRequest API resource is not supported by this cluster; skipping wait")
+		r.dependencyNotNeeded(ctx, authCR, embeddedDBDependency)
 		return subreconciler.ContinueReconciling()
 	}
 
 	if needsExternal, err := r.needsExternalEDB(debugCtx, authCR); err == nil && needsExternal {
 		log.Info("Configured to connect to external database; skipping this check")
+		r.dependencyNotNeeded(ctx, authCR, embeddedDBDependency)
 		return subreconciler.ContinueReconciling()
 	} else if err != nil {
 		log.Error(err, "Unexpected error occurred while trying to determine whether external EDB is to be configured")
 		return subreconciler.RequeueWithError(err)
 	}
 
-	const dbDep = "im-embedded-db"
-
 	opReqName := "im-needs-database"
 	opReq := &operatorv1alpha1.OperandRequest{}
 	if err = r.Get(debugCtx, types.NamespacedName{Name: opReqName, Namespace: authCR.Namespace}, opReq); k8sErrors.IsNotFound(err) {
 		log.Info("Database OperandRequest not found; waiting for it to be created")
-		r.dependencyWaiting(ctx, authCR, dbDep)
+		r.dependencyWaiting(ctx, authCR, embeddedDBDependency)
 		return subreconciler.RequeueWithDelay(30 * time.Second)
 	} else if err != nil {
 		log.Error(err, "Failed to get database OperandRequest")
@@ -657,6 +661,7 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 		log.Info("Database OperandRequest not yet in Running phase; waiting",
 			"currentPhase", opReq.Status.Phase,
 			"desiredPhase", operatorv1alpha1.ClusterPhaseRunning)
+		r.dependencyWaiting(ctx, authCR, embeddedDBDependency)
 		return subreconciler.RequeueWithDelay(30 * time.Second)
 	}
 
@@ -664,9 +669,9 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 
 	result, err = r.checkIBMPGClusterHealth(debugCtx, req.Namespace)
 	if subreconciler.ShouldContinue(result, err) {
-		r.dependencyReady(ctx, authCR, dbDep)
+		r.dependencyReady(ctx, authCR, embeddedDBDependency)
 	} else {
-		r.dependencyWaiting(ctx, authCR, dbDep)
+		r.dependencyWaiting(ctx, authCR, embeddedDBDependency)
 	}
 	return
 }

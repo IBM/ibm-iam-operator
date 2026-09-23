@@ -165,7 +165,7 @@ func (r *AuthenticationReconciler) RecordDependencyReady(ctx context.Context, in
 // BuildOperationTimingEntry constructs the OperationTimingEntry for a finished
 // operation. It neither writes to the API server nor emits an event; call
 // RecordOperationEnded once the status update carrying the entry is succeeds.
-func (r *AuthenticationReconciler) BuildOperationTimingEntry(ctx context.Context, instance *operatorv1alpha1.Authentication, state *operationState, phase string, message string) *operatorv1alpha1.OperationTimingEntry {
+func (r *AuthenticationReconciler) BuildOperationTimingEntry(state *operationState, phase string) *operatorv1alpha1.OperationTimingEntry {
 	if state == nil {
 		return nil
 	}

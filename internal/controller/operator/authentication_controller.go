@@ -158,9 +158,10 @@ type AuthenticationReconciler struct {
 	clusterType     common.ClusterType
 	needsRollout    bool
 	common.ByteGenerator
-	Recorder        record.EventRecorder
-	opStates        map[types.NamespacedName]*operationState
-	opStatesMu      sync.Mutex
+	Recorder   record.EventRecorder
+	operations operationTracker
+	// WARNING: per-pass state; safe only with MaxConcurrentReconciles=1
+	// (controller-runtime default).
 	pendingProgress *checkpoint
 }
 
@@ -184,16 +185,15 @@ func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Contex
 
 	pendingProgress := r.pendingProgress
 	r.pendingProgress = nil
-	opState := r.getOperationState(req.NamespacedName)
 	isReady := observed.Status.Service.Status == ResourceReadyState
 
 	if !isReady {
 		// Not Ready at 100% means a new round of work has begun since the last
-		// completion; restrat progress so the checkpoints below can apply.
+		// completion; restart progress so the checkpoints below it can apply.
 		if SetProgress(observed, progressCheckpoints.Start) {
 			modified = true
 		}
-		// Flush even when nothing else changed - a checkpoint may have been
+		// Flush even when nothing else changed — a checkpoint may have been
 		// reached on a requeue pass (e.g. waiting for DB).
 		if pendingProgress != nil && SetProgress(observed, *pendingProgress) {
 			modified = true
@@ -208,13 +208,10 @@ func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Contex
 		modified = true
 	}
 
-	// An operation exists only if an external dependency had to be waitied on.
-	// It ends once the CR is Ready and nothing it waited on is still pending.
-	completedOp := false
-	if isReady && opState != nil && !opState.hasPendingDependencies() {
-		prependOperationTiming(observed, *r.BuildOperationTimingEntry(opState, operationPhaseCompleted))
+	// An operation exists only if an external dependency had to be waited on.
+	finished, onOperationPersisted := r.finishOperation(ctx, observed)
+	if finished {
 		modified = true
-		completedOp = true
 	}
 
 	if !modified && isReady {
@@ -231,16 +228,14 @@ func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Contex
 		return subreconciler.RequeueWithError(err)
 	}
 	log.Info("Updated status")
-	// Clear only once timing entry is persisted, so a failed update is
-	// retried with the same operation on the next pass
-	if completedOp {
-		r.clearOperationState(req.NamespacedName)
-		r.RecordOperationEnded(observed, operationPhaseCompleted, fmt.Sprintf("Reconcile operation completed for %s/%s", observed.Namespace, observed.Name))
-		log.Info("Recorded operationTiming", "phase", operationPhaseCompleted, "totalDuration", observed.Status.OperationTiming[0].TotalDuration)
-	}
+	onOperationPersisted()
 	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
+// recordReconcileFailure adds a failure entry to reconcileHistory on a fresh
+// copy of the CR, so that partial changes made while computing the status are
+// not written. Repeats of the latest failure are not added again, so a
+// requeue loop cannot push older entries out of the history.
 func (r *AuthenticationReconciler) recordReconcileFailure(ctx context.Context, req ctrl.Request, reconcileErr error) {
 	log := logf.FromContext(ctx)
 	latest := &operatorv1alpha1.Authentication{}
@@ -481,7 +476,7 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 	authCR := &operatorv1alpha1.Authentication{}
 	err = r.Get(ctx, req.NamespacedName, authCR)
 	if k8sErrors.IsNotFound(err) {
-		r.clearOperationState(req.NamespacedName)
+		r.operations.remove(req.NamespacedName)
 		return result, nil
 	} else if err != nil {
 		return
@@ -710,28 +705,28 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	//bootstrappedPred := predicate.Funcs{
-	//	UpdateFunc: func(e event.UpdateEvent) bool {
-	//		predLog.Info("Update event", "Label.Version", e.ObjectNew.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.ObjectNew.GetLabels()[common.ManagerVersionLabel] == version.Version)
-	//		return e.ObjectNew.GetLabels()[common.ManagerVersionLabel] == version.Version
-	//	},
+	//  UpdateFunc: func(e event.UpdateEvent) bool {
+	//      predLog.Info("Update event", "Label.Version", e.ObjectNew.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.ObjectNew.GetLabels()[common.ManagerVersionLabel] == version.Version)
+	//      return e.ObjectNew.GetLabels()[common.ManagerVersionLabel] == version.Version
+	//  },
 
-	//	// Allow create events
-	//	CreateFunc: func(e event.CreateEvent) bool {
-	//		predLog.Info("Create event", "Label.Version", e.Object.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version)
-	//		return e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version
-	//	},
+	//  // Allow create events
+	//  CreateFunc: func(e event.CreateEvent) bool {
+	//      predLog.Info("Create event", "Label.Version", e.Object.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version)
+	//      return e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version
+	//  },
 
-	//	// Allow delete events
-	//	DeleteFunc: func(e event.DeleteEvent) bool {
-	//		predLog.Info("Delete event", "Label.Version", e.Object.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version)
-	//		return e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version
-	//	},
+	//  // Allow delete events
+	//  DeleteFunc: func(e event.DeleteEvent) bool {
+	//      predLog.Info("Delete event", "Label.Version", e.Object.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version)
+	//      return e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version
+	//  },
 
-	//	// Allow generic events (e.g., external triggers)
-	//	GenericFunc: func(e event.GenericEvent) bool {
-	//		predLog.Info("Generic event", "Label.Version", e.Object.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version)
-	//		return e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version
-	//	},
+	//  // Allow generic events (e.g., external triggers)
+	//  GenericFunc: func(e event.GenericEvent) bool {
+	//      predLog.Info("Generic event", "Label.Version", e.Object.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version)
+	//      return e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version
+	//  },
 	//}
 
 	authCtrl.Watches(&corev1.ConfigMap{},

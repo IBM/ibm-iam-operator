@@ -131,12 +131,12 @@ func (r *AuthenticationReconciler) ensureMigrationJobSucceeded(ctx context.Conte
 
 	if job.Status.Succeeded == 1 {
 		log.Info("Job succeeded")
-		r.recordDependencyReady(ctx, authCR, MigrationJobName)
+		r.dependencyReady(ctx, authCR, MigrationJobName)
 		return subreconciler.ContinueReconciling()
 	}
 
 	log.Info("Job has not succeeded yet")
-	r.recordDependencyWait(ctx, authCR, MigrationJobName)
+	r.dependencyWaiting(ctx, authCR, MigrationJobName)
 	return subreconciler.Requeue()
 }
 

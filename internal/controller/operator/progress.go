@@ -17,6 +17,7 @@ limitations under the License.
 package operator
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -28,8 +29,7 @@ import (
 const (
 	maxReconcileHistoryEntries = 3
 
-	progressCompleteValue   = 100
-	progressCompleteMessage = "The Current Operation Is Completed"
+	reconcileSuccessMessage = "The last reconciliation was completed successfully."
 )
 
 type checkpoint struct {
@@ -37,8 +37,9 @@ type checkpoint struct {
 	msg string
 }
 
-// Checkpoint percentages and messages for each stage of a reconcile pass.
-// 100% is set separately in updateAuthenticationStatus on Ready transition.
+// progressCheckpoints are the stages of a reconcile pass, in order. Each is
+// named for the step just finished; its message describes what the operator
+// is doing next, so a CR that stops at a checkpoint shows what it waits on.
 var progressCheckpoints = struct {
 	Start          checkpoint
 	RBACDone       checkpoint
@@ -50,15 +51,15 @@ var progressCheckpoints = struct {
 	RoutesHPAsDone checkpoint
 	Complete       checkpoint
 }{
-	Start:          checkpoint{0, "New Reconcile Loop Begin"},
-	RBACDone:       checkpoint{10, "Finished RBAC Setup"},
-	DBRequested:    checkpoint{20, "Finished Database OperandRequest"},
-	DBReady:        checkpoint{40, "Finished Waiting for Embedded Database"},
-	MigrationDone:  checkpoint{55, "Finished Database Schema Migration"},
-	ResourcesDone:  checkpoint{70, "Finished Deploying Core Resources"},
-	OIDCDone:       checkpoint{85, "Finished OIDC Client Registration"},
-	RoutesHPAsDone: checkpoint{95, "Finished Routes and HPAs"},
-	Complete:       checkpoint{progressCompleteValue, progressCompleteMessage},
+	Start:          checkpoint{0, "Setting up RBAC"},
+	RBACDone:       checkpoint{10, "Configuring database"},
+	DBRequested:    checkpoint{20, "Waiting for database"},
+	DBReady:        checkpoint{40, "Running database migration"},
+	MigrationDone:  checkpoint{55, "Deploying services"},
+	ResourcesDone:  checkpoint{70, "Registering OIDC client"},
+	OIDCDone:       checkpoint{85, "Configuring routes and autoscaling"},
+	RoutesHPAsDone: checkpoint{95, "Waiting for services to become ready"},
+	Complete:       checkpoint{100, "Completed"},
 }
 
 func parseProgress(s string) (int, bool) {
@@ -73,44 +74,72 @@ func parseProgress(s string) (int, bool) {
 	return v, true
 }
 
-// SetProgress returns true when the field changed, false when it was a no-op.
-// Three cases:
-//   - current == 100%: only 0% (loop reset) is accepted to avoid overwriting a
-//     completed state with a mid-operation value from the new pass.
-//   - blank/unparseable: accept any checkpoint so progress recovers if the
-//     initial 0% write was ever missed.
-//   - otherwise: only advance, never retreat.
-func SetProgress(authCR *operatorv1alpha1.Authentication, c checkpoint) bool {
-	incoming := c.pct
-	current, ok := parseProgress(authCR.Status.Progress)
-
-	if ok && current == progressCompleteValue {
-		if incoming != 0 {
-			return false
-		}
-		authCR.Status.Progress = "0%"
-		authCR.Status.ProgressMessage = c.msg
-		return true
-	}
-
-	if !ok {
-		authCR.Status.Progress = fmt.Sprintf("%d%%", incoming)
-		authCR.Status.ProgressMessage = c.msg
-		return true
-	}
-
-	if incoming < current {
+// setProgress writes c to authCR and reports whether anything changed.
+func setProgress(authCR *operatorv1alpha1.Authentication, c checkpoint) bool {
+	progress := fmt.Sprintf("%d%%", c.pct)
+	if authCR.Status.Progress == progress && authCR.Status.ProgressMessage == c.msg {
 		return false
 	}
-
-	authCR.Status.Progress = fmt.Sprintf("%d%%", incoming)
+	authCR.Status.Progress = progress
 	authCR.Status.ProgressMessage = c.msg
 	return true
 }
 
-func AppendReconcileHistory(authCR *operatorv1alpha1.Authentication, message string) {
-	ts := time.Now().UTC().Format("2006-01-02T15:04:05Z")
-	entry := fmt.Sprintf("%s %s", ts, message)
+// startProgress resets progress to 0% when a new operation begins: the
+// previous one completed (100%) or progress was never set. Mid-operation it
+// does nothing.
+func startProgress(authCR *operatorv1alpha1.Authentication) bool {
+	if current, ok := parseProgress(authCR.Status.Progress); ok && current != progressCheckpoints.Complete.pct {
+		return false
+	}
+	return setProgress(authCR, progressCheckpoints.Start)
+}
+
+// advanceProgress moves progress forward to c. It never moves backwards,
+// because a pass that requeues early reaches fewer checkpoints than an
+// earlier pass did.
+func advanceProgress(authCR *operatorv1alpha1.Authentication, c checkpoint) bool {
+	if current, ok := parseProgress(authCR.Status.Progress); ok && c.pct <= current {
+		return false
+	}
+	return setProgress(authCR, c)
+}
+
+func completeProgress(authCR *operatorv1alpha1.Authentication) bool {
+	return setProgress(authCR, progressCheckpoints.Complete)
+}
+
+// passProgress records the last checkpoint reached during one reconcile pass.
+// It lives in the pass's context rather than on the reconciler, so concurrent
+// reconciles of different CRs cannot see each other's checkpoints.
+type passProgress struct {
+	reached *checkpoint
+}
+
+type passProgressKey struct{}
+
+func withPassProgress(ctx context.Context) context.Context {
+	return context.WithValue(ctx, passProgressKey{}, &passProgress{})
+}
+
+// reachCheckpoint records c as the latest checkpoint of the current pass.
+func reachCheckpoint(ctx context.Context, c checkpoint) {
+	if p, ok := ctx.Value(passProgressKey{}).(*passProgress); ok {
+		p.reached = &c
+	}
+}
+
+// reachedCheckpoint returns the latest checkpoint of the current pass, or nil
+// if none was reached.
+func reachedCheckpoint(ctx context.Context) *checkpoint {
+	if p, ok := ctx.Value(passProgressKey{}).(*passProgress); ok {
+		return p.reached
+	}
+	return nil
+}
+
+func appendReconcileHistory(authCR *operatorv1alpha1.Authentication, message string, now time.Time) {
+	entry := fmt.Sprintf("%s %s", now.UTC().Format(time.RFC3339), message)
 	updated := append([]string{entry}, authCR.Status.ReconcileHistory...)
 	if len(updated) > maxReconcileHistoryEntries {
 		updated = updated[:maxReconcileHistoryEntries]
@@ -118,16 +147,18 @@ func AppendReconcileHistory(authCR *operatorv1alpha1.Authentication, message str
 	authCR.Status.ReconcileHistory = updated
 }
 
-func AppendReconcileHistoryIfNew(authCR *operatorv1alpha1.Authentication, message string) bool {
+// appendReconcileHistoryIfNew appends message unless it matches the most
+// recent entry (ignoring its timestamp). It returns whether an entry was added.
+func appendReconcileHistoryIfNew(authCR *operatorv1alpha1.Authentication, message string, now time.Time) bool {
 	if len(authCR.Status.ReconcileHistory) > 0 {
 		if _, latest, ok := strings.Cut(authCR.Status.ReconcileHistory[0], " "); ok && latest == message {
 			return false
 		}
 	}
-	AppendReconcileHistory(authCR, message)
+	appendReconcileHistory(authCR, message, now)
 	return true
 }
 
-func MarkReconcileSuccess(authCR *operatorv1alpha1.Authentication) {
-	AppendReconcileHistory(authCR, "The last reconciliation was completed successfully.")
+func markReconcileSuccess(authCR *operatorv1alpha1.Authentication, now time.Time) {
+	appendReconcileHistory(authCR, reconcileSuccessMessage, now)
 }

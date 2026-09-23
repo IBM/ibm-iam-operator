@@ -160,9 +160,6 @@ type AuthenticationReconciler struct {
 	common.ByteGenerator
 	Recorder   record.EventRecorder
 	operations operationTracker
-	// WARNING: per-pass state; safe only with MaxConcurrentReconciles=1
-	// (controller-runtime default).
-	pendingProgress *checkpoint
 }
 
 func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
@@ -183,19 +180,16 @@ func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Contex
 		return subreconciler.RequeueWithError(err)
 	}
 
-	pendingProgress := r.pendingProgress
-	r.pendingProgress = nil
 	isReady := observed.Status.Service.Status == ResourceReadyState
 
 	if !isReady {
-		// Not Ready at 100% means a new round of work has begun since the last
-		// completion; restart progress so the checkpoints below it can apply.
-		if SetProgress(observed, progressCheckpoints.Start) {
+		// Not Ready after a completion means a new operation has begun.
+		if startProgress(observed) {
 			modified = true
 		}
 		// Flush even when nothing else changed — a checkpoint may have been
 		// reached on a requeue pass (e.g. waiting for DB).
-		if pendingProgress != nil && SetProgress(observed, *pendingProgress) {
+		if c := reachedCheckpoint(ctx); c != nil && advanceProgress(observed, *c) {
 			modified = true
 		}
 	}
@@ -203,8 +197,8 @@ func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Contex
 	// Complete on the Ready transition, or when progress has never been set
 	// (CRs created before these fields existed).
 	if isReady && (previousServiceStatus != ResourceReadyState || observed.Status.Progress == "") {
-		SetProgress(observed, progressCheckpoints.Complete)
-		MarkReconcileSuccess(observed)
+		completeProgress(observed)
+		markReconcileSuccess(observed, time.Now())
 		modified = true
 	}
 
@@ -242,7 +236,7 @@ func (r *AuthenticationReconciler) recordReconcileFailure(ctx context.Context, r
 	if result, err := r.getLatestAuthentication(ctx, req, latest); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
-	if !AppendReconcileHistoryIfNew(latest, fmt.Sprintf("Reconciliation failed: %s", reconcileErr.Error())) {
+	if !appendReconcileHistoryIfNew(latest, fmt.Sprintf("Reconciliation failed: %s", reconcileErr.Error()), time.Now()) {
 		return
 	}
 	if err := r.Client.Status().Update(ctx, latest); err != nil {
@@ -410,13 +404,10 @@ func (r *AuthenticationReconciler) ensureBootstrapIsComplete(ctx context.Context
 	return subreconciler.ContinueReconciling()
 }
 
-func (r *AuthenticationReconciler) advanceProgress(c checkpoint) {
-	r.pendingProgress = &c
-}
-
-func (r *AuthenticationReconciler) progressSubreconciler(c checkpoint) func(context.Context, ctrl.Request) (*ctrl.Result, error) {
+// progressSubreconciler records c as reached when the pass gets this far.
+func progressSubreconciler(c checkpoint) func(context.Context, ctrl.Request) (*ctrl.Result, error) {
 	return func(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-		r.advanceProgress(c)
+		reachCheckpoint(ctx, c)
 		return subreconciler.ContinueReconciling()
 	}
 }
@@ -431,16 +422,16 @@ func (r *AuthenticationReconciler) runNonStatusSubreconcilers(ctx context.Contex
 		r.createRoleBinding,
 		r.handleClusterRoles,
 		r.handleClusterRoleBindings,
-		r.progressSubreconciler(progressCheckpoints.RBACDone),
+		progressSubreconciler(progressCheckpoints.RBACDone),
 		r.addMongoMigrationFinalizers,
 		r.overrideMongoDBBootstrap,
 		r.handleEDBToIBMPGMigration,
 		r.handleDatabaseOperandRequest,
 		r.createEDBShareClaim,
 		r.ensureDatastoreSecretAndCM,
-		r.progressSubreconciler(progressCheckpoints.DBRequested),
+		progressSubreconciler(progressCheckpoints.DBRequested),
 		r.ensureCommonServiceDBIsReady,
-		r.progressSubreconciler(progressCheckpoints.DBReady),
+		progressSubreconciler(progressCheckpoints.DBReady),
 		r.ensureMigrationJobRuns,
 		r.checkSAMLPresence,
 		r.handleCertificates,
@@ -451,18 +442,18 @@ func (r *AuthenticationReconciler) runNonStatusSubreconcilers(ctx context.Contex
 		r.removeIngresses,
 		r.handleServiceAccount,
 		r.ensureMigrationJobSucceeded,
-		r.progressSubreconciler(progressCheckpoints.MigrationDone),
+		progressSubreconciler(progressCheckpoints.MigrationDone),
 		r.handleDeployments,
-		r.progressSubreconciler(progressCheckpoints.ResourcesDone),
+		progressSubreconciler(progressCheckpoints.ResourcesDone),
 		r.ensureOIDCClientRegistrationJobRuns,
-		r.progressSubreconciler(progressCheckpoints.OIDCDone),
+		progressSubreconciler(progressCheckpoints.OIDCDone),
 		r.handleZenFrontDoor,
 		r.handleUIOperandRequest,
 		r.handleRoutes,
 		r.handleHPAs,
 		r.handleMongoDBCleanup,
 		r.cleanupOldRBAC,
-		r.progressSubreconciler(progressCheckpoints.RoutesHPAsDone))...).Reconcile(ctx)
+		progressSubreconciler(progressCheckpoints.RoutesHPAsDone))...).Reconcile(ctx)
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -486,7 +477,7 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 		log.Info("useSecretsStoreCSI is enabled, but the API is not available on this cluster. Ignoring setting until Secrets Store CSI driver is installed.")
 	}
 
-	r.advanceProgress(progressCheckpoints.Start)
+	ctx = withPassProgress(ctx)
 
 	finalResult, err := common.NewLazySubreconcilers(common.NewSubreconcilers(req,
 		r.runNonStatusSubreconcilers,

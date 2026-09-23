@@ -28,6 +28,7 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/tools/record"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -284,6 +285,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	// With ENFORCE_LEAST_PRIVILEGE the events RBAC is not grated, so events are
+	// discarded rather that failing with Forbidden.
+	enforceLeastPrivilege := os.Getenv("ENFORCE_LEAST_PRIVILEGE") == "true"
+	eventRecorderFor := func(name string) record.EventRecorder {
+		if enforceLeastPrivilege {
+			return &record.FakeRecorder{}
+		}
+		return mgr.GetEventRecorderFor(name)
+	}
+
 	const clientControllerName = "controller_oidc_client"
 
 	clientReconciler := &oidcsecuritycontrollers.ClientReconciler{
@@ -293,7 +304,7 @@ func main() {
 		},
 		Reader:        mgr.GetAPIReader(),
 		Scheme:        mgr.GetScheme(),
-		Recorder:      mgr.GetEventRecorderFor(clientControllerName),
+		Recorder:      eventRecorderFor(clientControllerName),
 		ByteGenerator: &common.RandomByteGenerator{},
 	}
 	if os.Getenv(common.ForceRunModeEnv) == string(common.LocalRunMode) {
@@ -306,17 +317,15 @@ func main() {
 		os.Exit(1)
 	}
 	const authControllerName = "controller_authentication"
-	enforceLeastPrivilege := os.Getenv("ENFORCE_LEAST_PRIVILEGE") == "true"
 	if err = (&operatorcontrollers.AuthenticationReconciler{
 		Client: &controllercommon.FallbackClient{
 			Client: mgr.GetClient(),
 			Reader: mgr.GetAPIReader(),
 		},
-		DiscoveryClient:       *dc,
-		Scheme:                mgr.GetScheme(),
-		ByteGenerator:         &common.RandomByteGenerator{},
-		Recorder:              mgr.GetEventRecorderFor(authControllerName),
-		EnforceLeastPrivilege: enforceLeastPrivilege,
+		DiscoveryClient: *dc,
+		Scheme:          mgr.GetScheme(),
+		ByteGenerator:   &common.RandomByteGenerator{},
+		Recorder:        eventRecorderFor(authControllerName),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Authentication")
 		os.Exit(1)

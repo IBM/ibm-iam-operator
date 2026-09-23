@@ -99,6 +99,21 @@ func (o *operation) ready(component string, now metav1.Time) (time.Duration, boo
 	return wait, true
 }
 
+// drop stops waiting on component if it is still pending. It reports whether
+// a pending wait was removed.
+func (o *operation) drop(component string) bool {
+	for i, d := range o.deps {
+		if d.Component == component {
+			if !d.ReadyTime.IsZero() {
+				return false
+			}
+			o.deps = slices.Delete(o.deps, i, i+1)
+			return true
+		}
+	}
+	return false
+}
+
 // pending reports whether any dependency waited on is not ready yet.
 func (o *operation) pending() bool {
 	for _, d := range o.deps {
@@ -200,6 +215,16 @@ func (r *AuthenticationReconciler) dependencyReady(ctx context.Context, authCR *
 	logf.FromContext(ctx).Info("Dependency ready", "component", component, "duration", formatDuration(wait))
 	r.event(authCR, corev1.EventTypeNormal, EventReasonDependencyReady,
 		fmt.Sprintf("Dependency %s is ready", component))
+}
+
+// dependencyNotNeeded stops waiting on component for authCR, e.g. because the
+// configuration changed so that it no longer applies. Without this, an
+// operation that was waiting on it could never finish.
+func (r *AuthenticationReconciler) dependencyNotNeeded(ctx context.Context, authCR *operatorv1alpha1.Authentication, component string) {
+	op := r.operations.get(client.ObjectKeyFromObject(authCR))
+	if op != nil && op.drop(component) {
+		logf.FromContext(ctx).Info("No longer waiting for dependency", "component", component)
+	}
 }
 
 // finishOperation adds the operationTiming entry for authCR's operation to its

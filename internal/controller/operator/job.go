@@ -131,17 +131,12 @@ func (r *AuthenticationReconciler) ensureMigrationJobSucceeded(ctx context.Conte
 
 	if job.Status.Succeeded == 1 {
 		log.Info("Job succeeded")
-		r.RecordDependencyReady(ctx, authCR, r.currentOpState, MigrationJobName)
+		r.recordDependencyReady(ctx, authCR, MigrationJobName)
 		return subreconciler.ContinueReconciling()
 	}
 
 	log.Info("Job has not succeeded yet")
-	// Record that we are waiting for the migration job (only on the first pass).
-	if r.currentOpState != nil {
-		if _, alreadyWaiting := r.currentOpState.depStartTimes[MigrationJobName]; !alreadyWaiting {
-			r.RecordDependencyWaitStart(ctx, authCR, r.currentOpState, MigrationJobName)
-		}
-	}
+	r.recordDependencyWait(ctx, authCR, MigrationJobName)
 	return subreconciler.Requeue()
 }
 
@@ -988,14 +983,14 @@ func buildMigratorVolumes(needsMongoDBMigration bool, edbSPCName string, zenInst
 		})
 	} else {
 		volumes = append(volumes, corev1.Volume{
-				Name: "pgsql-certs",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName:  common.DatastoreEDBSecretName,
-						DefaultMode: ptr.To(int32(420)),
-					},
+			Name: "pgsql-certs",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  common.DatastoreEDBSecretName,
+					DefaultMode: ptr.To(int32(420)),
 				},
-			})
+			},
+		})
 	}
 
 	if !needsMongoDBMigration {

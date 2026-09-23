@@ -84,6 +84,26 @@ func (r *AuthenticationReconciler) clearOperationState(key types.NamespacedName)
 	delete(r.opStates, key)
 }
 
+func (r *AuthenticationReconciler) recordDependencyWait(ctx context.Context, authCR *operatorv1alpha1.Authentication, component string) {
+	key := types.NamespacedName{Namespace: authCR.Namespace, Name: authCR.Name}
+	state := r.getOperationState(key)
+	if state == nil {
+		state := r.RecordOperationStart(ctx, authCR, fmt.Sprintf("Waiting on external dependencies for %s/%s", authCR.Namespace, authCR.Name))
+		// A CR that has never had a service status is a fresh install, which
+		// began when the CR was created rather than when the wait was noticed
+		if authCR.Status.Service.Status == "" && !authCR.CreationTimestamp.IsZero() {
+			state.startTime = authCR.CreationTimestamp
+		}
+		r.setOperationState(key, state)
+	}
+	r.RecordDependencyWaitStart(ctx, authCR, state, component)
+}
+
+func (r *AuthenticationReconciler) recordDependencyReady(ctx context.Context, authCR *operatorv1alpha1.Authentication, component string) {
+	key := types.NamespacedName{Namespace: authCR.Namespace, Name: authCR.Name}
+	r.RecordDependencyReady(ctx, authCR, r.getOperationState(key), component)
+}
+
 func (r *AuthenticationReconciler) RecordOperationStart(ctx context.Context, instance *operatorv1alpha1.Authentication, message string) *operationState {
 	log := logf.FromContext(ctx)
 	state := &operationState{

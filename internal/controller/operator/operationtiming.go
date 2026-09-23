@@ -84,6 +84,15 @@ func (r *AuthenticationReconciler) clearOperationState(key types.NamespacedName)
 	delete(r.opStates, key)
 }
 
+func (s *operationState) hasPendingDependencies() bool {
+	for component := range s.depStartTimes {
+		if !s.depReady[component] {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *AuthenticationReconciler) recordDependencyWait(ctx context.Context, authCR *operatorv1alpha1.Authentication, component string) {
 	key := types.NamespacedName{Namespace: authCR.Namespace, Name: authCR.Name}
 	state := r.getOperationState(key)

@@ -176,37 +176,12 @@ func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Contex
 	modified, err = r.setAuthenticationStatus(ctx, observed)
 	if err != nil {
 		log.Error(err, "Failed to set Authentication status")
-		r.recordReconcileFailure(ctx, req, err)
 		return subreconciler.RequeueWithError(err)
 	}
 
+	operationStatusChanged, onOperationPersisted := r.applyOperationStatus(ctx, observed, previousServiceStatus, time.Now())
+	modified = modified || operationStatusChanged
 	isReady := observed.Status.Service.Status == ResourceReadyState
-
-	if !isReady {
-		// Not Ready after a completion means a new operation has begun.
-		if startProgress(observed) {
-			modified = true
-		}
-		// Flush even when nothing else changed — a checkpoint may have been
-		// reached on a requeue pass (e.g. waiting for DB).
-		if c := reachedCheckpoint(ctx); c != nil && advanceProgress(observed, *c) {
-			modified = true
-		}
-	}
-
-	// Complete on the Ready transition, or when progress has never been set
-	// (CRs created before these fields existed).
-	if isReady && (previousServiceStatus != ResourceReadyState || observed.Status.Progress == "") {
-		completeProgress(observed)
-		markReconcileSuccess(observed, time.Now())
-		modified = true
-	}
-
-	// An operation exists only if an external dependency had to be waited on.
-	finished, onOperationPersisted := r.finishOperation(ctx, observed)
-	if finished {
-		modified = true
-	}
 
 	if !modified && isReady {
 		log.Info("No new status changes needed")
@@ -226,22 +201,72 @@ func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Contex
 	return subreconciler.RequeueWithDelay(defaultLowerWait)
 }
 
+// applyOperationStatus updates progress, reconcileHistory and operationTiming
+// on observed, whose service status has just been computed for this pass;
+// previousServiceStatus is the service status before this pass. It reports
+// whether anything changed. onPersisted must be called once observed's status
+// has been written successfully.
+func (r *AuthenticationReconciler) applyOperationStatus(ctx context.Context, observed *operatorv1alpha1.Authentication, previousServiceStatus string, now time.Time) (modified bool, onPersisted func()) {
+	isReady := observed.Status.Service.Status == ResourceReadyState
+
+	if !isReady {
+		// Not Ready after a completion means a new operation has begun.
+		if startProgress(observed) {
+			modified = true
+		}
+		// Flush even when nothing else changed — a checkpoint may have been
+		// reached on a requeue pass (e.g. waiting for DB).
+		if c := reachedCheckpoint(ctx); c != nil && advanceProgress(observed, *c) {
+			modified = true
+		}
+	}
+
+	// Record success on the Ready transition; when progress has never been set
+	// (CRs created before these fields existed); or on the first complete pass
+	// after a recorded failure, so the history does not keep reporting it.
+	recovered := lastReconcileFailed(observed) && passCompleted(ctx)
+	if isReady && (previousServiceStatus != ResourceReadyState || observed.Status.Progress == "" || recovered) {
+		completeProgress(observed)
+		markReconcileSuccess(observed, now)
+		modified = true
+	}
+
+	// An operation exists only if an external dependency had to be waited on.
+	finished, onPersisted := r.finishOperation(ctx, observed)
+	return modified || finished, onPersisted
+}
+
 // recordReconcileFailure adds a failure entry to reconcileHistory on a fresh
-// copy of the CR, so that partial changes made while computing the status are
-// not written. Repeats of the latest failure are not added again, so a
-// requeue loop cannot push older entries out of the history.
+// copy of the CR, so that partial changes made during the pass are not
+// written. Repeats of the latest failure are not added again, so a requeue
+// loop cannot push older entries out of the history.
 func (r *AuthenticationReconciler) recordReconcileFailure(ctx context.Context, req ctrl.Request, reconcileErr error) {
 	log := logf.FromContext(ctx)
 	latest := &operatorv1alpha1.Authentication{}
 	if result, err := r.getLatestAuthentication(ctx, req, latest); subreconciler.ShouldHaltOrRequeue(result, err) {
 		return
 	}
-	if !appendReconcileHistoryIfNew(latest, fmt.Sprintf("Reconciliation failed: %s", reconcileErr.Error()), time.Now()) {
+	if !appendReconcileHistoryIfNew(latest, reconcileFailureMessage(reconcileErr), time.Now()) {
 		return
 	}
 	if err := r.Client.Status().Update(ctx, latest); err != nil {
 		log.Error(err, "Failed to record reconcile failure in status")
 	}
+}
+
+// onlyConflicts reports whether err consists solely of update conflicts,
+// looking inside errors joined by errors.Join.
+func onlyConflicts(err error) bool {
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		errs := joined.Unwrap()
+		for _, e := range errs {
+			if !onlyConflicts(e) {
+				return false
+			}
+		}
+		return len(errs) > 0
+	}
+	return k8sErrors.IsConflict(err)
 }
 
 func (r *AuthenticationReconciler) handleAuthenticationFinalizer(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
@@ -482,6 +507,12 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 	finalResult, err := common.NewLazySubreconcilers(common.NewSubreconcilers(req,
 		r.runNonStatusSubreconcilers,
 		r.updateAuthenticationStatus)).Reconcile(ctx)
+
+	// Update conflicts are routine and retried straight away, so they are not
+	// worth a history entry.
+	if err != nil && !onlyConflicts(err) {
+		r.recordReconcileFailure(ctx, req, err)
+	}
 
 	if subreconciler.ShouldRequeue(finalResult, err) {
 		log.Info("Reconciliation for Authentication CR incomplete; requeueing")

@@ -642,17 +642,9 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 	const dbDep = "im-embedded-db"
 
 	opReqName := "im-needs-database"
-	// Get the OperandRequest
 	opReq := &operatorv1alpha1.OperandRequest{}
 	if err = r.Get(debugCtx, types.NamespacedName{Name: opReqName, Namespace: authCR.Namespace}, opReq); k8sErrors.IsNotFound(err) {
 		log.Info("Database OperandRequest not found; waiting for it to be created")
-		// Record that we are now waiting for the embedded DB (only on the first
-		// requeue — RecordDependencyWaitStart is a no-op when state is nil).
-		if r.currentOpState != nil {
-			if _, alreadyWaiting := r.currentOpState.depStartTimes[dbDep]; !alreadyWaiting {
-				r.RecordDependencyWaitStart(ctx, authCR, r.currentOpState, dbDep)
-			}
-		}
 		return subreconciler.RequeueWithDelay(30 * time.Second)
 	} else if err != nil {
 		log.Error(err, "Failed to get database OperandRequest")
@@ -664,17 +656,12 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 		log.Info("Database OperandRequest not yet in Running phase; waiting",
 			"currentPhase", opReq.Status.Phase,
 			"desiredPhase", operatorv1alpha1.ClusterPhaseRunning)
-		if r.currentOpState != nil {
-			if _, alreadyWaiting := r.currentOpState.depStartTimes[dbDep]; !alreadyWaiting {
-				r.RecordDependencyWaitStart(ctx, authCR, r.currentOpState, dbDep)
-			}
-		}
 		return subreconciler.RequeueWithDelay(30 * time.Second)
 	}
 
 	log.Info("Database OperandRequest is in Running phase")
 
-	// Record dependency wait start before checking cluster health (once only).
+	// Record wait start once, immediately before checking cluster health.
 	if r.currentOpState != nil {
 		if _, alreadyWaiting := r.currentOpState.depStartTimes[dbDep]; !alreadyWaiting {
 			r.RecordDependencyWaitStart(ctx, authCR, r.currentOpState, dbDep)

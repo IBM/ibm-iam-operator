@@ -187,7 +187,7 @@ func (r *AuthenticationReconciler) RecordOperationEnded(instance *operatorv1alph
 	if phase != operationPhaseCompleted {
 		eventType = corev1.EventTypeWarning
 	}
-	r.event(instance, eventType, EventReasonOperationEnded, fmt.Sprintf("phase=%s: $s", phase, message))
+	r.event(instance, eventType, EventReasonOperationEnded, fmt.Sprintf("phase=%s: %s", phase, message))
 }
 
 func (r *AuthenticationReconciler) event(instance *operatorv1alpha1.Authentication, eventType, reason, message string) {

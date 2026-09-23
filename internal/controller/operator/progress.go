@@ -17,17 +17,12 @@ limitations under the License.
 package operator
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
-	ctrl "sigs.k8s.io/controller-runtime"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
-	"github.com/opdev/subreconciler"
 )
 
 const (
@@ -125,25 +120,4 @@ func AppendReconcileHistory(authCR *operatorv1alpha1.Authentication, message str
 
 func MarkReconcileSuccess(authCR *operatorv1alpha1.Authentication) {
 	AppendReconcileHistory(authCR, "The last reconciliation was completed successfully.")
-}
-
-func (r *AuthenticationReconciler) WriteProgress(ctx context.Context, req ctrl.Request, c checkpoint) (result *ctrl.Result, err error) {
-	log := logf.FromContext(ctx)
-	authCR := &operatorv1alpha1.Authentication{}
-	if result, err = r.getLatestAuthentication(ctx, req, authCR); subreconciler.ShouldHaltOrRequeue(result, err) {
-		// ShouldHaltOrRequeue is true for both errors and pure requeues (err==nil).
-		if err != nil {
-			log.Error(err, "Could not fetch Authentication before writing progress")
-		}
-		return
-	}
-	if !SetProgress(authCR, c) {
-		return subreconciler.ContinueReconciling()
-	}
-	if err = r.Client.Status().Update(ctx, authCR); err != nil {
-		log.Error(err, "Failed to update progress status")
-		return subreconciler.RequeueWithError(err)
-	}
-	log.V(1).Info("Progress updated", "progress", authCR.Status.Progress, "message", authCR.Status.ProgressMessage)
-	return subreconciler.ContinueReconciling()
 }

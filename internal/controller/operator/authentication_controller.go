@@ -484,11 +484,6 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 
 	r.advanceProgress(progressCheckpoints.Start)
 
-	if r.currentOpState == nil && authCR.Status.Service.Status != ResourceReadyState {
-		r.currentOpState = r.RecordOperationStart(ctx, authCR,
-			fmt.Sprintf("Reconcile operation started for %s/%s", authCR.Namespace, authCR.Name))
-	}
-
 	finalResult, err := common.NewLazySubreconcilers(common.NewSubreconcilers(req,
 		r.runNonStatusSubreconcilers,
 		r.updateAuthenticationStatus)).Reconcile(ctx)
@@ -506,7 +501,6 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 		}
 		r.currentOpState = nil
 	}
-	r.pendingProgress = nil
 
 	if subreconciler.ShouldRequeue(finalResult, err) {
 		log.Info("Reconciliation for Authentication CR incomplete; requeueing")

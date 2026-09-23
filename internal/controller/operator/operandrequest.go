@@ -645,6 +645,7 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 	opReq := &operatorv1alpha1.OperandRequest{}
 	if err = r.Get(debugCtx, types.NamespacedName{Name: opReqName, Namespace: authCR.Namespace}, opReq); k8sErrors.IsNotFound(err) {
 		log.Info("Database OperandRequest not found; waiting for it to be created")
+		r.recordDependencyWait(ctx, authCR, dbDep)
 		return subreconciler.RequeueWithDelay(30 * time.Second)
 	} else if err != nil {
 		log.Error(err, "Failed to get database OperandRequest")
@@ -661,17 +662,11 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 
 	log.Info("Database OperandRequest is in Running phase")
 
-	// Record wait start once, immediately before checking cluster health.
-	if r.currentOpState != nil {
-		if _, alreadyWaiting := r.currentOpState.depStartTimes[dbDep]; !alreadyWaiting {
-			r.RecordDependencyWaitStart(ctx, authCR, r.currentOpState, dbDep)
-		}
-	}
-
-	// Check IBM PG Cluster health; record ready when it passes.
 	result, err = r.checkIBMPGClusterHealth(debugCtx, req.Namespace)
 	if subreconciler.ShouldContinue(result, err) {
-		r.RecordDependencyReady(ctx, authCR, r.currentOpState, dbDep)
+		r.recordDependencyReady(ctx, authCR, dbDep)
+	} else {
+		r.recordDependencyWait(ctx, authCR, dbDep)
 	}
 	return
 }

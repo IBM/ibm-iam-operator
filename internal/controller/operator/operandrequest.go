@@ -645,7 +645,7 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 	opReq := &operatorv1alpha1.OperandRequest{}
 	if err = r.Get(debugCtx, types.NamespacedName{Name: opReqName, Namespace: authCR.Namespace}, opReq); k8sErrors.IsNotFound(err) {
 		log.Info("Database OperandRequest not found; waiting for it to be created")
-		r.recordDependencyWait(ctx, authCR, dbDep)
+		r.dependencyWaiting(ctx, authCR, dbDep)
 		return subreconciler.RequeueWithDelay(30 * time.Second)
 	} else if err != nil {
 		log.Error(err, "Failed to get database OperandRequest")
@@ -664,9 +664,9 @@ func (r *AuthenticationReconciler) ensureCommonServiceDBIsReady(ctx context.Cont
 
 	result, err = r.checkIBMPGClusterHealth(debugCtx, req.Namespace)
 	if subreconciler.ShouldContinue(result, err) {
-		r.recordDependencyReady(ctx, authCR, dbDep)
+		r.dependencyReady(ctx, authCR, dbDep)
 	} else {
-		r.recordDependencyWait(ctx, authCR, dbDep)
+		r.dependencyWaiting(ctx, authCR, dbDep)
 	}
 	return
 }

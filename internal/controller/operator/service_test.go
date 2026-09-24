@@ -31,19 +31,19 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"k8s.io/utils/ptr"
 )
 
 var _ = Describe("Service handling", func() {
 	const (
-		authCRName           = "example-authentication"
-		namespace            = "data-ns"
-		headlessServiceName  = "platform-auth-service-headless"
-		gvkNone              = "none"
-		gvkOCPRoute          = "openshift.io/v1/route"
+		authCRName          = "example-authentication"
+		namespace           = "data-ns"
+		headlessServiceName = "platform-auth-service-headless"
+		gvkNone             = "none"
+		gvkOCPRoute         = "openshift.io/v1/route"
 	)
 
 	var (
@@ -256,7 +256,7 @@ var _ = Describe("Service handling", func() {
 				})
 
 				It("is idempotent: second reconcile succeeds without re-creating the service", func() {
-					_, _ = r.handleServices(ctx, req) // first: creates
+					_, _ = r.handleServices(ctx, req)    // first: creates
 					_, err := r.handleServices(ctx, req) // second: no-op drift
 					Expect(err).ToNot(HaveOccurred())
 

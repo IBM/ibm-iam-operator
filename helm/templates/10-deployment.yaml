@@ -258,6 +258,8 @@ spec:
               fieldPath: metadata.namespace
         - name: OPERATOR_NAME
           value: ibm-iam-operator
+        - name: ENFORCE_LEAST_PRIVILEGE
+          value: {{ .Values.global.enforceLeastPrivilege | default false | quote }}
         - name: ROUTE_HTTP_PORT
           value: ""
         - name: ROUTE_HTTPS_PORT

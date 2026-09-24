@@ -82,7 +82,6 @@ rules:
   verbs:
   - create
   - patch
-  - update
 {{- end }}
 - apiGroups:
   - ""

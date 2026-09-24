@@ -39,7 +39,8 @@ type checkpoint struct {
 }
 
 // progressCheckpoints are the ordered stages of a reconcile pass. Each
-// message describes the next pending work, so a stalled CR shows what it waits on.
+// is named for the strep just finished; its message describes the next pending
+// work, so a stalled CR shows what it waits on.
 var progressCheckpoints = struct {
 	Start          checkpoint
 	RBACDone       checkpoint

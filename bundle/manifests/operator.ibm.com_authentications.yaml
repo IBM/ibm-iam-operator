@@ -483,6 +483,93 @@ spec:
                 items:
                   type: string
                 type: array
+              operationTiming:
+                description: |-
+                  OperationTiming holds the most recent operations, newest first, at
+                  most 5.
+                items:
+                  description: |-
+                    OperationTimingEntry records the timing of one operation: a period in which
+                    the Authentication was not Ready, such as an install, an upgrade, or a
+                    rollout after a configuration change.
+                  properties:
+                    dependencyTime:
+                      description: |-
+                        DependencyTime lists each external dependency the operation waited on.
+                        It is omitted when the operation waited on none.
+                      items:
+                        description: |-
+                          DependencyTime records how long an operation waited on one external
+                          dependency.
+                        properties:
+                          component:
+                            description: |-
+                              Component is the dependency waited on: im-embedded-db or
+                              ibm-im-db-migration.
+                            type: string
+                          dependencyDuration:
+                            description: DependencyDuration is ReadyTime minus StartTime,
+                              e.g. 12m30s.
+                            type: string
+                          readyTime:
+                            description: ReadyTime is when the operator first found
+                              the dependency ready again.
+                            format: date-time
+                            type: string
+                          startTime:
+                            description: StartTime is when the operator first found
+                              the dependency not ready.
+                            format: date-time
+                            type: string
+                        required:
+                        - component
+                        - dependencyDuration
+                        - readyTime
+                        - startTime
+                        type: object
+                      type: array
+                    endTime:
+                      description: EndTime is when the Authentication was Ready with
+                        no dependency pending.
+                      format: date-time
+                      type: string
+                    phase:
+                      description: Phase is the outcome of the operation; currently
+                        always Completed.
+                      type: string
+                    startTime:
+                      description: |-
+                        StartTime is when the operation began: the creation of the
+                        Authentication for a fresh install, otherwise when it stopped being
+                        Ready or first waited on a dependency.
+                      format: date-time
+                      type: string
+                    totalDuration:
+                      description: TotalDuration is EndTime minus StartTime, e.g.
+                        22m30s.
+                      type: string
+                  required:
+                  - endTime
+                  - phase
+                  - startTime
+                  - totalDuration
+                  type: object
+                type: array
+              progress:
+                description: Progress is how far the current operation has got, from
+                  0% to 100%.
+                type: string
+              progressMessage:
+                description: ProgressMessage describes what the operator is doing
+                  at Progress.
+                type: string
+              reconcileHistory:
+                description: |-
+                  ReconcileHistory holds the most recent reconcile outcomes, newest first,
+                  at most 3. Each entry is an RFC 3339 timestamp followed by a message.
+                items:
+                  type: string
+                type: array
             required:
             - nodes
             type: object

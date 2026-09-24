@@ -38,9 +38,8 @@ type checkpoint struct {
 	msg string
 }
 
-// progressCheckpoints are the stages of a reconcile pass, in order. Each is
-// named for the step just finished; its message describes what the operator
-// is doing next, so a CR that stops at a checkpoint shows what it waits on.
+// progressCheckpoints are the ordered stages of a reconcile pass. Each
+// message describes the next pending work, so a stalled CR shows what it waits on.
 var progressCheckpoints = struct {
 	Start          checkpoint
 	RBACDone       checkpoint
@@ -86,9 +85,8 @@ func setProgress(authCR *operatorv1alpha1.Authentication, c checkpoint) bool {
 	return true
 }
 
-// startProgress resets progress to 0% when a new operation begins: the
-// previous one completed (100%) or progress was never set. Mid-operation it
-// does nothing.
+// startProgress resets progress to 0% at the start of a new operation (previous
+// completed at 100% or was never set). No-op mid-operation.
 func startProgress(authCR *operatorv1alpha1.Authentication) bool {
 	if current, ok := parseProgress(authCR.Status.Progress); ok && current != progressCheckpoints.Complete.pct {
 		return false
@@ -96,9 +94,7 @@ func startProgress(authCR *operatorv1alpha1.Authentication) bool {
 	return setProgress(authCR, progressCheckpoints.Start)
 }
 
-// advanceProgress moves progress forward to c. It never moves backwards,
-// because a pass that requeues early reaches fewer checkpoints than an
-// earlier pass did.
+// advanceProgress moves progress forward to c; never backwards.
 func advanceProgress(authCR *operatorv1alpha1.Authentication, c checkpoint) bool {
 	if current, ok := parseProgress(authCR.Status.Progress); ok && c.pct <= current {
 		return false
@@ -110,9 +106,8 @@ func completeProgress(authCR *operatorv1alpha1.Authentication) bool {
 	return setProgress(authCR, progressCheckpoints.Complete)
 }
 
-// passProgress records the last checkpoint reached during one reconcile pass.
-// It lives in the pass's context rather than on the reconciler, so concurrent
-// reconciles of different CRs cannot see each other's checkpoints.
+// passProgress tracks the last checkpoint reached in a single reconcile pass,
+// stored in context to isolate concurrent reconciles of different CRs.
 type passProgress struct {
 	reached *checkpoint
 }
@@ -155,8 +150,8 @@ func appendReconcileHistory(authCR *operatorv1alpha1.Authentication, message str
 	authCR.Status.ReconcileHistory = updated
 }
 
-// appendReconcileHistoryIfNew appends message unless it matches the most
-// recent entry (ignoring its timestamp). It returns whether an entry was added.
+// appendReconcileHistoryIfNew appends message only if it differs from the most
+// recent entry (timestamp ignored). Reports whether an entry was added.
 func appendReconcileHistoryIfNew(authCR *operatorv1alpha1.Authentication, message string, now time.Time) bool {
 	if len(authCR.Status.ReconcileHistory) > 0 {
 		if _, latest, ok := strings.Cut(authCR.Status.ReconcileHistory[0], " "); ok && latest == message {
@@ -171,8 +166,8 @@ func markReconcileSuccess(authCR *operatorv1alpha1.Authentication, now time.Time
 	appendReconcileHistory(authCR, reconcileSuccessMessage, now)
 }
 
-// reconcileFailureMessage is the reconcileHistory message for err, on one line
-// even when err joins several errors.
+// reconcileFailureMessage returns the reconcileHistory message for err,
+// collapsing newlines to keep it single-line.
 func reconcileFailureMessage(err error) string {
 	return reconcileFailurePrefix + strings.ReplaceAll(err.Error(), "\n", "; ")
 }

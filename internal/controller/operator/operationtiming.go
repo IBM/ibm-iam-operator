@@ -48,12 +48,11 @@ func formatDuration(d time.Duration) string {
 	return d.Round(time.Second).String()
 }
 
-// operation is an in-flight operation for one Authentication CR: when it
-// started and the external dependencies it has waited on.
+// operation is an in-flight operation for one Authentication CR.
 type operation struct {
 	start metav1.Time
-	// deps has one entry per dependency waited on, in the order the waits
-	// began. A zero ReadyTime means the dependency is still pending.
+	// deps are the external dependencies waited on, in wait order.
+	// A zero ReadyTime means the dependency is still pending.
 	deps []operatorv1alpha1.DependencyTime
 }
 
@@ -66,8 +65,8 @@ func (o *operation) dep(component string) *operatorv1alpha1.DependencyTime {
 	return nil
 }
 
-// waitStarted records that the operation began waiting on component at now.
-// It returns false if component was already waited on in this operation.
+// waitStarted records that the operation began waiting on component.
+// Returns false if already waiting on component.
 func (o *operation) waitStarted(component string, now metav1.Time) bool {
 	if o.dep(component) != nil {
 		return false
@@ -76,9 +75,8 @@ func (o *operation) waitStarted(component string, now metav1.Time) bool {
 	return true
 }
 
-// ready records that component became ready at now and returns how long it
-// was waited on. It returns false if component was never waited on or is
-// already ready.
+// ready records that component became ready and returns the wait duration.
+// Returns false if component was never waited on or is already ready.
 func (o *operation) ready(component string, now metav1.Time) (time.Duration, bool) {
 	d := o.dep(component)
 	if d == nil || !d.ReadyTime.IsZero() {
@@ -90,8 +88,7 @@ func (o *operation) ready(component string, now metav1.Time) (time.Duration, boo
 	return wait, true
 }
 
-// drop stops waiting on component if it is still pending. It reports whether
-// a pending wait was removed.
+// drop removes a still-pending wait on component. Reports whether one was removed.
 func (o *operation) drop(component string) bool {
 	for i, d := range o.deps {
 		if d.Component == component {
@@ -129,11 +126,9 @@ func (o *operation) entry(end metav1.Time) operatorv1alpha1.OperationTimingEntry
 	return e
 }
 
-// operationTracker holds the in-flight operation of each Authentication CR.
-// It is kept in memory across requeues so dependency waits can span multiple
-// reconcile passes. The mutex guards only the map: controller-runtime never
-// reconciles the same CR concurrently, so an operation is only ever touched by
-// one goroutine at a time.
+// operationTracker holds in-flight operations keyed by CR. Kept in memory
+// across requeues so dependency waits span multiple passes. The mutex guards
+// the map only; controller-runtime serialises reconciles per CR.
 type operationTracker struct {
 	mu  sync.Mutex
 	ops map[types.NamespacedName]*operation
@@ -145,8 +140,7 @@ func (t *operationTracker) get(key types.NamespacedName) *operation {
 	return t.ops[key]
 }
 
-// getOrStart returns the operation for key, starting one at start if none is
-// in flight. started reports whether a new operation was started.
+// getOrStart returns the operation for key, starting one at start if none is in flight.
 func (t *operationTracker) getOrStart(key types.NamespacedName, start metav1.Time) (op *operation, started bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -167,9 +161,8 @@ func (t *operationTracker) remove(key types.NamespacedName) {
 	delete(t.ops, key)
 }
 
-// startOperation returns authCR's in-flight operation, starting one if none
-// exists. freshInstall marks a CR that has never had a service status; its
-// operation began when the CR was created rather than when it was noticed.
+// startOperation returns authCR's in-flight operation, starting one if none exists.
+// For a fresh install (no prior service status) the start time is the CR's creation time.
 func (r *AuthenticationReconciler) startOperation(ctx context.Context, authCR *operatorv1alpha1.Authentication, freshInstall bool) *operation {
 	start := metav1.Now()
 	if freshInstall && !authCR.CreationTimestamp.IsZero() {
@@ -184,11 +177,8 @@ func (r *AuthenticationReconciler) startOperation(ctx context.Context, authCR *o
 	return op
 }
 
-// dependencyWaiting records that component is not ready for authCR, starting
-// an operation for it if none is in flight. A wait can begin before the CR's
-// status turns non-Ready, e.g. on the first pass of a fresh install. It is
-// safe to call on every reconcile pass while waiting; only the first call per
-// operation counts.
+// dependencyWaiting records that component is not yet ready, starting an operation
+// if none is in flight. Safe to call every pass; only the first call per operation counts.
 func (r *AuthenticationReconciler) dependencyWaiting(ctx context.Context, authCR *operatorv1alpha1.Authentication, component string) {
 	// authCR is as fetched this pass, so an empty service status means the CR
 	// has never had one: a fresh install.
@@ -200,8 +190,7 @@ func (r *AuthenticationReconciler) dependencyWaiting(ctx context.Context, authCR
 	}
 }
 
-// dependencyReady records that component is ready for authCR. It has no
-// effect unless the in-flight operation was waiting on component.
+// dependencyReady records that component became ready. No-op if not being waited on.
 func (r *AuthenticationReconciler) dependencyReady(ctx context.Context, authCR *operatorv1alpha1.Authentication, component string) {
 	op := r.operations.get(client.ObjectKeyFromObject(authCR))
 	if op == nil {
@@ -216,9 +205,8 @@ func (r *AuthenticationReconciler) dependencyReady(ctx context.Context, authCR *
 		fmt.Sprintf("Dependency %s is ready", component))
 }
 
-// dependencyNotNeeded stops waiting on component for authCR, e.g. because the
-// configuration changed so that it no longer applies. Without this, an
-// operation that was waiting on it could never finish.
+// dependencyNotNeeded drops a pending wait on component (e.g. config changed),
+// so the operation is not blocked by a dependency that no longer applies.
 func (r *AuthenticationReconciler) dependencyNotNeeded(ctx context.Context, authCR *operatorv1alpha1.Authentication, component string) {
 	op := r.operations.get(client.ObjectKeyFromObject(authCR))
 	if op != nil && op.drop(component) {
@@ -226,13 +214,10 @@ func (r *AuthenticationReconciler) dependencyNotNeeded(ctx context.Context, auth
 	}
 }
 
-// finishOperation adds the operationTiming entry for authCR's operation to its
-// status once the operation is complete: the CR is Ready and no dependency the
-// operation waited on is still pending. It reports whether an entry was added.
-//
-// onPersisted must be called after the status update carrying the entry
-// succeeds; only then is the operation forgotten, so a failed update is retried
-// with the same operation on the next pass. It is a no-op if nothing was added.
+// finishOperation adds an operationTiming entry when the CR is Ready and all
+// waited dependencies are resolved. Reports whether an entry was added.
+// Call onPersisted after the status update succeeds to forget the operation;
+// a failed update will retry with the same operation on the next pass.
 func (r *AuthenticationReconciler) finishOperation(ctx context.Context, authCR *operatorv1alpha1.Authentication) (added bool, onPersisted func()) {
 	key := client.ObjectKeyFromObject(authCR)
 	op := r.operations.get(key)
@@ -255,8 +240,7 @@ func (r *AuthenticationReconciler) event(authCR *operatorv1alpha1.Authentication
 	}
 }
 
-// prependOperationTiming adds entry as the most recent operation, keeping at
-// most maxOperationTimingEntries.
+// prependOperationTiming prepends entry, capping the list at maxOperationTimingEntries.
 func prependOperationTiming(authCR *operatorv1alpha1.Authentication, entry operatorv1alpha1.OperationTimingEntry) {
 	updated := append([]operatorv1alpha1.OperationTimingEntry{entry}, authCR.Status.OperationTiming...)
 	if len(updated) > maxOperationTimingEntries {

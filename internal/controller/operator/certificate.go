@@ -28,8 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -37,7 +35,6 @@ import (
 )
 
 const DefaultClusterIssuer = "cs-ca-issuer"
-const Certv1alpha1APIVersion = "certmanager.k8s.io/v1alpha1"
 
 func (r *AuthenticationReconciler) handleCertificates(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	authCR := &operatorv1alpha1.Authentication{}
@@ -51,7 +48,6 @@ func (r *AuthenticationReconciler) handleCertificates(ctx context.Context, req c
 
 	certificateFieldsList := r.generateCertificateFieldsList(ctx, authCR)
 	certificateSubreconcilers := []subreconciler.Fn{
-		r.removeV1Alpha1Certs(authCR, certificateFieldsList),
 		r.cleanupDefaultSAMLCertificate(authCR),
 		r.createV1CertificatesIfNotPresent(authCR, certificateFieldsList),
 		r.addLabelIfMissing(certificateFieldsList),
@@ -172,78 +168,6 @@ func (r *AuthenticationReconciler) GetSAMLCertificateSecretNameWithLabelCheck(ct
 
 	log.Info("Using default SAML certificate", "secret", defaultSAMLCertSecret)
 	return defaultSAMLCertSecret
-}
-
-// removeV1Alpha1Certs removes v1alpha1 Certificates for IM so that they can be replaced with cert-manager.io/v1 Certificates.
-func (r *AuthenticationReconciler) removeV1Alpha1Certs(authCR *operatorv1alpha1.Authentication, fieldsList []*reconcileCertificateFields) (fn subreconciler.Fn) {
-	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		log := logf.FromContext(ctx)
-		log.Info("Removing v1alpha1 Certificates for IM, if present")
-
-		if !ctrlcommon.ClusterHasCertificateV1Alpha1(&r.DiscoveryClient) {
-			log.Info("Cluster does not have v1alpha1 Certificate API; skipping")
-			return subreconciler.ContinueReconciling()
-		}
-
-		allV1Alpha1CertReconcilers := make([]subreconciler.Fn, 0)
-		for _, fields := range fieldsList {
-			allV1Alpha1CertReconcilers = append(allV1Alpha1CertReconcilers, r.removeV1Alpha1Cert(authCR, fields))
-		}
-		results := []*ctrl.Result{}
-		errs := []error{}
-		for _, reconcileV1Alpha1Cert := range allV1Alpha1CertReconcilers {
-			result, err = reconcileV1Alpha1Cert(ctx)
-			results = append(results, result)
-			errs = append(errs, err)
-		}
-
-		result, err = ctrlcommon.ReduceSubreconcilerResultsAndErrors(results, errs)
-		if subreconciler.ShouldContinue(result, err) {
-			log.Info("No v1alpha1 Certificates exist for IM")
-		} else if subreconciler.ShouldRequeue(result, err) && err == nil {
-			log.Info("v1alpha1 Certificates were removed; requeueing")
-		} else if err != nil {
-			log.Info("Encountered an issue while trying to remove v1alpha1 Certificates for IM")
-		}
-
-		return
-	}
-}
-
-func (r *AuthenticationReconciler) removeV1Alpha1Cert(_ *operatorv1alpha1.Authentication, fields *reconcileCertificateFields) (fn subreconciler.Fn) {
-	return func(ctx context.Context) (result *ctrl.Result, err error) {
-		log := logf.FromContext(ctx, "Certificate.Name", fields.Name)
-
-		log.Info("Cluster has certmanager.k8s.io/v1alpha1 API; replacing v1alpha1 Certificate if present")
-
-		gvk := schema.GroupVersionKind{
-			Group:   "certmanager.k8s.io",
-			Version: "v1alpha1",
-			Kind:    "Certificate",
-		}
-
-		unstrCert := &unstructured.Unstructured{}
-		unstrCert.SetGroupVersionKind(gvk)
-
-		if err = r.Get(ctx, fields.NamespacedName, unstrCert); k8sErrors.IsNotFound(err) {
-			log.Info("No v1alpha1 Certificate to delete; continue")
-			return subreconciler.ContinueReconciling()
-		} else if err != nil {
-			log.Error(err, "Failed to retrieve v1alpha1 Certificate")
-			return subreconciler.RequeueWithError(err)
-		}
-		if unstrCert.GetAPIVersion() != Certv1alpha1APIVersion {
-			log.Info("API version is not v1alpha1, continue")
-			return subreconciler.ContinueReconciling()
-		}
-		log.Info("API version is v1alpha1; deleting Certificate")
-		if err = r.Delete(ctx, unstrCert); err != nil {
-			log.Error(err, "Failed to delete")
-			return subreconciler.RequeueWithError(err)
-		}
-		log.Info("Successfully deleted")
-		return subreconciler.RequeueWithDelay(defaultLowerWait)
-	}
 }
 
 // cleanupDefaultSAMLCertificate removes the default saml-auth-cert when a custom ingress certificate is configured.

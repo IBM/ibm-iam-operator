@@ -25,6 +25,7 @@ import (
 	testutil "github.com/IBM/ibm-iam-operator/test/utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,6 +34,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
@@ -66,9 +68,19 @@ var _ = Describe("OperandBindInfo handling", func() {
 			scheme = runtime.NewScheme()
 			Expect(corev1.AddToScheme(scheme)).To(Succeed())
 			Expect(operatorv1alpha1.AddODLMEnabledToScheme(scheme)).To(Succeed())
+			Expect(authorizationv1.AddToScheme(scheme)).To(Succeed())
 			cb = *fakeclient.NewClientBuilder().
 				WithScheme(scheme).
-				WithObjects(authCR)
+				WithObjects(authCR).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Create: func(ctx context.Context, cl client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+						if ssar, ok := obj.(*authorizationv1.SelfSubjectAccessReview); ok {
+							ssar.Status.Allowed = true
+							return nil
+						}
+						return cl.Create(ctx, obj, opts...)
+					},
+				})
 			cl = cb.Build()
 			dc, err := discovery.NewDiscoveryClientForConfig(cfg)
 			Expect(err).NotTo(HaveOccurred())

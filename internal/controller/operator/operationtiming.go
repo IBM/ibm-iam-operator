@@ -66,7 +66,7 @@ func (o *operation) dep(component string) *operatorv1alpha1.DependencyTime {
 }
 
 // waitStarted records that the operation began waiting on component.
-// Returns false if already waiting on component.
+// Returns false if the component was already waited on in this operation.
 func (o *operation) waitStarted(component string, now metav1.Time) bool {
 	if o.dep(component) != nil {
 		return false

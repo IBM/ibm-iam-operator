@@ -209,10 +209,11 @@ func (r *AuthenticationReconciler) applyOperationStatus(ctx context.Context, obs
 	isReady := observed.Status.Service.Status == ResourceReadyState
 
 	if !isReady {
-		// Use previousServiceStatus (pre-pass) to detect a fresh install; observed
-		// was just overwritten so it can't be used for that check.
+		// Any not-Ready pass is a part of an operation. Use the computed status, not the cached
+		// CR from the start of Reconcile, which can be stale around our own writes. previousServiceStatus
+		// (pre-pass) detects a fresh install; observed was just overwritten.
 		r.startOperation(ctx, observed, previousServiceStatus == "")
-		// Reset to 0% when a new operation begins (previous ended at 100%).
+		// Reset to 0% when a new operation begins (previous ended at 100%, or never set).
 		if startProgress(observed) {
 			modified = true
 		}

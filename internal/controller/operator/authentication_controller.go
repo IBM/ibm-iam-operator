@@ -727,28 +727,28 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	//bootstrappedPred := predicate.Funcs{
-	//  UpdateFunc: func(e event.UpdateEvent) bool {
-	//      predLog.Info("Update event", "Label.Version", e.ObjectNew.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.ObjectNew.GetLabels()[common.ManagerVersionLabel] == version.Version)
-	//      return e.ObjectNew.GetLabels()[common.ManagerVersionLabel] == version.Version
-	//  },
+	//	UpdateFunc: func(e event.UpdateEvent) bool {
+	//		predLog.Info("Update event", "Label.Version", e.ObjectNew.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.ObjectNew.GetLabels()[common.ManagerVersionLabel] == version.Version)
+	//		return e.ObjectNew.GetLabels()[common.ManagerVersionLabel] == version.Version
+	//	},
 
-	//  // Allow create events
-	//  CreateFunc: func(e event.CreateEvent) bool {
-	//      predLog.Info("Create event", "Label.Version", e.Object.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version)
-	//      return e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version
-	//  },
+	//	// Allow create events
+	//	CreateFunc: func(e event.CreateEvent) bool {
+	//		predLog.Info("Create event", "Label.Version", e.Object.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version)
+	//		return e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version
+	//	},
 
-	//  // Allow delete events
-	//  DeleteFunc: func(e event.DeleteEvent) bool {
-	//      predLog.Info("Delete event", "Label.Version", e.Object.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version)
-	//      return e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version
-	//  },
+	//	// Allow delete events
+	//	DeleteFunc: func(e event.DeleteEvent) bool {
+	//		predLog.Info("Delete event", "Label.Version", e.Object.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version)
+	//		return e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version
+	//	},
 
-	//  // Allow generic events (e.g., external triggers)
-	//  GenericFunc: func(e event.GenericEvent) bool {
-	//      predLog.Info("Generic event", "Label.Version", e.Object.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version)
-	//      return e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version
-	//  },
+	//	// Allow generic events (e.g., external triggers)
+	//	GenericFunc: func(e event.GenericEvent) bool {
+	//		predLog.Info("Generic event", "Label.Version", e.Object.GetLabels()[common.ManagerVersionLabel], "Controller.Version", version.Version, "match", e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version)
+	//		return e.Object.GetLabels()[common.ManagerVersionLabel] == version.Version
+	//	},
 	//}
 
 	authCtrl.Watches(&corev1.ConfigMap{},

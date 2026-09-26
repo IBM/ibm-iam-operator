@@ -576,6 +576,53 @@ var _ = Describe("getMongoDBOperatorOperand", func() {
 			})
 		})
 
+		Context("When IS_EMBEDDED is \"false\" (external DB configured)", func() {
+			BeforeEach(func() {
+				externalCM := &corev1.ConfigMap{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "v1",
+						Kind:       "ConfigMap",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      ctrlcommon.DatastoreEDBCMName,
+						Namespace: nsName,
+					},
+					Data: map[string]string{
+						"IS_EMBEDDED": "false",
+					},
+				}
+				cb = *fakeclient.NewClientBuilder().
+					WithScheme(scheme).
+					WithRuntimeObjects(authCR, externalCM)
+				cl = cb.Build()
+				dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+				Expect(err).NotTo(HaveOccurred())
+				r = &AuthenticationReconciler{
+					Client: &ctrlcommon.FallbackClient{
+						Client: cl,
+						Reader: cl,
+					},
+					Scheme:          scheme,
+					DiscoveryClient: *dc,
+				}
+			})
+
+			It("should NOT create the im-needs-database OperandRequest", func() {
+				By("calling handleDatabaseOperandRequest with IS_EMBEDDED=false")
+				result, err := r.handleDatabaseOperandRequest(ctx, ctrl.Request{
+					NamespacedName: client.ObjectKeyFromObject(authCR),
+				})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).ToNot(BeNil())
+
+				By("verifying im-needs-database was NOT created")
+				opReq := &operatorv1alpha1.OperandRequest{}
+				err = r.Get(ctx, client.ObjectKey{Name: "im-needs-database", Namespace: authCR.Namespace}, opReq)
+				Expect(err).To(HaveOccurred())
+				Expect(k8sErrors.IsNotFound(err)).To(BeTrue())
+			})
+		})
+
 		Context("When ibm-iam-request DOES exist", func() {
 			var legacyOpReq *operatorv1alpha1.OperandRequest
 

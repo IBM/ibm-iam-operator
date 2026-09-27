@@ -29,6 +29,7 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -50,6 +51,7 @@ import (
 	oidcsecuritycontrollers "github.com/IBM/ibm-iam-operator/internal/controller/oidc.security"
 	operatorcontrollers "github.com/IBM/ibm-iam-operator/internal/controller/operator"
 	routev1 "github.com/openshift/api/route/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	discovery "k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	//+kubebuilder:scaffold:imports
@@ -66,7 +68,7 @@ func init() {
 	utilruntime.Must(certmgrv1.AddToScheme(scheme))
 	utilruntime.Must(zenv1.AddToScheme(scheme))
 
-	// Add the Route scheme if found on the cluster
+	// Get config and create clients for SSAR checks
 	cfg, err := config.GetConfig()
 	if err != nil {
 		return
@@ -77,24 +79,107 @@ func init() {
 		return
 	}
 
-	if controllercommon.ClusterHasOperandRequestAPIResource(dc) {
-		setupLog.V(1).Info("OperandRequest API present; adding ODLM-enabled operator.ibm.com scheme")
-		utilruntime.Must(operatorv1alpha1.AddODLMEnabledToScheme(scheme))
-	} else {
-		setupLog.V(1).Info("OperandRequest not API present; adding base operator.ibm.com scheme")
-		utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
+	// Create a temporary client for SSAR checks during init
+	tempClient, err := client.New(cfg, client.Options{Scheme: scheme})
+	if err != nil {
+		setupLog.Error(err, "Failed to create temporary client for SSAR checks")
+		return
 	}
 
+	ctx := context.Background()
+
+	// Get watch namespaces for permission checks
+	watchNamespaceEnv := os.Getenv("WATCH_NAMESPACE")
+	var namespacesToCheck []string
+	if watchNamespaceEnv == "" {
+		// Empty string means cluster-wide, check with empty namespace
+		namespacesToCheck = []string{""}
+	} else {
+		// Split comma-separated namespaces
+		namespacesToCheck = strings.Split(watchNamespaceEnv, ",")
+	}
+
+	// Always register the full ODLM-enabled scheme (Authentication + OperandRequest +
+	// OperandBindInfo). Scheme registration must never be gated on a runtime RBAC
+	// check: init() runs once at process start — before ibm-namespace-scope-operator
+	// has projected permissions into watched namespaces. If the SSAR fails here the
+	// type is permanently absent from the scheme, causing a "no kind is registered
+	// for OperandRequest" panic on every reconcile even after RBAC is later granted.
+	// Scheme registration has no security implication; it only maps Go types to GVKs.
+	// Access-gating (whether to *watch* a resource) is done in SetupWithManager.
+	utilruntime.Must(operatorv1alpha1.AddODLMEnabledToScheme(scheme))
+
+	// Route: register whenever the Route API is present on the cluster, regardless of
+	// whether the operator has Route permissions. The reconciler unconditionally builds
+	// SecondaryReconcilerBuilder[*routev1.Route] at runtime (routes.go), so the type
+	// must always be in the scheme on OCP clusters. Whether the operator actually
+	// *watches* or manages routes is gated by RBAC checks in SetupWithManager.
 	if controllercommon.ClusterHasRouteGroupVersion(dc) {
-		setupLog.V(1).Info("Route API present; adding Routes to scheme")
 		utilruntime.Must(routev1.AddToScheme(scheme))
 	}
 
+	// Ingress: same rationale — register whenever the API is present; watch gating
+	// is handled in SetupWithManager.
+	if controllercommon.ClusterHasIngressGroupVersion(dc) {
+		utilruntime.Must(networkingv1.AddToScheme(scheme))
+	}
+
+	// Check SecretProviderClass permissions across all watch namespaces
+	spcVerbs := []string{"get", "list", "watch"}
 	if controllercommon.ClusterHasCSIGroupVersion(dc) {
-		setupLog.V(1).Info("SSCSI API present; adding SSCSI driver to scheme")
-		utilruntime.Must(sscsidriverv1.AddToScheme(scheme))
+		hasSPCAccess, err := hasNamespacedAPIAccessForNamespaces(ctx, tempClient, namespacesToCheck, "secrets-store.csi.x-k8s.io", "secretproviderclasses", spcVerbs)
+		if err != nil {
+			setupLog.Error(err, "Failed to check SecretProviderClass permissions")
+			hasSPCAccess = false
+		}
+		if hasSPCAccess {
+			setupLog.V(1).Info("SSCSI API present with required permissions in all watch namespaces; adding SSCSI driver to scheme")
+			utilruntime.Must(sscsidriverv1.AddToScheme(scheme))
+		} else {
+			setupLog.Info("SSCSI API present but missing required permissions; skipping SSCSI driver scheme")
+		}
 	}
 	//+kubebuilder:scaffold:scheme
+}
+
+// hasNamespacedAPIAccess uses SelfSubjectAccessReviews to check if the operator has all required permissions
+// for a given namespaced resource. Empty namespace means check without namespace scope.
+func hasNamespacedAPIAccess(ctx context.Context, c client.Client, namespace string, group string, resource string, verbs []string) (bool, error) {
+	for _, verb := range verbs {
+		ssar := &authorizationv1.SelfSubjectAccessReview{
+			Spec: authorizationv1.SelfSubjectAccessReviewSpec{
+				ResourceAttributes: &authorizationv1.ResourceAttributes{
+					Namespace: namespace,
+					Verb:      verb,
+					Group:     group,
+					Resource:  resource,
+				},
+			},
+		}
+		if err := c.Create(ctx, ssar); err != nil {
+			return false, fmt.Errorf("failed to create SSAR for %s.%s verb %s: %w", resource, group, verb, err)
+		}
+		if !ssar.Status.Allowed {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// hasNamespacedAPIAccessForNamespaces checks if the operator has all required permissions
+// for a given namespaced resource across multiple namespaces. It fails fast, returning
+// an error or false as soon as any namespace check fails.
+func hasNamespacedAPIAccessForNamespaces(ctx context.Context, c client.Client, namespaces []string, group string, resource string, verbs []string) (bool, error) {
+	for _, ns := range namespaces {
+		hasAccess, err := hasNamespacedAPIAccess(ctx, c, ns, group, resource, verbs)
+		if err != nil {
+			return false, err
+		}
+		if !hasAccess {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 func main() {

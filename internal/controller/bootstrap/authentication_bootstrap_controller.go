@@ -305,12 +305,29 @@ func (r *BootstrapReconciler) setIngressSecretIfCustomized(ctx context.Context, 
 		log.Error(err, "Unexpected error occurred while trying to retrieve custom TLS certificate Secret")
 		return
 	}
+
+	// Check if Route API is available before attempting to access Routes.
+	if !common.ClusterHasRouteGroupVersion(r.DiscoveryClient) {
+		log.Info("Route API not available in cluster; skipping Route-based TLS customization")
+		return nil
+	}
+
 	consoleRoute := &routev1.Route{}
 	consoleName := "cp-console"
 	if authCR.Spec.Config.ZenFrontDoor {
 		consoleName = "cpd"
 	}
 	log.Info("Did not find Secret containing custom TLS; check the console Route for current TLS configuration", "Route.Name", consoleName)
+	// Guard: check get permission before touching the Route API.
+	var canGet bool
+	if canGet, err = authctrl.CanAccessRoute(ctx, r.Client, authCR.Namespace, "get"); err != nil {
+		log.V(1).Info("Could not determine Route get permission; skipping Route-based TLS customization", "reason", err.Error())
+		return nil
+	}
+	if !canGet {
+		log.V(1).Info("Operator does not have permission to get Routes; skipping Route-based TLS customization", "Route.Name", consoleName)
+		return nil
+	}
 	if err = r.Get(ctx, types.NamespacedName{Name: consoleName, Namespace: authCR.Namespace}, consoleRoute); k8sErrors.IsNotFound(err) {
 		err = nil
 		log.Info("Did not find Route, so no TLS customization will be performed", "Route.Name", consoleName)

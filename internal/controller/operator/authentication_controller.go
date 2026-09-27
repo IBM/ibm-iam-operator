@@ -18,6 +18,7 @@ package operator
 
 import (
 	"context"
+	"strings"
 
 	"fmt"
 	"sync"
@@ -26,6 +27,7 @@ import (
 	certmgr "github.com/IBM/ibm-iam-operator/internal/api/certmanager/v1"
 	"github.com/IBM/ibm-iam-operator/internal/controller/common"
 	"github.com/IBM/ibm-iam-operator/internal/version"
+	"github.com/go-logr/logr"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -426,60 +428,155 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	setupLog := ctrl.Log.WithName("setup")
+	ctx := context.Background()
+
+	// Get the watch namespace(s) for permission checks
+	watchNamespace, err := common.GetWatchNamespace()
+	if err != nil {
+		setupLog.Error(err, "Failed to get watch namespace")
+		return err
+	}
+	// Split into individual namespaces if multiple are specified
+	var namespacesToCheck []string
+	if watchNamespace == "" {
+		// Empty means cluster-wide, but we have namespace-scoped permissions
+		setupLog.Info("WATCH_NAMESPACE is empty (cluster-wide), but operator has namespace-scoped permissions")
+		namespacesToCheck = []string{""}
+	} else {
+		namespacesToCheck = strings.Split(watchNamespace, ",")
+	}
+	setupLog.Info("Checking permissions in namespaces", "namespaces", namespacesToCheck)
+
 	authCtrl := ctrl.NewControllerManagedBy(mgr).
 		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&corev1.Secret{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&certmgr.Certificate{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&batchv1.Job{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&corev1.Service{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
-		Watches(&netv1.Ingress{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&appsv1.Deployment{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner())).
 		Watches(&autoscalingv2.HorizontalPodAutoscaler{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
 
-	//Add routes
-	if common.ClusterHasOpenShiftConfigGroupVerison(&r.DiscoveryClient) {
-		authCtrl.Watches(&routev1.Route{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
-	}
+	// Add OperandRequest watch first: permissions are always expected when the ODLM API
+	// is present (projected by ibm-namespace-scope-operator). Retry with a timeout to
+	// tolerate the race between pod start and RBAC projection.
+	// This is checked first so the manager blocks here until ODLM RBAC is ready before
+	// proceeding to the intentionally-optional Route/Ingress checks.
 	if common.ClusterHasOperandRequestAPIResource(&r.DiscoveryClient) {
-		authCtrl.Watches(&operatorv1alpha1.OperandRequest{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
-	}
-	if common.ClusterHasOperandBindInfoAPIResource(&r.DiscoveryClient) {
-		authCtrl.Watches(&operatorv1alpha1.OperandBindInfo{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
-	}
-	if common.ClusterHasCSIGroupVersion(&r.DiscoveryClient) {
-		authCtrl.Watches(&sscsidriverv1.SecretProviderClass{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
-		spcLabelSelector := metav1.LabelSelector{
-			MatchExpressions: []metav1.LabelSelectorRequirement{
-				{
-					Key:      "app.kubernetes.io/part-of",
-					Operator: metav1.LabelSelectorOpIn,
-					Values:   []string{"im"},
-				},
-				{
-					Key:      SecretProviderClassAsVolumeLabel,
-					Operator: metav1.LabelSelectorOpExists,
-				},
-			},
-		}
-		spcLabelPredicate, err := predicate.LabelSelectorPredicate(spcLabelSelector)
+		operandRequestVerbs := []string{"create", "get", "list", "patch", "watch", "update", "delete"}
+		hasOperandRequestAccess, err := r.waitForODLMAccess(ctx, setupLog, namespacesToCheck, "operandrequests", operandRequestVerbs)
 		if err != nil {
-			return err
+			setupLog.Error(err, "Failed to check OperandRequest permissions for watch setup")
+		} else if hasOperandRequestAccess {
+			setupLog.V(1).Info("OperandRequest API present with required permissions; setting up OperandRequest watch")
+			authCtrl.Watches(&operatorv1alpha1.OperandRequest{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+		} else {
+			setupLog.Info("OperandRequest API present but missing required permissions after waiting; skipping OperandRequest watch")
 		}
-		authCtrl.Watches(&sscsidriverv1.SecretProviderClass{},
+	}
 
-			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
-				authCR, _ := common.GetAuthentication(ctx, r.Client)
-				if authCR == nil {
-					return
-				}
-				return []reconcile.Request{
-					{NamespacedName: types.NamespacedName{
-						Name:      authCR.Name,
-						Namespace: authCR.Namespace,
-					}},
-				}
-			}), builder.WithPredicates(spcLabelPredicate),
-		)
+	// Add OperandBindInfo watch — same rationale as OperandRequest above.
+	if common.ClusterHasOperandBindInfoAPIResource(&r.DiscoveryClient) {
+		operandBindInfoVerbs := []string{"create", "get", "list", "patch", "watch", "update", "delete"}
+		hasOperandBindInfoAccess, err := r.waitForODLMAccess(ctx, setupLog, namespacesToCheck, "operandbindinfos", operandBindInfoVerbs)
+		if err != nil {
+			setupLog.Error(err, "Failed to check OperandBindInfo permissions for watch setup")
+		} else if hasOperandBindInfoAccess {
+			setupLog.V(1).Info("OperandBindInfo API present with required permissions; setting up OperandBindInfo watch")
+			authCtrl.Watches(&operatorv1alpha1.OperandBindInfo{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+		} else {
+			setupLog.Info("OperandBindInfo API present but missing required permissions after waiting; skipping OperandBindInfo watch")
+		}
+	}
+
+	// Add Routes watch if API is present and operator has required permissions.
+	// Route permissions are intentionally optional — no retry.
+	if common.ClusterHasRouteGroupVersion(&r.DiscoveryClient) {
+		routeVerbs := []string{"get", "list", "watch", "create", "delete", "update", "patch"}
+		hasRouteAccess, err := r.hasAPIAccessInNamespaces(ctx, namespacesToCheck, "route.openshift.io", "routes", routeVerbs)
+		if err != nil {
+			setupLog.Error(err, "Failed to check Route permissions for watch setup")
+		} else if !hasRouteAccess {
+			setupLog.Info("Route API present but missing required permissions; skipping Route watch")
+		} else {
+			// Also check routes/custom-host subresource permission
+			hasCustomHostAccess, err := r.hasAPIAccessInNamespaces(ctx, namespacesToCheck, "route.openshift.io", "routes/custom-host", []string{"create"})
+			if err != nil {
+				setupLog.Error(err, "Failed to check routes/custom-host permissions for watch setup")
+			} else if hasCustomHostAccess {
+				setupLog.V(1).Info("Route API present with all required permissions including routes/custom-host; setting up Route watch")
+				authCtrl.Watches(&routev1.Route{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+			} else {
+				setupLog.Info("Route API present but missing routes/custom-host create permission; skipping Route watch")
+			}
+		}
+	}
+
+	// Add Ingress watch if API is present and operator has required permissions.
+	// Ingress permissions are intentionally optional — no retry.
+	if common.ClusterHasIngressGroupVersion(&r.DiscoveryClient) {
+		setupLog.Info("Ingress API detected in cluster; checking permissions")
+		ingressVerbs := []string{"delete", "get", "list", "watch"}
+		hasIngressAccess, err := r.hasAPIAccessInNamespaces(ctx, namespacesToCheck, "networking.k8s.io", "ingresses", ingressVerbs)
+		if err != nil {
+			setupLog.Error(err, "Failed to check Ingress permissions for watch setup; skipping Ingress watch")
+			hasIngressAccess = false
+		}
+
+		if hasIngressAccess {
+			setupLog.Info("Ingress API present with required permissions; setting up Ingress watch")
+			authCtrl.Watches(&netv1.Ingress{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+		} else {
+			setupLog.Info("Ingress API present but missing required permissions; skipping Ingress watch")
+		}
+	} else {
+		setupLog.Info("Ingress API not detected in cluster; skipping Ingress watch")
+	}
+
+	// Add SecretProviderClass watches if API is present and operator has required permissions
+	if common.ClusterHasCSIGroupVersion(&r.DiscoveryClient) {
+		spcVerbs := []string{"get", "list", "watch"}
+		hasSPCAccess, err := r.hasAPIAccessInNamespaces(ctx, namespacesToCheck, "secrets-store.csi.x-k8s.io", "secretproviderclasses", spcVerbs)
+		if err != nil {
+			setupLog.Error(err, "Failed to check SecretProviderClass permissions for watch setup")
+		} else if hasSPCAccess {
+			setupLog.V(1).Info("SecretProviderClass API present with required permissions; setting up SecretProviderClass watches")
+			authCtrl.Watches(&sscsidriverv1.SecretProviderClass{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &operatorv1alpha1.Authentication{}, handler.OnlyControllerOwner()))
+			spcLabelSelector := metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "app.kubernetes.io/part-of",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"im"},
+					},
+					{
+						Key:      SecretProviderClassAsVolumeLabel,
+						Operator: metav1.LabelSelectorOpExists,
+					},
+				},
+			}
+			spcLabelPredicate, err := predicate.LabelSelectorPredicate(spcLabelSelector)
+			if err != nil {
+				return err
+			}
+			authCtrl.Watches(&sscsidriverv1.SecretProviderClass{},
+
+				handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) (requests []reconcile.Request) {
+					authCR, _ := common.GetAuthentication(ctx, r.Client)
+					if authCR == nil {
+						return
+					}
+					return []reconcile.Request{
+						{NamespacedName: types.NamespacedName{
+							Name:      authCR.Name,
+							Namespace: authCR.Namespace,
+						}},
+					}
+				}), builder.WithPredicates(spcLabelPredicate),
+			)
+		} else {
+			setupLog.Info("SecretProviderClass API present but missing required permissions; skipping SecretProviderClass watches")
+		}
 	}
 
 	productCMPred := predicate.Funcs{
@@ -622,6 +719,41 @@ func (r *AuthenticationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+// odlmAccessRetryInterval is the wait between SSAR retries for ODLM resources.
+const odlmAccessRetryInterval = 2 * time.Second
+
+// odlmAccessRetryTimeout is the maximum time to wait for ibm-namespace-scope-operator
+// to project ODLM (OperandRequest/OperandBindInfo) RBAC into watched namespaces.
+// Route, Ingress, and SPC permissions are intentionally optional and are never
+// retried — a denied SSAR for those means "don't watch" by design.
+const odlmAccessRetryTimeout = 5 * time.Minute
+
+// waitForODLMAccess retries hasAPIAccessInNamespaces for ODLM resources until
+// permissions are granted or odlmAccessRetryTimeout elapses.
+// It returns (true, nil) on success and (false, nil) on timeout.
+// Real API errors are returned immediately without retrying.
+func (r *AuthenticationReconciler) waitForODLMAccess(ctx context.Context, log logr.Logger, namespaces []string, resource string, verbs []string) (bool, error) {
+	deadline := time.Now().Add(odlmAccessRetryTimeout)
+	for {
+		ok, err := r.hasAPIAccessInNamespaces(ctx, namespaces, "operator.ibm.com", resource, verbs)
+		if err != nil {
+			return false, err
+		}
+		if ok {
+			return true, nil
+		}
+		if time.Now().After(deadline) {
+			return false, nil
+		}
+		log.Info("ODLM permissions not yet available; retrying", "resource", resource, "namespaces", namespaces)
+		select {
+		case <-ctx.Done():
+			return false, nil
+		case <-time.After(odlmAccessRetryInterval):
+		}
+	}
+}
+
 // hasAPIAccess uses SelfSubjectAccessReviews to confirm whether the Opertor's ServiceAccount has authorization to use a
 // list of verbs on a given apiversion and kind.
 func (r *AuthenticationReconciler) hasAPIAccess(ctx context.Context, namespace string, group string, resource string, verbs []string) (hasAccess bool, err error) {
@@ -649,5 +781,16 @@ func (r *AuthenticationReconciler) hasAPIAccess(ctx context.Context, namespace s
 	}
 
 	reqLogger.Info("Operator ServiceAccount is authorized")
+	return true, nil
+}
+
+// hasAPIAccessInNamespaces checks if the operator has the required permissions across all specified namespaces
+func (r *AuthenticationReconciler) hasAPIAccessInNamespaces(ctx context.Context, namespaces []string, group string, resource string, verbs []string) (hasAccess bool, err error) {
+	for _, ns := range namespaces {
+		hasAccess, err = r.hasAPIAccess(ctx, ns, group, resource, verbs)
+		if err != nil || !hasAccess {
+			return false, err
+		}
+	}
 	return true, nil
 }

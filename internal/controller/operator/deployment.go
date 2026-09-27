@@ -65,6 +65,19 @@ func (r *AuthenticationReconciler) handleDeployments(ctx context.Context, req ct
 		return
 	}
 
+	// Check if operator has required SecretProviderClass permissions when CSI is enabled
+	if authCR.SecretsStoreCSIEnabled() && common.ClusterHasCSIGroupVersion(&r.DiscoveryClient) {
+		spcVerbs := []string{"get", "list", "watch"}
+		hasSPCAccess, err := r.hasAPIAccess(ctx, authCR.Namespace, "secrets-store.csi.x-k8s.io", "secretproviderclasses", spcVerbs)
+		if err != nil {
+			log.Error(err, "Failed to check SecretProviderClass permissions")
+			return subreconciler.RequeueWithError(err)
+		}
+		if !hasSPCAccess {
+			log.Info("Operator does not have required SecretProviderClass permissions; CSI features will be unavailable")
+		}
+	}
+
 	// Check for the presence of dependencies
 	consoleConfigMap := &corev1.ConfigMap{}
 	ibmCloudClusterInfoKey := types.NamespacedName{Name: common.IBMCloudClusterInfoCMName, Namespace: req.Namespace}
@@ -304,6 +317,16 @@ func generatePlatformAuthService(imagePullSecret, samlCertSecret, ldapSPCName, e
 						TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 							{
 								MaxSkew:           1,
+								TopologyKey:       "kubernetes.io/hostname",
+								WhenUnsatisfiable: corev1.ScheduleAnyway,
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"app": s.GetName(),
+									},
+								},
+							},
+							{
+								MaxSkew:           1,
 								TopologyKey:       "topology.kubernetes.io/zone",
 								WhenUnsatisfiable: corev1.ScheduleAnyway,
 								LabelSelector: &metav1.LabelSelector{
@@ -481,6 +504,16 @@ func generatePlatformIdentityManagement(imagePullSecret, samlCertSecret, auditSe
 						TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 							{
 								MaxSkew:           1,
+								TopologyKey:       "kubernetes.io/hostname",
+								WhenUnsatisfiable: corev1.ScheduleAnyway,
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"app": s.GetName(),
+									},
+								},
+							},
+							{
+								MaxSkew:           1,
 								TopologyKey:       "topology.kubernetes.io/zone",
 								WhenUnsatisfiable: corev1.ScheduleAnyway,
 								LabelSelector: &metav1.LabelSelector{
@@ -655,6 +688,16 @@ func generatePlatformIdentityProvider(imagePullSecret, samlCertSecret, saasServi
 						TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
 							{
 								MaxSkew:           1,
+								TopologyKey:       "kubernetes.io/hostname",
+								WhenUnsatisfiable: corev1.ScheduleAnyway,
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"app": s.GetName(),
+									},
+								},
+							},
+							{
+								MaxSkew:           1,
 								TopologyKey:       "topology.kubernetes.io/zone",
 								WhenUnsatisfiable: corev1.ScheduleAnyway,
 								LabelSelector: &metav1.LabelSelector{
@@ -801,7 +844,7 @@ func preserveObservedFields(observed, generated *appsv1.Deployment) {
 			if observedContainer.ReadinessProbe != nil {
 				generated.Spec.Template.Spec.Containers[i].ReadinessProbe.SuccessThreshold = observedContainer.ReadinessProbe.SuccessThreshold
 			}
-			
+
 			generated.Spec.Template.Spec.Containers[i].TerminationMessagePath = observedContainer.TerminationMessagePath
 			generated.Spec.Template.Spec.Containers[i].TerminationMessagePolicy = observedContainer.TerminationMessagePolicy
 		}
@@ -1081,6 +1124,33 @@ func buildAuthSvcVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCN
 				},
 			},
 		},
+		{
+			Name: "oidc-auth",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-oidc-credentials",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "OAUTH2_CLIENT_REGISTRATION_SECRET",
+							Path: "OAUTH2_CLIENT_REGISTRATION_SECRET",
+						},
+						{
+							Key:  "WLP_CLIENT_ID",
+							Path: "WLP_CLIENT_ID",
+						},
+						{
+							Key:  "WLP_CLIENT_SECRET",
+							Path: "WLP_CLIENT_SECRET",
+						},
+						{
+							Key:  "WLP_SCOPE",
+							Path: "WLP_SCOPE",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		},
 	}
 	if auditSecretName != "" {
 		auditVolume := corev1.Volume{
@@ -1222,6 +1292,51 @@ func buildMgmtVolumes(ldapCACert, routerCertSecret, auditSecretName, ldapSPCName
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
 					SizeLimit: memory50,
+				},
+			},
+		},
+		{
+			Name: "oidc-auth",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-oidc-credentials",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "OAUTH2_CLIENT_REGISTRATION_SECRET",
+							Path: "OAUTH2_CLIENT_REGISTRATION_SECRET",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		},
+		{
+			Name: "scim-admin-auth",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-auth-scim-credentials",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "scim_admin_username",
+							Path: "scim_admin_username",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		},
+		{
+			Name: "platform-admin-auth",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-auth-idp-credentials",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "admin_username",
+							Path: "admin_username",
+						},
+					},
+					DefaultMode: &partialAccess,
 				},
 			},
 		},
@@ -1395,6 +1510,79 @@ func buildProviderVolumes(ldapCACert, samlCertSecret, auditSecretName, ldapSPCNa
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
 					SizeLimit: memory150,
+				},
+			},
+		},
+		{
+			Name: "oidc-auth",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-oidc-credentials",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "OAUTH2_CLIENT_REGISTRATION_SECRET",
+							Path: "OAUTH2_CLIENT_REGISTRATION_SECRET",
+						},
+						{
+							Key:  "WLP_CLIENT_ID",
+							Path: "WLP_CLIENT_ID",
+						},
+						{
+							Key:  "WLP_CLIENT_SECRET",
+							Path: "WLP_CLIENT_SECRET",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		},
+		{
+			Name: "platform-admin-auth",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-auth-idp-credentials",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "admin_username",
+							Path: "admin_username",
+						},
+						{
+							Key:  "admin_password",
+							Path: "admin_password",
+						},
+					},
+					DefaultMode: &partialAccess,
+				},
+			},
+		},
+		{
+			Name: "platform-encryption",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "platform-auth-idp-encryption",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "ENCRYPTION_IV",
+							Path: "ENCRYPTION_IV",
+						},
+						{
+							Key:  "ENCRYPTION_KEY",
+							Path: "ENCRYPTION_KEY",
+						},
+						{
+							Key:  "algorithm",
+							Path: "algorithm",
+						},
+						{
+							Key:  "inputEncoding",
+							Path: "inputEncoding",
+						},
+						{
+							Key:  "outputEncoding",
+							Path: "outputEncoding",
+						},
+					},
+					DefaultMode: &partialAccess,
 				},
 			},
 		},

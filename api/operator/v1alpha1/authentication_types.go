@@ -180,6 +180,10 @@ type ConfigSpec struct {
 	LibertyAuthCacheTimeout     *string             `json:"libertyAuthCacheTimeout,omitempty"`
 	LdapClientConnectTimeout    *string             `json:"ldapClientConnectTimeout,omitempty"`
 	LDAPAllowlistEnabled        *bool               `json:"ldapAllowlistEnabled,omitempty"`
+	IdPrvdrWorkers              *string             `json:"idPrvdrWorkers,omitempty"`
+	IdMgmtWorkers               *string             `json:"idMgmtWorkers,omitempty"`
+	DisableCertAuthRoute        bool                `json:"disableCertAuthRoute,omitempty"`
+	CpuRateLimit                *string             `json:"cpuRateLimit,omitempty"`
 }
 
 type ManagedResourceStatus struct {
@@ -384,6 +388,14 @@ func (a *Authentication) ShouldManageRoutes() bool {
 // Returns true when .spec.config.ingress.gvk is set to "none".
 func (a *Authentication) ShouldRemoveRoutes() bool {
 	return !a.ShouldManageRoutes()
+}
+
+// ShouldDisableCertAuthRoute returns true when the certauth passthrough Route
+// (im-certauth-passthrough) should not be created or should be removed.
+// Returns true when .spec.config.disableCertAuthRoute is explicitly set to true.
+// Defaults to false, meaning the route is created by default.
+func (a *Authentication) ShouldDisableCertAuthRoute() bool {
+	return a.Spec.Config.DisableCertAuthRoute
 }
 
 func (a *Authentication) GetDBSchemaVersion() string {

@@ -232,6 +232,19 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 		envVars = append(envVars, instanaAgentEnabledVar...)
 	}
 
+	if instance.Spec.Config.HttpProxy != nil {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "_userdefined_http_proxy",
+			Value: *instance.Spec.Config.HttpProxy,
+		})
+	}
+	if instance.Spec.Config.HttpsProxy != nil {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "_userdefined_https_proxy",
+			Value: *instance.Spec.Config.HttpsProxy,
+		})
+	}
+
 	return corev1.Container{
 		Name:            "platform-auth-service",
 		Image:           authServiceImage,
@@ -458,6 +471,18 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "CPU_RATE_LIMIT",
 			Value: *instance.Spec.Config.CpuRateLimit,
+		})
+	}
+	if instance.Spec.Config.HttpProxy != nil {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "_userdefined_http_proxy",
+			Value: *instance.Spec.Config.HttpProxy,
+		})
+	}
+	if instance.Spec.Config.HttpsProxy != nil {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "_userdefined_https_proxy",
+			Value: *instance.Spec.Config.HttpsProxy,
 		})
 	}
 
@@ -726,6 +751,18 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "CPU_RATE_LIMIT",
 			Value: *instance.Spec.Config.CpuRateLimit,
+		})
+	}
+	if instance.Spec.Config.HttpProxy != nil {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "_userdefined_http_proxy",
+			Value: *instance.Spec.Config.HttpProxy,
+		})
+	}
+	if instance.Spec.Config.HttpsProxy != nil {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "_userdefined_https_proxy",
+			Value: *instance.Spec.Config.HttpsProxy,
 		})
 	}
 

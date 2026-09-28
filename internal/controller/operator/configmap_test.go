@@ -639,7 +639,7 @@ var _ = Describe("ConfigMap handling", func() {
 					"SCIM_LDAP_SEARCH_SIZE_LIMIT":        "4500",
 					"SCIM_LDAP_SEARCH_TIME_LIMIT":        "10",
 					"SCIM_ASYNC_PARALLEL_LIMIT":          "100",
-					"SCIM_SERVER_MAX_START_INDEX":        "10000",
+					"SCIM_SERVER_MAX_START_INDEX":        "5000",
 					"SCIM_GET_DISPLAY_FOR_GROUP_USERS":   "true",
 					"IS_OPENSHIFT_ENV":                   "false",
 				},

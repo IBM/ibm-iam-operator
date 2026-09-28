@@ -33,10 +33,13 @@ import (
 )
 
 const (
+	// maxOperationTimingEntries is how many operations status.operationTiming keeps.
 	maxOperationTimingEntries = 5
 
+	// operationPhaseCompleted is the phase of a finished operation.
 	operationPhaseCompleted = "Completed"
 
+	// Event reasons for operations and the dependencies they wait on.
 	EventReasonOperationStarted      = "OperationStarted"
 	EventReasonDependencyWaitStarted = "DependencyWaitStarted"
 	EventReasonDependencyReady       = "DependencyReady"
@@ -56,7 +59,9 @@ type operation struct {
 	deps []operatorv1alpha1.DependencyTime
 }
 
-func (o *operation) dep(component string) *operatorv1alpha1.DependencyTime {
+// getDependency returns the entry for component, or nil if the operation has
+// not waited on it.
+func (o *operation) getDependency(component string) *operatorv1alpha1.DependencyTime {
 	for i := range o.deps {
 		if o.deps[i].Component == component {
 			return &o.deps[i]
@@ -68,7 +73,7 @@ func (o *operation) dep(component string) *operatorv1alpha1.DependencyTime {
 // waitStarted records that the operation began waiting on component.
 // Returns false if the component was already waited on in this operation.
 func (o *operation) waitStarted(component string, now metav1.Time) bool {
-	if o.dep(component) != nil {
+	if o.getDependency(component) != nil {
 		return false
 	}
 	o.deps = append(o.deps, operatorv1alpha1.DependencyTime{Component: component, StartTime: now})
@@ -78,7 +83,7 @@ func (o *operation) waitStarted(component string, now metav1.Time) bool {
 // ready records that component became ready and returns the wait duration.
 // Returns false if component was never waited on or is already ready.
 func (o *operation) ready(component string, now metav1.Time) (time.Duration, bool) {
-	d := o.dep(component)
+	d := o.getDependency(component)
 	if d == nil || !d.ReadyTime.IsZero() {
 		return 0, false
 	}
@@ -102,8 +107,8 @@ func (o *operation) drop(component string) bool {
 	return false
 }
 
-// pending reports whether any dependency waited on is not ready yet.
-func (o *operation) pending() bool {
+// hasPendingDependencies reports whether any dependency waited on is not ready yet.
+func (o *operation) hasPendingDependencies() bool {
 	for _, d := range o.deps {
 		if d.ReadyTime.IsZero() {
 			return true
@@ -134,6 +139,7 @@ type operationTracker struct {
 	ops map[types.NamespacedName]*operation
 }
 
+// get returns the in-flight operation for key, or nil if there is none.
 func (t *operationTracker) get(key types.NamespacedName) *operation {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -155,6 +161,8 @@ func (t *operationTracker) getOrStart(key types.NamespacedName, start metav1.Tim
 	return op, true
 }
 
+// remove forgets the operation for key, e.g. once it is recorded in status or
+// its CR is deleted.
 func (t *operationTracker) remove(key types.NamespacedName) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -221,7 +229,7 @@ func (r *AuthenticationReconciler) dependencyNotNeeded(ctx context.Context, auth
 func (r *AuthenticationReconciler) finishOperation(ctx context.Context, authCR *operatorv1alpha1.Authentication) (added bool, onPersisted func()) {
 	key := client.ObjectKeyFromObject(authCR)
 	op := r.operations.get(key)
-	if op == nil || authCR.Status.Service.Status != ResourceReadyState || op.pending() {
+	if op == nil || authCR.Status.Service.Status != ResourceReadyState || op.hasPendingDependencies() {
 		return false, func() {}
 	}
 	entry := op.entry(metav1.Now())
@@ -234,6 +242,7 @@ func (r *AuthenticationReconciler) finishOperation(ctx context.Context, authCR *
 	}
 }
 
+// event records a Kubernetes Event on authCR, if a recorder is set.
 func (r *AuthenticationReconciler) event(authCR *operatorv1alpha1.Authentication, eventType, reason, message string) {
 	if r.Recorder != nil {
 		r.Recorder.Event(authCR, eventType, reason, message)

@@ -27,12 +27,15 @@ import (
 )
 
 const (
+	// maxReconcileHistoryEntries is how many entries status.reconcileHistory keeps.
 	maxReconcileHistoryEntries = 3
 
 	reconcileSuccessMessage = "The last reconciliation was completed successfully."
 	reconcileFailurePrefix  = "Reconciliation failed: "
 )
 
+// checkpoint is a stage of a reconcile pass: its progress percentage and the
+// message shown in status.progressMessage.
 type checkpoint struct {
 	pct int
 	msg string
@@ -63,6 +66,8 @@ var progressCheckpoints = struct {
 	Complete:       checkpoint{100, "Completed"},
 }
 
+// parseProgress parses a progress value such as "40%" into 40. It returns
+// false if s is empty or not a number.
 func parseProgress(s string) (int, bool) {
 	s = strings.TrimSuffix(strings.TrimSpace(s), "%")
 	if s == "" {
@@ -103,6 +108,7 @@ func advanceProgress(authCR *operatorv1alpha1.Authentication, c checkpoint) bool
 	return setProgress(authCR, c)
 }
 
+// completeProgress sets progress to 100% and reports whether anything changed.
 func completeProgress(authCR *operatorv1alpha1.Authentication) bool {
 	return setProgress(authCR, progressCheckpoints.Complete)
 }
@@ -113,8 +119,11 @@ type passProgress struct {
 	reached *checkpoint
 }
 
+// passProgressKey is the context key for a pass's passProgress.
 type passProgressKey struct{}
 
+// withPassProgress returns a copy of ctx holding an empty passProgress, for
+// one reconcile pass to record its checkpoints in.
 func withPassProgress(ctx context.Context) context.Context {
 	return context.WithValue(ctx, passProgressKey{}, &passProgress{})
 }
@@ -142,6 +151,8 @@ func passCompleted(ctx context.Context) bool {
 	return c != nil && *c == progressCheckpoints.RoutesHPAsDone
 }
 
+// appendReconcileHistory adds message, prefixed with now in RFC 3339 UTC, as
+// the newest reconcileHistory entry, keeping at most maxReconcileHistoryEntries.
 func appendReconcileHistory(authCR *operatorv1alpha1.Authentication, message string, now time.Time) {
 	entry := fmt.Sprintf("%s %s", now.UTC().Format(time.RFC3339), message)
 	updated := append([]string{entry}, authCR.Status.ReconcileHistory...)
@@ -163,6 +174,7 @@ func appendReconcileHistoryIfNew(authCR *operatorv1alpha1.Authentication, messag
 	return true
 }
 
+// markReconcileSuccess adds a success entry to reconcileHistory.
 func markReconcileSuccess(authCR *operatorv1alpha1.Authentication, now time.Time) {
 	appendReconcileHistory(authCR, reconcileSuccessMessage, now)
 }

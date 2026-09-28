@@ -130,6 +130,13 @@ func convertToLibertyFormat(memory string) string {
 
 }
 
+// isProxyValueActive returns true when v is non-nil, non-empty, and not the
+// literal string "disable" (case-insensitive).  When false the proxy env var
+// should be omitted from the pod spec entirely.
+func isProxyValueActive(v *string) bool {
+	return v != nil && *v != "" && !strings.EqualFold(*v, "disable")
+}
+
 func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authServiceImage string, ldapSpcExist bool) corev1.Container {
 	resources := instance.Spec.AuthService.Resources
 
@@ -232,13 +239,13 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 		envVars = append(envVars, instanaAgentEnabledVar...)
 	}
 
-	if instance.Spec.Config.HttpProxy != nil {
+	if isProxyValueActive(instance.Spec.Config.HttpProxy) {
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "_userdefined_http_proxy",
 			Value: *instance.Spec.Config.HttpProxy,
 		})
 	}
-	if instance.Spec.Config.HttpsProxy != nil {
+	if isProxyValueActive(instance.Spec.Config.HttpsProxy) {
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "_userdefined_https_proxy",
 			Value: *instance.Spec.Config.HttpsProxy,
@@ -473,13 +480,13 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			Value: *instance.Spec.Config.CpuRateLimit,
 		})
 	}
-	if instance.Spec.Config.HttpProxy != nil {
+	if isProxyValueActive(instance.Spec.Config.HttpProxy) {
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "_userdefined_http_proxy",
 			Value: *instance.Spec.Config.HttpProxy,
 		})
 	}
-	if instance.Spec.Config.HttpsProxy != nil {
+	if isProxyValueActive(instance.Spec.Config.HttpsProxy) {
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "_userdefined_https_proxy",
 			Value: *instance.Spec.Config.HttpsProxy,
@@ -753,13 +760,13 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			Value: *instance.Spec.Config.CpuRateLimit,
 		})
 	}
-	if instance.Spec.Config.HttpProxy != nil {
+	if isProxyValueActive(instance.Spec.Config.HttpProxy) {
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "_userdefined_http_proxy",
 			Value: *instance.Spec.Config.HttpProxy,
 		})
 	}
-	if instance.Spec.Config.HttpsProxy != nil {
+	if isProxyValueActive(instance.Spec.Config.HttpsProxy) {
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "_userdefined_https_proxy",
 			Value: *instance.Spec.Config.HttpsProxy,

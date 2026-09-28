@@ -183,6 +183,26 @@ func hasNamespacedAPIAccessForNamespaces(ctx context.Context, c client.Client, n
 	return true, nil
 }
 
+func canRecordEvents(ctx context.Context, c client.Client, namespace string) bool {
+	allowed, err := hasNamespacedAPIAccess(ctx, c, namespace, "", "events", []string{"create", "patch"})
+	if err != nil {
+		setupLog.Error(err, "Failed to check Event permissions", "namespace", namespace)
+		return false
+	}
+	return allowed
+}
+
+// noopRecorder is an EventRecorder that drops every event. It is used when
+// the operator is not permitted to create Events.
+type noopRecorder struct{}
+
+var _ record.EventRecorder = noopRecorder{}
+
+func (noopRecorder) Event(runtime.Object, string, string, string)          {}
+func (noopRecorder) Eventf(runtime.Object, string, string, string, ...any) {}
+func (noopRecorder) AnnotatedEventf(runtime.Object, map[string]string, string, string, string, ...any) {
+}
+
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
@@ -285,12 +305,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	// With ENFORCE_LEAST_PRIVILEGE the events RBAC is not grated, so events are
-	// discarded rather that failing with Forbidden.
-	enforceLeastPrivilege := os.Getenv("ENFORCE_LEAST_PRIVILEGE") == "true"
+	// Installs can withhold permission to create Events (e.g. the Helm chart's
+	// global.enforceLeastPrivilege); without it, events are discarded rather
+	// than failing with Forbidden.
+	operatorNamespace, err := controllercommon.GetOperatorNamespace()
+	if err != nil {
+		// e.g. running locally without a forced namespace
+		setupLog.Info("Could not determine the operator namespace; checking Event permissions cluster-wide", "reason", err.Error())
+		operatorNamespace = ""
+	}
+	eventsAllowed := canRecordEvents(context.Background(), mgr.GetClient(), operatorNamespace)
+	if !eventsAllowed {
+		setupLog.Info("Operator is not permitted to create Events; events will not be recorded")
+	}
 	eventRecorderFor := func(name string) record.EventRecorder {
-		if enforceLeastPrivilege {
-			return &record.FakeRecorder{}
+		if !eventsAllowed {
+			return noopRecorder{}
 		}
 		return mgr.GetEventRecorderFor(name)
 	}

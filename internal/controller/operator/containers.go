@@ -175,50 +175,6 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 				},
 			},
 		},
-		{
-			Name: "WLP_CLIENT_ID",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_ID",
-				},
-			},
-		},
-		{
-			Name: "WLP_CLIENT_SECRET",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_SECRET",
-				},
-			},
-		},
-		{
-			Name: "WLP_SCOPE",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_SCOPE",
-				},
-			},
-		},
-		{
-			Name: "OAUTH2_CLIENT_REGISTRATION_SECRET",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "OAUTH2_CLIENT_REGISTRATION_SECRET",
-				},
-			},
-		},
 	}
 
 	idpEnvVarList := []string{"NODE_ENV", "MASTER_PATH", "MASTER_HOST", "IDENTITY_PROVIDER_URL", "HTTP_ONLY", "SESSION_TIMEOUT", "LDAP_RECURSIVE_SEARCH", "LDAP_ATTR_CACHE_SIZE", "LDAP_ATTR_CACHE_TIMEOUT", "LDAP_ATTR_CACHE_ENABLED", "LDAP_ATTR_CACHE_SIZELIMIT",
@@ -382,61 +338,6 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			},
 		},
 		{
-			Name: "ENCRYPTION_KEY",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp-encryption",
-					},
-					Key: "ENCRYPTION_KEY",
-				},
-			},
-		},
-		{
-			Name: "ENCRYPTION_IV",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp-encryption",
-					},
-					Key: "ENCRYPTION_IV",
-				},
-			},
-		},
-		{
-			Name: "algorithm",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp-encryption",
-					},
-					Key: "algorithm",
-				},
-			},
-		},
-		{
-			Name: "inputEncoding",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp-encryption",
-					},
-					Key: "inputEncoding",
-				},
-			},
-		},
-		{
-			Name: "outputEncoding",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp-encryption",
-					},
-					Key: "outputEncoding",
-				},
-			},
-		},
-		{
 			Name:  "service_crn_id",
 			Value: saasCRNId,
 		},
@@ -461,74 +362,8 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			Value: "system:serviceaccount:" + instance.Namespace + ":" + providerSA,
 		},
 		{
-			Name: "roksClientSecret",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_SECRET",
-				},
-			},
-		},
-		{
-			Name: "wlpClientId",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_ID",
-				},
-			},
-		},
-		{
-			Name: "wlpClientSecret",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_SECRET",
-				},
-			},
-		},
-		{
 			Name:  "IDMGMT_KUBEDNS_NAME",
 			Value: "platform-identity-management",
-		},
-		{
-			Name: "OAUTH2_CLIENT_REGISTRATION_SECRET",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "OAUTH2_CLIENT_REGISTRATION_SECRET",
-				},
-			},
-		},
-		{
-			Name: "DEFAULT_ADMIN_USER",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp-credentials",
-					},
-					Key: "admin_username",
-				},
-			},
-		},
-		{
-			Name: "DEFAULT_ADMIN_PASSWORD",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp-credentials",
-					},
-					Key: "admin_password",
-				},
-			},
 		},
 		{
 			Name:  "IAM_PAP_URL",
@@ -539,6 +374,17 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			Value: "https://platform-auth-service:9443/iam",
 		},
 	}
+
+	// Add PRVDR_CPU_LIMIT environment variable using ResourceFieldRef
+	envVars = append(envVars, corev1.EnvVar{
+		Name: "PRVDR_CPU_LIMIT",
+		ValueFrom: &corev1.EnvVarSource{
+			ResourceFieldRef: &corev1.ResourceFieldSelector{
+				Resource: "limits.cpu",
+				Divisor:  resource.MustParse("1m"),
+			},
+		},
+	})
 
 	idpEnvVarList := []string{"NODE_ENV", "LOG_LEVEL_IDPROVIDER", "LOG_LEVEL_MW", "PROVIDER_ISSUER_URL", "MASTER_HOST", "MASTER_PATH",
 		"PREFERRED_LOGIN", "DEFAULT_LOGIN", "IDTOKEN_LIFETIME", "SAAS_CLIENT_REDIRECT_URL", "IBM_CLOUD_SAAS", "ROKS_ENABLED", "ROKS_URL",
@@ -553,6 +399,14 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
 
 	envVars = append(envVars, idpEnvVars...)
+
+	// Add PRVDR_WORKER_COUNT from CR spec if provided
+	if instance.Spec.Config.IdPrvdrWorkers != nil {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "PRVDR_WORKER_COUNT",
+			Value: *instance.Spec.Config.IdPrvdrWorkers,
+		})
+	}
 
 	if instance.Spec.Config.EnableImpersonation {
 		impersonationVars := []corev1.EnvVar{
@@ -598,6 +452,13 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			},
 		}
 		envVars = append(envVars, instanaAgentEnabledVar...)
+	}
+
+	if instance.Spec.Config.CpuRateLimit != nil {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "CPU_RATE_LIMIT",
+			Value: *instance.Spec.Config.CpuRateLimit,
+		})
 	}
 
 	return corev1.Container{
@@ -724,17 +585,6 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			},
 		},
 		{
-			Name: "OAUTH2_CLIENT_REGISTRATION_SECRET",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "OAUTH2_CLIENT_REGISTRATION_SECRET",
-				},
-			},
-		},
-		{
 			Name:  "AUTHZ_DISABLED",
 			Value: "true",
 		},
@@ -757,61 +607,6 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		{
 			Name:  "roksClientId",
 			Value: "system:serviceaccount:" + instance.Namespace + ":" + providerSA,
-		},
-		{
-			Name: "roksClientSecret",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_SECRET",
-				},
-			},
-		},
-		{
-			Name: "DEFAULT_ADMIN_USER",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp-credentials",
-					},
-					Key: "admin_username",
-				},
-			},
-		},
-		{
-			Name: "DEFAULT_ADMIN_PASSWORD",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-idp-credentials",
-					},
-					Key: "admin_password",
-				},
-			},
-		},
-		{
-			Name: "SCIM_ADMIN_USER",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-scim-credentials",
-					},
-					Key: "scim_admin_username",
-				},
-			},
-		},
-		{
-			Name: "SCIM_ADMIN_PASSWORD",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-auth-scim-credentials",
-					},
-					Key: "scim_admin_password",
-				},
-			},
 		},
 		{
 			Name:  "IDPROVIDER_KUBEDNS_NAME",
@@ -843,40 +638,18 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 				},
 			},
 		},
-		{
-			Name: "WLP_CLIENT_ID",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_ID",
-				},
-			},
-		},
-		{
-			Name: "WLP_CLIENT_SECRET",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_CLIENT_SECRET",
-				},
-			},
-		},
-		{
-			Name: "WLP_SCOPE",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "platform-oidc-credentials",
-					},
-					Key: "WLP_SCOPE",
-				},
-			},
-		},
 	}
+
+	// Add MGMT_CPU_LIMIT environment variable using ResourceFieldRef
+	envVars = append(envVars, corev1.EnvVar{
+		Name: "MGMT_CPU_LIMIT",
+		ValueFrom: &corev1.EnvVarSource{
+			ResourceFieldRef: &corev1.ResourceFieldSelector{
+				Resource: "limits.cpu",
+				Divisor:  resource.MustParse("1m"),
+			},
+		},
+	})
 
 	idpEnvVarList := []string{"NODE_ENV", "LOG_LEVEL_IDMGMT", "LOG_LEVEL_MW", "IBM_CLOUD_SAAS", "MASTER_HOST", "AUDIT_DETAIL",
 		"ROKS_ENABLED", "ROKS_USER_PREFIX", "IDENTITY_AUTH_DIRECTORY_URL", "OIDC_ISSUER_URL", "BOOTSTRAP_USERID", "CLUSTER_NAME", "HTTP_ONLY", "LDAP_SEARCH_SIZE_LIMIT", "LDAP_SEARCH_TIME_LIMIT",
@@ -888,6 +661,14 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 	idpEnvVars := buildIdpEnvVars(idpEnvVarList)
 
 	envVars = append(envVars, idpEnvVars...)
+
+	// Add MGMT_WORKER_COUNT from CR spec if provided
+	if instance.Spec.Config.IdMgmtWorkers != nil {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "MGMT_WORKER_COUNT",
+			Value: *instance.Spec.Config.IdMgmtWorkers,
+		})
+	}
 
 	if instance.Spec.Config.EnableImpersonation {
 		impersonationVars := []corev1.EnvVar{
@@ -939,6 +720,13 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			},
 		}
 		envVars = append(envVars, instanaAgentEnabledVar...)
+	}
+
+	if instance.Spec.Config.CpuRateLimit != nil {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "CPU_RATE_LIMIT",
+			Value: *instance.Spec.Config.CpuRateLimit,
+		})
 	}
 
 	return corev1.Container{
@@ -1111,6 +899,10 @@ func buildAuthSvcVolumeMounts(ldapSpcExist bool) []corev1.VolumeMount {
 			Name:      "scim-admin-auth",
 			MountPath: "/auth/scim-admin-auth",
 		},
+		{
+			Name:      "oidc-auth",
+			MountPath: "/auth/oidc-auth",
+		},
 	}
 	if ldapSpcExist {
 		volumeMounts = EnsureVolumeMountPresent(volumeMounts, GetLdapBindPwdVolumeMount())
@@ -1145,6 +937,18 @@ func buildIdentityManagerVolumeMounts(auditSecretName *string, ldapSpcExist bool
 		{
 			Name:      "tmp-vol",
 			MountPath: "/tmp",
+		},
+		{
+			Name:      "oidc-auth",
+			MountPath: "/auth/oidc-auth",
+		},
+		{
+			Name:      "scim-admin-auth",
+			MountPath: "/auth/scim-admin-auth",
+		},
+		{
+			Name:      "platform-admin-auth",
+			MountPath: "/auth/platform-admin-auth",
 		},
 	}
 
@@ -1195,6 +999,18 @@ func buildIdentityProviderVolumeMounts(auditSecretName *string, ldapSpcExist boo
 		{
 			Name:      "tmp-vol",
 			MountPath: "/tmp",
+		},
+		{
+			Name:      "oidc-auth",
+			MountPath: "/auth/oidc-auth",
+		},
+		{
+			Name:      "platform-admin-auth",
+			MountPath: "/auth/platform-admin-auth",
+		},
+		{
+			Name:      "platform-encryption",
+			MountPath: "/encryption/platform-encryption",
 		},
 	}
 	if auditSecretName != nil && *auditSecretName != "" {

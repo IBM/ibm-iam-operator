@@ -194,6 +194,12 @@ spec:
                     type: string
                   clusterName:
                     type: string
+                  cpuRateLimit:
+                    description: CpuRateLimit sets a CPU usage rate limit applied
+                      to IAM service containers. Valid values are "1"-"100" or "disable"
+                      (case-insensitive). Leave unset to apply no rate limit.
+                    pattern: ^([1-9][0-9]?|100|[Dd][Ii][Ss][Aa][Bb][Ll][Ee])?$
+                    type: string
                   cspExtension:
                     properties:
                       connectSrc:
@@ -212,6 +218,10 @@ spec:
                     type: string
                   defaultLogin:
                     type: string
+                  disableCertAuthRoute:
+                    description: DisableCertAuthRoute when set to true disables the
+                      creation of the im-certauth-passthrough Route. Defaults to false.
+                    type: boolean
                   enableImpersonation:
                     type: boolean
                   fipsEnabled:
@@ -221,6 +231,18 @@ spec:
                   icpPort:
                     format: int32
                     type: integer
+                  idMgmtWorkers:
+                    description: IdMgmtWorkers specifies the number of nodejs worker
+                      threads for platform-identity-management pods. Must be either
+                      "auto" or a numeric string from "1" to "100".
+                    pattern: ^(auto|([1-9][0-9]?|100))$
+                    type: string
+                  idPrvdrWorkers:
+                    description: IdPrvdrWorkers specifies the number of nodejs worker
+                      threads for platform-identity-provider pods. Must be either
+                      "auto" or a numeric string from "1" to "100".
+                    pattern: ^(auto|([1-9][0-9]?|100))$
+                    type: string
                   ingress:
                     properties:
                       gvk:

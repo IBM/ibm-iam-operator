@@ -179,7 +179,7 @@ func (r *AuthenticationReconciler) startOperation(ctx context.Context, authCR *o
 	op, started := r.operations.getOrStart(client.ObjectKeyFromObject(authCR), start)
 	if started {
 		logf.FromContext(ctx).Info("Operation started", "startTime", start)
-		r.event(authCR, corev1.EventTypeNormal, EventReasonOperationStarted,
+		r.Recorder.Event(authCR, corev1.EventTypeNormal, EventReasonOperationStarted,
 			fmt.Sprintf("Operation started for %s/%s", authCR.Namespace, authCR.Name))
 	}
 	return op
@@ -193,7 +193,7 @@ func (r *AuthenticationReconciler) dependencyWaiting(ctx context.Context, authCR
 	op := r.startOperation(ctx, authCR, authCR.Status.Service.Status == "")
 	if op.waitStarted(component, metav1.Now()) {
 		logf.FromContext(ctx).Info("Waiting for dependency", "component", component)
-		r.event(authCR, corev1.EventTypeNormal, EventReasonDependencyWaitStarted,
+		r.Recorder.Event(authCR, corev1.EventTypeNormal, EventReasonDependencyWaitStarted,
 			fmt.Sprintf("Waiting for dependency: %s", component))
 	}
 }
@@ -209,7 +209,7 @@ func (r *AuthenticationReconciler) dependencyReady(ctx context.Context, authCR *
 		return
 	}
 	logf.FromContext(ctx).Info("Dependency ready", "component", component, "duration", formatDuration(wait))
-	r.event(authCR, corev1.EventTypeNormal, EventReasonDependencyReady,
+	r.Recorder.Event(authCR, corev1.EventTypeNormal, EventReasonDependencyReady,
 		fmt.Sprintf("Dependency %s is ready", component))
 }
 
@@ -237,15 +237,8 @@ func (r *AuthenticationReconciler) finishOperation(ctx context.Context, authCR *
 	return true, func() {
 		r.operations.remove(key)
 		logf.FromContext(ctx).Info("Recorded operationTiming", "totalDuration", entry.TotalDuration)
-		r.event(authCR, corev1.EventTypeNormal, EventReasonOperationEnded,
+		r.Recorder.Event(authCR, corev1.EventTypeNormal, EventReasonOperationEnded,
 			fmt.Sprintf("Operation completed for %s/%s in %s", authCR.Namespace, authCR.Name, entry.TotalDuration))
-	}
-}
-
-// event records a Kubernetes Event on authCR, if a recorder is set.
-func (r *AuthenticationReconciler) event(authCR *operatorv1alpha1.Authentication, eventType, reason, message string) {
-	if r.Recorder != nil {
-		r.Recorder.Event(authCR, eventType, reason, message)
 	}
 }
 

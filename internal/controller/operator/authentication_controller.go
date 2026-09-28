@@ -158,8 +158,11 @@ type AuthenticationReconciler struct {
 	clusterType     common.ClusterType
 	needsRollout    bool
 	common.ByteGenerator
-	Recorder   record.EventRecorder
-	operations operationTracker
+	Recorder record.EventRecorder
+	// operations holds the in-flight operation of each Authentication CR, keyed
+	// by namespace and name. Kept in memory across requeues so dependency waits
+	// span multiple passes.
+	operations map[types.NamespacedName]*operation
 }
 
 func (r *AuthenticationReconciler) updateAuthenticationStatus(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
@@ -493,7 +496,7 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 	authCR := &operatorv1alpha1.Authentication{}
 	err = r.Get(ctx, req.NamespacedName, authCR)
 	if k8sErrors.IsNotFound(err) {
-		r.operations.remove(req.NamespacedName)
+		delete(r.operations, req.NamespacedName)
 		return result, nil
 	} else if err != nil {
 		return

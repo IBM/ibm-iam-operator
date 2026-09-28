@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -131,57 +130,25 @@ func (o *operation) entry(end metav1.Time) operatorv1alpha1.OperationTimingEntry
 	return e
 }
 
-// operationTracker holds in-flight operations keyed by CR. Kept in memory
-// across requeues so dependency waits span multiple passes. The mutex guards
-// the map only; controller-runtime serialises reconciles per CR.
-type operationTracker struct {
-	mu  sync.Mutex
-	ops map[types.NamespacedName]*operation
-}
-
-// get returns the in-flight operation for key, or nil if there is none.
-func (t *operationTracker) get(key types.NamespacedName) *operation {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	return t.ops[key]
-}
-
-// getOrStart returns the operation for key, starting one at start if none is in flight.
-func (t *operationTracker) getOrStart(key types.NamespacedName, start metav1.Time) (op *operation, started bool) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if op = t.ops[key]; op != nil {
-		return op, false
-	}
-	if t.ops == nil {
-		t.ops = make(map[types.NamespacedName]*operation)
-	}
-	op = &operation{start: start}
-	t.ops[key] = op
-	return op, true
-}
-
-// remove forgets the operation for key, e.g. once it is recorded in status or
-// its CR is deleted.
-func (t *operationTracker) remove(key types.NamespacedName) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	delete(t.ops, key)
-}
-
 // startOperation returns authCR's in-flight operation, starting one if none exists.
 // For a fresh install (no prior service status) the start time is the CR's creation time.
 func (r *AuthenticationReconciler) startOperation(ctx context.Context, authCR *operatorv1alpha1.Authentication, freshInstall bool) *operation {
+	key := client.ObjectKeyFromObject(authCR)
+	if op := r.operations[key]; op != nil {
+		return op
+	}
 	start := metav1.Now()
 	if freshInstall && !authCR.CreationTimestamp.IsZero() {
 		start = authCR.CreationTimestamp
 	}
-	op, started := r.operations.getOrStart(client.ObjectKeyFromObject(authCR), start)
-	if started {
-		logf.FromContext(ctx).Info("Operation started", "startTime", start)
-		r.Recorder.Event(authCR, corev1.EventTypeNormal, EventReasonOperationStarted,
-			fmt.Sprintf("Operation started for %s/%s", authCR.Namespace, authCR.Name))
+	if r.operations == nil {
+		r.operations = make(map[types.NamespacedName]*operation)
 	}
+	op := &operation{start: start}
+	r.operations[key] = op
+	logf.FromContext(ctx).Info("Operation started", "startTime", start)
+	r.Recorder.Event(authCR, corev1.EventTypeNormal, EventReasonOperationStarted,
+		fmt.Sprintf("Operation started for %s/%s", authCR.Namespace, authCR.Name))
 	return op
 }
 
@@ -200,7 +167,7 @@ func (r *AuthenticationReconciler) dependencyWaiting(ctx context.Context, authCR
 
 // dependencyReady records that component became ready. No-op if not being waited on.
 func (r *AuthenticationReconciler) dependencyReady(ctx context.Context, authCR *operatorv1alpha1.Authentication, component string) {
-	op := r.operations.get(client.ObjectKeyFromObject(authCR))
+	op := r.operations[client.ObjectKeyFromObject(authCR)]
 	if op == nil {
 		return
 	}
@@ -216,7 +183,7 @@ func (r *AuthenticationReconciler) dependencyReady(ctx context.Context, authCR *
 // dependencyNotNeeded drops a pending wait on component (e.g. config changed),
 // so the operation is not blocked by a dependency that no longer applies.
 func (r *AuthenticationReconciler) dependencyNotNeeded(ctx context.Context, authCR *operatorv1alpha1.Authentication, component string) {
-	op := r.operations.get(client.ObjectKeyFromObject(authCR))
+	op := r.operations[client.ObjectKeyFromObject(authCR)]
 	if op != nil && op.drop(component) {
 		logf.FromContext(ctx).Info("No longer waiting for dependency", "component", component)
 	}
@@ -228,14 +195,14 @@ func (r *AuthenticationReconciler) dependencyNotNeeded(ctx context.Context, auth
 // a failed update will retry with the same operation on the next pass.
 func (r *AuthenticationReconciler) finishOperation(ctx context.Context, authCR *operatorv1alpha1.Authentication) (added bool, onPersisted func()) {
 	key := client.ObjectKeyFromObject(authCR)
-	op := r.operations.get(key)
+	op := r.operations[key]
 	if op == nil || authCR.Status.Service.Status != ResourceReadyState || op.hasPendingDependencies() {
 		return false, func() {}
 	}
 	entry := op.entry(metav1.Now())
 	prependOperationTiming(authCR, entry)
 	return true, func() {
-		r.operations.remove(key)
+		delete(r.operations, key)
 		logf.FromContext(ctx).Info("Recorded operationTiming", "totalDuration", entry.TotalDuration)
 		r.Recorder.Event(authCR, corev1.EventTypeNormal, EventReasonOperationEnded,
 			fmt.Sprintf("Operation completed for %s/%s in %s", authCR.Namespace, authCR.Name, entry.TotalDuration))

@@ -366,6 +366,11 @@ func (in *ConfigSpec) DeepCopyInto(out *ConfigSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.PreferredLoginIdp != nil {
+		in, out := &in.PreferredLoginIdp, &out.PreferredLoginIdp
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.CpuRateLimit != nil {
 		in, out := &in.CpuRateLimit, &out.CpuRateLimit
 		*out = new(string)

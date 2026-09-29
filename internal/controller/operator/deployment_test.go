@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -64,7 +63,7 @@ func (d deploymentSecondary) OnFinished(_ context.Context, _, _ client.Object) e
 // that has the Authentication CR registered.
 func newDeploymentSecondary(name string, authCR *operatorv1alpha1.Authentication) deploymentSecondary {
 	scheme := runtime.NewScheme()
-	_ = corev1.AddToScheme(scheme)
+	_ = v1.AddToScheme(scheme)
 	_ = appsv1.AddToScheme(scheme)
 	_ = operatorv1alpha1.AddToScheme(scheme)
 	cl := fakeclient.NewClientBuilder().WithScheme(scheme).WithObjects(authCR).Build()
@@ -78,16 +77,16 @@ func newDeploymentSecondary(name string, authCR *operatorv1alpha1.Authentication
 
 // builtInTolerationsWithEffect mirrors the default tolerations for auth-service and identity-provider
 // (which include Effect: NoSchedule on the "dedicated" entry).
-var builtInTolerationsWithEffect = []corev1.Toleration{
-	{Key: "dedicated", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule},
-	{Key: "CriticalAddonsOnly", Operator: corev1.TolerationOpExists},
+var builtInTolerationsWithEffect = []v1.Toleration{
+	{Key: "dedicated", Operator: v1.TolerationOpExists, Effect: v1.TaintEffectNoSchedule},
+	{Key: "CriticalAddonsOnly", Operator: v1.TolerationOpExists},
 }
 
 // builtInTolerationsNoEffect mirrors the default tolerations for identity-manager,
 // which omits Effect on the "dedicated" entry (pre-existing inconsistency in the code).
-var builtInTolerationsNoEffect = []corev1.Toleration{
-	{Key: "dedicated", Operator: corev1.TolerationOpExists},
-	{Key: "CriticalAddonsOnly", Operator: corev1.TolerationOpExists},
+var builtInTolerationsNoEffect = []v1.Toleration{
+	{Key: "dedicated", Operator: v1.TolerationOpExists},
+	{Key: "CriticalAddonsOnly", Operator: v1.TolerationOpExists},
 }
 
 var _ = Describe("Deployment handling", func() {
@@ -186,15 +185,15 @@ var _ = Describe("Deployment handling", func() {
 	Describe("NodeSelector and Tolerations propagation", func() {
 		var ctx context.Context
 		var authCR *operatorv1alpha1.Authentication
-		var customToleration corev1.Toleration
+		var customToleration v1.Toleration
 
 		BeforeEach(func() {
 			ctx = context.Background()
-			customToleration = corev1.Toleration{
+			customToleration = v1.Toleration{
 				Key:      "custom-taint",
-				Operator: corev1.TolerationOpEqual,
+				Operator: v1.TolerationOpEqual,
 				Value:    "custom-value",
-				Effect:   corev1.TaintEffectNoSchedule,
+				Effect:   v1.TaintEffectNoSchedule,
 			}
 			authCR = &operatorv1alpha1.Authentication{
 				TypeMeta: metav1.TypeMeta{
@@ -215,7 +214,7 @@ var _ = Describe("Deployment handling", func() {
 		})
 
 		DescribeTable("generatePlatformAuthService propagates scheduling fields",
-			func(nodeSelector map[string]string, tolerations []corev1.Toleration) {
+			func(nodeSelector map[string]string, tolerations []v1.Toleration) {
 				authCR.Spec.NodeSelector = nodeSelector
 				authCR.Spec.Tolerations = tolerations
 				s := newDeploymentSecondary("platform-auth-service", authCR)
@@ -234,16 +233,16 @@ var _ = Describe("Deployment handling", func() {
 			},
 			Entry("sets nodeSelector and appends custom tolerations when both are specified",
 				map[string]string{"node-role.kubernetes.io/worker": "true"},
-				[]corev1.Toleration{customToleration},
+				[]v1.Toleration{customToleration},
 			),
 			Entry("leaves nodeSelector nil and only has built-in tolerations when neither field is set",
 				map[string]string(nil),
-				[]corev1.Toleration(nil),
+				[]v1.Toleration(nil),
 			),
 		)
 
 		DescribeTable("generatePlatformIdentityManagement propagates scheduling fields",
-			func(nodeSelector map[string]string, tolerations []corev1.Toleration) {
+			func(nodeSelector map[string]string, tolerations []v1.Toleration) {
 				authCR.Spec.NodeSelector = nodeSelector
 				authCR.Spec.Tolerations = tolerations
 				s := newDeploymentSecondary("platform-identity-management", authCR)
@@ -262,16 +261,16 @@ var _ = Describe("Deployment handling", func() {
 			},
 			Entry("sets nodeSelector and appends custom tolerations when both are specified",
 				map[string]string{"node-role.kubernetes.io/worker": "true"},
-				[]corev1.Toleration{customToleration},
+				[]v1.Toleration{customToleration},
 			),
 			Entry("leaves nodeSelector nil and only has built-in tolerations when neither field is set",
 				map[string]string(nil),
-				[]corev1.Toleration(nil),
+				[]v1.Toleration(nil),
 			),
 		)
 
 		DescribeTable("generatePlatformIdentityProvider propagates scheduling fields",
-			func(nodeSelector map[string]string, tolerations []corev1.Toleration) {
+			func(nodeSelector map[string]string, tolerations []v1.Toleration) {
 				authCR.Spec.NodeSelector = nodeSelector
 				authCR.Spec.Tolerations = tolerations
 				s := newDeploymentSecondary("platform-identity-provider", authCR)
@@ -290,11 +289,11 @@ var _ = Describe("Deployment handling", func() {
 			},
 			Entry("sets nodeSelector and appends custom tolerations when both are specified",
 				map[string]string{"node-role.kubernetes.io/worker": "true"},
-				[]corev1.Toleration{customToleration},
+				[]v1.Toleration{customToleration},
 			),
 			Entry("leaves nodeSelector nil and only has built-in tolerations when neither field is set",
 				map[string]string(nil),
-				[]corev1.Toleration(nil),
+				[]v1.Toleration(nil),
 			),
 		)
 	})

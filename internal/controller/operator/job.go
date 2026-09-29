@@ -19,6 +19,7 @@ package operator
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 
 	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/api/oidc.security/v1"
@@ -541,7 +542,7 @@ func generateJobObject(s common.SecondaryReconciler, ctx context.Context, job *b
 
 	}
 	if len(authCR.Spec.NodeSelector) > 0 {
-		job.Spec.Template.Spec.NodeSelector = authCR.Spec.NodeSelector
+		job.Spec.Template.Spec.NodeSelector = maps.Clone(authCR.Spec.NodeSelector)
 	}
 	if len(authCR.Spec.Tolerations) > 0 {
 		job.Spec.Template.Spec.Tolerations = append(
@@ -833,7 +834,7 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 
 	}
 	if len(authCR.Spec.NodeSelector) > 0 {
-		job.Spec.Template.Spec.NodeSelector = authCR.Spec.NodeSelector
+		job.Spec.Template.Spec.NodeSelector = maps.Clone(authCR.Spec.NodeSelector)
 	}
 	if len(authCR.Spec.Tolerations) > 0 {
 		job.Spec.Template.Spec.Tolerations = append(

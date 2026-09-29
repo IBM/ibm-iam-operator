@@ -624,6 +624,16 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 			}
 		}
 
+		// When both preferredLogin and preferredLoginIdp are set, PREFERRED_LOGIN_IDP takes
+		// precedence over PREFERRED_LOGIN. CRD admission validation guarantees all entries
+		// in PreferredLoginIdp satisfy the IdP name constraints (^[a-zA-Z0-9\-_]{3,50}$).
+		if authCR.Spec.Config.PreferredLogin != "" && len(authCR.Spec.Config.PreferredLoginIdp) > 0 {
+			reqLogger.V(1).Info("Both spec.config.preferredLogin and spec.config.preferredLoginIdp are set; "+
+				"PREFERRED_LOGIN_IDP takes precedence over PREFERRED_LOGIN",
+				"preferredLogin", authCR.Spec.Config.PreferredLogin,
+				"preferredLoginIdp", authCR.Spec.Config.PreferredLoginIdp)
+		}
+
 		*generated = corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      s.GetName(),

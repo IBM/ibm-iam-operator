@@ -22,6 +22,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"reflect"
 	"strings"
@@ -419,6 +420,15 @@ func generatePlatformAuthService(imagePullSecret, samlCertSecret, ldapSPCName, e
 		if imagePullSecret != "" {
 			deploy.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: imagePullSecret}}
 		}
+		if len(authCR.Spec.NodeSelector) > 0 {
+			deploy.Spec.Template.Spec.NodeSelector = maps.Clone(authCR.Spec.NodeSelector)
+		}
+		if len(authCR.Spec.Tolerations) > 0 {
+			deploy.Spec.Template.Spec.Tolerations = append(
+				deploy.Spec.Template.Spec.Tolerations,
+				authCR.Spec.Tolerations...,
+			)
+		}
 		// Set SecretWatcher instance as the owner and controller
 		err = controllerutil.SetControllerReference(authCR, deploy, s.GetClient().Scheme())
 		if err != nil {
@@ -588,6 +598,7 @@ func generatePlatformIdentityManagement(imagePullSecret, samlCertSecret, auditSe
 							{
 								Key:      "dedicated",
 								Operator: corev1.TolerationOpExists,
+								Effect:   corev1.TaintEffectNoSchedule,
 							},
 							{
 								Key:      "CriticalAddonsOnly",
@@ -603,6 +614,15 @@ func generatePlatformIdentityManagement(imagePullSecret, samlCertSecret, auditSe
 		}
 		if imagePullSecret != "" {
 			deploy.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: imagePullSecret}}
+		}
+		if len(authCR.Spec.NodeSelector) > 0 {
+			deploy.Spec.Template.Spec.NodeSelector = maps.Clone(authCR.Spec.NodeSelector)
+		}
+		if len(authCR.Spec.Tolerations) > 0 {
+			deploy.Spec.Template.Spec.Tolerations = append(
+				deploy.Spec.Template.Spec.Tolerations,
+				authCR.Spec.Tolerations...,
+			)
 		}
 		// Set SecretWatcher instance as the owner and controller
 		err = controllerutil.SetControllerReference(authCR, deploy, s.GetClient().Scheme())
@@ -789,6 +809,15 @@ func generatePlatformIdentityProvider(imagePullSecret, samlCertSecret, saasServi
 
 		if imagePullSecret != "" {
 			deploy.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: imagePullSecret}}
+		}
+		if len(authCR.Spec.NodeSelector) > 0 {
+			deploy.Spec.Template.Spec.NodeSelector = maps.Clone(authCR.Spec.NodeSelector)
+		}
+		if len(authCR.Spec.Tolerations) > 0 {
+			deploy.Spec.Template.Spec.Tolerations = append(
+				deploy.Spec.Template.Spec.Tolerations,
+				authCR.Spec.Tolerations...,
+			)
 		}
 
 		err = controllerutil.SetControllerReference(authCR, deploy, s.GetClient().Scheme())

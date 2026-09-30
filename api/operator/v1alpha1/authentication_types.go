@@ -50,13 +50,13 @@ type AuthenticationSpec struct {
 	EnableInstanaMetricCollection bool                   `json:"enableInstanaMetricCollection,omitempty"`
 	AutoScaleConfig               bool                   `json:"autoScaleConfig,omitempty"`
 
-	// NodeSelector constrains which nodes IAM pods are eligible to run on.
+	// NodeSelector constrains which nodes IM pods are eligible to run on.
 	// When set, the map is applied as-is to every Deployment and Job pod spec
 	// created by this operator.
 	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
-	// Tolerations allow IAM pods to be scheduled onto nodes with matching taints.
+	// Tolerations allow IM pods to be scheduled onto nodes with matching taints.
 	// The values provided here are appended to the operator's built-in default
 	// tolerations (dedicated/NoSchedule and CriticalAddonsOnly).
 	// +optional

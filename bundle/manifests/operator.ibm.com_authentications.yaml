@@ -227,7 +227,7 @@ spec:
                   fipsEnabled:
                     type: boolean
                   httpProxy:
-                    description: HttpProxy sets the HTTP proxy URL.
+                    description: HTTPProxy sets the HTTP proxy URL.
                     type: string
                   httpsProxy:
                     description: HttpsProxy sets the HTTPS proxy URL.

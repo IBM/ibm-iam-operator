@@ -21,7 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -359,8 +359,8 @@ func (in *ConfigSpec) DeepCopyInto(out *ConfigSpec) {
 		*out = new(string)
 		**out = **in
 	}
-	if in.HttpProxy != nil {
-		in, out := &in.HttpProxy, &out.HttpProxy
+	if in.HTTPProxy != nil {
+		in, out := &in.HTTPProxy, &out.HTTPProxy
 		*out = new(string)
 		**out = **in
 	}

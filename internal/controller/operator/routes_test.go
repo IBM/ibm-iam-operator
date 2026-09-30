@@ -27,6 +27,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	routev1 "github.com/openshift/api/route/v1"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +39,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
@@ -651,6 +653,7 @@ var _ = Describe("Route handling", func() {
 			Expect(routev1.AddToScheme(scheme)).To(Succeed())
 			Expect(zenv1.AddToScheme(scheme)).To(Succeed())
 			Expect(operatorv1alpha1.AddToScheme(scheme)).To(Succeed())
+			Expect(authorizationv1.AddToScheme(scheme)).To(Succeed())
 			authCR = &operatorv1alpha1.Authentication{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "operator.ibm.com/v1alpha1",
@@ -752,7 +755,16 @@ var _ = Describe("Route handling", func() {
 					platformOIDCCredentialsSecret,
 					authCR,
 					frontdoor,
-				)
+				).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Create: func(ctx context.Context, cl client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+						if ssar, ok := obj.(*authorizationv1.SelfSubjectAccessReview); ok {
+							ssar.Status.Allowed = true
+							return nil
+						}
+						return cl.Create(ctx, obj, opts...)
+					},
+				})
 			cl = cb.Build()
 			dc, err := discovery.NewDiscoveryClientForConfig(cfg)
 			Expect(err).NotTo(HaveOccurred())

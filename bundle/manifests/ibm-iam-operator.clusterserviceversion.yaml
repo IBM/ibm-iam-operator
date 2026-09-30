@@ -470,19 +470,6 @@ spec:
               verbs:
                 - update
             - apiGroups:
-                - ""
-              resources:
-                - pods
-              verbs:
-                - get
-            - apiGroups:
-                - apps
-              resources:
-                - replicasets
-                - deployments
-              verbs:
-                - get
-            - apiGroups:
                 - operator.ibm.com
               resources:
                 - authentications
@@ -550,15 +537,6 @@ spec:
                 - list
                 - patch
                 - update
-                - watch
-            - apiGroups:
-                - certmanager.k8s.io
-              resources:
-                - certificates
-              verbs:
-                - delete
-                - get
-                - list
                 - watch
             - apiGroups:
                 - networking.k8s.io

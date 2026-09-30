@@ -38,7 +38,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 	BeforeAll(func() {
 		By("bootstrapping test environment with Certificate CRDs")
 		crds, err := envtest.InstallCRDs(cfg, envtest.CRDInstallOptions{
-			Paths: []string{filepath.Join(".", "testdata", "crds", "certmanager.k8s.io_certificates_v1.yaml")},
+			Paths: []string{filepath.Join(".", "testdata", "crds", "cert-manager.io_certificates_v1.yaml")},
 		})
 		Expect(crds).To(HaveLen(1))
 		Expect(err).ToNot(HaveOccurred())
@@ -74,7 +74,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 	Describe("createV1CertificateIfNotPresent", Ordered, func() {
 		BeforeEach(func() {
 			crds, err := envtest.InstallCRDs(cfg, envtest.CRDInstallOptions{
-				Paths: []string{filepath.Join(".", "testdata", "crds", "certmanager.k8s.io_certificates_v1.yaml")},
+				Paths: []string{filepath.Join(".", "testdata", "crds", "cert-manager.io_certificates_v1.yaml")},
 			})
 			Expect(crds).To(HaveLen(1))
 			Expect(err).ToNot(HaveOccurred())
@@ -248,7 +248,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 	Describe("createV1CertificatesIfNotPresent", Ordered, func() {
 		BeforeEach(func() {
 			crds, err := envtest.InstallCRDs(cfg, envtest.CRDInstallOptions{
-				Paths: []string{filepath.Join(".", "testdata", "crds", "certmanager.k8s.io_certificates_v1.yaml")},
+				Paths: []string{filepath.Join(".", "testdata", "crds", "cert-manager.io_certificates_v1.yaml")},
 			})
 			Expect(crds).To(HaveLen(1))
 			Expect(err).ToNot(HaveOccurred())
@@ -423,7 +423,7 @@ var _ = Describe("Certificate handling", Ordered, func() {
 
 		BeforeEach(func() {
 			crds, err := envtest.InstallCRDs(cfg, envtest.CRDInstallOptions{
-				Paths: []string{filepath.Join(".", "testdata", "crds", "certmanager.k8s.io_certificates_v1.yaml")},
+				Paths: []string{filepath.Join(".", "testdata", "crds", "cert-manager.io_certificates_v1.yaml")},
 			})
 			Expect(crds).To(HaveLen(1))
 			Expect(err).ToNot(HaveOccurred())

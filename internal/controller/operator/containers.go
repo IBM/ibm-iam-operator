@@ -130,9 +130,8 @@ func convertToLibertyFormat(memory string) string {
 
 }
 
-// isProxyValueActive returns true when v is non-nil, non-empty, and not the
-// literal string "disable" (case-insensitive).  When false the proxy env var
-// should be omitted from the pod spec entirely.
+// isProxyValueActive returns true when v is non-nil, non-empty, When false
+// the proxy env var should be omitted from the pod spec entirely.
 func isProxyValueActive(v *string) bool {
 	return v != nil && *v != ""
 }

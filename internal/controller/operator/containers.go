@@ -134,7 +134,7 @@ func convertToLibertyFormat(memory string) string {
 // literal string "disable" (case-insensitive).  When false the proxy env var
 // should be omitted from the pod spec entirely.
 func isProxyValueActive(v *string) bool {
-	return v != nil && *v != "" && !strings.EqualFold(*v, "disable")
+	return v != nil && *v != ""
 }
 
 func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authServiceImage string, ldapSpcExist bool) corev1.Container {

@@ -28,6 +28,7 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/tools/record"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -182,6 +183,26 @@ func hasNamespacedAPIAccessForNamespaces(ctx context.Context, c client.Client, n
 	return true, nil
 }
 
+func canRecordEvents(ctx context.Context, c client.Client, namespace string) bool {
+	allowed, err := hasNamespacedAPIAccess(ctx, c, namespace, "", "events", []string{"create", "patch"})
+	if err != nil {
+		setupLog.Error(err, "Failed to check Event permissions", "namespace", namespace)
+		return false
+	}
+	return allowed
+}
+
+// noopRecorder is an EventRecorder that drops every event. It is used when
+// the operator is not permitted to create Events.
+type noopRecorder struct{}
+
+var _ record.EventRecorder = noopRecorder{}
+
+func (noopRecorder) Event(runtime.Object, string, string, string)          {}
+func (noopRecorder) Eventf(runtime.Object, string, string, string, ...any) {}
+func (noopRecorder) AnnotatedEventf(runtime.Object, map[string]string, string, string, string, ...any) {
+}
+
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
@@ -284,6 +305,26 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Installs can withhold permission to create Events (e.g. the Helm chart's
+	// global.enforceLeastPrivilege); without it, events are discarded rather
+	// than failing with Forbidden.
+	operatorNamespace, err := controllercommon.GetOperatorNamespace()
+	if err != nil {
+		// e.g. running locally without a forced namespace
+		setupLog.Info("Could not determine the operator namespace; checking Event permissions cluster-wide", "reason", err.Error())
+		operatorNamespace = ""
+	}
+	eventsAllowed := canRecordEvents(context.Background(), mgr.GetClient(), operatorNamespace)
+	if !eventsAllowed {
+		setupLog.Info("Operator is not permitted to create Events; events will not be recorded")
+	}
+	eventRecorderFor := func(name string) record.EventRecorder {
+		if !eventsAllowed {
+			return noopRecorder{}
+		}
+		return mgr.GetEventRecorderFor(name)
+	}
+
 	const clientControllerName = "controller_oidc_client"
 
 	clientReconciler := &oidcsecuritycontrollers.ClientReconciler{
@@ -293,7 +334,7 @@ func main() {
 		},
 		Reader:        mgr.GetAPIReader(),
 		Scheme:        mgr.GetScheme(),
-		Recorder:      mgr.GetEventRecorderFor(clientControllerName),
+		Recorder:      eventRecorderFor(clientControllerName),
 		ByteGenerator: &common.RandomByteGenerator{},
 	}
 	if os.Getenv(common.ForceRunModeEnv) == string(common.LocalRunMode) {
@@ -305,6 +346,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Client")
 		os.Exit(1)
 	}
+	const authControllerName = "controller_authentication"
 	if err = (&operatorcontrollers.AuthenticationReconciler{
 		Client: &controllercommon.FallbackClient{
 			Client: mgr.GetClient(),
@@ -313,6 +355,7 @@ func main() {
 		DiscoveryClient: *dc,
 		Scheme:          mgr.GetScheme(),
 		ByteGenerator:   &common.RandomByteGenerator{},
+		Recorder:        eventRecorderFor(authControllerName),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Authentication")
 		os.Exit(1)

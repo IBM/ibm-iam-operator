@@ -245,10 +245,10 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			Value: *instance.Spec.Config.HTTPProxy,
 		})
 	}
-	if isProxyValueActive(instance.Spec.Config.HttpsProxy) {
+	if isProxyValueActive(instance.Spec.Config.HTTPSProxy) {
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "_userdefined_https_proxy",
-			Value: *instance.Spec.Config.HttpsProxy,
+			Value: *instance.Spec.Config.HTTPSProxy,
 		})
 	}
 
@@ -486,10 +486,10 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 			Value: *instance.Spec.Config.HTTPProxy,
 		})
 	}
-	if isProxyValueActive(instance.Spec.Config.HttpsProxy) {
+	if isProxyValueActive(instance.Spec.Config.HTTPSProxy) {
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "_userdefined_https_proxy",
-			Value: *instance.Spec.Config.HttpsProxy,
+			Value: *instance.Spec.Config.HTTPSProxy,
 		})
 	}
 
@@ -766,10 +766,10 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 			Value: *instance.Spec.Config.HTTPProxy,
 		})
 	}
-	if isProxyValueActive(instance.Spec.Config.HttpsProxy) {
+	if isProxyValueActive(instance.Spec.Config.HTTPSProxy) {
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "_userdefined_https_proxy",
-			Value: *instance.Spec.Config.HttpsProxy,
+			Value: *instance.Spec.Config.HTTPSProxy,
 		})
 	}
 

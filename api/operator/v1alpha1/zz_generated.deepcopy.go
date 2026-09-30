@@ -364,8 +364,8 @@ func (in *ConfigSpec) DeepCopyInto(out *ConfigSpec) {
 		*out = new(string)
 		**out = **in
 	}
-	if in.HttpsProxy != nil {
-		in, out := &in.HttpsProxy, &out.HttpsProxy
+	if in.HTTPSProxy != nil {
+		in, out := &in.HTTPSProxy, &out.HTTPSProxy
 		*out = new(string)
 		**out = **in
 	}

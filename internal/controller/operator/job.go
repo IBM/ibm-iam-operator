@@ -19,6 +19,7 @@ package operator
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 
 	oidcsecurityv1 "github.com/IBM/ibm-iam-operator/api/oidc.security/v1"
@@ -542,6 +543,15 @@ func generateJobObject(s common.SecondaryReconciler, ctx context.Context, job *b
 		job.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: imagePullSecret}}
 
 	}
+	if len(authCR.Spec.NodeSelector) > 0 {
+		job.Spec.Template.Spec.NodeSelector = maps.Clone(authCR.Spec.NodeSelector)
+	}
+	if len(authCR.Spec.Tolerations) > 0 {
+		job.Spec.Template.Spec.Tolerations = append(
+			job.Spec.Template.Spec.Tolerations,
+			authCR.Spec.Tolerations...,
+		)
+	}
 
 	// Set Authentication instance as the owner and controller of the Job
 	err = controllerutil.SetControllerReference(authCR, job, s.GetClient().Scheme())
@@ -825,6 +835,15 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 		job.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: imagePullSecret}}
 
 	}
+	if len(authCR.Spec.NodeSelector) > 0 {
+		job.Spec.Template.Spec.NodeSelector = maps.Clone(authCR.Spec.NodeSelector)
+	}
+	if len(authCR.Spec.Tolerations) > 0 {
+		job.Spec.Template.Spec.Tolerations = append(
+			job.Spec.Template.Spec.Tolerations,
+			authCR.Spec.Tolerations...,
+		)
+	}
 
 	// Set Authentication instance as the owner and controller of the Job
 	err = controllerutil.SetControllerReference(authCR, job, s.GetClient().Scheme())
@@ -983,14 +1002,14 @@ func buildMigratorVolumes(needsMongoDBMigration bool, edbSPCName string, zenInst
 		})
 	} else {
 		volumes = append(volumes, corev1.Volume{
-				Name: "pgsql-certs",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName:  common.DatastoreEDBSecretName,
-						DefaultMode: ptr.To(int32(420)),
-					},
+			Name: "pgsql-certs",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  common.DatastoreEDBSecretName,
+					DefaultMode: ptr.To(int32(420)),
 				},
-			})
+			},
+		})
 	}
 
 	if !needsMongoDBMigration {

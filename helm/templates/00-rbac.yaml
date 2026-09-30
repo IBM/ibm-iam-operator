@@ -135,19 +135,6 @@ rules:
   verbs:
   - update
 - apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get
-- apiGroups:
-  - apps
-  resources:
-  - replicasets
-  - deployments
-  verbs:
-  - get
-- apiGroups:
   - operator.ibm.com
   resources:
   - authentications
@@ -215,15 +202,6 @@ rules:
   - list
   - patch
   - update
-  - watch
-- apiGroups:
-  - certmanager.k8s.io
-  resources:
-  - certificates
-  verbs:
-  - delete
-  - get
-  - list
   - watch
 {{- if $.Values.cpfs.imNetworking.manageNetworking }}
 - apiGroups:

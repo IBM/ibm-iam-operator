@@ -21,7 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -305,6 +305,16 @@ func (in *ConfigSpec) DeepCopyInto(out *ConfigSpec) {
 		in, out := &in.AuditSecret, &out.AuditSecret
 		*out = new(string)
 		**out = **in
+	}
+	if in.PreferredLogin != nil {
+		in, out := &in.PreferredLogin, &out.PreferredLogin
+		*out = new(string)
+		**out = **in
+	}
+	if in.PreferredLoginIdp != nil {
+		in, out := &in.PreferredLoginIdp, &out.PreferredLoginIdp
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 	if in.Ingress != nil {
 		in, out := &in.Ingress, &out.Ingress

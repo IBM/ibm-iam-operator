@@ -276,6 +276,18 @@ spec:
                     type: integer
                   preferredLogin:
                     type: string
+                  preferredLoginIdp:
+                    description: PreferredLoginIdp is a list of preferred Identity
+                      Provider names for login. Each name must be 3-50 characters
+                      and contain only alphanumeric characters, hyphens, or underscores.
+                      When both preferredLogin and preferredLoginIdp are set, preferredLoginIdp
+                      takes precedence.
+                    items:
+                      maxLength: 50
+                      minLength: 3
+                      pattern: ^[a-zA-Z0-9\-_]+$
+                      type: string
+                    type: array
                   providerIssuerURL:
                     type: string
                   roksEnabled:

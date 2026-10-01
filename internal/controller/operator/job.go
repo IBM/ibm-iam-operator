@@ -823,7 +823,7 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 						},
 					},
 					Volumes:    buildMigratorVolumes(needsMongoDBMigration, edbspc.Name, zenInstanceID),
-					Containers: buildMigratorContainer(s, image, resources, mongoHost, zenInstanceID),
+					Containers: buildMigratorContainer(s, authCR, image, resources, mongoHost, zenInstanceID),
 				},
 			},
 		},
@@ -852,7 +852,7 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 	return
 }
 
-func buildMigratorContainer(s common.SecondaryReconciler, image string, resources *corev1.ResourceRequirements, mongoHost string, zenInstanceID string) (containers []corev1.Container) {
+func buildMigratorContainer(s common.SecondaryReconciler, authCR *operatorv1alpha1.Authentication, image string, resources *corev1.ResourceRequirements, mongoHost string, zenInstanceID string) (containers []corev1.Container) {
 	container := corev1.Container{
 		Name:            s.GetName(),
 		Image:           image,
@@ -894,17 +894,7 @@ func buildMigratorContainer(s common.SecondaryReconciler, image string, resource
 		},
 		Command: []string{"/usr/local/bin/migrator", "migrate", "--postgres-config", "/etc/postgres"},
 		Env: []corev1.EnvVar{
-			{
-				Name: "DB_SSL_MODE",
-				ValueFrom: &corev1.EnvVarSource{
-					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "platform-auth-idp",
-						},
-						Key: "DB_SSL_MODE",
-					},
-				},
-			},
+			{Name: "DB_SSL_MODE", Value: authCR.GetDBSSLMode()},
 		},
 	}
 

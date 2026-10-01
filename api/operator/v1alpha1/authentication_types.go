@@ -196,6 +196,11 @@ type ConfigSpec struct {
 	IdMgmtWorkers               *string             `json:"idMgmtWorkers,omitempty"`
 	DisableCertAuthRoute        bool                `json:"disableCertAuthRoute,omitempty"`
 	CpuRateLimit                *string             `json:"cpuRateLimit,omitempty"`
+	// DBSSLMode sets the SSL mode used when connecting to the PostgreSQL database.
+	// Valid values match those accepted by the libpq sslmode parameter (e.g. "require", "verify-full", "disable").
+	// Defaults to "require" when unset.
+	// +optional
+	DBSSLMode                   *string             `json:"dbSSLMode,omitempty"`
 }
 
 type ManagedResourceStatus struct {
@@ -462,4 +467,13 @@ func (a *Authentication) IsLDAPAllowlistEnabled() bool {
 		return true
 	}
 	return *a.Spec.Config.LDAPAllowlistEnabled
+}
+
+// GetDBSSLMode returns the configured SSL mode for PostgreSQL connections.
+// Returns the spec value when explicitly set, otherwise defaults to "require".
+func (a *Authentication) GetDBSSLMode() string {
+	if a.Spec.Config.DBSSLMode != nil && *a.Spec.Config.DBSSLMode != "" {
+		return *a.Spec.Config.DBSSLMode
+	}
+	return "require"
 }

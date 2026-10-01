@@ -196,6 +196,8 @@ type ConfigSpec struct {
 	IdMgmtWorkers               *string             `json:"idMgmtWorkers,omitempty"`
 	DisableCertAuthRoute        bool                `json:"disableCertAuthRoute,omitempty"`
 	CpuRateLimit                *string             `json:"cpuRateLimit,omitempty"`
+	HTTPProxy                   *string             `json:"httpProxy,omitempty"`
+	HTTPSProxy                  *string             `json:"httpsProxy,omitempty"`
 }
 
 type ManagedResourceStatus struct {

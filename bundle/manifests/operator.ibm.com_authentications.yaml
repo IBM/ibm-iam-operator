@@ -226,6 +226,12 @@ spec:
                     type: boolean
                   fipsEnabled:
                     type: boolean
+                  httpProxy:
+                    description: HTTPProxy sets the HTTP proxy URL.
+                    type: string
+                  httpsProxy:
+                    description: HTTPSProxy sets the HTTPS proxy URL.
+                    type: string
                   ibmCloudSaas:
                     type: boolean
                   icpPort:

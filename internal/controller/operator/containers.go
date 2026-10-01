@@ -130,6 +130,12 @@ func convertToLibertyFormat(memory string) string {
 
 }
 
+// isProxyValueActive returns true when v is non-nil, non-empty, When false
+// the proxy env var should be omitted from the pod spec entirely.
+func isProxyValueActive(v *string) bool {
+	return v != nil && *v != ""
+}
+
 func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authServiceImage string, ldapSpcExist bool) corev1.Container {
 	resources := instance.Spec.AuthService.Resources
 
@@ -230,6 +236,19 @@ func buildAuthServiceContainer(instance *operatorv1alpha1.Authentication, authSe
 			},
 		}
 		envVars = append(envVars, instanaAgentEnabledVar...)
+	}
+
+	if isProxyValueActive(instance.Spec.Config.HTTPProxy) {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "_userdefined_http_proxy",
+			Value: *instance.Spec.Config.HTTPProxy,
+		})
+	}
+	if isProxyValueActive(instance.Spec.Config.HTTPSProxy) {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "_userdefined_https_proxy",
+			Value: *instance.Spec.Config.HTTPSProxy,
+		})
 	}
 
 	return corev1.Container{
@@ -458,6 +477,18 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "CPU_RATE_LIMIT",
 			Value: *instance.Spec.Config.CpuRateLimit,
+		})
+	}
+	if isProxyValueActive(instance.Spec.Config.HTTPProxy) {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "_userdefined_http_proxy",
+			Value: *instance.Spec.Config.HTTPProxy,
+		})
+	}
+	if isProxyValueActive(instance.Spec.Config.HTTPSProxy) {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "_userdefined_https_proxy",
+			Value: *instance.Spec.Config.HTTPSProxy,
 		})
 	}
 
@@ -726,6 +757,18 @@ func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, id
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "CPU_RATE_LIMIT",
 			Value: *instance.Spec.Config.CpuRateLimit,
+		})
+	}
+	if isProxyValueActive(instance.Spec.Config.HTTPProxy) {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "_userdefined_http_proxy",
+			Value: *instance.Spec.Config.HTTPProxy,
+		})
+	}
+	if isProxyValueActive(instance.Spec.Config.HTTPSProxy) {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "_userdefined_https_proxy",
+			Value: *instance.Spec.Config.HTTPSProxy,
 		})
 	}
 

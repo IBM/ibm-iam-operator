@@ -313,12 +313,8 @@ func (in *ConfigSpec) DeepCopyInto(out *ConfigSpec) {
 	}
 	if in.PreferredLoginIdp != nil {
 		in, out := &in.PreferredLoginIdp, &out.PreferredLoginIdp
-		*out = new([]string)
-		if **in != nil {
-			in, out := *in, *out
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 	if in.Ingress != nil {
 		in, out := &in.Ingress, &out.Ingress

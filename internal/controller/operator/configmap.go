@@ -629,10 +629,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 			preferredLogin = *authCR.Spec.Config.PreferredLogin
 		}
 
-		var preferredLoginIdp string
-		if authCR.Spec.Config.PreferredLoginIdp != nil {
-			preferredLoginIdp = strings.Join(*authCR.Spec.Config.PreferredLoginIdp, ",")
-		}
+		preferredLoginIdp := strings.Join(authCR.Spec.Config.PreferredLoginIdp, ",")
 
 		// When both preferredLogin and preferredLoginIdp are set, PREFERRED_LOGIN_IDP takes
 		// precedence over PREFERRED_LOGIN.
@@ -640,7 +637,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 			reqLogger.V(1).Info("Both spec.config.preferredLogin and spec.config.preferredLoginIdp are set; "+
 				"PREFERRED_LOGIN_IDP takes precedence over PREFERRED_LOGIN",
 				"preferredLogin", preferredLogin,
-				"preferredLoginIdp", *authCR.Spec.Config.PreferredLoginIdp)
+				"preferredLoginIdp", authCR.Spec.Config.PreferredLoginIdp)
 		}
 
 		*generated = corev1.ConfigMap{

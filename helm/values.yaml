@@ -17,6 +17,10 @@ global:
   imagePullPrefix: icr.io
   imagePullSecret: ibm-entitlement-key
   imagePullPolicy: IfNotPresent
+  # enforceLeastPrivilege removes the events RBAC permission and disables
+  # Kubernetes Event emission in the operator. Set to true for deployments
+  # that require a stricter security posture.
+  enforceLeastPrivilege: false
 # Define tethered namespaces here, e.g.:
 # tetheredNamespaces:
 #   - tenant1

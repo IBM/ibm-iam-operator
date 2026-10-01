@@ -624,13 +624,23 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 			}
 		}
 
+		var preferredLogin string
+		if authCR.Spec.Config.PreferredLogin != nil {
+			preferredLogin = *authCR.Spec.Config.PreferredLogin
+		}
+
+		var preferredLoginIdp string
+		if authCR.Spec.Config.PreferredLoginIdp != nil {
+			preferredLoginIdp = strings.Join(*authCR.Spec.Config.PreferredLoginIdp, ",")
+		}
+
 		// When both preferredLogin and preferredLoginIdp are set, PREFERRED_LOGIN_IDP takes
 		// precedence over PREFERRED_LOGIN.
-		if authCR.Spec.Config.PreferredLogin != "" && len(authCR.Spec.Config.PreferredLoginIdp) > 0 {
+		if preferredLogin != "" && preferredLoginIdp != "" {
 			reqLogger.V(1).Info("Both spec.config.preferredLogin and spec.config.preferredLoginIdp are set; "+
 				"PREFERRED_LOGIN_IDP takes precedence over PREFERRED_LOGIN",
-				"preferredLogin", authCR.Spec.Config.PreferredLogin,
-				"preferredLoginIdp", authCR.Spec.Config.PreferredLoginIdp)
+				"preferredLogin", preferredLogin,
+				"preferredLoginIdp", *authCR.Spec.Config.PreferredLoginIdp)
 		}
 
 		*generated = corev1.ConfigMap{
@@ -677,8 +687,8 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"SCOPE_CLAIM":                        authCR.Spec.Config.ScopeClaim,
 				"BOOTSTRAP_USERID":                   bootStrapUserId,
 				"PROVIDER_ISSUER_URL":                authCR.Spec.Config.ProviderIssuerURL,
-				"PREFERRED_LOGIN":                    authCR.Spec.Config.PreferredLogin,
-				"PREFERRED_LOGIN_IDP":                strings.Join(authCR.Spec.Config.PreferredLoginIdp, ","),
+				"PREFERRED_LOGIN":                    preferredLogin,
+				"PREFERRED_LOGIN_IDP":                preferredLoginIdp,
 				"DEFAULT_LOGIN":                      authCR.Spec.Config.DefaultLogin,
 				"LIBERTY_TOKEN_LENGTH":               "1024",
 				"OS_TOKEN_LENGTH":                    "51",

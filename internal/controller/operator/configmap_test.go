@@ -1,3 +1,19 @@
+//
+// Copyright 2020 IBM Corporation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
 package operator
 
 import (
@@ -403,7 +419,7 @@ var _ = Describe("ConfigMap handling", func() {
 					ClusterCADomain:       "domain.example.com",
 					DefaultAdminUser:      "myadmin",
 					ZenFrontDoor:          true,
-					PreferredLogin:        "ldap",
+					PreferredLogin:        ptr.To("ldap"),
 					ProviderIssuerURL:     "example.com",
 					ROKSURL:               "",
 					ROKSEnabled:           false,
@@ -1002,6 +1018,7 @@ var _ = Describe("ConfigMap handling", func() {
 				"SCOPE_CLAIM",
 				"NONCE_ENABLED",
 				"PREFERRED_LOGIN",
+				"PREFERRED_LOGIN_IDP",
 				"OIDC_ISSUER_URL",
 				"PROVIDER_ISSUER_URL",
 				"CLUSTER_NAME",
@@ -1447,6 +1464,53 @@ var _ = Describe("ConfigMap handling", func() {
 			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
 			Expect(generated.Data["CSP_CONNECT_SRC"]).To(Equal("'self'"))
 		})
+		It("sets PREFERRED_LOGIN_IDP to a comma-joined string when PreferredLoginIdp has multiple entries", func() {
+			authCR.Spec.Config.PreferredLoginIdp = []string{"ldap", "saml"}
+			Expect(r.Update(ctx, authCR)).To(Succeed())
+
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+
+			Expect(generated.Data).To(HaveKeyWithValue("PREFERRED_LOGIN_IDP", "ldap,saml"))
+		})
+
+		It("sets PREFERRED_LOGIN_IDP to a single value when PreferredLoginIdp has one entry", func() {
+			authCR.Spec.Config.PreferredLoginIdp = []string{"saml"}
+			Expect(r.Update(ctx, authCR)).To(Succeed())
+
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+
+			Expect(generated.Data).To(HaveKeyWithValue("PREFERRED_LOGIN_IDP", "saml"))
+		})
+
+		It("sets PREFERRED_LOGIN_IDP to empty string when PreferredLoginIdp is nil", func() {
+			authCR.Spec.Config.PreferredLoginIdp = nil
+			Expect(r.Update(ctx, authCR)).To(Succeed())
+
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+
+			Expect(generated.Data).To(HaveKeyWithValue("PREFERRED_LOGIN_IDP", ""))
+		})
 	})
 
 	Describe("validate CSPExtension", func() {
@@ -1601,7 +1665,7 @@ var _ = Describe("ConfigMap handling", func() {
 						ClusterCADomain:          "domain.example.com",
 						DefaultAdminUser:         "myadmin",
 						ZenFrontDoor:             true,
-						PreferredLogin:           "ldap",
+						PreferredLogin:           ptr.To("ldap"),
 						ProviderIssuerURL:        "example.com",
 						ROKSURL:                  "",
 						ROKSEnabled:              false,
@@ -1775,7 +1839,7 @@ var _ = Describe("ConfigMap handling", func() {
 						ClusterCADomain:       "domain.example.com",
 						DefaultAdminUser:      "myadmin",
 						ZenFrontDoor:          true,
-						PreferredLogin:        "ldap",
+						PreferredLogin:        ptr.To("ldap"),
 						ProviderIssuerURL:     "example.com",
 						ROKSURL:               "",
 						ROKSEnabled:           false,

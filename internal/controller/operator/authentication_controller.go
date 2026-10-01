@@ -507,7 +507,7 @@ func (r *AuthenticationReconciler) Reconcile(rootCtx context.Context, req ctrl.R
 	}
 
 	ctx = withPassProgress(ctx)
-	
+
 	// Evaluate the secondary resources and the primary's status, then
 	// requeue if any changes or issues were encountered in either
 	finalResult, err := common.NewLazySubreconcilers(common.NewSubreconcilers(req,

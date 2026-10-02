@@ -732,8 +732,13 @@ var _ = Describe("ConfigMap handling", func() {
 						"SCIM_LDAP_SEARCH_SIZE_LIMIT",
 						"SCIM_LDAP_SEARCH_TIME_LIMIT",
 						"SCIM_ASYNC_PARALLEL_LIMIT",
-						"SCIM_SERVER_MAX_START_INDEX",
 						"SCIM_GET_DISPLAY_FOR_GROUP_USERS",
+					},
+				},
+				{
+					"SCIM_SERVER_MAX_START_INDEX",
+					[]string{
+						"SCIM_SERVER_MAX_START_INDEX",
 					},
 				},
 				{
@@ -1510,6 +1515,55 @@ var _ = Describe("ConfigMap handling", func() {
 			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
 
 			Expect(generated.Data).To(HaveKeyWithValue("PREFERRED_LOGIN_IDP", ""))
+		})
+
+		It("adds SCIM_SERVER_MAX_START_INDEX when SCIM_LDAP_ATTRIBUTES_MAPPING is already present (upgrade scenario)", func() {
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			observed := getObserved(authCR.Namespace)
+			delete(observed.Data, "SCIM_SERVER_MAX_START_INDEX")
+
+			r.Create(ctx, &batchv1.Job{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "batch/v1", Kind: "Job"},
+				ObjectMeta: metav1.ObjectMeta{Name: "im-has-saml", Namespace: authCR.Namespace, UID: "96467cef-a1d2-455c-97be-eae3d6196e95"},
+			})
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+
+			updated, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(updated).To(BeTrue())
+			Expect(observed.Data).To(HaveKey("SCIM_SERVER_MAX_START_INDEX"))
+			Expect(observed.Data["SCIM_SERVER_MAX_START_INDEX"]).To(Equal(generated.Data["SCIM_SERVER_MAX_START_INDEX"]))
+		})
+
+		It("preserves a custom SCIM_SERVER_MAX_START_INDEX value when it is already set", func() {
+			// Once the key is present, customer customisations must not be overwritten.
+			resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+				WithName("platform-auth-idp").
+				WithNamespace(authCR.Namespace).
+				WithClient(cl).
+				WithPrimary(authCR).MustBuild()
+
+			observed := getObserved(authCR.Namespace)
+			customValue := "9999"
+			observed.Data["SCIM_SERVER_MAX_START_INDEX"] = customValue
+
+			r.Create(ctx, &batchv1.Job{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "batch/v1", Kind: "Job"},
+				ObjectMeta: metav1.ObjectMeta{Name: "im-has-saml", Namespace: authCR.Namespace, UID: "96467cef-a1d2-455c-97be-eae3d6196e95"},
+			})
+			generated := &corev1.ConfigMap{}
+			Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+
+			_, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
+			Expect(err).NotTo(HaveOccurred())
+			// The custom value must be left intact.
+			Expect(observed.Data["SCIM_SERVER_MAX_START_INDEX"]).To(Equal(customValue))
 		})
 	})
 

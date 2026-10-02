@@ -435,7 +435,6 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"SCIM_LDAP_SEARCH_SIZE_LIMIT",
 			"SCIM_LDAP_SEARCH_TIME_LIMIT",
 			"SCIM_ASYNC_PARALLEL_LIMIT",
-			"SCIM_SERVER_MAX_START_INDEX",
 			"SCIM_GET_DISPLAY_FOR_GROUP_USERS"),
 		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("SCIM_AUTH_CACHE_MAX_SIZE")),
 			"SCIM_AUTH_CACHE_MAX_SIZE"),
@@ -453,6 +452,8 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"LDAP_CTX_POOL_PREFERREDSIZE"),
 		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("MASTER_PATH")),
 			"MASTER_PATH"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("SCIM_SERVER_MAX_START_INDEX")),
+			"SCIM_SERVER_MAX_START_INDEX"),
 	}
 
 	if v, ok := generated.Data["IS_OPENSHIFT_ENV"]; ok {

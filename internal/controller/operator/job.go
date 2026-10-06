@@ -825,7 +825,7 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 						},
 					},
 					Volumes:    buildMigratorVolumes(needsMongoDBMigration, edbspc.Name, zenInstanceID),
-					Containers: buildMigratorContainer(s, image, resources, mongoHost, zenInstanceID),
+					Containers: buildMigratorContainer(s, authCR, image, resources, mongoHost, zenInstanceID),
 				},
 			},
 		},
@@ -854,7 +854,7 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 	return
 }
 
-func buildMigratorContainer(s common.SecondaryReconciler, image string, resources *corev1.ResourceRequirements, mongoHost string, zenInstanceID string) (containers []corev1.Container) {
+func buildMigratorContainer(s common.SecondaryReconciler, authCR *operatorv1alpha1.Authentication, image string, resources *corev1.ResourceRequirements, mongoHost string, zenInstanceID string) (containers []corev1.Container) {
 	container := corev1.Container{
 		Name:            s.GetName(),
 		Image:           image,
@@ -895,6 +895,9 @@ func buildMigratorContainer(s common.SecondaryReconciler, image string, resource
 			},
 		},
 		Command: []string{"/usr/local/bin/migrator", "migrate", "--postgres-config", "/etc/postgres"},
+		Env: []corev1.EnvVar{
+			{Name: "DB_SSL_MODE", Value: authCR.GetDBSSLMode()},
+		},
 	}
 
 	if mongoHost == "" {
@@ -902,12 +905,12 @@ func buildMigratorContainer(s common.SecondaryReconciler, image string, resource
 	}
 
 	container.Command = append(container.Command, "--mongodb-config", "/etc/mongodb")
-	container.Env = []corev1.EnvVar{
-		{Name: "MONGODB_HOST", Value: mongoHost},
-		{Name: "MONGODB_PORT", Value: "27017"},
-		{Name: "MONGODB_NAME", Value: "platform-db"},
-		{Name: "POD_NAMESPACE", Value: s.GetNamespace()},
-	}
+	container.Env = append(container.Env,
+		corev1.EnvVar{Name: "MONGODB_HOST", Value: mongoHost},
+		corev1.EnvVar{Name: "MONGODB_PORT", Value: "27017"},
+		corev1.EnvVar{Name: "MONGODB_NAME", Value: "platform-db"},
+		corev1.EnvVar{Name: "POD_NAMESPACE", Value: s.GetNamespace()},
+	)
 	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
 		Name:      "mongodb-admin-creds",
 		MountPath: "/etc/mongodb/config",

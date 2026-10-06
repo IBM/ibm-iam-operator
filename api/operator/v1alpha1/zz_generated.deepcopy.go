@@ -381,6 +381,11 @@ func (in *ConfigSpec) DeepCopyInto(out *ConfigSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.DBSSLMode != nil {
+		in, out := &in.DBSSLMode, &out.DBSSLMode
+		*out = new(string)
+		**out = **in
+	}
 	if in.HTTPProxy != nil {
 		in, out := &in.HTTPProxy, &out.HTTPProxy
 		*out = new(string)

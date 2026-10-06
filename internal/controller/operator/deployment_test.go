@@ -82,13 +82,6 @@ var builtInTolerationsWithEffect = []v1.Toleration{
 	{Key: "CriticalAddonsOnly", Operator: v1.TolerationOpExists},
 }
 
-// builtInTolerationsNoEffect mirrors the default tolerations for identity-manager,
-// which omits Effect on the "dedicated" entry (pre-existing inconsistency in the code).
-var builtInTolerationsNoEffect = []v1.Toleration{
-	{Key: "dedicated", Operator: v1.TolerationOpExists},
-	{Key: "CriticalAddonsOnly", Operator: v1.TolerationOpExists},
-}
-
 var _ = Describe("Deployment handling", func() {
 	DescribeTable("hasDataField",
 		func(b []byte, has bool) {
@@ -254,7 +247,7 @@ var _ = Describe("Deployment handling", func() {
 				} else {
 					Expect(deploy.Spec.Template.Spec.NodeSelector).To(BeNil())
 				}
-				Expect(deploy.Spec.Template.Spec.Tolerations).To(ContainElements(builtInTolerationsNoEffect))
+				Expect(deploy.Spec.Template.Spec.Tolerations).To(ContainElements(builtInTolerationsWithEffect))
 				for _, t := range tolerations {
 					Expect(deploy.Spec.Template.Spec.Tolerations).To(ContainElement(t))
 				}

@@ -380,6 +380,7 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"SCOPE_CLAIM",
 			"NONCE_ENABLED",
 			"PREFERRED_LOGIN",
+			"PREFERRED_LOGIN_IDP",
 			"OIDC_ISSUER_URL",
 			"PROVIDER_ISSUER_URL",
 			"CLUSTER_NAME",
@@ -434,7 +435,6 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"SCIM_LDAP_SEARCH_SIZE_LIMIT",
 			"SCIM_LDAP_SEARCH_TIME_LIMIT",
 			"SCIM_ASYNC_PARALLEL_LIMIT",
-			"SCIM_SERVER_MAX_START_INDEX",
 			"SCIM_GET_DISPLAY_FOR_GROUP_USERS"),
 		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("SCIM_AUTH_CACHE_MAX_SIZE")),
 			"SCIM_AUTH_CACHE_MAX_SIZE"),
@@ -452,6 +452,8 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"LDAP_CTX_POOL_PREFERREDSIZE"),
 		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("MASTER_PATH")),
 			"MASTER_PATH"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("SCIM_SERVER_MAX_START_INDEX")),
+			"SCIM_SERVER_MAX_START_INDEX"),
 	}
 
 	if v, ok := generated.Data["IS_OPENSHIFT_ENV"]; ok {
@@ -623,6 +625,22 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 			}
 		}
 
+		var preferredLogin string
+		if authCR.Spec.Config.PreferredLogin != nil {
+			preferredLogin = *authCR.Spec.Config.PreferredLogin
+		}
+
+		preferredLoginIdp := strings.Join(authCR.Spec.Config.PreferredLoginIdp, ",")
+
+		// When both preferredLogin and preferredLoginIdp are set, PREFERRED_LOGIN_IDP takes
+		// precedence over PREFERRED_LOGIN.
+		if preferredLogin != "" && preferredLoginIdp != "" {
+			reqLogger.V(1).Info("Both spec.config.preferredLogin and spec.config.preferredLoginIdp are set; "+
+				"PREFERRED_LOGIN_IDP takes precedence over PREFERRED_LOGIN",
+				"preferredLogin", preferredLogin,
+				"preferredLoginIdp", authCR.Spec.Config.PreferredLoginIdp)
+		}
+
 		*generated = corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      s.GetName(),
@@ -667,7 +685,8 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"SCOPE_CLAIM":                        authCR.Spec.Config.ScopeClaim,
 				"BOOTSTRAP_USERID":                   bootStrapUserId,
 				"PROVIDER_ISSUER_URL":                authCR.Spec.Config.ProviderIssuerURL,
-				"PREFERRED_LOGIN":                    authCR.Spec.Config.PreferredLogin,
+				"PREFERRED_LOGIN":                    preferredLogin,
+				"PREFERRED_LOGIN_IDP":                preferredLoginIdp,
 				"DEFAULT_LOGIN":                      authCR.Spec.Config.DefaultLogin,
 				"LIBERTY_TOKEN_LENGTH":               "1024",
 				"OS_TOKEN_LENGTH":                    "51",

@@ -169,7 +169,8 @@ type ConfigSpec struct {
 	SaasClientRedirectUrl       string              `json:"saasClientRedirectUrl,omitempty"`
 	NONCEEnabled                bool                `json:"nonceEnabled"`
 	XFrameDomain                string              `json:"xframeDomain,omitempty"`
-	PreferredLogin              string              `json:"preferredLogin,omitempty"`
+	PreferredLogin              *string             `json:"preferredLogin,omitempty"`
+	PreferredLoginIdp           []string            `json:"preferredLoginIdp,omitempty"`
 	DefaultLogin                string              `json:"defaultLogin,omitempty"`
 	ROKSURL                     string              `json:"roksURL"`
 	ROKSUserPrefix              string              `json:"roksUserPrefix"`
@@ -196,11 +197,9 @@ type ConfigSpec struct {
 	IdMgmtWorkers               *string             `json:"idMgmtWorkers,omitempty"`
 	DisableCertAuthRoute        bool                `json:"disableCertAuthRoute,omitempty"`
 	CpuRateLimit                *string             `json:"cpuRateLimit,omitempty"`
-	// DBSSLMode sets the SSL mode used when connecting to the PostgreSQL database.
-	// Valid values match those accepted by the libpq sslmode parameter (e.g. "require", "verify-full", "disable").
-	// Defaults to "require" when unset.
-	// +optional
 	DBSSLMode                   *string             `json:"dbSSLMode,omitempty"`
+	HTTPProxy                   *string             `json:"httpProxy,omitempty"`
+	HTTPSProxy                  *string             `json:"httpsProxy,omitempty"`
 }
 
 type ManagedResourceStatus struct {
@@ -243,15 +242,36 @@ func (a *Authentication) SetService(ctx context.Context, service ServiceStatus, 
 	return nil
 }
 
+// DependencyTime records the wait time for a single immediate dependency.
+type DependencyTime struct {
+	Component          string      `json:"component"`
+	StartTime          metav1.Time `json:"startTime"`
+	ReadyTime          metav1.Time `json:"readyTime"`
+	DependencyDuration string      `json:"dependencyDuration"`
+}
+
+// OperationTimingEntry records timing for a single end-to-end operation
+// (install, upgrade, or patch).
+type OperationTimingEntry struct {
+	StartTime      metav1.Time      `json:"startTime"`
+	EndTime        metav1.Time      `json:"endTime"`
+	TotalDuration  string           `json:"totalDuration"`
+	Phase          string           `json:"phase"`
+	DependencyTime []DependencyTime `json:"dependencyTime,omitempty"`
+}
+
 // AuthenticationStatus defines the observed state of Authentication
 type AuthenticationStatus struct {
-	Nodes      []string           `json:"nodes"`
-	Service    ServiceStatus      `json:"service,omitempty"`
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	Nodes            []string               `json:"nodes"`
+	Service          ServiceStatus          `json:"service,omitempty"`
+	Conditions       []metav1.Condition     `json:"conditions,omitempty"`
+	OperationTiming  []OperationTimingEntry `json:"operationTiming,omitempty"`
+	Progress         string                 `json:"progress,omitempty"`
+	ProgressMessage  string                 `json:"progressMessage,omitempty"`
+	ReconcileHistory []string               `json:"reconcileHistory,omitempty"`
 }
 
 const ConditionMigrationsRunning = "MigrationsRunning"
-
 const ConditionMigrated string = "MigrationsPerformed"
 const MessageMigrationSuccess string = "All migrations completed successfully"
 const MessageMigrationInProgress string = "Migrations are currently being performed; monitor progress in the IM Operator \"migration_worker\" logs"

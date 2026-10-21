@@ -32,14 +32,6 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// hpaServiceTarget associates a Deployment name with its per-service Replicas
-// override. When perSvcReplicas is non-nil, the HPA for that service is
-// suppressed regardless of autoScaleConfig (§4.2).
-type hpaServiceTarget struct {
-	deploymentName string
-	perSvcReplicas *int32 // nil = no per-service override; non-nil = HPA suppressed
-}
-
 func (r *AuthenticationReconciler) handleHPAs(ctx context.Context, req ctrl.Request) (result *ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
 	debugLog := log.V(1)
@@ -53,28 +45,33 @@ func (r *AuthenticationReconciler) handleHPAs(ctx context.Context, req ctrl.Requ
 
 	authCRNS := authCR.Namespace
 
-	targets := []hpaServiceTarget{
-		{deploymentName: "platform-auth-service", perSvcReplicas: authCR.Spec.AuthService.Replicas},
-		{deploymentName: "platform-identity-provider", perSvcReplicas: authCR.Spec.IdentityProvider.Replicas},
-		{deploymentName: "platform-identity-management", perSvcReplicas: authCR.Spec.IdentityManager.Replicas},
+	deploymentNames := []string{
+		"platform-auth-service",
+		"platform-identity-provider",
+		"platform-identity-management",
 	}
 
 	subRecs := []common.SecondaryReconciler{}
-	for _, t := range targets {
-		if hpaEnabled(authCR.Spec.AutoScaleConfig, t.perSvcReplicas) {
-			log.Info("Autoscaling enabled for service; HPA should be present", "service", t.deploymentName)
-			subRecs = append(subRecs, buildHPAReconciler(authCR, t.deploymentName, authCRNS, r.Client))
+	for _, depName := range deploymentNames {
+		perSvcReplicas := perSvcReplicasForDeployment(authCR, depName)
+		if hpaEnabled(authCR.Spec.AutoScaleConfig, perSvcReplicas) {
+			log.Info("Autoscaling enabled for service; HPA should be present", "service", depName)
+			subRecs = append(subRecs, buildHPAReconciler(authCR, depName, authCRNS, r.Client))
 		} else {
 			// Per-service pin set, or global autoscaling disabled — delete any existing HPA.
-			debugLog.Info("HPA suppressed for service; removing if present", "service", t.deploymentName)
-			deleted, delErr := deleteHPAIfPresent(debugCtx, r.Client, t.deploymentName+"-hpa", authCRNS)
+			debugLog.Info("HPA suppressed for service; removing if present", "service", depName)
+			deleted, delErr := deleteHPAIfPresent(debugCtx, r.Client, depName+"-hpa", authCRNS)
 			if delErr != nil {
+				log.Error(delErr, "Failed to delete HPA", "service", depName)
 				return subreconciler.RequeueWithDelay(defaultLowerWait)
 			}
 			if deleted {
-				effectiveCount := effectiveReplicas(authCR.Spec.Replicas, t.perSvcReplicas)
-				if updateErr := r.UpdateDeploymentReplicas(debugCtx, t.deploymentName, authCRNS, effectiveCount); updateErr != nil {
-					log.Error(updateErr, "Failed to update deployment replicas after HPA deletion", "service", t.deploymentName)
+				effectiveCount := effectiveReplicas(authCR.Spec.Replicas, perSvcReplicas)
+				// Immediate update to eliminate the delay before handleDeployments runs.
+				// Non-fatal if this fails: handleDeployments will reconcile replicas on
+				// this or subsequent reconcile passes, so we do not requeue here.
+				if updateErr := r.UpdateDeploymentReplicas(debugCtx, depName, authCRNS, effectiveCount); updateErr != nil {
+					log.Error(updateErr, "Failed to update deployment replicas after HPA deletion", "service", depName)
 				}
 			}
 		}
@@ -102,7 +99,8 @@ func (r *AuthenticationReconciler) handleHPAs(ctx context.Context, req ctrl.Requ
 
 // buildHPAReconciler returns a SecondaryReconciler that creates or updates the
 // HPA for the named Deployment. It is only called for services where hpaEnabled
-// returns true (i.e. perSvcReplicas is nil).
+// returns true (i.e. perSvcReplicas is nil, so min/max replicas are always based
+// on global spec.Replicas).
 func buildHPAReconciler(
 	authCR *operatorv1alpha1.Authentication,
 	deploymentName, namespace string,
@@ -139,6 +137,9 @@ func deleteHPAIfPresent(ctx context.Context, c client.Client, hpaName, namespace
 	return true, nil
 }
 
+// generateHPAObject returns a GenerateFn that creates the HPA spec.
+// Note that generateHPAObject is only invoked when hpaEnabled is true (perSvcReplicas is nil),
+// so minReplicas and maxReplicas are intentionally derived from global instance.Spec.Replicas.
 func generateHPAObject(instance *operatorv1alpha1.Authentication, deploymentName string) common.GenerateFn[*autoscalingv2.HorizontalPodAutoscaler] {
 	return func(s common.SecondaryReconciler, ctx context.Context, hpa *autoscalingv2.HorizontalPodAutoscaler) (err error) {
 

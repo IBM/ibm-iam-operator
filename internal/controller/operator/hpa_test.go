@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	operatorv1alpha1 "github.com/IBM/ibm-iam-operator/api/operator/v1alpha1"
+	testutil "github.com/IBM/ibm-iam-operator/test/utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -534,6 +535,41 @@ var _ = Describe("HPA helpers", func() {
 			_, err := r.handleHPAs(ctx, req)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(r.needsRollout).To(BeTrue())
+		})
+
+		It("requeues with defaultLowerWait when deleteHPAIfPresent encounters an error", func() {
+			ctx := context.Background()
+			scheme := newHPATestScheme()
+			authCR := makeAuthCRForHPA(hpaNS, globalReplicas, false)
+			hpa := makeHPAFixture("platform-auth-service", hpaNS)
+			cl := fakeclient.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(authCR, hpa).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Delete: func(_ context.Context, _ client.WithWatch, obj client.Object, _ ...client.DeleteOption) error {
+						if _, ok := obj.(*autoscalingv2.HorizontalPodAutoscaler); ok {
+							return fmt.Errorf("simulated delete error")
+						}
+						return nil
+					},
+				}).
+				Build()
+			r := &AuthenticationReconciler{Client: cl}
+			req := hpaRequest(hpaNS, authCR.Name)
+			res, err := r.handleHPAs(ctx, req)
+			testutil.ConfirmThatItRequeuesWithDelay(res, err, defaultLowerWait)
+		})
+
+		It("continues reconciling when UpdateDeploymentReplicas fails after HPA deletion", func() {
+			ctx := context.Background()
+			scheme := newHPATestScheme()
+			authCR := makeAuthCRForHPA(hpaNS, globalReplicas, false)
+			hpa := makeHPAFixture("platform-auth-service", hpaNS)
+			// Deployment is intentionally omitted so UpdateDeploymentReplicas returns an error
+			r := newHPAReconciler(scheme, authCR, hpa)
+			req := hpaRequest(hpaNS, authCR.Name)
+			res, err := r.handleHPAs(ctx, req)
+			testutil.ConfirmThatItContinuesReconciling(res, err)
 		})
 	})
 })

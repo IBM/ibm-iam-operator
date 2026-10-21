@@ -252,7 +252,7 @@ func generatePlatformAuthService(imagePullSecret, samlCertSecret, ldapSPCName, e
 		if !ok {
 			return fmt.Errorf("received non-Authentication")
 		}
-		replicas := authCR.Spec.Replicas
+		replicas := effectiveReplicas(authCR.Spec.Replicas, authCR.Spec.AuthService.Replicas)
 		ldapCACert := authCR.Spec.AuthService.LdapsCACert
 		ldapSPCExists := ldapSPCName != ""
 
@@ -448,7 +448,7 @@ func generatePlatformIdentityManagement(imagePullSecret, samlCertSecret, auditSe
 		if !ok {
 			return fmt.Errorf("received non-Authentication")
 		}
-		replicas := authCR.Spec.Replicas
+		replicas := effectiveReplicas(authCR.Spec.Replicas, authCR.Spec.IdentityManager.Replicas)
 		ldapCACert := authCR.Spec.AuthService.LdapsCACert
 		ldapSPCExists := ldapSPCName != ""
 
@@ -642,7 +642,7 @@ func generatePlatformIdentityProvider(imagePullSecret, samlCertSecret, saasServi
 		if !ok {
 			return fmt.Errorf("unexpected non-Authentication")
 		}
-		replicas := authCR.Spec.Replicas
+		replicas := effectiveReplicas(authCR.Spec.Replicas, authCR.Spec.IdentityProvider.Replicas)
 		ldapCACert := authCR.Spec.AuthService.LdapsCACert
 		ldapSPCExists := ldapSPCName != ""
 
@@ -916,9 +916,12 @@ func modifyDeployment(needsRollout bool) common.ModifyFn[*appsv1.Deployment] {
 		if !ok {
 			return
 		}
-		if authCR.Spec.AutoScaleConfig {
+		servicePerSvcReplicas := perSvcReplicasForDeployment(authCR, s.GetName())
+		if hpaEnabled(authCR.Spec.AutoScaleConfig, servicePerSvcReplicas) {
+			// HPA owns this Deployment's scale — don't fight it.
 			generated.Spec.Replicas = observed.Spec.Replicas
 		}
+		// else: generated.Spec.Replicas already holds effectiveReplicas(...) from the generator.
 		if val, ok := observed.Labels["operator.ibm.com/bindinfoRefresh"]; !ok || val != "enabled" {
 			observed.Labels["operator.ibm.com/bindinfoRefresh"] = "enabled"
 			modified = true

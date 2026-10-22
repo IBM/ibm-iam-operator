@@ -545,7 +545,7 @@ func buildIdentityProviderContainer(instance *operatorv1alpha1.Authentication, i
 
 func buildIdentityManagerContainer(instance *operatorv1alpha1.Authentication, identityManagerImage string, ldapSpcExist bool) corev1.Container {
 
-	replicaCount := int(instance.Spec.Replicas)
+	replicaCount := int(effectiveReplicas(instance.Spec.Replicas, instance.Spec.IdentityManager.Replicas))
 	resources := instance.Spec.IdentityManager.Resources
 	if resources == nil {
 		resources = &corev1.ResourceRequirements{

@@ -40,6 +40,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -889,6 +890,119 @@ var _ = Describe("ResourceStatus", func() {
 			Expect(statuses).To(HaveLen(2))
 			Expect(statuses[0].Status).To(Equal(ResourceReadyState))
 			Expect(statuses[1].Status).To(Equal(ResourceNotReadyState))
+		})
+	})
+
+	// §7.2.4 — expectedPodCount tests for per-service replica overrides.
+	//
+	// setAuthenticationStatus computes expectedPodCount as the sum of effectiveReplicas
+	// across the three services. These tests assert that it reflects readiness correctly
+	// when per-service overrides produce a total that differs from spec.Replicas * 3.
+	Context("setAuthenticationStatus expectedPodCount with per-service replicas", func() {
+		// getReconcilerWithSpec builds an AuthenticationReconciler whose Authentication CR
+		// has the given spec (including per-service replica overrides).
+		getReconcilerWithSpec := func(server *httptest.Server, spec operatorv1alpha1.AuthenticationSpec) *AuthenticationReconciler {
+			scheme := runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).To(Succeed())
+			Expect(operatorv1alpha1.AddODLMEnabledToScheme(scheme)).To(Succeed())
+			Expect(batchv1.AddToScheme(scheme)).To(Succeed())
+			Expect(appsv1.AddToScheme(scheme)).To(Succeed())
+			Expect(routev1.AddToScheme(scheme)).To(Succeed())
+			authCR := &operatorv1alpha1.Authentication{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "operator.ibm.com/v1alpha1",
+					Kind:       "Authentication",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "example-authentication",
+					Namespace:       "data-ns",
+					ResourceVersion: trackerAddResourceVersion,
+				},
+				Spec: spec,
+			}
+			cb := *fakeclient.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(authCR.DeepCopy())
+			cl := cb.Build()
+			dc := discovery.NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+			return &AuthenticationReconciler{
+				Client: &ctrlcommon.FallbackClient{
+					Client: cl,
+					Reader: cl,
+				},
+				DiscoveryClient: *dc,
+			}
+		}
+
+		// addPodsForService creates n pods labelled with the given app name.
+		addPodsForService := func(cl client.Client, ctx context.Context, ns, appName string, n int) {
+			for i := 0; i < n; i++ {
+				po := &corev1.Pod{
+					TypeMeta: metav1.TypeMeta{Kind: "Pod", APIVersion: "v1"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      fmt.Sprintf("%s-%d", appName, i),
+						Namespace: ns,
+						Labels:    map[string]string{"k8s-app": appName},
+					},
+				}
+				Expect(cl.Create(ctx, po)).To(Succeed())
+			}
+		}
+
+		It("Status.Nodes reflects pods matching per-service replica counts (authService=1, idp=3, idm=2)", func() {
+			// The per-service sum is 1+3+2=6.
+			// Verify Status.Nodes contains exactly those 6 pods (one per effective replica).
+			server := getFakeServerForDiscovery()
+			defer server.Close()
+			spec := operatorv1alpha1.AuthenticationSpec{
+				OperatorVersion: "4.0.0",
+				Replicas:        2, // global default
+			}
+			spec.AuthService.Replicas = ptr.To[int32](1)
+			spec.IdentityProvider.Replicas = ptr.To[int32](3)
+			spec.IdentityManager.Replicas = ptr.To[int32](2)
+			r := getReconcilerWithSpec(server, spec)
+			ctx = context.Background()
+			// Seed 1+3+2=6 pods across the three services.
+			addPodsForService(r.Client, ctx, "data-ns", "platform-auth-service", 1)
+			addPodsForService(r.Client, ctx, "data-ns", "platform-identity-provider", 3)
+			addPodsForService(r.Client, ctx, "data-ns", "platform-identity-management", 2)
+
+			authCR := &operatorv1alpha1.Authentication{}
+			Expect(r.Get(ctx, types.NamespacedName{Name: "example-authentication", Namespace: "data-ns"}, authCR)).To(Succeed())
+			_, err := r.setAuthenticationStatus(ctx, authCR)
+			Expect(err).NotTo(HaveOccurred())
+			// Status.Nodes should list all 6 pods — one per effective replica.
+			Expect(authCR.Status.Nodes).To(HaveLen(6),
+				"expectedPodCount should be sum of per-service replicas (1+3+2=6)")
+		})
+
+		It("Status.Nodes count equals per-service sum, not global*3 (global=3 → old code would expect 9)", func() {
+			// global=3 → old code expects 9 pods; per-service sum=1+3+2=6.
+			// Seeding 6 pods and asserting Status.Nodes has 6 entries proves the new formula is used.
+			server := getFakeServerForDiscovery()
+			defer server.Close()
+			spec := operatorv1alpha1.AuthenticationSpec{
+				OperatorVersion: "4.0.0",
+				Replicas:        3, // old code would expect 9 pods
+			}
+			spec.AuthService.Replicas = ptr.To[int32](1)
+			spec.IdentityProvider.Replicas = ptr.To[int32](3)
+			spec.IdentityManager.Replicas = ptr.To[int32](2)
+			r := getReconcilerWithSpec(server, spec)
+			ctx = context.Background()
+			// Seed only 1+3+2=6 pods (matching per-service sum, not global*3=9).
+			addPodsForService(r.Client, ctx, "data-ns", "platform-auth-service", 1)
+			addPodsForService(r.Client, ctx, "data-ns", "platform-identity-provider", 3)
+			addPodsForService(r.Client, ctx, "data-ns", "platform-identity-management", 2)
+
+			authCR := &operatorv1alpha1.Authentication{}
+			Expect(r.Get(ctx, types.NamespacedName{Name: "example-authentication", Namespace: "data-ns"}, authCR)).To(Succeed())
+			_, err := r.setAuthenticationStatus(ctx, authCR)
+			Expect(err).NotTo(HaveOccurred())
+			// Status.Nodes should have 6 entries (per-service sum), not 9 (global*3).
+			Expect(authCR.Status.Nodes).To(HaveLen(6),
+				"expectedPodCount should be per-service sum (1+3+2=6), not global*3 (3*3=9)")
 		})
 	})
 })

@@ -96,6 +96,9 @@ type AuthServiceSpec struct {
 	RouterCertSecret string                       `json:"routerCertSecret"`
 	Resources        *corev1.ResourceRequirements `json:"resources,omitempty"`
 	LdapsCACert      string                       `json:"ldapsCACert"`
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	Replicas *int32 `json:"replicas,omitempty"`
 }
 
 type IdentityProviderSpec struct {
@@ -103,6 +106,9 @@ type IdentityProviderSpec struct {
 	ImageName     string                       `json:"imageName"`
 	ImageTag      string                       `json:"imageTag"`
 	Resources     *corev1.ResourceRequirements `json:"resources,omitempty"`
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	Replicas *int32 `json:"replicas,omitempty"`
 }
 
 type IdentityManagerSpec struct {
@@ -111,6 +117,9 @@ type IdentityManagerSpec struct {
 	ImageTag        string                       `json:"imageTag"`
 	MasterNodesList string                       `json:"masterNodesList"`
 	Resources       *corev1.ResourceRequirements `json:"resources,omitempty"`
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	Replicas *int32 `json:"replicas,omitempty"`
 }
 
 type InitMongodbSpec struct {

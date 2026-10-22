@@ -89,6 +89,10 @@ spec:
                     type: string
                   ldapsCACert:
                     type: string
+                  replicas:
+                    format: int32
+                    minimum: 1
+                    type: integer
                   resources:
                     description: ResourceRequirements describes the compute resource
                       requirements.
@@ -346,6 +350,10 @@ spec:
                     type: string
                   masterNodesList:
                     type: string
+                  replicas:
+                    format: int32
+                    minimum: 1
+                    type: integer
                   resources:
                     description: ResourceRequirements describes the compute resource
                       requirements.
@@ -387,6 +395,10 @@ spec:
                     type: string
                   imageTag:
                     type: string
+                  replicas:
+                    format: int32
+                    minimum: 1
+                    type: integer
                   resources:
                     description: ResourceRequirements describes the compute resource
                       requirements.

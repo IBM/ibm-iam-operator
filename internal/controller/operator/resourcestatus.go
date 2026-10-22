@@ -73,7 +73,9 @@ func (r *AuthenticationReconciler) setAuthenticationStatus(ctx context.Context, 
 		return
 	}
 	authCR.Status.Service = calculatedStatus
-	expectedPodCount := int(authCR.Spec.Replicas) * 3
+	expectedPodCount := int(effectiveReplicas(authCR.Spec.Replicas, authCR.Spec.AuthService.Replicas)) +
+		int(effectiveReplicas(authCR.Spec.Replicas, authCR.Spec.IdentityProvider.Replicas)) +
+		int(effectiveReplicas(authCR.Spec.Replicas, authCR.Spec.IdentityManager.Replicas))
 	if len(nodes) != expectedPodCount {
 		debugLog.Info("Number of nodes did not match expected count", "expected", expectedPodCount)
 		authCR.Status.Service.Status = ResourceNotReadyState

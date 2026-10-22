@@ -213,6 +213,19 @@ spec:
                           type: string
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
+                  cpuRateLimit:
+                    description: CpuRateLimit sets a CPU usage rate limit applied
+                      to IAM service containers. Valid values are "1"-"100" or
+                      "disable" (case-insensitive). Leave unset to apply no rate
+                      limit.
+                    pattern: ^([1-9][0-9]?|100|[Dd][Ii][Ss][Aa][Bb][Ll][Ee])?$
+                    type: string
+                  httpProxy:
+                    description: HTTPProxy sets the HTTP proxy URL.
+                    type: string
+                  httpsProxy:
+                    description: HTTPSProxy sets the HTTPS proxy URL.
+                    type: string
                   defaultAdminPassword:
                     type: string
                   defaultAdminUser:
@@ -285,6 +298,9 @@ spec:
                     description: 'IdMgmtWorkers specifies the number of nodejs worker threads for platform-identity-management pods. Must be either "auto" or a numeric string from "1" to "100".'
                     type: string
                     pattern: '^(auto|([1-9][0-9]?|100))$'
+                  disableCertAuthRoute:
+                    description: 'DisableCertAuthRoute when set to true disables the creation of the im-certauth-passthrough Route. Defaults to false.'
+                    type: boolean
                 required:
                 - authUniqueHosts
                 - clusterCADomain

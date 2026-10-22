@@ -594,7 +594,11 @@ func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.A
 					CACertificate:                 caCrt,
 				},
 			},
-			IMCrtAuthRouteName: {
+		}
+
+		// Only include the certauth passthrough route when it is not disabled
+		if !authCR.ShouldDisableCertAuthRoute() {
+			(*allRoutesFields)[IMCrtAuthRouteName] = &reconcileRouteFields{
 				Annotations: map[string]string{
 					"haproxy.router.openshift.io/balance": "source",
 				},
@@ -606,7 +610,7 @@ func (r *AuthenticationReconciler) getAllRoutesFields(authCR *operatorv1alpha1.A
 					Termination:                   routev1.TLSTerminationPassthrough,
 					InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
 				},
-			},
+			}
 		}
 
 		for _, routeFields := range *allRoutesFields {

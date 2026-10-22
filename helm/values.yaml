@@ -17,23 +17,27 @@ global:
   imagePullPrefix: icr.io
   imagePullSecret: ibm-entitlement-key
   imagePullPolicy: IfNotPresent
+  # enforceLeastPrivilege removes the events RBAC permission and disables
+  # Kubernetes Event emission in the operator. Set to true for deployments
+  # that require a stricter security posture.
+  enforceLeastPrivilege: false
 # Define tethered namespaces here, e.g.:
 # tetheredNamespaces:
 #   - tenant1
 #   - tenant2
 operator:
-  imageTag: "4.18.1"
+  imageTag: "4.18.4"
 operands:
   platformIdentityProvider:
-    imageTag: "4.18.1"
+    imageTag: "4.18.4"
   platformAuthService:
-    imageTag: "4.18.1"
+    imageTag: "4.18.4"
   platformIdentityManagement:
-    imageTag: "4.18.1"
+    imageTag: "4.18.4"
   imInitContainer:
-    imageTag: "4.18.1"
+    imageTag: "4.18.4"
   imDBMigrator:
-    imageTag: "4.18.1"
+    imageTag: "4.18.4"
 #common ui specific
 # Enabling this sets WATCH_NAMESPACE to look for namespace-scope ConfigMap for
 # the list of namespaces. Disabling generates the comma-separated list based upon

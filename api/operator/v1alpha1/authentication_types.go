@@ -49,6 +49,18 @@ type AuthenticationSpec struct {
 	Config                        ConfigSpec             `json:"config"`
 	EnableInstanaMetricCollection bool                   `json:"enableInstanaMetricCollection,omitempty"`
 	AutoScaleConfig               bool                   `json:"autoScaleConfig,omitempty"`
+
+	// NodeSelector constrains which nodes IM pods are eligible to run on.
+	// When set, the map is applied as-is to every Deployment and Job pod spec
+	// created by this operator.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Tolerations allow IM pods to be scheduled onto nodes with matching taints.
+	// The values provided here are appended to the operator's built-in default
+	// tolerations (dedicated/NoSchedule and CriticalAddonsOnly).
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
 type AuditServiceSpec struct {
@@ -157,7 +169,8 @@ type ConfigSpec struct {
 	SaasClientRedirectUrl       string              `json:"saasClientRedirectUrl,omitempty"`
 	NONCEEnabled                bool                `json:"nonceEnabled"`
 	XFrameDomain                string              `json:"xframeDomain,omitempty"`
-	PreferredLogin              string              `json:"preferredLogin,omitempty"`
+	PreferredLogin              *string             `json:"preferredLogin,omitempty"`
+	PreferredLoginIdp           []string            `json:"preferredLoginIdp,omitempty"`
 	DefaultLogin                string              `json:"defaultLogin,omitempty"`
 	ROKSURL                     string              `json:"roksURL"`
 	ROKSUserPrefix              string              `json:"roksUserPrefix"`
@@ -182,6 +195,10 @@ type ConfigSpec struct {
 	LDAPAllowlistEnabled        *bool               `json:"ldapAllowlistEnabled,omitempty"`
 	IdPrvdrWorkers              *string             `json:"idPrvdrWorkers,omitempty"`
 	IdMgmtWorkers               *string             `json:"idMgmtWorkers,omitempty"`
+	DisableCertAuthRoute        bool                `json:"disableCertAuthRoute,omitempty"`
+	CpuRateLimit                *string             `json:"cpuRateLimit,omitempty"`
+	HTTPProxy                   *string             `json:"httpProxy,omitempty"`
+	HTTPSProxy                  *string             `json:"httpsProxy,omitempty"`
 }
 
 type ManagedResourceStatus struct {
@@ -224,15 +241,36 @@ func (a *Authentication) SetService(ctx context.Context, service ServiceStatus, 
 	return nil
 }
 
+// DependencyTime records the wait time for a single immediate dependency.
+type DependencyTime struct {
+	Component          string      `json:"component"`
+	StartTime          metav1.Time `json:"startTime"`
+	ReadyTime          metav1.Time `json:"readyTime"`
+	DependencyDuration string      `json:"dependencyDuration"`
+}
+
+// OperationTimingEntry records timing for a single end-to-end operation
+// (install, upgrade, or patch).
+type OperationTimingEntry struct {
+	StartTime      metav1.Time      `json:"startTime"`
+	EndTime        metav1.Time      `json:"endTime"`
+	TotalDuration  string           `json:"totalDuration"`
+	Phase          string           `json:"phase"`
+	DependencyTime []DependencyTime `json:"dependencyTime,omitempty"`
+}
+
 // AuthenticationStatus defines the observed state of Authentication
 type AuthenticationStatus struct {
-	Nodes      []string           `json:"nodes"`
-	Service    ServiceStatus      `json:"service,omitempty"`
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	Nodes            []string               `json:"nodes"`
+	Service          ServiceStatus          `json:"service,omitempty"`
+	Conditions       []metav1.Condition     `json:"conditions,omitempty"`
+	OperationTiming  []OperationTimingEntry `json:"operationTiming,omitempty"`
+	Progress         string                 `json:"progress,omitempty"`
+	ProgressMessage  string                 `json:"progressMessage,omitempty"`
+	ReconcileHistory []string               `json:"reconcileHistory,omitempty"`
 }
 
 const ConditionMigrationsRunning = "MigrationsRunning"
-
 const ConditionMigrated string = "MigrationsPerformed"
 const MessageMigrationSuccess string = "All migrations completed successfully"
 const MessageMigrationInProgress string = "Migrations are currently being performed; monitor progress in the IM Operator \"migration_worker\" logs"
@@ -386,6 +424,14 @@ func (a *Authentication) ShouldManageRoutes() bool {
 // Returns true when .spec.config.ingress.gvk is set to "none".
 func (a *Authentication) ShouldRemoveRoutes() bool {
 	return !a.ShouldManageRoutes()
+}
+
+// ShouldDisableCertAuthRoute returns true when the certauth passthrough Route
+// (im-certauth-passthrough) should not be created or should be removed.
+// Returns true when .spec.config.disableCertAuthRoute is explicitly set to true.
+// Defaults to false, meaning the route is created by default.
+func (a *Authentication) ShouldDisableCertAuthRoute() bool {
+	return a.Spec.Config.DisableCertAuthRoute
 }
 
 func (a *Authentication) GetDBSchemaVersion() string {

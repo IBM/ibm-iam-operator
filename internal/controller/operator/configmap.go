@@ -37,6 +37,7 @@ import (
 	"github.com/IBM/ibm-iam-operator/internal/controller/common"
 	"github.com/opdev/subreconciler"
 	routev1 "github.com/openshift/api/route/v1"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -379,6 +380,7 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"SCOPE_CLAIM",
 			"NONCE_ENABLED",
 			"PREFERRED_LOGIN",
+			"PREFERRED_LOGIN_IDP",
 			"OIDC_ISSUER_URL",
 			"PROVIDER_ISSUER_URL",
 			"CLUSTER_NAME",
@@ -450,6 +452,8 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"LDAP_CTX_POOL_PREFERREDSIZE"),
 		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("MASTER_PATH")),
 			"MASTER_PATH"),
+		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("SCIM_SERVER_MAX_START_INDEX")),
+			"SCIM_SERVER_MAX_START_INDEX"),
 	}
 
 	if v, ok := generated.Data["IS_OPENSHIFT_ENV"]; ok {
@@ -621,6 +625,22 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 			}
 		}
 
+		var preferredLogin string
+		if authCR.Spec.Config.PreferredLogin != nil {
+			preferredLogin = *authCR.Spec.Config.PreferredLogin
+		}
+
+		preferredLoginIdp := strings.Join(authCR.Spec.Config.PreferredLoginIdp, ",")
+
+		// When both preferredLogin and preferredLoginIdp are set, PREFERRED_LOGIN_IDP takes
+		// precedence over PREFERRED_LOGIN.
+		if preferredLogin != "" && preferredLoginIdp != "" {
+			reqLogger.V(1).Info("Both spec.config.preferredLogin and spec.config.preferredLoginIdp are set; "+
+				"PREFERRED_LOGIN_IDP takes precedence over PREFERRED_LOGIN",
+				"preferredLogin", preferredLogin,
+				"preferredLoginIdp", authCR.Spec.Config.PreferredLoginIdp)
+		}
+
 		*generated = corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      s.GetName(),
@@ -665,7 +685,8 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"SCOPE_CLAIM":                        authCR.Spec.Config.ScopeClaim,
 				"BOOTSTRAP_USERID":                   bootStrapUserId,
 				"PROVIDER_ISSUER_URL":                authCR.Spec.Config.ProviderIssuerURL,
-				"PREFERRED_LOGIN":                    authCR.Spec.Config.PreferredLogin,
+				"PREFERRED_LOGIN":                    preferredLogin,
+				"PREFERRED_LOGIN_IDP":                preferredLoginIdp,
 				"DEFAULT_LOGIN":                      authCR.Spec.Config.DefaultLogin,
 				"LIBERTY_TOKEN_LENGTH":               "1024",
 				"OS_TOKEN_LENGTH":                    "51",
@@ -703,6 +724,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"SCIM_LDAP_SEARCH_SIZE_LIMIT":        "4500",
 				"SCIM_LDAP_SEARCH_TIME_LIMIT":        "10",
 				"SCIM_ASYNC_PARALLEL_LIMIT":          "100",
+				"SCIM_SERVER_MAX_START_INDEX":        "5000",
 				"SCIM_GET_DISPLAY_FOR_GROUP_USERS":   "true",
 				"SCIM_AUTH_CACHE_MAX_SIZE":           "1000",
 				"SCIM_AUTH_CACHE_TTL_VALUE":          "60",
@@ -896,9 +918,45 @@ func getHostFromDummyRoute(ctx context.Context, cl client.Client, authCR *operat
 	return
 }
 
-// GetAppsDomain obtains the OCP appsDomain by attempting to create a dummy Route in the services namespace.
+// CanAccessRoute checks via a SelfSubjectAccessReview whether the operator SA
+// has the given permission (verb) on Routes in the specified namespace.
+// It uses cl.Create on the SSAR resource — safe on any client.Client including
+// the cached one — so it never primes a cache informer for Route objects.
+func CanAccessRoute(ctx context.Context, cl client.Client, namespace, verb string) (allowed bool, err error) {
+	ssar := &authorizationv1.SelfSubjectAccessReview{
+		Spec: authorizationv1.SelfSubjectAccessReviewSpec{
+			ResourceAttributes: &authorizationv1.ResourceAttributes{
+				Namespace: namespace,
+				Verb:      verb,
+				Group:     "route.openshift.io",
+				Resource:  "routes",
+			},
+		},
+	}
+	if err = cl.Create(ctx, ssar); err != nil {
+		return false, fmt.Errorf("failed to check Route %s permission: %w", verb, err)
+	}
+	return ssar.Status.Allowed, nil
+}
+
+// GetAppsDomain obtains the OCP appsDomain by attempting to create a dummy
+// Route in the services namespace.  Before doing any Route API call it checks
+// whether the operator SA has list permission on Routes via a
+// SelfSubjectAccessReview so that no cache informer is ever primed for Route
+// objects when the SA lacks list/watch permissions.
 func GetAppsDomain(cl client.Client, ctx context.Context, authCR *operatorv1alpha1.Authentication) (domain string, err error) {
 	reqLogger := logf.FromContext(ctx)
+
+	// Guard: check list permission before touching the Route API.
+	allowed, err := CanAccessRoute(ctx, cl, authCR.Namespace, "list")
+	if err != nil {
+		reqLogger.V(1).Info("Could not determine Route list permission; skipping apps domain detection", "reason", err.Error())
+		return "", nil
+	}
+	if !allowed {
+		reqLogger.V(1).Info("Operator does not have permission to list Routes; cannot determine apps domain from Routes")
+		return "", nil
+	}
 
 	commonLabel := map[string]string{"app": "im"}
 	routeLabels := common.MergeMap(commonLabel, authCR.Spec.Labels)
@@ -910,20 +968,22 @@ func GetAppsDomain(cl client.Client, ctx context.Context, authCR *operatorv1alph
 	}
 
 	if err = cl.List(ctx, imRoutes, listOpts...); err != nil {
-		if k8sErrors.IsNotFound(err) {
-			// Route not found, continue to try dummy route
-		} else if meta.IsNoMatchError(err) || runtime.IsNotRegisteredError(err) {
-			// Route API not available in scheme (no permissions or not OpenShift)
-			reqLogger.V(1).Info("Route API not available; cannot determine apps domain from Routes")
-			return "", nil
-		} else {
-			reqLogger.Error(err, "Failed to list Routes")
-			return
-		}
+		reqLogger.Error(err, "Failed to list Routes")
+		return
 	}
 
 	var host string
 	if len(imRoutes.Items) == 0 {
+		// Guard: check create permission before attempting to create the dummy Route.
+		allowed, err = CanAccessRoute(ctx, cl, authCR.Namespace, "create")
+		if err != nil {
+			reqLogger.V(1).Info("Could not determine Route create permission; skipping dummy Route", "reason", err.Error())
+			return "", nil
+		}
+		if !allowed {
+			reqLogger.V(1).Info("Operator does not have permission to create Routes; cannot determine apps domain from dummy Route")
+			return "", nil
+		}
 		if host, err = getHostFromDummyRoute(ctx, cl, authCR); err != nil {
 			if meta.IsNoMatchError(err) || runtime.IsNotRegisteredError(err) {
 				// Route API not available in scheme

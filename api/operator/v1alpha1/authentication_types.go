@@ -197,6 +197,7 @@ type ConfigSpec struct {
 	IdMgmtWorkers               *string             `json:"idMgmtWorkers,omitempty"`
 	DisableCertAuthRoute        bool                `json:"disableCertAuthRoute,omitempty"`
 	CpuRateLimit                *string             `json:"cpuRateLimit,omitempty"`
+	DBSSLMode                   *string             `json:"dbSSLMode,omitempty"`
 	HTTPProxy                   *string             `json:"httpProxy,omitempty"`
 	HTTPSProxy                  *string             `json:"httpsProxy,omitempty"`
 }
@@ -486,4 +487,13 @@ func (a *Authentication) IsLDAPAllowlistEnabled() bool {
 		return true
 	}
 	return *a.Spec.Config.LDAPAllowlistEnabled
+}
+
+// GetDBSSLMode returns the configured SSL mode for PostgreSQL connections.
+// Returns the spec value when explicitly set, otherwise defaults to "require".
+func (a *Authentication) GetDBSSLMode() string {
+	if a.Spec.Config.DBSSLMode != nil && *a.Spec.Config.DBSSLMode != "" {
+		return *a.Spec.Config.DBSSLMode
+	}
+	return "require"
 }

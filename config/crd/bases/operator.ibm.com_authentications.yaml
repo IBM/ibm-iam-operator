@@ -205,6 +205,13 @@ spec:
                       limit.
                     pattern: ^([1-9][0-9]?|100|[Dd][Ii][Ss][Aa][Bb][Ll][Ee])?$
                     type: string
+                  dbSSLMode:
+                    description: DBSSLMode sets the SSL mode used for PostgreSQL
+                      connections. Written to DB_SSL_MODE in the platform-auth-idp
+                      ConfigMap. Supported values are "require", "verify-ca" and
+                      "verify-full". Defaults to "require".
+                    pattern: ^(require|verify-ca|verify-full)?$
+                    type: string
                   httpProxy:
                     description: HTTPProxy sets the HTTP proxy URL.
                     type: string

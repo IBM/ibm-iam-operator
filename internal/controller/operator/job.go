@@ -825,7 +825,7 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 						},
 					},
 					Volumes:    buildMigratorVolumes(needsMongoDBMigration, edbspc.Name, zenInstanceID),
-					Containers: buildMigratorContainer(s, authCR, image, resources, mongoHost, zenInstanceID),
+					Containers: buildMigratorContainer(s, image, resources, mongoHost, zenInstanceID),
 				},
 			},
 		},
@@ -854,7 +854,8 @@ func generateMigratorJobObject(s common.SecondaryReconciler, ctx context.Context
 	return
 }
 
-func buildMigratorContainer(s common.SecondaryReconciler, authCR *operatorv1alpha1.Authentication, image string, resources *corev1.ResourceRequirements, mongoHost string, zenInstanceID string) (containers []corev1.Container) {
+func buildMigratorContainer(s common.SecondaryReconciler, image string, resources *corev1.ResourceRequirements, mongoHost string, zenInstanceID string) (containers []corev1.Container) {
+	authCR := s.GetPrimary().(*operatorv1alpha1.Authentication)
 	container := corev1.Container{
 		Name:            s.GetName(),
 		Image:           image,

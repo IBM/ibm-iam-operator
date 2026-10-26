@@ -105,6 +105,16 @@ func (r *AuthenticationReconciler) handleDatabaseOperandRequest(ctx context.Cont
 		return
 	}
 
+	var usingExternalDB bool
+	if usingExternalDB, err = r.isConfiguredForExternalDB(debugCtx, authCR); err != nil {
+		log.Error(err, "Unexpected error was encountered while attempting to determine whether external DB is configured")
+		return subreconciler.RequeueWithError(err)
+	}
+	if usingExternalDB {
+		log.Info("External DB is configured; skipping creation of im-needs-database OperandRequest")
+		return subreconciler.ContinueReconciling()
+	}
+
 	desiredOperands := []operatorv1alpha1.Operand{}
 
 	if err = r.addEmbeddedDBIfNeeded(debugCtx, authCR, &desiredOperands); err != nil {

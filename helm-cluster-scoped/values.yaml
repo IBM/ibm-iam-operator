@@ -1,4 +1,15 @@
 cpfs:
+  # grantOpenShiftAuthRBAC controls whether the ClusterRole and ClusterRoleBinding that
+  # grant permissions required for use of the OpenShift Authentication IDP (allowing
+  # ibm-iam-operator to manage OpenShift user/group lookup RBAC) are created.
+  # Must be a YAML boolean. The string "false" (for example from --set-string) is
+  # treated as true.
+  # Set to false to omit them (for example, when a Cluster Admin manages this RBAC
+  # separately or does not use OpenShift authentication). With false, the Operator
+  # does not create the platform-identity-provider and platform-identity-management
+  # ClusterRoles/ClusterRoleBindings, so OpenShift user and group lookups need those
+  # roles to be provisioned separately.
+  grantOpenShiftAuthRBAC: true
   imageRegistryNamespaceOperator: cpopen
   imageRegistryNamespaceOperand: cpopen/cpfs
-  labels:
+  labels: {}

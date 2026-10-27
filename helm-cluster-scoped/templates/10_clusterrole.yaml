@@ -1,3 +1,9 @@
+{{- $cpfs := default dict .Values.cpfs -}}
+{{- $grantOpenShiftAuthRBAC := true -}}
+{{- if hasKey $cpfs "grantOpenShiftAuthRBAC" -}}
+  {{- $grantOpenShiftAuthRBAC = $cpfs.grantOpenShiftAuthRBAC -}}
+{{- end -}}
+{{- if $grantOpenShiftAuthRBAC }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -47,3 +53,4 @@ rules:
   verbs:
   - get
   - list
+{{- end }}

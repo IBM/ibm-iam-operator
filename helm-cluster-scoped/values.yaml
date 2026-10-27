@@ -2,3 +2,5 @@ cpfs:
   imageRegistryNamespaceOperator: cpopen
   imageRegistryNamespaceOperand: cpopen/cpfs
   labels:
+global:
+  operatorNamespace: cpfs-operators

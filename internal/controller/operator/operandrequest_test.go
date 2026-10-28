@@ -613,7 +613,7 @@ var _ = Describe("getMongoDBOperatorOperand", func() {
 					NamespacedName: client.ObjectKeyFromObject(authCR),
 				})
 				Expect(err).ToNot(HaveOccurred())
-				Expect(result).ToNot(BeNil())
+				Expect(result).To(BeNil())
 
 				By("verifying im-needs-database was NOT created")
 				opReq := &operatorv1alpha1.OperandRequest{}

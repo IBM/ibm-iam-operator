@@ -212,13 +212,6 @@ spec:
                         type: array
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
-                  dbSSLMode:
-                    description: DBSSLMode sets the SSL mode used for PostgreSQL connections.
-                      Written to DB_SSL_MODE in the platform-auth-idp ConfigMap. Supported
-                      values are "require", "verify-ca" and "verify-full". Defaults
-                      to "require".
-                    pattern: ^(require|verify-ca|verify-full)?$
-                    type: string
                   defaultAdminPassword:
                     type: string
                   defaultAdminUser:

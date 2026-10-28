@@ -489,11 +489,27 @@ func (a *Authentication) IsLDAPAllowlistEnabled() bool {
 	return *a.Spec.Config.LDAPAllowlistEnabled
 }
 
-// GetDBSSLMode returns the configured SSL mode for PostgreSQL connections.
-// Returns the spec value when explicitly set, otherwise defaults to "require".
-func (a *Authentication) GetDBSSLMode() string {
-	if a.Spec.Config.DBSSLMode != nil && *a.Spec.Config.DBSSLMode != "" {
-		return *a.Spec.Config.DBSSLMode
+// DefaultDBSSLMode is the SSL mode used for PostgreSQL connections when none, or an
+// unsupported one, is configured.
+const DefaultDBSSLMode = "require"
+
+// NormalizeDBSSLMode returns mode if it is one of "require", "verify-ca" or
+// "verify-full". Any other value, including the empty string, results in
+// DefaultDBSSLMode.
+func NormalizeDBSSLMode(mode string) string {
+	switch mode {
+	case "require", "verify-ca", "verify-full":
+		return mode
 	}
-	return "require"
+	return DefaultDBSSLMode
+}
+
+// GetDBSSLMode returns the configured SSL mode for PostgreSQL connections.
+// Returns the spec value when it is a supported value ("require", "verify-ca" or
+// "verify-full"), otherwise defaults to "require".
+func (a *Authentication) GetDBSSLMode() string {
+	if a.Spec.Config.DBSSLMode == nil {
+		return DefaultDBSSLMode
+	}
+	return NormalizeDBSSLMode(*a.Spec.Config.DBSSLMode)
 }

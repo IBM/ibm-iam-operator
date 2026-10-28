@@ -878,6 +878,7 @@ var _ = Describe("ConfigMap handling", func() {
 			Entry("defaults to require when unset", nil, "require"),
 			Entry("defaults to require when empty", ptr.To(""), "require"),
 			Entry("uses the configured value", ptr.To("verify-full"), "verify-full"),
+			Entry("falls back to require when the value is unsupported", ptr.To("disable"), "require"),
 		)
 
 		DescribeTable("preserves an existing DB_SSL_MODE from the platform-auth-idp ConfigMap",
@@ -902,7 +903,8 @@ var _ = Describe("ConfigMap handling", func() {
 				Expect(generated.Data).To(HaveKeyWithValue("DB_SSL_MODE", expected))
 			},
 			Entry("reuses the existing value when the CR does not set dbSSLMode", nil, "verify-ca", "verify-ca"),
-			Entry("reuses the existing value when the CR dbSSLMode is empty", ptr.To(""), "disable", "disable"),
+			Entry("reuses the existing value when the CR dbSSLMode is empty", ptr.To(""), "verify-full", "verify-full"),
+			Entry("falls back to require when the existing value is unsupported", nil, "disable", "require"),
 			Entry("falls back to require when the existing value is empty", nil, "", "require"),
 			Entry("prefers the CR value over the existing value", ptr.To("verify-full"), "disable", "verify-full"),
 		)

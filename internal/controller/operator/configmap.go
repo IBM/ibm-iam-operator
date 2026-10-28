@@ -1526,9 +1526,11 @@ func getSAMLJobResult(cl client.Client, ctx context.Context, namespace string) (
 // .spec.config.dbSSLMode on the Authentication CR takes precedence. Otherwise, a
 // DB_SSL_MODE already present in the platform-auth-idp ConfigMap (e.g., from a prior
 // release) is preserved. If neither exists, the default from GetDBSSLMode is used.
+// The result is always one of "require", "verify-ca" or "verify-full"; any other
+// value is replaced with "require".
 func resolveDBSSLMode(ctx context.Context, c client.Reader, authCR *operatorv1alpha1.Authentication) (string, error) {
 	if authCR.Spec.Config.DBSSLMode != nil && *authCR.Spec.Config.DBSSLMode != "" {
-		return *authCR.Spec.Config.DBSSLMode, nil
+		return operatorv1alpha1.NormalizeDBSSLMode(*authCR.Spec.Config.DBSSLMode), nil
 	}
 	cm := &corev1.ConfigMap{}
 	cmKey := types.NamespacedName{Name: "platform-auth-idp", Namespace: authCR.Namespace}
@@ -1538,7 +1540,7 @@ func resolveDBSSLMode(ctx context.Context, c client.Reader, authCR *operatorv1al
 		return "", err
 	}
 	if v := cm.Data["DB_SSL_MODE"]; v != "" {
-		return v, nil
+		return operatorv1alpha1.NormalizeDBSSLMode(v), nil
 	}
 	return authCR.GetDBSSLMode(), nil
 }

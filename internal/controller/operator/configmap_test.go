@@ -856,6 +856,58 @@ var _ = Describe("ConfigMap handling", func() {
 				}
 			}
 		})
+		DescribeTable("sets DB_SSL_MODE from the Authentication CR",
+			func(dbSSLMode *string, expected string) {
+				cr := authCR.DeepCopy()
+				cr.Spec.Config.DBSSLMode = dbSSLMode
+				resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+					WithName("platform-auth-idp").
+					WithNamespace(cr.Namespace).
+					WithClient(cl).
+					WithPrimary(cr).MustBuild()
+				generated := &corev1.ConfigMap{}
+				Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+				Expect(generated.Data).To(HaveKeyWithValue("DB_SSL_MODE", expected))
+
+				observed := getObserved(cr.Namespace)
+				observed.Data["DB_SSL_MODE"] = "stale"
+				_, err := updatePlatformAuthIDP(resource, ctx, observed, generated)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(observed.Data).To(HaveKeyWithValue("DB_SSL_MODE", expected))
+			},
+			Entry("defaults to require when unset", nil, "require"),
+			Entry("defaults to require when empty", ptr.To(""), "require"),
+			Entry("uses the configured value", ptr.To("verify-full"), "verify-full"),
+			Entry("falls back to require when the value is unsupported", ptr.To("disable"), "require"),
+		)
+
+		DescribeTable("preserves an existing DB_SSL_MODE from the platform-auth-idp ConfigMap",
+			func(dbSSLMode *string, existing string, expected string) {
+				cr := authCR.DeepCopy()
+				cr.Spec.Config.DBSSLMode = dbSSLMode
+				existingCM := &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{Name: "platform-auth-idp", Namespace: cr.Namespace},
+					Data:       map[string]string{"DB_SSL_MODE": existing, "MASTER_PATH": ""},
+				}
+				Expect(cl.Create(ctx, existingCM)).To(Succeed())
+				DeferCleanup(func() {
+					Expect(cl.Delete(ctx, existingCM)).To(Succeed())
+				})
+				resource := ctrlcommon.NewSecondaryReconcilerBuilder[*corev1.ConfigMap]().
+					WithName("platform-auth-idp").
+					WithNamespace(cr.Namespace).
+					WithClient(cl).
+					WithPrimary(cr).MustBuild()
+				generated := &corev1.ConfigMap{}
+				Expect(r.generateAuthIdpConfigMap(ibmcloudClusterInfo)(resource, ctx, generated)).To(Succeed())
+				Expect(generated.Data).To(HaveKeyWithValue("DB_SSL_MODE", expected))
+			},
+			Entry("reuses the existing value when the CR does not set dbSSLMode", nil, "verify-ca", "verify-ca"),
+			Entry("reuses the existing value when the CR dbSSLMode is empty", ptr.To(""), "verify-full", "verify-full"),
+			Entry("falls back to require when the existing value is unsupported", nil, "disable", "require"),
+			Entry("falls back to require when the existing value is empty", nil, "", "require"),
+			Entry("prefers the CR value over the existing value", ptr.To("verify-full"), "disable", "verify-full"),
+		)
 
 		It("sets fields when the values do not match the expected value", func() {
 			updateOnNotUpToDate := []struct {

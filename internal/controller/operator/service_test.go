@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -215,14 +214,13 @@ var _ = Describe("Service handling", func() {
 		})
 
 		// ─────────────────────────────────────────────────────────────────
-		// platform-auth-service-headless: 4 cases
+		// platform-auth-service-headless: created by default in all configurations
 		// ─────────────────────────────────────────────────────────────────
 		Describe("platform-auth-service-headless", func() {
 
-			// Case 1: zenFrontDoor=true AND gvk=none → create headless service
-			Context("Case 1: zenFrontDoor=true and gvk=none", func() {
+			Context("by default when zenFrontDoor is false and gvk is unset", func() {
 				BeforeEach(func() {
-					authCR = newAuthCR(true, ptr.To(gvkNone))
+					authCR = newAuthCR(false, nil)
 					setupReconciler(authCR)
 				})
 
@@ -255,6 +253,15 @@ var _ = Describe("Service handling", func() {
 					Expect(svc.Spec.Ports[0].Port).To(BeEquivalentTo(9443))
 				})
 
+				It("creates platform-auth-service-headless without SessionAffinity ClientIP", func() {
+					result, err := r.handleServices(ctx, req)
+					testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
+
+					svc, err := getService(headlessServiceName)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(svc.Spec.SessionAffinity).NotTo(Equal(corev1.ServiceAffinityClientIP))
+				})
+
 				It("is idempotent: second reconcile succeeds without re-creating the service", func() {
 					_, _ = r.handleServices(ctx, req)    // first: creates
 					_, err := r.handleServices(ctx, req) // second: no-op drift
@@ -266,106 +273,52 @@ var _ = Describe("Service handling", func() {
 				})
 			})
 
-			// Case 2: zenFrontDoor=true BUT gvk removed/changed → delete headless service
-			Context("Case 2: zenFrontDoor=true but gvk is unset (removed)", func() {
+			Context("when zenFrontDoor is true and gvk is none", func() {
 				BeforeEach(func() {
-					// Pre-create the headless service as if it existed from Case 1.
-					existingHeadless := &corev1.Service{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:            headlessServiceName,
-							Namespace:       namespace,
-							ResourceVersion: trackerAddResourceVersion,
-						},
-						Spec: corev1.ServiceSpec{
-							ClusterIP: "None",
-							Selector:  map[string]string{"k8s-app": "platform-auth-service"},
-							Ports:     []corev1.ServicePort{{Name: "p9443", Port: 9443}},
-						},
-					}
-					// gvk is nil (not set) → ShouldRemoveRoutes() returns false
-					authCR = newAuthCR(true, nil)
-					setupReconciler(authCR, existingHeadless)
-				})
-
-				It("deletes platform-auth-service-headless", func() {
-					result, err := r.handleServices(ctx, req)
-					testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
-
-					_, err = getService(headlessServiceName)
-					Expect(k8sErrors.IsNotFound(err)).To(BeTrue(),
-						"expected platform-auth-service-headless to have been deleted")
-				})
-			})
-
-			// Case 3: zenFrontDoor=false AND gvk=none → delete headless service
-			Context("Case 3: zenFrontDoor=false and gvk=none", func() {
-				BeforeEach(func() {
-					existingHeadless := &corev1.Service{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:            headlessServiceName,
-							Namespace:       namespace,
-							ResourceVersion: trackerAddResourceVersion,
-						},
-						Spec: corev1.ServiceSpec{
-							ClusterIP: "None",
-							Selector:  map[string]string{"k8s-app": "platform-auth-service"},
-							Ports:     []corev1.ServicePort{{Name: "p9443", Port: 9443}},
-						},
-					}
-					authCR = newAuthCR(false, ptr.To(gvkNone))
-					setupReconciler(authCR, existingHeadless)
-				})
-
-				It("deletes platform-auth-service-headless", func() {
-					result, err := r.handleServices(ctx, req)
-					testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
-
-					_, err = getService(headlessServiceName)
-					Expect(k8sErrors.IsNotFound(err)).To(BeTrue(),
-						"expected platform-auth-service-headless to have been deleted")
-				})
-			})
-
-			// Case 4: zenFrontDoor=false AND gvk=ocp route → delete headless service
-			Context("Case 4: zenFrontDoor=false and gvk=ocp-route", func() {
-				BeforeEach(func() {
-					existingHeadless := &corev1.Service{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:            headlessServiceName,
-							Namespace:       namespace,
-							ResourceVersion: trackerAddResourceVersion,
-						},
-						Spec: corev1.ServiceSpec{
-							ClusterIP: "None",
-							Selector:  map[string]string{"k8s-app": "platform-auth-service"},
-							Ports:     []corev1.ServicePort{{Name: "p9443", Port: 9443}},
-						},
-					}
-					authCR = newAuthCR(false, ptr.To(gvkOCPRoute))
-					setupReconciler(authCR, existingHeadless)
-				})
-
-				It("deletes platform-auth-service-headless", func() {
-					result, err := r.handleServices(ctx, req)
-					testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
-
-					_, err = getService(headlessServiceName)
-					Expect(k8sErrors.IsNotFound(err)).To(BeTrue(),
-						"expected platform-auth-service-headless to have been deleted")
-				})
-			})
-
-			// Cleanup is a no-op when the headless service does not exist
-			Context("when the headless service does not exist and condition is not met", func() {
-				BeforeEach(func() {
-					authCR = newAuthCR(false, nil)
+					authCR = newAuthCR(true, ptr.To(gvkNone))
 					setupReconciler(authCR)
 				})
 
-				It("does not error when there is nothing to delete", func() {
+				It("creates platform-auth-service-headless with ClusterIP: None", func() {
 					result, err := r.handleServices(ctx, req)
+					testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
+
+					svc, err := getService(headlessServiceName)
 					Expect(err).ToNot(HaveOccurred())
-					_ = result // may be nil or requeue depending on other services
+					Expect(svc.Spec.ClusterIP).To(Equal("None"))
+					Expect(svc.Spec.Selector).To(HaveKeyWithValue("k8s-app", "platform-auth-service"))
+				})
+			})
+
+			Context("when zenFrontDoor is true and gvk is unset", func() {
+				BeforeEach(func() {
+					authCR = newAuthCR(true, nil)
+					setupReconciler(authCR)
+				})
+
+				It("still creates platform-auth-service-headless", func() {
+					result, err := r.handleServices(ctx, req)
+					testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
+
+					svc, err := getService(headlessServiceName)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(svc.Spec.ClusterIP).To(Equal("None"))
+				})
+			})
+
+			Context("when zenFrontDoor is false and gvk is ocp-route", func() {
+				BeforeEach(func() {
+					authCR = newAuthCR(false, ptr.To(gvkOCPRoute))
+					setupReconciler(authCR)
+				})
+
+				It("still creates platform-auth-service-headless", func() {
+					result, err := r.handleServices(ctx, req)
+					testutil.ConfirmThatItRequeuesWithDelay(result, err, defaultLowerWait)
+
+					svc, err := getService(headlessServiceName)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(svc.Spec.ClusterIP).To(Equal("None"))
 				})
 			})
 		})

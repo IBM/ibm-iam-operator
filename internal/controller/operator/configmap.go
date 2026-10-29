@@ -401,6 +401,7 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"LDAP_ALLOWLIST_ENABLED",
 			"CSP_FRAME_ANCESTORS",
 			"CSP_CONNECT_SRC",
+			"DB_SSL_MODE",
 		),
 		updatesValuesWhen(observedKeyValueSetTo[*corev1.ConfigMap]("SESSION_TIMEOUT", "43200"),
 			"SESSION_TIMEOUT"),
@@ -428,8 +429,6 @@ func updatePlatformAuthIDP(_ common.SecondaryReconciler, _ context.Context, obse
 			"DB_POOL_MIN_SIZE",
 			"DB_POOL_MAX_SIZE",
 			"SEQL_LOGGING"),
-		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("DB_SSL_MODE")),
-			"DB_SSL_MODE"),
 		updatesValuesWhen(not(observedKeySet[*corev1.ConfigMap]("SCIM_LDAP_ATTRIBUTES_MAPPING")),
 			"SCIM_LDAP_ATTRIBUTES_MAPPING",
 			"SCIM_LDAP_SEARCH_SIZE_LIMIT",
@@ -577,6 +576,13 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 			return
 		}
 
+		var dbSSLMode string
+		if dbSSLMode, err = resolveDBSSLMode(ctx, s.GetClient(), authCR); err != nil {
+			reqLogger.Error(err, "Failed to determine DB_SSL_MODE")
+			err = fmt.Errorf("could not set DB_SSL_MODE: %w", err)
+			return
+		}
+
 		var oauth21Enabled bool
 		if authCR.Spec.Config.OAuth21Enabled != nil {
 			reqLogger.Info("Found OAuth 21 enablement", "OAuth 2.1 enabled", *authCR.Spec.Config.OAuth21Enabled)
@@ -719,7 +725,7 @@ func (r *AuthenticationReconciler) generateAuthIdpConfigMap(clusterInfo *corev1.
 				"DB_CONNECT_MAX_RETRIES":             "5",
 				"DB_POOL_MIN_SIZE":                   "5",
 				"DB_POOL_MAX_SIZE":                   "15",
-				"DB_SSL_MODE":                        "require",
+				"DB_SSL_MODE":                        dbSSLMode,
 				"SEQL_LOGGING":                       "false",
 				"SCIM_LDAP_SEARCH_SIZE_LIMIT":        "4500",
 				"SCIM_LDAP_SEARCH_TIME_LIMIT":        "10",
@@ -1514,6 +1520,29 @@ func getSAMLJobResult(cl client.Client, ctx context.Context, namespace string) (
 	}
 
 	return
+}
+
+// resolveDBSSLMode determines the DB_SSL_MODE value to use. An explicit
+// .spec.config.dbSSLMode on the Authentication CR takes precedence. Otherwise, a
+// DB_SSL_MODE already present in the platform-auth-idp ConfigMap (e.g., from a prior
+// release) is preserved. If neither exists, the default from GetDBSSLMode is used.
+// The result is always one of "require", "verify-ca" or "verify-full"; any other
+// value is replaced with "require".
+func resolveDBSSLMode(ctx context.Context, c client.Reader, authCR *operatorv1alpha1.Authentication) (string, error) {
+	if authCR.Spec.Config.DBSSLMode != nil && *authCR.Spec.Config.DBSSLMode != "" {
+		return operatorv1alpha1.NormalizeDBSSLMode(*authCR.Spec.Config.DBSSLMode), nil
+	}
+	cm := &corev1.ConfigMap{}
+	cmKey := types.NamespacedName{Name: "platform-auth-idp", Namespace: authCR.Namespace}
+	if err := c.Get(ctx, cmKey, cm); k8sErrors.IsNotFound(err) {
+		return authCR.GetDBSSLMode(), nil
+	} else if err != nil {
+		return "", err
+	}
+	if v := cm.Data["DB_SSL_MODE"]; v != "" {
+		return operatorv1alpha1.NormalizeDBSSLMode(v), nil
+	}
+	return authCR.GetDBSSLMode(), nil
 }
 
 func (r *AuthenticationReconciler) getMasterPath(ctx context.Context, namespace string) (path string, err error) {

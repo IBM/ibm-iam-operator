@@ -1,3 +1,9 @@
+{{- $cpfs := default dict .Values.cpfs -}}
+{{- $grantOpenShiftAuthRBAC := true -}}
+{{- if hasKey $cpfs "grantOpenShiftAuthRBAC" -}}
+  {{- $grantOpenShiftAuthRBAC = $cpfs.grantOpenShiftAuthRBAC -}}
+{{- end -}}
+{{- if $grantOpenShiftAuthRBAC }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -24,3 +30,4 @@ roleRef:
     kind: ClusterRole
     name: ibm-iam-operator-{{ .Values.global.operatorNamespace }}
     apiGroup: rbac.authorization.k8s.io
+{{- end }}

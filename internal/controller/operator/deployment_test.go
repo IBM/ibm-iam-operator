@@ -290,4 +290,75 @@ var _ = Describe("Deployment handling", func() {
 			),
 		)
 	})
+
+	Describe("buildIdentityProviderContainer env vars", func() {
+		var authCR *operatorv1alpha1.Authentication
+
+		BeforeEach(func() {
+			authCR = &operatorv1alpha1.Authentication{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "example-authentication",
+					Namespace: "data-ns",
+				},
+				Spec: operatorv1alpha1.AuthenticationSpec{
+					OperatorVersion: "4.0.0",
+					Replicas:        1,
+					Config:          operatorv1alpha1.ConfigSpec{},
+				},
+			}
+		})
+
+		It("includes PREFERRED_LOGIN_IDP sourced from platform-auth-idp configmap", func() {
+			container := buildIdentityProviderContainer(authCR, "identity-provider:latest", "", false)
+
+			var found *v1.EnvVar
+			for i := range container.Env {
+				if container.Env[i].Name == "PREFERRED_LOGIN_IDP" {
+					found = &container.Env[i]
+					break
+				}
+			}
+			Expect(found).NotTo(BeNil(), "PREFERRED_LOGIN_IDP env var should be present")
+			Expect(found.ValueFrom).NotTo(BeNil())
+			Expect(found.ValueFrom.ConfigMapKeyRef).NotTo(BeNil())
+			Expect(found.ValueFrom.ConfigMapKeyRef.Name).To(Equal("platform-auth-idp"))
+			Expect(found.ValueFrom.ConfigMapKeyRef.Key).To(Equal("PREFERRED_LOGIN_IDP"))
+		})
+
+		It("still includes PREFERRED_LOGIN sourced from platform-auth-idp configmap", func() {
+			container := buildIdentityProviderContainer(authCR, "identity-provider:latest", "", false)
+
+			var found *v1.EnvVar
+			for i := range container.Env {
+				if container.Env[i].Name == "PREFERRED_LOGIN" {
+					found = &container.Env[i]
+					break
+				}
+			}
+			Expect(found).NotTo(BeNil(), "PREFERRED_LOGIN env var should be present")
+			Expect(found.ValueFrom).NotTo(BeNil())
+			Expect(found.ValueFrom.ConfigMapKeyRef).NotTo(BeNil())
+			Expect(found.ValueFrom.ConfigMapKeyRef.Name).To(Equal("platform-auth-idp"))
+			Expect(found.ValueFrom.ConfigMapKeyRef.Key).To(Equal("PREFERRED_LOGIN"))
+		})
+
+		It("places PREFERRED_LOGIN_IDP immediately after PREFERRED_LOGIN", func() {
+			container := buildIdentityProviderContainer(authCR, "identity-provider:latest", "", false)
+
+			preferredLoginIdx := -1
+			preferredLoginIdpIdx := -1
+			for i, e := range container.Env {
+				switch e.Name {
+				case "PREFERRED_LOGIN":
+					preferredLoginIdx = i
+				case "PREFERRED_LOGIN_IDP":
+					preferredLoginIdpIdx = i
+				}
+			}
+			Expect(preferredLoginIdx).NotTo(Equal(-1), "PREFERRED_LOGIN should be present")
+			Expect(preferredLoginIdpIdx).NotTo(Equal(-1), "PREFERRED_LOGIN_IDP should be present")
+			Expect(preferredLoginIdpIdx).To(Equal(preferredLoginIdx+1),
+				"PREFERRED_LOGIN_IDP should appear immediately after PREFERRED_LOGIN")
+		})
+	})
 })

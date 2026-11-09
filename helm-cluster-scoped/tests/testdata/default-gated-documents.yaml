@@ -1,0 +1,56 @@
+# Source: ibm-iam-operator-cluster-scoped/templates/10_clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ibm-iam-operator-ibm-common-services
+  namespace: ibm-common-services
+  labels:
+    app.kubernetes.io/instance: ibm-iam-operator
+    app.kubernetes.io/managed-by: ibm-iam-operator
+    app.kubernetes.io/name: ibm-iam-operator
+    component-id: ibm-iam-operator-cluster-scoped
+rules:
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterroles
+  verbs:
+  - create
+  - delete
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterrolebindings
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - delete
+- apiGroups:
+  - user.openshift.io
+  resources:
+  - users
+  - groups
+  - identities
+  verbs:
+  - get
+  - list
+---
+# Source: ibm-iam-operator-cluster-scoped/templates/11_clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ibm-iam-operator-ibm-common-services
+  labels:
+    component-id: ibm-iam-operator-cluster-scoped
+subjects:
+- kind: ServiceAccount
+  name: ibm-iam-operator
+  namespace: ibm-common-services
+roleRef:
+    kind: ClusterRole
+    name: ibm-iam-operator-ibm-common-services
+    apiGroup: rbac.authorization.k8s.io
+
+---

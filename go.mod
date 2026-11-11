@@ -88,6 +88,6 @@ require (
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
-replace golang.org/x/crypto => golang.org/x/crypto v0.57.0
+replace golang.org/x/crypto => golang.org/x/crypto v0.59.0
 
 replace golang.org/x/net => golang.org/x/net v0.62.0

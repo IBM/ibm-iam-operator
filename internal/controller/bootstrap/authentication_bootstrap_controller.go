@@ -258,6 +258,10 @@ func (r *BootstrapReconciler) generateClusterInfo(ctx context.Context, authCR *o
 
 func (r *BootstrapReconciler) setIngressHostnameIfCustomized(ctx context.Context, authCR *operatorv1alpha1.Authentication) (err error) {
 	log := logf.FromContext(ctx)
+	if authCR.HasCustomIngressHostname() {
+		log.Info("Custom ingress hostname already configured on Authentication CR; skipping hostname bootstrapping", "Hostname", *authCR.Spec.Config.Ingress.Hostname)
+		return nil
+	}
 	clusterInfo := &corev1.ConfigMap{}
 	if err = r.Get(ctx, types.NamespacedName{Name: common.IBMCloudClusterInfoCMName, Namespace: authCR.Namespace}, clusterInfo); k8sErrors.IsNotFound(err) {
 		log.Info("Did not find ConfigMap; assume no hostname customization")
@@ -289,8 +293,13 @@ func (r *BootstrapReconciler) setIngressHostnameIfCustomized(ctx context.Context
 // if not found, creates one using the TLS configuration from the console Route
 // so that the existing TLS configuration is preserved through an upgrade.
 func (r *BootstrapReconciler) setIngressSecretIfCustomized(ctx context.Context, authCR *operatorv1alpha1.Authentication) (err error) {
+	log := logf.FromContext(ctx)
+	if authCR.HasCustomIngressCertificate() {
+		log.Info("Custom ingress certificate secret already configured on Authentication CR; skipping secret bootstrapping", "Secret.Name", *authCR.Spec.Config.Ingress.Secret)
+		return nil
+	}
 	customTLSSecretName := "custom-tls-secret"
-	log := logf.FromContext(ctx, "Secret.Name", customTLSSecretName)
+	log = log.WithValues("Secret.Name", customTLSSecretName)
 	secret := &corev1.Secret{}
 	if err = r.Get(ctx, types.NamespacedName{Name: customTLSSecretName, Namespace: authCR.Namespace}, secret); err == nil {
 		if err = validateTLSSecret(secret); err != nil {

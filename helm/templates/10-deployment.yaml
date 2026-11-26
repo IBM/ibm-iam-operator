@@ -35,7 +35,7 @@ metadata:
             "authService": {
               "imageName": "icp-platform-auth",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.17.1",
+              "imageTag": "4.17.2",
               "ldapsCACert": "platform-auth-ldaps-ca-cert",
               "resources": {
                 "limits": {
@@ -106,7 +106,7 @@ metadata:
             "identityManager": {
               "imageName": "icp-identity-manager",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.17.0",
+              "imageTag": "4.17.1",
               "masterNodesList": "10.0.0.1",
               "resources": {
                 "limits": {
@@ -124,7 +124,7 @@ metadata:
             "identityProvider": {
               "imageName": "icp-identity-provider",
               "imageRegistry": "icr.io/cpopen/cpfs",
-              "imageTag": "4.17.0",
+              "imageTag": "4.17.1",
               "resources": {
                 "limits": {
                   "cpu": "1000m",
